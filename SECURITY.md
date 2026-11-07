@@ -1,16 +1,24 @@
 # Security boundaries
 
-This is a synthetic **local reference only**, not a service for real funds or title. It has not received an independent security audit.
+The production surface is an unavailable-registry guard, not a service for real funds or title. It has not received an independent security audit.
+
+## Production isolation
+
+The main CLI/API/MCP import no reference engine, signer, client, store or fixture generator. Their import graph and command/HTTP/RPC rejection behavior are regression-tested. Configuration, backend URLs, supplied files and mode flags cannot enable native naming. Registry readiness is always false; liveness must never be used as a readiness signal.
+
+Production entry points never inspect supplied signer/config files or inherited credentials. The public build imports only availability metadata and selected web assets. It neither generates nor consumes test accounts, balances, deeds, bids or settlement receipts. A structurally valid availability document is not a cryptographic network capability proof; no native network is contacted.
+
+The production HTTP server is loopback-only, bounded by connection/time limits, and rejects registry requests without parsing their bodies. Production MCP advertises only a read-only status tool. No field can activate a registry or simulated fallback.
 
 ## Credentials
 
 Local tests and CI require **no external credentials or manually configured GitHub Secrets**. Test keys are generated at runtime, held in memory or temporary 0600 files outside the repository, and removed by the smoke harness. No live PoA API key, personal token, wallet secret, pinning credential or chain account is used.
 
-The CLI reads a private file only in the local signer process. Keys are never input to the HTTP/MCP service, static UI, signed-intent payload, URL, configuration, Git commit or logs. Do not store real keys in the working tree even if ignored. Ignore rules, artifact checks and Gitleaks are defense in depth, not a guarantee of detecting every secret. Protocol metadata and records are public data; never put credentials or private information there.
+The isolated reference CLI reads a private file only in the local signer process. Keys are never input to the HTTP/MCP service, static UI, signed-intent payload, URL, configuration, Git commit or logs. Do not store real keys in the working tree even if ignored. Ignore rules, artifact checks and Gitleaks are defense in depth, not a guarantee of detecting every secret. Protocol metadata and records are public data; never put credentials or private information there.
 
 Authenticated integrations must receive credentials through GitHub Actions Secrets or a private runtime environment, never frontend files, commits, request parameters, URLs or logs. The current CI only uses the automatic platform checkout context, with read-only permission and no persistent checkout credential. No personal token is supplied to application code, CI tests or scanners.
 
-## Local trust model
+## Isolated reference trust model (not production)
 
 - Genesis configuration is explicit, hash-bound, frozen, and trusted synthetic input. Only `local:` chain IDs and `local-fixture` asset descriptors are accepted. The fixture issuer may announce unsold roots; it has no holder-signature or seizure bypass.
 - The constructor injects an authoritative local clock. HTTP and MCP expose no clock adjustment or funding endpoint. Tests advance a `ManualClock` inside their own process. System clock samples wall time once, then uses monotonic elapsed time. Restart skew/backward execution fails closed.
@@ -27,7 +35,7 @@ Authenticated integrations must receive credentials through GitHub Actions Secre
 
 Keep configuration and local data private and backed up. Do not commit runtime data or test keys. Shutdown closes HTTP and releases `writer.lock.local`. A killed process may leave that lock: verify the recorded process is no longer running and that no other writer owns this directory before an operator removes it. Do not bypass a live lock. Only an unterminated final journal fragment is automatically truncated. A complete corrupt line or changed config manifest fails closed. There is no administrative API for replacing ownership, funds, signatures or journal checks.
 
-## HTTP / static UI
+## Isolated reference HTTP / UI
 
 The server binds `127.0.0.1`, validates Host, rejects browser-origin POSTs, limits request size/time/connections and does not log bodies or raw exceptions. GET CORS is public; state contains no signer keys. The CLI/MCP client accepts only literal loopback HTTP origins with no credentials, path, query, fragment or redirect. No arbitrary fetch proxy exists.
 
@@ -35,8 +43,10 @@ UI content uses `textContent`, never `innerHTML`, eval or embedded executable in
 
 Use GitHub's private vulnerability-reporting channel if the repository enables one. Do not publish secret material in issues.
 
-## Public static Pages demo
+## Public production-only Pages
 
-Only the allowlisted `_site/` assets and engine-derived public fixture JSON are published. The public demo has no backend endpoint, signs/submits nothing, makes only same-origin static GETs and uses a restrictive CSP. Throwaway fixture keys are generated only in memory and discarded. The Pages examples illustrate schemas/digests, are not authorizations, and must not be signed or submitted. Real credentials and existing treasury configuration are not read or referenced by the build, workflow, artifacts or frontend. Builds/tests run with an allowlisted environment (HOME/PATH/LANG), excluding inherited credentials; no environment dumps occur.
+Only seven availability assets are published from `_site/`. There is no fixture JSON, ownership explorer, handoff generator, signer or backend URL. The browser uses textContent and fixed same-origin GET paths only; forged ready/native fields, extra ledger fields, backend overrides and demo mode fail closed. Generated stale demo files are removed after strict path/type checks; unknown files or symlinks stop the build rather than being uploaded or silently deleted.
 
-The trusted-main-only Pages build job has contents-read permission. A separate deployment job has only Pages-write/OIDC-write, checks out no source and runs the pinned official deploy action. Pull-request jobs cannot trigger this deployment or receive these privileges. `_site/` alone is uploaded, never the repository, runtime data, key files, environment files, test evidence or process state.
+Builds/tests run with an allowlisted environment (HOME/PATH/LANG), excluding inherited credentials; no environment dump occurs. Reference fixture keys are generated only by isolated automated tests/local reference tools, never the public build. Test-only static output uses a temporary directory and is removed after browser verification.
+
+The trusted-main-only Pages build job has contents-read permission. The separate deployment job has Pages-write/OIDC-write, checks out no source and runs the pinned official action. Pull-request jobs cannot trigger deployment or receive those privileges. Only `_site/` is uploaded, never reference test output, repository/runtime data, keys, environment files or evidence.

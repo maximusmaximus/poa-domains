@@ -1,13 +1,13 @@
 import { generateKeyPairSync } from "node:crypto";
-import { Engine } from "./engine.js";
-import { ManualClock } from "./clock.js";
-import { Body, DOMAIN, publicPrincipal, signBody } from "./auth.js";
-import { fixtureConfig } from "./config.js";
-import { capabilities, prepare } from "./interface.js";
-import { NORMALIZATION_HASH } from "./names.js";
-import { cidFor } from "./metadata.js";
-import { rightsHash, Rights } from "./model.js";
-import { need } from "./core.js";
+import { Engine } from "../src/engine.js";
+import { ManualClock } from "../src/clock.js";
+import { Body, DOMAIN, publicPrincipal, signBody } from "../src/auth.js";
+import { fixtureConfig } from "../src/config.js";
+import { capabilities, prepare } from "../src/interface.js";
+import { NORMALIZATION_HASH } from "../src/names.js";
+import { cidFor } from "../src/metadata.js";
+import { rightsHash, Rights } from "../src/model.js";
+import { need } from "../src/core.js";
 
 // Uses only newly generated unfunded fixture keys held in memory. No env,
 // secret store, key file, external account, network request or upload is read.

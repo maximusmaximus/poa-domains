@@ -1,25 +1,55 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { publicDemoFixture } from "../src/pages-fixture.js";
-import { prepare } from "../src/interface.js";
-import { canonical, hash } from "../src/core.js";
-import { nameKey } from "../src/names.js";
-import { ACTIONS } from "../src/actions.js";
-test("Pages fixture comes from engine with public-only data, explicit absent backend and all 17 action examples", () => {
-  const f = publicDemoFixture();
-  assert.equal(f.state.stateHash, hash("local-state/v1", f.state.state));
-  for (const entry of Object.values(f.state.state.names))
-    assert.equal(entry.key, nameKey(f.capabilities.registryId, entry.name));
-  assert.equal(f.details.apiEndpoint, null);
-  assert.equal(f.details.keysDiscarded, true);
-  assert.equal(f.capabilities.livePoA, false);
-  assert.equal(f.state.finality, "synthetic-snapshot-not-chain-finality");
-  assert.deepEqual(Object.keys(f.examples).sort(), Object.keys(ACTIONS).sort());
-  for (const x of Object.values(f.examples))
-    assert.ok(prepare(x, f.capabilities));
-  const serialized = canonical(f);
-  assert.doesNotMatch(serialized, /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/);
-  assert.doesNotMatch(serialized, /"(?:privateKey|secret|mnemonic|seed)"/);
-  assert.doesNotMatch(serialized, /https?:\/\/(?:localhost|127\.0\.0\.1)/);
-  assert.equal(Object.values(f.state.state.deeds).length, 3);
+import {
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  mkdirSync,
+  writeFileSync,
+  existsSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { buildProductionBundle, PUBLIC_FILES } from "../src/pages-build.js";
+import { productionStatus } from "../src/production.js";
+
+test("production Pages allowlist contains no fixture ledger, signer, schema handoff or synthetic settlement", () => {
+  const dir = mkdtempSync(join(tmpdir(), "poa-production-pages-test-"));
+  try {
+    mkdirSync(join(dir, "demo"));
+    writeFileSync(join(dir, "demo/state.json"), '{"oldGeneratedFixture":true}');
+    buildProductionBundle(dir);
+    assert.deepEqual(readdirSync(dir).sort(), [...PUBLIC_FILES].sort());
+    assert.equal(existsSync(join(dir, "demo")), false);
+    assert.deepEqual(
+      JSON.parse(readFileSync(join(dir, "status.json"), "utf8")),
+      productionStatus(),
+    );
+    assert.deepEqual(
+      JSON.parse(readFileSync(join(dir, "config.json"), "utf8")),
+      {
+        mode: "production-only",
+        publicApiBase: null,
+        statusFile: "./status.json",
+      },
+    );
+    const app = readFileSync(join(dir, "app.js"), "utf8");
+    assert.doesNotMatch(
+      app,
+      /shared\.js|\/v1\/|makeBody|generateKeyPair|fixtureConfig|localhost|127\.0\.0\.1|innerHTML|eval\(/,
+    );
+    assert.doesNotMatch(
+      readFileSync(join(dir, "index.html"), "utf8"),
+      /<form|<input|<select|<textarea/,
+    );
+    writeFileSync(join(dir, "unexpected.txt"), "not-a-generated-file");
+    assert.throws(
+      () => buildProductionBundle(dir),
+      /UNEXPECTED_BUILD_ARTIFACT/,
+    );
+    assert.equal(existsSync(join(dir, "unexpected.txt")), true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

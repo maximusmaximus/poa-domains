@@ -8,7 +8,7 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setup } from "./helpers.js";
-import { startServer } from "../src/server.js";
+import { startReferenceServer as startServer } from "../src/reference-server.js";
 import { capabilities, prepare } from "../src/interface.js";
 import { intentId } from "../src/auth.js";
 import { ACTIONS } from "../src/actions.js";
@@ -106,7 +106,7 @@ test("API and CLI preserve exact signed body, nonce, receipt and canonical resol
       params: unsigned.params,
     };
     writeFileSync(join(dir, "input.json"), JSON.stringify(input));
-    const cli = resolve("dist/src/cli.js");
+    const cli = resolve("dist/src/reference-cli.js");
     const prepared = JSON.parse(
       (
         await exec(process.execPath, [
@@ -204,14 +204,8 @@ test("API and CLI preserve exact signed body, nonce, receipt and canonical resol
     );
     assert.equal(nonceOut.nonce, c.e.nextNonce(c.alice.id));
     const handoffOut = JSON.parse(
-      (
-        await exec(process.execPath, [
-          cli,
-          "handoff",
-          "--file",
-          unsignedFile,
-        ])
-      ).stdout,
+      (await exec(process.execPath, [cli, "handoff", "--file", unsignedFile]))
+        .stdout,
     );
     assert.equal(handoffOut.intentId, intentId(prepared));
     const stateFile = join(dir, "state-export.json");
@@ -225,7 +219,10 @@ test("API and CLI preserve exact signed body, nonce, receipt and canonical resol
     ]);
     const home = await fetch(s.url + "/");
     assert.equal(home.status, 200);
-    assert.match(home.headers.get("content-security-policy") ?? "", /default-src 'none'/);
+    assert.match(
+      home.headers.get("content-security-policy") ?? "",
+      /default-src 'none'/,
+    );
     if (process.platform !== "win32") {
       const insecureKey = join(dir, "insecure.pem");
       writeFileSync(
@@ -255,7 +252,7 @@ export async function mcp(url: string, messages: any[]): Promise<any[]> {
   return new Promise((resolveResult, reject) => {
     const child = spawn(
       process.execPath,
-      [resolve("dist/src/cli.js"), "mcp", "--url", url],
+      [resolve("dist/src/reference-cli.js"), "mcp", "--url", url],
       { stdio: ["pipe", "pipe", "pipe"] },
     );
     let out = "",

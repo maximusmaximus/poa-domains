@@ -12,17 +12,20 @@
   },
   "scripts": {
     "clean": "node -e \"import('node:fs').then(fs => fs.rmSync('dist', { recursive: true, force: true }))\"",
-    "build": "tsc",
+    "build": "npm run clean && tsc",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test dist/test/*.test.js",
     "test:coverage": "npm run build && node --test --experimental-test-coverage dist/test/*.test.js",
     "smoke": "npm run build && node dist/test/smoke.js",
-    "demo": "npm run build && node dist/src/demo.js",
     "unicode:audit": "node scripts/unicode-audit.mjs",
     "security": "node scripts/security-scan.mjs && npm audit --audit-level=high",
-    "check": "npm run typecheck && npm test && npm run smoke && npm run pages:smoke && npm run unicode:audit && npm run security",
+    "check": "npm run typecheck && npm test && npm run production:smoke && npm run smoke && npm run reference:pages:smoke && npm run pages:smoke && npm run unicode:audit && npm run security",
     "pages:build": "npm run build && node dist/src/pages-build.js",
-    "pages:smoke": "npm run pages:build && node dist/test/pages-smoke.js"
+    "pages:smoke": "npm run pages:build && node dist/test/pages-smoke.js",
+    "reference:demo": "npm run build && node dist/src/reference-demo.js",
+    "reference:pages:smoke": "npm run build && node dist/test/reference-pages-smoke.js",
+    "start": "node dist/src/cli.js serve",
+    "production:smoke": "npm run build && node dist/test/production-smoke.js"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

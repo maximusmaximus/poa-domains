@@ -7,7 +7,7 @@ import { join, resolve } from "node:path";
 import { setup, witness } from "./helpers.js";
 import { attachJournal } from "../src/store.js";
 import { Engine } from "../src/engine.js";
-import { startServer } from "../src/server.js";
+import { startReferenceServer as startServer } from "../src/reference-server.js";
 import { browserSmoke } from "./browser.js";
 import { intentId } from "../src/auth.js";
 const exec = promisify(execFile);
@@ -16,7 +16,7 @@ const checks: string[] = [];
 const c = setup();
 attachJournal(c.e, join(dir, "data"));
 const server = await startServer(c.e);
-const cli = resolve("dist/src/cli.js");
+const cli = resolve("dist/src/reference-cli.js");
 const call = async (command: string, ...args: string[]) =>
   JSON.parse((await exec(process.execPath, [cli, command, ...args])).stdout);
 const post = async (packet: any) => {

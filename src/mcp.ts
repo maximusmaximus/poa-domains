@@ -1,40 +1,11 @@
 import { createInterface } from "node:readline";
-import { need, parseJSON, Fault, exact } from "./core.js";
-import { request } from "./client.js";
-export async function runMcp(url: string): Promise<void> {
+import { exact, Fault, need, parseJSON } from "./core.js";
+import { productionStatus } from "./production.js";
+
+export async function runMcp(options: unknown = {}): Promise<void> {
+  exact(options, []);
   let initialized = false,
     ready = false;
-  const tools = [
-    {
-      name: "read_state",
-      description: "Read local committed reference state, not chain finality",
-      inputSchema: {
-        type: "object",
-        properties: {},
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: true },
-    },
-    {
-      name: "submit_intent",
-      description:
-        "Submit exactly one fully signed local intent. No keys. All implemented actions are enumerated in capabilities.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          body: { type: "object" },
-          signatures: { type: "object" },
-        },
-        required: ["body", "signatures"],
-        additionalProperties: false,
-      },
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: true,
-        idempotentHint: true,
-      },
-    },
-  ];
   const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
   for await (const line of lines) {
     let rpc: any;
@@ -54,9 +25,12 @@ export async function runMcp(url: string): Promise<void> {
         result = {
           protocolVersion: "2025-11-25",
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: "poa-domains-local-reference", version: "0.1.0" },
+          serverInfo: {
+            name: "poa-domains-production-guard",
+            version: "0.1.0",
+          },
           instructions:
-            "Only local reference state. No live PoA access. Never supply keys. Use a previously authorized exact signed packet; query receipt after uncertainty.",
+            "Native naming unavailable. Only registry_status is supported. No signing, settlement, simulated state or reference fallback.",
         };
       } else if (rpc.method === "ping") result = {};
       else {
@@ -64,11 +38,10 @@ export async function runMcp(url: string): Promise<void> {
         if (rpc.method === "tools/list")
           result = {
             tools: [
-              ...tools,
               {
-                name: "read_capabilities",
+                name: "registry_status",
                 description:
-                  "Read all implemented action payload schemas and pinned policies",
+                  "Read disabled native-registry availability; no network state or ownership claims",
                 inputSchema: {
                   type: "object",
                   properties: {},
@@ -79,57 +52,37 @@ export async function runMcp(url: string): Promise<void> {
             ],
           };
         else if (rpc.method === "tools/call") {
-          const p = exact(rpc.params, ["name", "arguments"]);
-          let data: any;
-          try {
-            if (p.name === "read_state") {
-              exact(p.arguments, []);
-              data = await request(url, "/v1/state");
-            } else if (p.name === "read_capabilities") {
-              exact(p.arguments, []);
-              data = await request(url, "/v1/capabilities");
-            } else {
-              need(p.name === "submit_intent", "TOOL");
-              data = await request(url, "/v1/intents", p.arguments);
-            }
-            result = {
-              content: [{ type: "text", text: JSON.stringify(data) }],
-              isError: data.status === "rejected",
-            };
-          } catch (e) {
+          const params = exact(rpc.params, ["name", "arguments"]);
+          if (params.name === "registry_status") {
+            exact(params.arguments, []);
             result = {
               content: [
-                {
-                  type: "text",
-                  text: JSON.stringify({
-                    code: e instanceof Fault ? e.code : "TOOL_FAILURE",
-                  }),
-                },
+                { type: "text", text: JSON.stringify(productionStatus()) },
+              ],
+              isError: false,
+            };
+          } else
+            result = {
+              content: [
+                { type: "text", text: JSON.stringify(productionStatus()) },
               ],
               isError: true,
             };
-          }
-        } else if (
-          rpc.method === "resources/list" ||
-          rpc.method === "prompts/list"
-        )
-          result =
-            rpc.method === "resources/list"
-              ? { resources: [] }
-              : { prompts: [] };
+        } else if (rpc.method === "resources/list") result = { resources: [] };
+        else if (rpc.method === "prompts/list") result = { prompts: [] };
         else throw new Fault("METHOD_NOT_FOUND");
       }
       process.stdout.write(
         JSON.stringify({ jsonrpc: "2.0", id: rpc.id, result }) + "\n",
       );
-    } catch (e) {
+    } catch (error) {
       process.stdout.write(
         JSON.stringify({
           jsonrpc: "2.0",
           id: rpc?.id ?? null,
           error: {
             code: -32600,
-            message: e instanceof Fault ? e.code : "RPC_ERROR",
+            message: error instanceof Fault ? error.code : "RPC_ERROR",
           },
         }) + "\n",
       );

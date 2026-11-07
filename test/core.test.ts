@@ -268,7 +268,7 @@ test("submitted packet and returned snapshots cannot mutate committed state", ()
 });
 test("browser shared module maintains exact canonical, normalization, parser, and digest parity with engine", async () => {
   const web: any = await import(
-    new URL("../../web/shared.js", import.meta.url).href
+    new URL("../../reference-web/shared.js", import.meta.url).href
   );
   const c = setup();
   const cap = capabilities(c.e);
@@ -315,5 +315,8 @@ test("browser shared module maintains exact canonical, normalization, parser, an
   assert.deepEqual(webBody, engineBody);
   assert.equal(web.canonical(webBody), canonical(engineBody));
   assert.equal(await web.digest(webBody), intentId(engineBody));
-  assert.match(web.instructions(webBody, intentId(engineBody)), /submit_intent/);
+  assert.match(
+    web.instructions(webBody, intentId(engineBody)),
+    /submit_intent/,
+  );
 });

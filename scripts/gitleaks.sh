@@ -38,9 +38,9 @@ const target = path.join(root, bin);
 assert.ok(fs.statSync(target).isFile());
 fs.chmodSync(target, 0o700);
 JS
-"$work/$bin" dir --no-banner --redact --config .gitleaks.toml .
-"$work/$bin" git --no-banner --redact --config .gitleaks.toml --log-opts=--all .
+"$work/$bin" dir --no-banner --no-color --redact --config .gitleaks.toml .
+"$work/$bin" git --no-banner --no-color --redact --config .gitleaks.toml --log-opts=--all .
 
 if [ -d _site ]; then
-  "$work/$bin" dir --no-banner --redact --config .gitleaks.toml _site
+  "$work/$bin" dir --no-banner --no-color --redact --config .gitleaks.toml _site
 fi

@@ -1,119 +1,130 @@
 import {
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
   copyFileSync,
-  readdirSync,
+  existsSync,
   lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
 } from "node:fs";
-import { resolve, join } from "node:path";
-import { publicDemoFixture } from "./pages-fixture.js";
-import { noSecrets, need } from "./core.js";
-import { nameKey } from "./names.js";
-const output = resolve("_site");
-mkdirSync(output, { recursive: true });
-need(
-  lstatSync(output).isDirectory() && !lstatSync(output).isSymbolicLink(),
-  "ARTIFACT_DIRECTORY",
-);
-mkdirSync(join(output, "demo"), { recursive: true });
-need(
-  lstatSync(join(output, "demo")).isDirectory() &&
-    !lstatSync(join(output, "demo")).isSymbolicLink(),
-  "ARTIFACT_DIRECTORY",
-);
-const fixture = publicDemoFixture();
-noSecrets(fixture);
-for (const entry of Object.values(fixture.state.state.names))
-  need(
-    entry.key === nameKey(fixture.capabilities.registryId, entry.name),
-    "PUBLIC_NAME_ID",
-  );
-const files = ["index.html", "style.css", "app.js", "shared.js", "icon.svg"];
-for (const file of files) copyFileSync(join("web", file), join(output, file));
-const policy =
-  "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'";
-const html = readFileSync(join(output, "index.html"), "utf8").replace(
-  "<head>",
-  '<head>\n<meta http-equiv="Content-Security-Policy" content="' +
-    policy +
-    '">',
-);
-writeFileSync(join(output, "index.html"), html);
-writeFileSync(
-  join(output, "config.json"),
-  JSON.stringify(
-    {
-      mode: "static-synthetic-demo",
-      publicApiBase: null,
-      files: {
-        state: "./demo/state.json",
-        capabilities: "./demo/capabilities.json",
-        examples: "./demo/examples.json",
-        details: "./demo/details.json",
-      },
-    },
-    null,
-    2,
-  ) + "\n",
-);
-for (const key of ["state", "capabilities", "examples", "details"] as const)
-  writeFileSync(
-    join(output, "demo", key + ".json"),
-    JSON.stringify(fixture[key], null, 2) + "\n",
-  );
-writeFileSync(join(output, ".nojekyll"), "");
-const expected = new Set([...files, "config.json", "demo", ".nojekyll"]);
-need(
-  readdirSync(output).every((f) => expected.has(f)),
-  "UNEXPECTED_BUILD_ARTIFACT",
-);
-need(
-  readdirSync(join(output, "demo")).every((f) =>
-    [
-      "state.json",
-      "capabilities.json",
-      "examples.json",
-      "details.json",
-    ].includes(f),
-  ),
-  "UNEXPECTED_BUILD_ARTIFACT",
-);
-for (const file of [
-  ...files,
+import { join, resolve, sep } from "node:path";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
+import { canonical, need, noSecrets } from "./core.js";
+import { productionStatus } from "./production.js";
+
+export const PUBLIC_FILES = [
+  "index.html",
+  "app.js",
+  "style.css",
+  "icon.svg",
   "config.json",
+  "status.json",
   ".nojekyll",
-  ...["state", "capabilities", "examples", "details"].map(
-    (x) => "demo/" + x + ".json",
-  ),
-]) {
-  const path = join(output, file);
+] as const;
+// Known generated assets from the replaced public demo may be removed, but an
+// unexpected file or symlink fails closed rather than being uploaded/deleted.
+const previous = new Set([
+  ...PUBLIC_FILES,
+  "shared.js",
+  "demo/state.json",
+  "demo/capabilities.json",
+  "demo/examples.json",
+  "demo/details.json",
+]);
+export function buildProductionBundle(directory = resolve("_site")) {
+  const output = resolve(directory);
   need(
-    lstatSync(path).isFile() && !lstatSync(path).isSymbolicLink(),
-    "ARTIFACT_LINK",
+    output === resolve("_site") ||
+      output.startsWith(resolve(tmpdir()) + sep + "poa-production-pages-test-"),
+    "BUILD_DIRECTORY",
   );
-  const bytes = readFileSync(path);
-  need(bytes.length < 1000000, "ARTIFACT_SIZE");
+  if (existsSync(output)) {
+    need(
+      lstatSync(output).isDirectory() && !lstatSync(output).isSymbolicLink(),
+      "ARTIFACT_DIRECTORY",
+    );
+    for (const file of readdirSync(output)) {
+      const path = join(output, file),
+        stat = lstatSync(path);
+      need(!stat.isSymbolicLink(), "ARTIFACT_LINK");
+      if (file === "demo" && stat.isDirectory()) {
+        for (const child of readdirSync(path))
+          need(
+            previous.has("demo/" + child) &&
+              lstatSync(join(path, child)).isFile() &&
+              !lstatSync(join(path, child)).isSymbolicLink(),
+            "UNEXPECTED_BUILD_ARTIFACT",
+          );
+      } else
+        need(stat.isFile() && previous.has(file), "UNEXPECTED_BUILD_ARTIFACT");
+    }
+    rmSync(output, { recursive: true });
+  }
+  mkdirSync(output);
+  for (const file of ["index.html", "app.js", "style.css", "icon.svg"])
+    copyFileSync(join("web", file), join(output, file));
+  const config = JSON.parse(readFileSync("web/config.json", "utf8"));
   need(
-    !/-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----\s+[A-Za-z0-9+/=]{20}/.test(
-      bytes.toString(),
+    canonical(config) ===
+      canonical({
+        mode: "production-only",
+        publicApiBase: null,
+        statusFile: "./status.json",
+      }),
+    "PRODUCTION_WEB_CONFIG",
+  );
+  const status = productionStatus();
+  noSecrets(status);
+  writeFileSync(
+    join(output, "config.json"),
+    JSON.stringify(config, null, 2) + "\n",
+  );
+  writeFileSync(
+    join(output, "status.json"),
+    JSON.stringify(status, null, 2) + "\n",
+  );
+  const policy =
+    "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'";
+  writeFileSync(
+    join(output, "index.html"),
+    readFileSync(join(output, "index.html"), "utf8").replace(
+      "<head>",
+      '<head><meta http-equiv="Content-Security-Policy" content="' +
+        policy +
+        '">',
     ),
-    "PRIVATE_ARTIFACT",
   );
+  writeFileSync(join(output, ".nojekyll"), "");
+  need(
+    readdirSync(output).length === PUBLIC_FILES.length &&
+      readdirSync(output).every((file) =>
+        (PUBLIC_FILES as readonly string[]).includes(file),
+      ),
+    "UNEXPECTED_BUILD_ARTIFACT",
+  );
+  for (const file of PUBLIC_FILES) {
+    const path = join(output, file);
+    need(
+      lstatSync(path).isFile() &&
+        !lstatSync(path).isSymbolicLink() &&
+        lstatSync(path).size < 100000,
+      "PUBLIC_ARTIFACT",
+    );
+  }
+  return {
+    status: "built",
+    mode: "production-only",
+    operational: false,
+    files: PUBLIC_FILES.length,
+    apiEndpoint: null,
+    fixtureData: false,
+    output,
+  };
 }
-console.log(
-  JSON.stringify(
-    {
-      status: "built",
-      mode: "static-synthetic-demo",
-      files: 11,
-      names: Object.keys(fixture.state.state.names).length,
-      actions: Object.keys(fixture.capabilities.actions).length,
-      apiEndpoint: null,
-      keysExported: false,
-      output: "_site",
-    },
-    null,
-    2,
-  ),
-);
+if (
+  process.argv[1] &&
+  fileURLToPath(import.meta.url) === resolve(process.argv[1])
+)
+  console.log(JSON.stringify(buildProductionBundle(), null, 2));

@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { resolve, extname } from "node:path";
 import { verifyStaticPage } from "./pages-browser.js";
+
 const directory = resolve("_site"),
   prefix = "/poa-domains/";
 const types: Record<string, string> = {
@@ -50,7 +51,7 @@ try {
     JSON.stringify(
       {
         ...result,
-        mode: "static-synthetic-demo",
+        mode: "production-only",
         repoSubpath: prefix,
         serverClosed: true,
       },

@@ -94,7 +94,7 @@ export async function browserSmoke(
     );
     assert.match(
       await page.locator("#instructions").innerText(),
-      /node dist\/src\/cli.js/,
+      /node dist\/src\/reference-cli.js/,
     );
     checks.push(
       "UI and engine operation digests agree with exact canonical name/deed/versions/nonce/caps and API/CLI/MCP handoff",

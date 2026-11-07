@@ -1,33 +1,56 @@
-# PoA domains — local reference engine
+# PoA domains — production-only availability guard
 
-Working TypeScript naming/deed registry with a localhost API, CLI, MCP adapter and read-only agent-handoff UI.
+Public site: https://maximusmaximus.github.io/poa-domains/
 
-**Public synthetic demo:** https://maximusmaximus.github.io/poa-domains/ — self-contained GitHub Pages explorer, fixture names/auctions/records and all 17 inert handoff examples. No localhost or hosted naming backend is required; no real ownership, funds or transactions are shown.
+**The native naming registry is unavailable. This repository is not production-ready native PoA naming.** The public site displays only application availability. It does not display simulated ownership, balances, auctions, records or transaction receipts, and has no signing or transaction handoff form.
 
-**This is not deployed to PoA and does not create live PoA NFTs.** Balances and deeds are synthetic local state, not tokens, real funds or blockchain finality. No mining, live PoA writes, IPFS uploads, wallet connection or financial-protocol deployment is performed. Only the read-only static synthetic interface is published.
+## Production entry points
 
-## Run and verify
-
-Engine/CLI: Node **22.15+** (tested with Node 24) and npm. Browser CI is pinned to **Ubuntu 24.04**, supported by the pinned Playwright release; other Linux distributions need compatible browser system dependencies.
+The default CLI, API and MCP never initialize a reference ledger, read supplied key/configuration files, connect to a provider, or fall back to test data. There is no flag, credential, environment switch or endpoint override that enables registry operations.
 
 ```sh
 npm ci --ignore-scripts
 npx playwright install --with-deps chromium
-npm run typecheck
-npm test
-npm run smoke
-npm run pages:smoke
-npm run unicode:audit
-npm run security
-# Requires a git commit for history scanning:
-bash scripts/gitleaks.sh
-# Read-only synthetic in-memory UI, http://127.0.0.1:8787
-npm run demo
+npm run build
+node dist/src/cli.js status       # availability metadata; operational:false
+node dist/src/cli.js ready        # unavailable; exits 1
+node dist/src/cli.js mcp          # stdio; registry_status is the only tool
+npm start                        # status-only API on http://127.0.0.1:8787
 ```
 
-The offline smoke command runs a temporary localhost service and real headless browser. It exercises signed auction, bids, refund, finalization, child sale, fixed resale, CLI/API/MCP parity and journal restart; then removes temporary signer files and service data. After dependencies/browser installation it needs no internet or external credentials. `npm run security` separately queries the public npm advisory service; the scanner installation downloads an official checksum-verified release.
+The status-only API has no ownership or settlement backend:
 
-## Implemented
+| Path                                     | Current behavior                                                             |
+| ---------------------------------------- | ---------------------------------------------------------------------------- |
+| `GET /healthz`                           | HTTP 200, process alive, `registryReady:false`                               |
+| `GET /readyz`                            | HTTP 503, `NATIVE_NAMING_UNAVAILABLE`                                        |
+| `GET /v1/status`, `GET /v1/capabilities` | Availability metadata, `operational:false`, empty native actions, no backend |
+| Registry reads and writes under `/v1/`   | HTTP 503, `accepted:false`, `submitted:false`, no state or receipt           |
+
+Production CLI signing, preparation, handoffs, submission, state/receipt/nonce/resolve/export commands are rejected. Supplied `--config`/`--data` are rejected without file access. Supplied provider URLs and key/input/output paths do not enable processing. Status metadata is not a live network probe; process liveness is not registry readiness.
+
+`npm run pages:build` emits exactly seven public availability assets into `_site/`. The builder imports no fixture generator or reference engine. The browser only reads relative configuration/status JSON and rejects demo modes, backend overrides, forged ready flags and extra ledger fields. Prior generated demo files are removed during a validated rebuild; unexpected artifacts or symlinks fail the build. GitHub Pages hosts no `/v1` API.
+
+## Verify
+
+Node 22.15+ is required (tested with Node 24). CI uses Ubuntu 24.04 and locked dependencies.
+
+```sh
+npm run check
+bash scripts/gitleaks.sh
+```
+
+The complete check includes production guard/API/CLI/MCP regressions, production smoke, the retained isolated reference test suite, both browser test surfaces, Unicode subset audit and npm advisory checks. Tests use ephemeral unfunded keys and synthetic fixtures only where explicitly testing the reference engine; no real PoA state is changed. [Test details](docs/TESTING.md).
+
+## Explicitly isolated reference implementation
+
+`src/reference-cli.ts`, `src/reference-server.ts`, `src/reference-mcp.ts`, `src/reference-demo.ts` and `reference-web/` are local test/reference tools, not production services. They are never loaded by production entry points or the public bundle. The fixture snapshot generator and its static test builder live under `test/`; their output is temporary and not published.
+
+`npm run reference:demo` explicitly opens the local reference UI. `node dist/src/reference-cli.js ...` is the reference-only CLI. Its `serve --config PUBLIC_CONFIG.json --data /private/runtime/local-data --port 8787` accepts only the local reference profile and opens a synthetic journal. Do not use it with real assets or a real treasury key. The reference signer consumes only ephemeral/private local test files; no key belongs in a frontend, URL, request parameter, log or repository.
+
+The fixture reserved names are exactly `system` and `admin` (`src/config.ts`); these are not an approved production reservation policy. Fixture fees, reserves, assets and bid increment likewise are not approved production economics or custody choices.
+
+### Reference engine capabilities (not native operations)
 
 - Deterministic replayable, atomic single-writer state machine; authenticated rejections roll back economic/title state.
 - Supply-one permanent root deeds; root ascending auctions and fixed resales; child fixed sales/resales and free transfers.
@@ -43,21 +66,6 @@ The offline smoke command runs a temporary localhost service and real headless b
 - Fsynced checksummed journal, full replay verification, exclusive writer lock, torn-tail recovery and immutable configuration manifest. UI and normal resolver read committed local state only.
 - All **17 implemented actions** use the same signed-intent endpoint and CLI/MCP submission path. UI generates inert human instructions, exact unsigned body/digest and matching API/CLI/MCP material. It never signs or writes.
 
-## Interfaces
-
-```sh
-node dist/src/cli.js capabilities --url http://127.0.0.1:8787
-node dist/src/cli.js state --url http://127.0.0.1:8787
-node dist/src/cli.js resolve --url http://127.0.0.1:8787 --name poa:alpha
-node dist/src/cli.js mcp --url http://127.0.0.1:8787
-```
-
-[API and action schemas](docs/API.md) · [Local persistence and security](SECURITY.md) · [Testing](docs/TESTING.md)
-
-`serve --config PUBLIC_CONFIG.json --data /private/runtime/local-data --port 8787` opens an explicitly configured local journal. `fixtureConfig()` in `src/config.ts` produces a **synthetic fixture**, not a production manifest. Public keys and synthetic genesis balances are configuration; signing keys are never configuration. The demo discards its ephemeral signing keys and is intentionally read-only to its viewer. Use the smoke command for a complete executable transaction example.
-
-The CLI `sign` command accepts only a private local file path (mode 0600) and emits a signed packet, never a key. It is a local testing utility, not a compatibility claim for actual PoA wallets or hosted signing. Never give private key bytes to an agent, frontend or tool parameter. `export` emits public local state; no audit data is automatically published to GitHub.
-
 ## Actual limitations
 
 This independently runnable reference is **not a native PoA extension or adopted naming/NFT protocol**, has no consensus/ingress proof or network transaction adapter, and is not safe for real assets. There is no external-chain settlement, bridge, oracle, custody service, identity linking, arbitration/dispute mechanism, post-bid outage cancellation or key recovery. Such actions are absent/unsupported, not administratively improvised.
@@ -66,8 +74,10 @@ The journal replays the complete history; there is no checkpoint acceleration, h
 
 Unicode coverage and CID codec support are intentionally limited and explicit. Initial leases use a disclosed absolute expiry, not a moving fill-time duration. Consensual retirement/negotiated renewal cannot add or alter encumbrances while the parent is auction-locked; original guaranteed options remain exercisable. No full economic simulation, native-chain integration test or independent security audit is claimed.
 
-Source and CI live on GitHub. `npm run pages:build` creates an allowlisted `_site/` bundle containing only web assets and engine-derived public fixture JSON. Ephemeral fixture signing keys stay in memory and are discarded, never exported to JSON. `npm run pages:smoke` serves this exact bundle locally under `/poa-domains/` with no API and checks all 17 action handoffs in real Chromium. Demo instructions forbid signing/submitting its bodies; `npm run smoke` reproduces an independently generated local transaction flow instead.
+## Publication and security
 
-The ordinary local UI retains its local API mode. Static Pages mode has `publicApiBase:null` and fetches only relative same-origin JSON. Names, protected children, records, auction phases and synthetic as-of/finality labels are rendered from that frozen snapshot; refresh never implies live chain progress. No wallet is connected and no browser POST occurs.
+CI has contents-read permission. The main-only Pages workflow checks production guards and all reference tests in a sanitized environment, uploads only `_site/`, and grants Pages-write/OIDC-write only to the separate official deployment action. No workflow, production entry point or frontend uses repository secrets or treasury configuration. No real account, signer, funds, IPFS upload or protocol deployment is involved.
 
-CI uses `contents: read`. The separate main-only Pages workflow runs checks/builds with a sanitized environment, uploads only `_site/`, and grants `pages: write` plus `id-token: write` only to the deployment job running the official pinned deployment action. No repository/user secrets are referenced by either workflow or the frontend; no treasury credential or public treasury variable is used for the synthetic fixture. No project-wide license has been selected; vendored Unicode data carries its own license.
+[API boundaries](docs/API.md) · [Security](SECURITY.md) · [Unicode subset](docs/UNICODE.md)
+
+No project-wide license has been selected; vendored Unicode data carries its own license.

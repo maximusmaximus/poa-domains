@@ -1,4 +1,4 @@
-name: publish-read-only-demo
+name: publish-production-availability
 on:
   push:
     branches: [main]
@@ -27,7 +27,7 @@ jobs:
         run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm ci --ignore-scripts
       - name: Install browser test dependencies
         run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npx playwright install --with-deps chromium
-      - name: Check engine and exact public static bundle
+      - name: Check production guards, reference test suite and public availability bundle
         run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm run check
       - name: Redacted source, history and public artifact scan
         run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 bash scripts/gitleaks.sh
@@ -48,6 +48,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy tested synthetic static demo
+      - name: Deploy tested production-only availability page
         id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PoA domains — read-only reference</title>
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>PoA domains</h1>
+      <p id="mode">
+        Read-only local reference. Not live PoA. No wallet connection, browser
+        signing or browser writes.
+      </p>
+    </header>
+    <main>
+      <section>
+        <h2>Registry explorer</h2>
+        <p id="freshness"></p>
+        <div id="stats" class="stats"></div>
+        <h3>Names &amp; protected child rights</h3>
+        <div id="names" class="cards"></div>
+        <h3>Ascending auctions</h3>
+        <div id="auctions" class="cards"></div>
+        <button id="refresh" type="button">Refresh public state</button>
+        <details>
+          <summary>Raw committed state and receipts</summary>
+
+          <pre id="state"></pre>
+        </details>
+      </section>
+      <section>
+        <h2>Prepare an agent handoff</h2>
+        <p>
+          This creates inert unsigned data only. Independently verify everything
+          before authorizing a local signer. Static demo examples must never be
+          signed or submitted. Never paste a private key or credential.
+        </p>
+        <button type="button" id="example" hidden>
+          Load synthetic example for selected action
+        </button>
+        <p id="exampleNotice"></p>
+        <form id="handoff">
+          <label
+            >Action
+            <select id="action"></select
+          ></label>
+          <p>Exact required payload keys: <code id="keys"></code></p>
+          <label
+            >Public signer
+            <input id="signer" required autocomplete="off" /></label
+          ><label
+            >Public co-signers (sorted JSON array)
+            <input id="coSigners" value="[]" required /></label
+          ><label>Stable request ID <input id="requestId" required /></label
+          ><label
+            >Exact nonce
+            <input id="nonce" required inputmode="numeric" /></label
+          ><label
+            >Not before (integer seconds)
+            <input id="notBefore" required inputmode="numeric" /></label
+          ><label
+            >Exclusive deadline (integer seconds)
+            <input id="deadline" required inputmode="numeric" /></label
+          ><label
+            >Exact max total (base units)
+            <input id="maxTotal" required inputmode="numeric" /></label
+          ><label
+            >Max network fee (must be 0 locally)
+            <input id="maxNetworkFee" required inputmode="numeric" /></label
+          ><label
+            >Public action parameters (JSON)
+            <textarea id="params" rows="12" required>{}</textarea></label
+          ><button type="submit">Generate unsigned handoff</button>
+        </form>
+        <p id="error" role="alert"></p>
+        <h3>Instructions and matching API / CLI / MCP</h3>
+        <pre id="instructions"></pre>
+        <h3>Canonical unsigned body</h3>
+        <pre id="body"></pre>
+        <h3>Operation digest</h3>
+        <pre id="digest"></pre>
+        <button type="button" id="copy" disabled>
+          Copy instructions and exact body
+        </button>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

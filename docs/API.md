@@ -1,3 +1,19 @@
+# Production boundary
+
+The default executable is `dist/src/cli.js`. `status` and `capabilities` report `mode:production-only`, `operational:false`, `nativeNamingVerified:false`, `backend:null`, `actions:[]`, `accepted:false`, `submitted:false` and `code:NATIVE_NAMING_UNAVAILABLE`. `ready` returns the same document with exit 1. This is static application availability metadata, not a live chain capability check.
+
+`serve` starts a loopback status-only HTTP server. `/healthz` is process liveness (200; registryReady false); `/readyz` is registry readiness (503). `/v1/status` and `/v1/capabilities` return availability metadata (200). Every other `/v1/` path, including state, resolve, nonce, receipts and intent submission, returns HTTP 503 with the unavailable document. No request body is used for settlement. No native receipt or ownership data exists here.
+
+Configuration/ledger injection into the production server is rejected; only a numeric listening port is accepted. The production CLI rejects config/data options without reading files, and rejects supplied URLs, key/input/output paths and all registry/signing/handoff commands. There is no environment-based reference fallback.
+
+`cli.js mcp` supports the initialization handshake, read-only `registry_status`, ping and empty resources/prompts. Only `registry_status` is listed. Reference tool names such as `read_state` and `submit_intent` return `isError:true` with the unavailable document; no provider, fixture, ledger or signer is loaded.
+
+Public Pages only serves a fixed availability interface. It has no API, state explorer, wallet, unsigned-body builder or transaction form. Browser configuration is exactly `mode:production-only`, `publicApiBase:null`, `statusFile:./status.json`; any demo mode, provider override or simulated state fails closed.
+
+## Isolated reference protocol — tests/local research only
+
+Everything below applies only to `dist/src/reference-cli.js`, `src/reference-server.ts`, `src/reference-mcp.ts` and `reference-web/`. These are not production or live PoA interfaces. Production entry points deliberately reject their configuration and transaction packets.
+
 # Implemented local interface
 
 All paths are under an explicitly allowlisted `http://127.0.0.1:PORT`. No API key or cookies. GET is read-only. POST is for a complete previously authorized Ed25519 packet from a local signer; browser POSTs are refused.
@@ -76,10 +92,10 @@ Metadata is `{cid,document:{schema:"poa-domains.metadata.v1",name,rightsHash,des
 
 Business receipt: `intentId,requestId,signer,sequence,time,status,code,result`, plus HTTP `accepted:true`, explicit durability/finality label. Status is `succeeded` or `rejected`. Rejections such as `STALE_VERSION`, `MIN_RAISE`, `AMOUNT_CAP`, `LEASE_OBLIGATION` make no economic/title changes; admitted nonce/outcome bookkeeping still advances. Invalid authentication/domain/nonce is a bounded nonadmission error `{code,accepted:false}`. Durability failure returns HTTP 503 with `accepted:"unknown"`, halts writes and requires restart/query. Unknown receipt is not permission to change nonce or generate a new request.
 
-## CLI / MCP / static interface
+## Reference CLI / MCP / static interface
 
-`prepare --url ORIGIN --file PUBLIC_INPUT.json` requires all non-capability body fields explicitly; it fills only pinned capability identity and canonicalizes names. `handoff --file unsigned.json` returns inert instructions, body/digest and API/CLI/MCP material. `sign --file unsigned.json --key-file /private/runtime/signer.pem --out signed.json` is a local signer utility; repeat `--key-file` for co-signers. Output files are created exclusively, mode 0600. `submit --url ORIGIN --file signed.json` sends the exact packet; `receipt`, `nonce`, `state`, `export`, `resolve`, `capabilities` are read-only. No automatic retry or spend escalation.
+`node dist/src/reference-cli.js prepare --url ORIGIN --file PUBLIC_INPUT.json` requires all non-capability body fields explicitly; it fills only pinned capability identity and canonicalizes names. `handoff --file unsigned.json` returns inert instructions, body/digest and API/CLI/MCP material. `sign --file unsigned.json --key-file /private/runtime/signer.pem --out signed.json` is a local signer utility; repeat `--key-file` for co-signers. Output files are created exclusively, mode 0600. `submit --url ORIGIN --file signed.json` sends the exact packet; `receipt`, `nonce`, `state`, `export`, `resolve`, `capabilities` are read-only. No automatic retry or spend escalation.
 
-The stdio MCP adapter implements the **2025-11-25** initialization handshake, `tools/list`, `read_state`, `read_capabilities` and `submit_intent`. Every implemented action uses the same packet under `submit_intent`. This is a bounded adapter, not a claim of full protocol-version compatibility. No HTTP MCP transport or signing service is exposed.
+The isolated `reference-cli.js mcp --url ORIGIN` stdio MCP adapter implements the **2025-11-25** initialization handshake, `tools/list`, `read_state`, `read_capabilities` and `submit_intent`. Every implemented action uses the same packet under `submit_intent`. This is a bounded adapter, not a claim of full protocol-version compatibility. No HTTP MCP transport or signing service is exposed.
 
-The UI lists every implemented action and builds unsigned handoffs with explicit caps/versions/nonces/deadlines. It performs GET reads only. It accepts only the tested local-reference capability profile, never claims a production network. Static GitHub Pages hosting uses `mode:static-synthetic-demo`, `publicApiBase:null` and same-origin relative JSON only. It hosts no `/v1` API or signer. Synthetic handoffs explicitly forbid signing/submitting their fixture bodies and distinguish local CLI/API/MCP schema examples from hosted services. Local API mode remains available when running the actual local server.
+The isolated reference UI lists all 17 reference actions and builds unsigned local test handoffs. It lives in `reference-web/`, not in the production Pages artifact. Its static fixture variant is exercised only in a temporary test directory. Production CLI/MCP/API do not consume these bodies, states, receipts or fixture capabilities.
