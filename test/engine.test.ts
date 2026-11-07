@@ -403,3 +403,65 @@ test("model/property: 200 seeded bid/invalid/refund steps conserve exact per-ass
     c.clock.advance(1);
   }
 });
+
+test("quiet-period extension rejects safe-integer clock overflow atomically while existing winner can still finalize", () => {
+  const c = setup();
+  const max = Number.MAX_SAFE_INTEGER;
+  c.clock.set(max - 86400 - 7200);
+  const announced = c.send(
+    "announceAuction",
+    {
+      name: "alpha",
+      asset: "POA",
+      reserve: "100",
+      openAt: c.clock.now() + 86400,
+      expectedDeedId: null,
+      expectedVersion: 0,
+      metadata: witness("alpha"),
+    },
+    c.issuer,
+    { deadline: max },
+  );
+  ok(announced);
+  const id = announced.result.auctionId;
+  c.clock.set(max - 3601);
+  ok(
+    c.send(
+      "bid",
+      {
+        auctionId: id,
+        expectedVersion: 1,
+        asset: "POA",
+        amount: "100",
+        beneficiary: c.alice.id,
+      },
+      c.alice,
+      { deadline: max },
+    ),
+  );
+  assert.equal(c.e.closeEligible(c.e.snapshot().auctions[id]!), max - 1);
+  c.clock.set(max - 2);
+  const before = c.e.snapshot();
+  const failed = c.send(
+    "bid",
+    {
+      auctionId: id,
+      expectedVersion: 2,
+      asset: "POA",
+      amount: "111",
+      beneficiary: c.bob.id,
+    },
+    c.bob,
+    { deadline: max },
+  );
+  assert.equal(failed.code, "INTEGER");
+  assert.deepEqual(c.e.snapshot().balances, before.balances);
+  assert.deepEqual(c.e.snapshot().auctions, before.auctions);
+  c.clock.set(max - 1);
+  ok(
+    c.send("finalize", { auctionId: id, expectedVersion: 2 }, c.carol, {
+      deadline: max,
+    }),
+  );
+  assert.equal(c.deed("alpha").owner, c.alice.id);
+});

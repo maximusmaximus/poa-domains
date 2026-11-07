@@ -328,8 +328,10 @@ export class Engine {
   }
   closeEligible(a: Auction): number {
     return a.high
-      ? Math.max(a.openAt + a.window, a.high.at + a.quiet)
-      : a.openAt + a.window;
+      ? integer(
+          Math.max(integer(a.openAt + a.window), integer(a.high.at + a.quiet)),
+        )
+      : integer(a.openAt + a.window);
   }
   private apply(s: State, b: Body, id: string, time: number): any {
     const p = b.params;
