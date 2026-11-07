@@ -1,0 +1,31 @@
+name: Bug Report
+description: Report a deterministic state, journal, CLI/MCP/HTTP, or UI handoff bug in the local reference engine
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include any secret material or private keys in issues. For security vulnerabilities, use private vulnerability reporting as described in `SECURITY.md`.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Clear description of the observed defect vs. expected local reference behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Exact commands, synthetic intent payload, or test case that triggers the issue.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node.js version (`node -v`), and commit SHA.
+      placeholder: "Ubuntu 24.04 / Node v24.x"
+    validations:
+      required: true

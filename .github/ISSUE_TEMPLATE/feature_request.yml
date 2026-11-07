@@ -1,0 +1,19 @@
+name: Enhancement Proposal
+description: Propose a test, conformance, or local reference engine improvement
+title: "[Enhancement]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Motivation
+      description: Which local reference invariant, interface, or conformance check does this improve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Change
+      description: Concrete design and how it preserves deterministic single-writer replay and offline verification.
+    validations:
+      required: true
