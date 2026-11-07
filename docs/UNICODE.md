@@ -1,0 +1,11 @@
+# Pinned supported subset
+
+Source: [Unicode 17.0 emoji-test.txt](https://www.unicode.org/Public/17.0.0/emoji/emoji-test.txt), version 17.0. The exact source, SHA-256, explicit input→base mappings and Unicode license are vendored in `vendor/unicode/`. No asset/artwork files are used.
+
+`npm run unicode:audit` verifies the source digest/version, every input against official rows, fully-qualified canonical targets, token/codepoint agreement, duplicate mappings and base idempotence. This is an audit of the **supported naming subset**, not full UTS #51 repertoire coverage, CLDR translations or emoji artwork compliance.
+
+The manifest has **140 explicit aliases and 29 base tokens**: selected faces, rocket/fire/gem/robot/heart, thumbs/wave, person/technologist/running/walking, US/GB flags, and `1/#/*` keycaps. Supported tone variants and selected man/woman/person or runner/walker gender forms collapse only where explicitly listed. Heart qualification and minimally-qualified selected keycaps are also explicit entries. The implementation does not dynamically strip skin tones, gender, hair, direction, tags, variation selectors or ZWJ.
+
+Unsupported hair/direction variants, tag flags, other flags, families, lone components and arbitrary Unicode are rejected, even if visually plausible. A dangling variation selector/ZWJ or incomplete keycap is not silently discarded. Emoji sequences are matched longest-first before ASCII (so `1️⃣` is one emoji token and is different from plain digit `1`). ASCII case folding is explicit; optional `poa:` is an input convenience only. Signed names use the canonical display form. Dot is the only separator; no empty label, hyphen or path deeper than child.root.
+
+One canonical ASCII character or supported emoji sequence is one token. Each label permits 1–32 tokens. Premium roots have 1–3, standard roots 4–32; child primary prices remain fixed. Input byte limits are large enough for 32 longest supported sequences per label. Stable token IDs derive from canonical base code points, not mutable descriptions. Registry configuration pins the manifest hash; reopening a journal with a different mapping fails. No normalization migration mechanism exists in this implementation.

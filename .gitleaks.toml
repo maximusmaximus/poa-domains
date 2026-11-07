@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+[[rules]]
+id = "poa-bearer"
+description = "Potential PoA bearer credential"
+regex = '''\bpk_[A-Za-z0-9_-]{24,}\b'''
+entropy = 3.0
+[allowlist]
+paths = ['''(^|/)node_modules/''', '''(^|/)dist/''', '''(^|/)\.git/''']

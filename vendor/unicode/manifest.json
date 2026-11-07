@@ -1,0 +1,708 @@
+{
+  "version": "ascii-emoji-subset-17.0-v1",
+  "unicodeVersion": "17.0",
+  "source": "https://www.unicode.org/Public/17.0.0/emoji/emoji-test.txt",
+  "sourceSha256": "1d8a944f88d7952f7ef7c5167fef3c67995bcae24543949710231b03a201acda",
+  "aliases": [
+    {
+      "input": "#⃣",
+      "canonical": "#️⃣",
+      "token": "u23-fe0f-20e3"
+    },
+    {
+      "input": "#️⃣",
+      "canonical": "#️⃣",
+      "token": "u23-fe0f-20e3"
+    },
+    {
+      "input": "*⃣",
+      "canonical": "*️⃣",
+      "token": "u2a-fe0f-20e3"
+    },
+    {
+      "input": "*️⃣",
+      "canonical": "*️⃣",
+      "token": "u2a-fe0f-20e3"
+    },
+    {
+      "input": "1⃣",
+      "canonical": "1️⃣",
+      "token": "u31-fe0f-20e3"
+    },
+    {
+      "input": "1️⃣",
+      "canonical": "1️⃣",
+      "token": "u31-fe0f-20e3"
+    },
+    {
+      "input": "❤",
+      "canonical": "❤️",
+      "token": "u2764-fe0f"
+    },
+    {
+      "input": "❤️",
+      "canonical": "❤️",
+      "token": "u2764-fe0f"
+    },
+    {
+      "input": "🇬🇧",
+      "canonical": "🇬🇧",
+      "token": "u1f1ec-1f1e7"
+    },
+    {
+      "input": "🇺🇸",
+      "canonical": "🇺🇸",
+      "token": "u1f1fa-1f1f8"
+    },
+    {
+      "input": "🏃",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃‍♀",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃‍♀️",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃‍♂",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃‍♂️",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏻",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏻‍♀",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏻‍♀️",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏻‍♂",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏻‍♂️",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏼",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏼‍♀",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏼‍♀️",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏼‍♂",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏼‍♂️",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏽",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏽‍♀",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏽‍♀️",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏽‍♂",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏽‍♂️",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏾",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏾‍♀",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏾‍♀️",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏾‍♂",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏾‍♂️",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏿",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏿‍♀",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏿‍♀️",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏿‍♂",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "🏃🏿‍♂️",
+      "canonical": "🏃",
+      "token": "u1f3c3"
+    },
+    {
+      "input": "👋",
+      "canonical": "👋",
+      "token": "u1f44b"
+    },
+    {
+      "input": "👋🏻",
+      "canonical": "👋",
+      "token": "u1f44b"
+    },
+    {
+      "input": "👋🏼",
+      "canonical": "👋",
+      "token": "u1f44b"
+    },
+    {
+      "input": "👋🏽",
+      "canonical": "👋",
+      "token": "u1f44b"
+    },
+    {
+      "input": "👋🏾",
+      "canonical": "👋",
+      "token": "u1f44b"
+    },
+    {
+      "input": "👋🏿",
+      "canonical": "👋",
+      "token": "u1f44b"
+    },
+    {
+      "input": "👍",
+      "canonical": "👍",
+      "token": "u1f44d"
+    },
+    {
+      "input": "👍🏻",
+      "canonical": "👍",
+      "token": "u1f44d"
+    },
+    {
+      "input": "👍🏼",
+      "canonical": "👍",
+      "token": "u1f44d"
+    },
+    {
+      "input": "👍🏽",
+      "canonical": "👍",
+      "token": "u1f44d"
+    },
+    {
+      "input": "👍🏾",
+      "canonical": "👍",
+      "token": "u1f44d"
+    },
+    {
+      "input": "👍🏿",
+      "canonical": "👍",
+      "token": "u1f44d"
+    },
+    {
+      "input": "👎",
+      "canonical": "👎",
+      "token": "u1f44e"
+    },
+    {
+      "input": "👎🏻",
+      "canonical": "👎",
+      "token": "u1f44e"
+    },
+    {
+      "input": "👎🏼",
+      "canonical": "👎",
+      "token": "u1f44e"
+    },
+    {
+      "input": "👎🏽",
+      "canonical": "👎",
+      "token": "u1f44e"
+    },
+    {
+      "input": "👎🏾",
+      "canonical": "👎",
+      "token": "u1f44e"
+    },
+    {
+      "input": "👎🏿",
+      "canonical": "👎",
+      "token": "u1f44e"
+    },
+    {
+      "input": "👨",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "👨‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "👨🏻",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "👨🏻‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "👨🏼",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "👨🏼‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "👨🏽",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "👨🏽‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "👨🏾",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "👨🏾‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "👨🏿",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "👨🏿‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "👩",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "👩‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "👩🏻",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "👩🏻‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "👩🏼",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "👩🏼‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "👩🏽",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "👩🏽‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "👩🏾",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "👩🏾‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "👩🏿",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "👩🏿‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "💎",
+      "canonical": "💎",
+      "token": "u1f48e"
+    },
+    {
+      "input": "🔥",
+      "canonical": "🔥",
+      "token": "u1f525"
+    },
+    {
+      "input": "😀",
+      "canonical": "😀",
+      "token": "u1f600"
+    },
+    {
+      "input": "😁",
+      "canonical": "😁",
+      "token": "u1f601"
+    },
+    {
+      "input": "😂",
+      "canonical": "😂",
+      "token": "u1f602"
+    },
+    {
+      "input": "😃",
+      "canonical": "😃",
+      "token": "u1f603"
+    },
+    {
+      "input": "😄",
+      "canonical": "😄",
+      "token": "u1f604"
+    },
+    {
+      "input": "😅",
+      "canonical": "😅",
+      "token": "u1f605"
+    },
+    {
+      "input": "😆",
+      "canonical": "😆",
+      "token": "u1f606"
+    },
+    {
+      "input": "😉",
+      "canonical": "😉",
+      "token": "u1f609"
+    },
+    {
+      "input": "😊",
+      "canonical": "😊",
+      "token": "u1f60a"
+    },
+    {
+      "input": "😎",
+      "canonical": "😎",
+      "token": "u1f60e"
+    },
+    {
+      "input": "🙂",
+      "canonical": "🙂",
+      "token": "u1f642"
+    },
+    {
+      "input": "🙃",
+      "canonical": "🙃",
+      "token": "u1f643"
+    },
+    {
+      "input": "🚀",
+      "canonical": "🚀",
+      "token": "u1f680"
+    },
+    {
+      "input": "🚶",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶‍♀",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶‍♀️",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶‍♂",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶‍♂️",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏻",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏻‍♀",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏻‍♀️",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏻‍♂",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏻‍♂️",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏼",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏼‍♀",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏼‍♀️",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏼‍♂",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏼‍♂️",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏽",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏽‍♀",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏽‍♀️",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏽‍♂",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏽‍♂️",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏾",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏾‍♀",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏾‍♀️",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏾‍♂",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏾‍♂️",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏿",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏿‍♀",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏿‍♀️",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏿‍♂",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🚶🏿‍♂️",
+      "canonical": "🚶",
+      "token": "u1f6b6"
+    },
+    {
+      "input": "🤖",
+      "canonical": "🤖",
+      "token": "u1f916"
+    },
+    {
+      "input": "🧑",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "🧑‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "🧑🏻",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "🧑🏻‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "🧑🏼",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "🧑🏼‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "🧑🏽",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "🧑🏽‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "🧑🏾",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "🧑🏾‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    },
+    {
+      "input": "🧑🏿",
+      "canonical": "🧑",
+      "token": "u1f9d1"
+    },
+    {
+      "input": "🧑🏿‍💻",
+      "canonical": "🧑‍💻",
+      "token": "u1f9d1-200d-1f4bb"
+    }
+  ]
+}

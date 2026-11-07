@@ -1,0 +1,58 @@
+:root {
+  font: 16px/1.5 system-ui;
+  color: #dfecf5;
+  background: #101b26;
+}
+body {
+  max-width: 1000px;
+  margin: auto;
+  padding: 2rem;
+}
+header {
+  border-bottom: 2px solid #65cfa8;
+}
+section {
+  margin: 2rem 0;
+  padding: 1rem;
+  background: #192936;
+  border-radius: 0.6rem;
+}
+label {
+  display: block;
+  margin: 0.8rem 0;
+}
+input,
+textarea,
+select {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem;
+  color: inherit;
+  background: #0d1821;
+  border: 1px solid #54717d;
+  border-radius: 0.3rem;
+  font: inherit;
+}
+button {
+  padding: 0.7rem 1rem;
+  background: #65cfa8;
+  color: #092b22;
+  border: 0;
+  border-radius: 0.3rem;
+  cursor: pointer;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 32rem;
+  overflow: auto;
+  font-size: 0.85rem;
+}
+#mode,
+#error {
+  color: #ffd18b;
+}
+code {
+  overflow-wrap: anywhere;
+}
