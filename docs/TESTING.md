@@ -12,3 +12,5 @@ Tests use generated, unfunded local Ed25519 keys, synthetic genesis balances and
 `test/helpers.ts` generates keys at runtime. Only the CLI sign test/smoke writes an ephemeral PKCS#8 signer under an OS temporary directory, mode 0600, removed in `finally`; no fixture secret is committed. Source artifacts and evidence must not include private product documents or runtime signer/data files.
 
 These tests do not establish native PoA adoption, cross-chain atomicity, consensus time/finality, cryptographic compatibility with a hosted wallet, pin persistence, economic suitability, a full independent security audit or production scalability. Unsupported capabilities are rejected/absent rather than represented by passing fake adapter tests.
+
+CI uses an explicit Ubuntu 24.04 runner rather than a moving latest image, matching the pinned Playwright browser/system dependencies. All checks run without user secrets or deployment permissions.

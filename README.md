@@ -6,7 +6,7 @@ Working TypeScript naming/deed registry with a localhost API, CLI, MCP adapter a
 
 ## Run and verify
 
-Node **22.15+** (tested with Node 24), npm and Linux are supported.
+Engine/CLI: Node **22.15+** (tested with Node 24) and npm. Browser CI is pinned to **Ubuntu 24.04**, supported by the pinned Playwright release; other Linux distributions need compatible browser system dependencies.
 
 ```sh
 npm ci --ignore-scripts
