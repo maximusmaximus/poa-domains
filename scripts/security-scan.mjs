@@ -14,6 +14,15 @@ for (const file of new Set(files)) {
   if (/(?:^|\/)(?:\.env(?:\..*)?|[^/]+\.(?:pem|key|p12|pfx|jwk))$/.test(file))
     findings.push({ file, rule: "credential-artifact" });
   const body = fs.readFileSync(file, "utf8");
+  if (body.includes("\r\n"))
+    findings.push({ file, rule: "crlf-line-endings" });
+  if (/^\.github\/workflows\/.+\.ya?ml$/.test(file)) {
+    for (const line of body.split("\n")) {
+      const m = /^\s*-?\s*uses:\s*([^\s#]+)/.exec(line);
+      if (m && !/@[0-9a-f]{40}$/.test(m[1]))
+        findings.push({ file, rule: "unpinned-github-action" });
+    }
+  }
   if (
     /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\r\n]+[A-Za-z0-9+/=]{20}/.test(
       body,
