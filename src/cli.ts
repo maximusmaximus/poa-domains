@@ -3,10 +3,12 @@ import { parseArgs } from "node:util";
 import { Fault } from "./core.js";
 import { productionStatus, rejectRegistryOperation } from "./production.js";
 import { startServer } from "./server.js";
+import { NativeMonitor, NativeReader } from "./native.js";
 import { runMcp } from "./mcp.js";
 
 // Production entry point. No reference imports, environment-based mode switch,
 // endpoint discovery, file reads, signer initialization or simulation fallback.
+// Explicit native-* reads use only fixed documented public node routes.
 try {
   const { positionals, values } = parseArgs({
     allowPositionals: true,
@@ -26,9 +28,15 @@ try {
   if (positionals.length !== 1) throw new Fault("COMMAND");
   if (values.config !== undefined || values.data !== undefined)
     throw new Fault("PRODUCTION_CONFIG_UNSUPPORTED");
-  if (Object.keys(values).some((key) => key !== "port"))
-    rejectRegistryOperation();
   const command = positionals[0];
+  if (command === "native-receipt") {
+    if (Object.keys(values).some(key => key !== "id")) rejectRegistryOperation();
+    process.stdout.write(JSON.stringify(await new NativeReader().receipt(values.id)) + "\n");
+  } else if (command === "native-network") {
+    if (Object.keys(values).length) rejectRegistryOperation();
+    process.stdout.write(JSON.stringify(await new NativeMonitor().observe()) + "\n");
+  } else {
+  if (Object.keys(values).some((key) => key !== "port")) rejectRegistryOperation();
   if (command === "serve") {
     const port = values.port === undefined ? 8787 : Number(values.port);
     const server = await startServer({ port });
@@ -47,6 +55,7 @@ try {
     } else if (command === "mcp") await runMcp();
     else rejectRegistryOperation();
   }
+}
 } catch (error) {
   process.stderr.write(
     JSON.stringify({

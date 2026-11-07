@@ -1,9 +1,11 @@
 import { createInterface } from "node:readline";
 import { exact, Fault, need, parseJSON } from "./core.js";
+import { NativeReader, NativeMonitor } from "./native.js";
 import { productionStatus } from "./production.js";
 
 export async function runMcp(options: unknown = {}): Promise<void> {
   exact(options, []);
+  const reader = new NativeReader(), monitor = new NativeMonitor(reader);
   let initialized = false,
     ready = false;
   const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
@@ -26,11 +28,11 @@ export async function runMcp(options: unknown = {}): Promise<void> {
           protocolVersion: "2025-11-25",
           capabilities: { tools: { listChanged: false } },
           serverInfo: {
-            name: "poa-domains-production-guard",
+            name: "poa-domains-read-only",
             version: "0.1.0",
           },
           instructions:
-            "Native naming unavailable. Only registry_status is supported. No signing, settlement, simulated state or reference fallback.",
+            "Native naming unavailable. registry_status reports application availability. native_network and native_receipt read fixed public node routes; reports are NOT verified consensus/finality. No signing, settlement, simulated state or reference fallback.",
         };
       } else if (rpc.method === "ping") result = {};
       else {
@@ -49,11 +51,17 @@ export async function runMcp(options: unknown = {}): Promise<void> {
                 },
                 annotations: { readOnlyHint: true },
               },
+              { name: "native_network", description: "Read official public native node status and provenance; unverified report, never naming ownership or finality", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true } },
+              { name: "native_receipt", description: "Read a reported native transaction receipt; unknown never authorizes retry, flags do not verify finality", inputSchema: { type: "object", properties: { txid: { type: "string", pattern: "^[a-f0-9]{64}$" } }, required: ["txid"], additionalProperties: false }, annotations: { readOnlyHint: true } },
             ],
           };
         else if (rpc.method === "tools/call") {
           const params = exact(rpc.params, ["name", "arguments"]);
-          if (params.name === "registry_status") {
+          if (params.name === "native_network" || params.name === "native_receipt") {
+            const args = exact(params.arguments, params.name === "native_receipt" ? ["txid"] : []);
+            const value = params.name === "native_network" ? await monitor.observe() : await reader.receipt(args.txid);
+            result = { content: [{ type: "text", text: JSON.stringify(value) }], isError: false };
+          } else if (params.name === "registry_status") {
             exact(params.arguments, []);
             result = {
               content: [

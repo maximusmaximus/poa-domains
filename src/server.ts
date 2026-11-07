@@ -1,16 +1,19 @@
 import { createServer, Server } from "node:http";
 import { Fault, need } from "./core.js";
+import { NativeReader, NativeMonitor, nativeFailure } from "./native.js";
 import { productionOptions, productionStatus } from "./production.js";
 
-// Status-only localhost API. No Engine, ledger, signer, configuration file or
-// provider connection is accepted. Reference service lives in reference-server.
+// Read-only localhost API. No Engine, ledger, signer, configuration file or
+// caller-selected provider connection is accepted. Reference service lives in reference-server.
 export async function startServer(options: unknown = {}): Promise<{
   server: Server;
   url: string;
   close: () => Promise<void>;
 }> {
   const { port } = productionOptions(options);
-  const server = createServer((req, res) => {
+  const reader = new NativeReader(), monitor = new NativeMonitor(reader);
+  let cached: { at: number; value: unknown } | undefined;
+  const server = createServer(async (req, res) => {
     res.setHeader("cache-control", "no-store");
     res.setHeader("content-type", "application/json; charset=utf-8");
     res.setHeader("x-content-type-options", "nosniff");
@@ -25,6 +28,16 @@ export async function startServer(options: unknown = {}): Promise<{
       need(/^127\.0\.0\.1(?::[0-9]+)?$/.test(req.headers.host ?? ""), "HOST");
       const u = new URL(req.url ?? "/", "http://127.0.0.1");
       if (req.method === "GET" && !u.search) {
+        if (u.pathname === "/v1/native/network") {
+          try {
+            if (!cached || Date.now() - cached.at > 10000) cached = { at: Date.now(), value: await monitor.observe() };
+            return send(200, cached.value);
+          } catch (error) { cached = undefined; return send(502, nativeFailure(error)); }
+        }
+        if (u.pathname.startsWith("/v1/native/receipts/")) {
+          try { return send(200, await reader.receipt(u.pathname.slice("/v1/native/receipts/".length))); }
+          catch (error) { return send(error instanceof Fault && error.code === "NATIVE_DIGEST" ? 400 : 502, nativeFailure(error)); }
+        }
         if (u.pathname === "/healthz")
           return send(200, { processAlive: true, registryReady: false });
         if (["/v1/status", "/v1/capabilities"].includes(u.pathname))

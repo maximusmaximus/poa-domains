@@ -20,15 +20,33 @@ function exact(value, keys) {
   )
     throw Error("Unavailable");
 }
+let expiryTimer;
+function clearNetwork(message) {
+  clearTimeout(expiryTimer);
+  document.getElementById("network-status").textContent = message;
+  document.getElementById("network-details").textContent = "";
+}
+function renderNetwork(value) {
+  const now = Date.now();
+  exact(value, ["kind", "source", "chainId", "observedAt", "expiresAt", "verification", "finalityVerified", "registryReady", "checkpoint", "epochsClosed", "agentsJoined", "transactions", "reportedFinalTransactions", "attestationThreshold", "engineSha256", "paramsSha256"]);
+  exact(value.checkpoint, ["height", "cutoffTs"]);
+  const counts = [value.observedAt, value.expiresAt, value.checkpoint.height, value.checkpoint.cutoffTs, value.epochsClosed, value.agentsJoined, value.transactions, value.reportedFinalTransactions, value.attestationThreshold];
+  if (value.kind !== "native-network-observation" || value.source !== "https://minepoa.com" || value.chainId !== "poa-mainnet-1" || value.verification !== "node-reported-unverified" || value.finalityVerified !== false || value.registryReady !== false || !counts.every(n => Number.isSafeInteger(n) && n >= 0) || value.expiresAt !== value.observedAt + 900000 || value.observedAt > now + 300000 || now > value.expiresAt || value.checkpoint.cutoffTs * 1000 > value.observedAt + 300000 || value.reportedFinalTransactions > value.transactions || value.attestationThreshold < 1 || value.attestationThreshold > 256 || !/^[a-f0-9]{64}$/.test(value.engineSha256) || !/^[a-f0-9]{64}$/.test(value.paramsSha256)) throw Error("Observation unavailable");
+  document.getElementById("network-status").textContent = "Official-node observation (unverified), naming still unavailable. Observed " + new Date(value.observedAt).toLocaleString("en-US", { timeZone: "America/Los_Angeles", timeZoneName: "short" });
+  document.getElementById("network-details").textContent = "Network: " + value.chainId + "\nReported checkpoint: " + value.checkpoint.height + "\nClosed epochs: " + value.epochsClosed + "\nJoined agents: " + value.agentsJoined + "\nReported transactions: " + value.transactions + "\nReported engine SHA-256: " + value.engineSha256 + "\nReported params SHA-256: " + value.paramsSha256;
+  expiryTimer = setTimeout(() => clearNetwork("Network observation expired; no current network state is displayed."), Math.min(value.expiresAt - now + 1, 900001));
+}
 async function refresh() {
+  clearNetwork("Network observation unavailable or expired.");
   error.textContent = "";
   try {
     const config = await read("./config.json");
-    exact(config, ["mode", "publicApiBase", "statusFile"]);
+    exact(config, ["mode", "publicApiBase", "statusFile", "networkFile"]);
     if (
       config.mode !== "production-only" ||
       config.publicApiBase !== null ||
-      config.statusFile !== "./status.json"
+      config.statusFile !== "./status.json" ||
+      config.networkFile !== "./network.json"
     )
       throw Error("Unavailable");
     const value = await read("./status.json");
@@ -59,6 +77,8 @@ async function refresh() {
       throw Error("Unavailable");
     document.getElementById("status").textContent =
       "Verified application guard: native registry unavailable; all operations disabled.";
+    try { renderNetwork(await read("./network.json")); }
+    catch { clearNetwork("Network observation unavailable or expired; no current network state is displayed."); }
   } catch {
     document.getElementById("status").textContent =
       "Fail-closed: native registry unavailable; all operations disabled.";

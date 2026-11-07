@@ -1,0 +1,26 @@
+# Implemented native interfaces and evidence boundaries
+
+## Public upstream interfaces used
+
+- [Official skill](https://minepoa.com/skill.md), metadata version `0.80-mainnet1`: self-custody Ed25519 client, native POA transfers, mining, identity/chains-map updates, native swap escrow and finality reports.
+- [Official public client](https://minepoa.com/client/poa.mjs): contains replay code as well as CLI/signature helpers. Sorted-key recursive JSON is signed with Ed25519; native address is `poa1` + Base58 of the raw 32-byte public key; txid is SHA-256 of the canonical body excluding `sig`. `cid` binds a transaction signature to a network. Replay rejects unknown transaction types. This project independently implements a bounded wire subset; no upstream source or unspecified license is copied/vendored.
+- [Official OpenAPI](https://minepoa.com/openapi.yaml): `/api/network-facts`, `/api/receipt/{txid}` and chain-scoping (`/chain/{chain_id}/` prefix for endpoints). Current/default/frozen network identities are documented via `/api/networks`; this implementation does not follow a default-network switch.
+- [Public node status](https://minepoa.com/chain/poa-mainnet-1/api/status) and [network facts](https://minepoa.com/chain/poa-mainnet-1/api/network-facts): chain identity, reported checkpoint/counters, epoch, engine/parameter hashes and reported threshold. This implementation projects only validated public fields, not economics or account secrets.
+
+The inspected native replay transaction dispatcher has no domain deed, child right, naming auction, naming refund or naming settlement operation. No native naming extension/adoption interface or authoritative naming state proof was verified. This is not a claim that the native runtime is closed or that native extensions are impossible. Public client source exists, but publishing this separate repository does not alter the node's accepted replay/consensus rules.
+
+## Supported library interfaces
+
+`NativeReader.network()` and `.receipt(txid)` use fixed documented public GET routes. `NativeMonitor.observe()` adds coalescing and in-memory rollback/release-drift tripwires. `validateNetworkDocument(value)` rejects expired/invalid build observations. A reported engine hash is provenance information, not a verified release signature. A receipt is an observation, never a financial authorization.
+
+`verifyNativeEnvelope(body, {chainId, txid})` checks the expected hash, `cid` and signature against `body.from`. `signNativeEnvelope(unsigned, chainId, {address, sign})` is library-only and restricted to the documented transfer-body subset: explicit `type,from,to,amount,nonce,ts,parents,cid` and optional `memo`. Amount is a positive exact decimal string with at most six fractional digits, converted with BigInt and bounded to `2^127-1` units. The callback receives copied preimage bytes, and its output is checked against the stated public signer before return. The caller controls signing authorization; this application loads no key, estimates no nonce/time/balance, and never broadcasts.
+
+`verifyNativeCheckpointSignatures({state_root,height,sigs}, {chainId,expectedRoot,expectedHeight,trustedVerifiers,threshold})` validates the upstream checkpoint signature-body subset (`type:checkpoint-sig,root,height,verifier`). Duplicates, untrusted signers, changed root/height or forged signatures reject. Trusted signers and threshold must be explicitly supplied. The result separately reports quorum, but always reports network binding, state-root computation, external anchoring and finality as unverified. The upstream checkpoint signature body has no chain ID; adding a local context label cannot repair that cryptographically.
+
+The Pages builder publishes either a real, expiring public-node observation or an unavailable document. It never substitutes a fixture, local reference ledger or GitHub file for authoritative native ownership. Browser refresh rereads fixed same-origin build files only. The localhost API/CLI/MCP can explicitly read current public node reports, with no naming writes.
+
+## Actual unavailable production capabilities
+
+There is no adopted native naming registry, native naming transaction submission, authoritative domain ownership proof, consensus-clock/order integration, verified native settlement/finality or independent security audit. No naming payment asset, fee, reserve, increment, reservation, custody, pinning or arbitration policy has been approved as production policy. Fixture `system`/`admin` reservations and fixture economics remain test-only. The Unicode 17 subset and raw-CID metadata witness remain explicitly limited reference capabilities, not adopted native policy. No IPFS upload/pinning, live account, treasury operation or protocol deployment is performed.
+
+Monitoring is a process-local read-only tripwire, not a persistent consensus watcher. There is no automated native-state backup/restore, incident-response operator service, persistent release approval or external-anchor verifier. Upstream availability and unsigned initial reports remain trust limitations. Existing checksummed local reference journals are not native network backups.

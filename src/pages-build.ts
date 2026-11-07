@@ -12,6 +12,8 @@ import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { canonical, need, noSecrets } from "./core.js";
+import { NativeMonitor, nativeFailure, validateNetworkDocument } from "./native.js";
+import { Fault } from "./core.js";
 import { productionStatus } from "./production.js";
 
 export const PUBLIC_FILES = [
@@ -21,6 +23,7 @@ export const PUBLIC_FILES = [
   "icon.svg",
   "config.json",
   "status.json",
+  "network.json",
   ".nojekyll",
 ] as const;
 // Known generated assets from the replaced public demo may be removed, but an
@@ -33,7 +36,8 @@ const previous = new Set([
   "demo/examples.json",
   "demo/details.json",
 ]);
-export function buildProductionBundle(directory = resolve("_site")) {
+export function buildProductionBundle(directory = resolve("_site"), observation: unknown = nativeFailure(new Fault("NOT_OBSERVED"))) {
+  const network = validateNetworkDocument(observation);
   const output = resolve(directory);
   need(
     output === resolve("_site") ||
@@ -72,6 +76,7 @@ export function buildProductionBundle(directory = resolve("_site")) {
         mode: "production-only",
         publicApiBase: null,
         statusFile: "./status.json",
+        networkFile: "./network.json",
       }),
     "PRODUCTION_WEB_CONFIG",
   );
@@ -85,6 +90,8 @@ export function buildProductionBundle(directory = resolve("_site")) {
     join(output, "status.json"),
     JSON.stringify(status, null, 2) + "\n",
   );
+  noSecrets(network);
+  writeFileSync(join(output, "network.json"), JSON.stringify(network, null, 2) + "\n");
   const policy =
     "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'";
   writeFileSync(
@@ -127,4 +134,4 @@ if (
   process.argv[1] &&
   fileURLToPath(import.meta.url) === resolve(process.argv[1])
 )
-  console.log(JSON.stringify(buildProductionBundle(), null, 2));
+  console.log(JSON.stringify(buildProductionBundle(undefined, await new NativeMonitor().observe().catch(nativeFailure)), null, 2));

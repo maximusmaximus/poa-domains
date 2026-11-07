@@ -6,9 +6,9 @@ The production surface is an unavailable-registry guard, not a service for real 
 
 The main CLI/API/MCP import no reference engine, signer, client, store or fixture generator. Their import graph and command/HTTP/RPC rejection behavior are regression-tested. Configuration, backend URLs, supplied files and mode flags cannot enable native naming. Registry readiness is always false; liveness must never be used as a readiness signal.
 
-Production entry points never inspect supplied signer/config files or inherited credentials. The public build imports only availability metadata and selected web assets. It neither generates nor consumes test accounts, balances, deeds, bids or settlement receipts. A structurally valid availability document is not a cryptographic network capability proof; no native network is contacted.
+Production entry points never inspect supplied signer/config files or inherited credentials. The public build imports availability metadata, the fixed public native reader and selected web assets. It neither generates nor consumes test accounts, balances, deeds, bids or settlement receipts. A structurally valid availability document is not a cryptographic network capability proof; explicit native reads only contact fixed documented public HTTPS routes.
 
-The production HTTP server is loopback-only, bounded by connection/time limits, and rejects registry requests without parsing their bodies. Production MCP advertises only a read-only status tool. No field can activate a registry or simulated fallback.
+The production HTTP server is loopback-only, bounded by connection/time limits, and rejects registry requests without parsing their bodies. Production MCP advertises read-only availability/native-network/native-receipt tools. No field can activate a registry or simulated fallback.
 
 ## Credentials
 
@@ -45,8 +45,16 @@ Use GitHub's private vulnerability-reporting channel if the repository enables o
 
 ## Public production-only Pages
 
-Only seven availability assets are published from `_site/`. There is no fixture JSON, ownership explorer, handoff generator, signer or backend URL. The browser uses textContent and fixed same-origin GET paths only; forged ready/native fields, extra ledger fields, backend overrides and demo mode fail closed. Generated stale demo files are removed after strict path/type checks; unknown files or symlinks stop the build rather than being uploaded or silently deleted.
+Only eight public assets are published from `_site/`. There is no fixture JSON, ownership explorer, handoff generator, signer or configurable backend URL. A public-node observation is build-time, unverified and expires after 15 minutes. The browser uses textContent and fixed same-origin GET paths only; forged ready/native fields, extra ledger fields, backend overrides and demo mode fail closed. Generated stale demo files are removed after strict path/type checks; unknown files or symlinks stop the build rather than being uploaded or silently deleted.
 
 Builds/tests run with an allowlisted environment (HOME/PATH/LANG), excluding inherited credentials; no environment dump occurs. Reference fixture keys are generated only by isolated automated tests/local reference tools, never the public build. Test-only static output uses a temporary directory and is removed after browser verification.
 
 The trusted-main-only Pages build job has contents-read permission. The separate deployment job has Pages-write/OIDC-write, checks out no source and runs the pinned official action. Pull-request jobs cannot trigger deployment or receive those privileges. Only `_site/` is uploaded, never reference test output, repository/runtime data, keys, environment files or evidence.
+
+## Native read and cryptographic boundaries
+
+The public transport uses a literal documented HTTPS origin/chain/path allowlist, no redirects, strict TLS, bounded response/time/concurrency limits and a curl subprocess with `--disable` first and an explicit PATH/LANG-only environment. It never invokes a shell or reads curl config, credentials, cookies, netrc, key files or an inherited credential environment. Untrusted endpoint strings cannot be passed through API/CLI/MCP. Raw upstream bodies/errors are never logged or forwarded. Fractional public-node JSON parsing is separate from integer-only registry amounts.
+
+All native information remains `node-reported-unverified`; no JSON final/covered flag becomes proof of settlement. Cross-network and inconsistent snapshots fail closed. In-process rollback/release-drift tripwires do not authenticate the initial baseline, detect all reorgs or survive restart. There is no persistent native-state backup, authoritative resolver, independent operational monitoring service or audited native naming deployment here.
+
+Wire envelope signatures and checkpoint signer quorum are mathematical checks only. Native transfer signing is a library-only explicit caller callback and supports a restricted documented body subset, exact decimal strings (six native POA decimals) and bounded 127-bit units. It infers no balances, nonces, timestamps, policies, permissions or settlement. Native naming signatures are unsupported. Checkpoint preimages omit chain ID, so signer quorum alone cannot prove chain binding or anchoring. Trusted signer sets/thresholds are caller inputs, never inferred from untrusted node reports. All finality claims remain false.

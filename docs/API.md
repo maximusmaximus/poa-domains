@@ -2,13 +2,27 @@
 
 The default executable is `dist/src/cli.js`. `status` and `capabilities` report `mode:production-only`, `operational:false`, `nativeNamingVerified:false`, `backend:null`, `actions:[]`, `accepted:false`, `submitted:false` and `code:NATIVE_NAMING_UNAVAILABLE`. `ready` returns the same document with exit 1. This is static application availability metadata, not a live chain capability check.
 
-`serve` starts a loopback status-only HTTP server. `/healthz` is process liveness (200; registryReady false); `/readyz` is registry readiness (503). `/v1/status` and `/v1/capabilities` return availability metadata (200). Every other `/v1/` path, including state, resolve, nonce, receipts and intent submission, returns HTTP 503 with the unavailable document. No request body is used for settlement. No native receipt or ownership data exists here.
+`serve` starts a loopback read-only HTTP server. `/healthz` is process liveness (200; registryReady false); `/readyz` is registry readiness (503). `/v1/status` and `/v1/capabilities` return availability metadata (200). Except for the explicit native read routes described below, every other `/v1/` path, including state, resolve, nonce, receipts and intent submission, returns HTTP 503 with the unavailable document. No request body is used for settlement. No naming receipt or ownership data exists here.
 
 Configuration/ledger injection into the production server is rejected; only a numeric listening port is accepted. The production CLI rejects config/data options without reading files, and rejects supplied URLs, key/input/output paths and all registry/signing/handoff commands. There is no environment-based reference fallback.
 
-`cli.js mcp` supports the initialization handshake, read-only `registry_status`, ping and empty resources/prompts. Only `registry_status` is listed. Reference tool names such as `read_state` and `submit_intent` return `isError:true` with the unavailable document; no provider, fixture, ledger or signer is loaded.
+`cli.js mcp` supports the initialization handshake, read-only `registry_status`, ping and empty resources/prompts. The additional `native_network` and `native_receipt` tools use fixed public read-only routes; no caller-selected endpoint is accepted. Reference tool names such as `read_state` and `submit_intent` return `isError:true` with the unavailable document; no caller-selected provider, fixture, local ledger or signer is loaded.
 
-Public Pages only serves a fixed availability interface. It has no API, state explorer, wallet, unsigned-body builder or transaction form. Browser configuration is exactly `mode:production-only`, `publicApiBase:null`, `statusFile:./status.json`; any demo mode, provider override or simulated state fails closed.
+Public Pages serves a fixed availability interface and expiring build-time native-node observation. It has no API, state explorer, wallet, unsigned-body builder or transaction form. Browser configuration is exactly `mode:production-only`, `publicApiBase:null`, `statusFile:./status.json`, `networkFile:./network.json`; any demo mode, provider override or simulated state fails closed.
+
+## Native public reads (not naming)
+
+| Interface | Network report | Native receipt report |
+| --- | --- | --- |
+| CLI | `native-network` | `native-receipt --id TXID` |
+| HTTP GET | `/v1/native/network` | `/v1/native/receipts/TXID` |
+| MCP | `native_network {}` | `native_receipt {"txid":"64_lowercase_hex"}` |
+
+These only contact documented HTTPS routes on the pinned official origin/network. No credentials, POST, redirects, arbitrary endpoints or automatic retries are accepted. Network observations have `verification:node-reported-unverified`, `registryReady:false`, `finalityVerified:false`, local `observedAt`/`expiresAt`, reported checkpoint/counters and engine/parameter hashes. The observation timestamp is local read time, not authoritative consensus time. API network reads coalesce/cache for 10 seconds; long-running API/MCP monitoring latches rollback/release drift in memory.
+
+Native receipt `reportedStatus` is `included`, `rejected` or `unknown` (upstream 404). Any checkpoint/open-window flags are explicitly only reported. `finalityVerified:false`, `safeToResubmit:false`, `submitted:false` are invariant. No server hint, unknown receipt or HTTP flag authorizes retry, spend or settlement. Invalid IDs return HTTP 400 before external access; upstream failure/invalid data returns HTTP 502 with a bounded error code, never an upstream body. Query parameters, extra MCP arguments and provider/config/key options do not select another source.
+
+The wire verification and offline transfer-signer library interfaces are described in [NATIVE.md](NATIVE.md); they are not HTTP/CLI/MCP signing endpoints.
 
 ## Isolated reference protocol — tests/local research only
 

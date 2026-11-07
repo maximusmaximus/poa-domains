@@ -157,7 +157,7 @@ test("production CLI cannot read supplied files, sign, contact fixture endpoints
   });
 });
 
-test("production MCP advertises only status and refuses reference tools or supplied synthetic settlement", async () => {
+test("production MCP advertises only status and public-node reads and refuses reference tools or supplied synthetic settlement", async () => {
   const messages = [
     { id: 1, method: "initialize", params: {} },
     { method: "notifications/initialized" },
@@ -214,7 +214,7 @@ test("production MCP advertises only status and refuses reference tools or suppl
     result
       .find((row) => row.id === 2)
       .result.tools.map((tool: any) => tool.name),
-    ["registry_status"],
+    ["registry_status", "native_network", "native_receipt"],
   );
   assert.deepEqual(
     JSON.parse(result.find((row) => row.id === 3).result.content[0].text),
@@ -255,4 +255,24 @@ test("production entrypoint import graphs cannot load reference engines, signers
     "pages-build.ts",
   ])
     visit(resolve("src", file));
+});
+
+
+test("new native read entry points reject provider/fixture injection and malformed identifiers before external reads", async () => {
+  for (const args of [
+    ["native-network", "--url", "http://127.0.0.1:1"],
+    ["native-network", "--key-file", "/nonexistent-do-not-read"],
+    ["native-receipt", "--id", "../status"],
+    ["native-receipt", "--id", "0".repeat(64), "--url", "https://example.invalid"],
+  ]) await assert.rejects(exec(process.execPath, [cli, ...args]), (error: any) => {
+    assert.equal(error.code, 1); assert.equal(error.stdout, "");
+    assert.ok([UNAVAILABLE, "NATIVE_DIGEST"].includes(JSON.parse(error.stderr).code)); return true;
+  });
+  const server = await startServer();
+  try {
+    for (const path of ["/v1/native/network?endpoint=http://127.0.0.1:1", "/v1/native/receipts/" + "0".repeat(64) + "?mode=local-reference-only"])
+      assert.equal((await fetch(server.url + path)).status, 503);
+    assert.equal((await fetch(server.url + "/v1/native/receipts/invalid")).status, 400);
+    assert.equal((await fetch(server.url + "/v1/native/network", { method: "POST", body: "{}" })).status, 503);
+  } finally { await server.close(); }
 });

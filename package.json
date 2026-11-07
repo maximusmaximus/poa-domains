@@ -25,7 +25,8 @@
     "reference:demo": "npm run build && node dist/src/reference-demo.js",
     "reference:pages:smoke": "npm run build && node dist/test/reference-pages-smoke.js",
     "start": "node dist/src/cli.js serve",
-    "production:smoke": "npm run build && node dist/test/production-smoke.js"
+    "production:smoke": "npm run build && node dist/test/production-smoke.js",
+    "native:smoke": "npm run build && node dist/test/native-live-smoke.js"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

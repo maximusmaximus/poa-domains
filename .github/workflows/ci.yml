@@ -1,4 +1,4 @@
-name: reference-checks
+name: native-and-reference-checks
 on:
   push:
   pull_request:

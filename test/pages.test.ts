@@ -32,6 +32,7 @@ test("production Pages allowlist contains no fixture ledger, signer, schema hand
         mode: "production-only",
         publicApiBase: null,
         statusFile: "./status.json",
+        networkFile: "./network.json",
       },
     );
     const app = readFileSync(join(dir, "app.js"), "utf8");

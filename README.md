@@ -1,12 +1,12 @@
-# PoA domains — production-only availability guard
+# PoA domains — native public reads and isolated naming reference
 
 Public site: https://maximusmaximus.github.io/poa-domains/
 
-**The native naming registry is unavailable. This repository is not production-ready native PoA naming.** The public site displays only application availability. It does not display simulated ownership, balances, auctions, records or transaction receipts, and has no signing or transaction handoff form.
+**The native naming registry is unavailable. This repository is not production-ready native PoA naming.** The public site displays application availability and, when obtainable, an expiring build-time observation of the official native node. It does not display simulated ownership, balances, auctions, records or transaction receipts, and has no signing or transaction handoff form.
 
 ## Production entry points
 
-The default CLI, API and MCP never initialize a reference ledger, read supplied key/configuration files, connect to a provider, or fall back to test data. There is no flag, credential, environment switch or endpoint override that enables registry operations.
+The default CLI, API and MCP never initialize a reference ledger, read supplied key/configuration files, accept a caller-selected provider, or fall back to test data. Explicit native reads contact only the documented public node; they do not enable naming. There is no flag, credential, environment switch or endpoint override that enables registry operations.
 
 ```sh
 npm ci --ignore-scripts
@@ -14,22 +14,36 @@ npx playwright install --with-deps chromium
 npm run build
 node dist/src/cli.js status       # availability metadata; operational:false
 node dist/src/cli.js ready        # unavailable; exits 1
-node dist/src/cli.js mcp          # stdio; registry_status is the only tool
-npm start                        # status-only API on http://127.0.0.1:8787
+node dist/src/cli.js native-network # real public status + engine/parameter hashes
+node dist/src/cli.js native-receipt --id TXID # reported native receipt, not finality
+node dist/src/cli.js mcp          # stdio; registry_status/native_network/native_receipt
+npm start                        # read-only API on http://127.0.0.1:8787
 ```
 
-The status-only API has no ownership or settlement backend:
+The read-only API has no ownership or settlement backend:
 
 | Path                                     | Current behavior                                                             |
 | ---------------------------------------- | ---------------------------------------------------------------------------- |
 | `GET /healthz`                           | HTTP 200, process alive, `registryReady:false`                               |
 | `GET /readyz`                            | HTTP 503, `NATIVE_NAMING_UNAVAILABLE`                                        |
 | `GET /v1/status`, `GET /v1/capabilities` | Availability metadata, `operational:false`, empty native actions, no backend |
+| `GET /v1/native/network`                 | Public node report; HTTP 502 on invalid/unavailable data, no fixture fallback |
+| `GET /v1/native/receipts/TXID`            | Reported native receipt; unknown never authorizes retry or finality |
 | Registry reads and writes under `/v1/`   | HTTP 503, `accepted:false`, `submitted:false`, no state or receipt           |
 
 Production CLI signing, preparation, handoffs, submission, state/receipt/nonce/resolve/export commands are rejected. Supplied `--config`/`--data` are rejected without file access. Supplied provider URLs and key/input/output paths do not enable processing. Status metadata is not a live network probe; process liveness is not registry readiness.
 
-`npm run pages:build` emits exactly seven public availability assets into `_site/`. The builder imports no fixture generator or reference engine. The browser only reads relative configuration/status JSON and rejects demo modes, backend overrides, forged ready flags and extra ledger fields. Prior generated demo files are removed during a validated rebuild; unexpected artifacts or symlinks fail the build. GitHub Pages hosts no `/v1` API.
+`npm run pages:build` emits exactly eight public assets into `_site/`. The builder imports no fixture generator or reference engine. The browser only reads relative configuration/status/network-observation JSON and rejects demo modes, backend overrides, forged ready flags and extra ledger fields. Prior generated demo files are removed during a validated rebuild; unexpected artifacts or symlinks fail the build. GitHub Pages hosts no `/v1` API.
+
+## Implemented native components
+
+- Fixed documented, chain-scoped public HTTPS reads from `https://minepoa.com/chain/poa-mainnet-1/api/status`, `network-facts` and `receipt/TXID`. No authentication or writes. **Node 22.15+ and a standard `curl` executable are required.** The curl subprocess disables configuration, follows no redirects, and receives only an explicit PATH/LANG environment, never inherited credentials. Timeout/body/concurrency limits and strict field/duplicate-key validation fail closed.
+- API/CLI/MCP expose the same native read capabilities. API observations coalesce/cache for at most 10 seconds. Chain mismatch, inconsistent epoch/quorum fields, future checkpoints and invalid provenance hashes are rejected. Process-memory monitoring latches observed checkpoint rollback, epoch rollback or engine/parameter hash drift. This is not a consensus/reorg detector and the baseline is not persisted across restart.
+- `src/native-crypto.ts` implements the native sorted-JSON/SHA-256/Base58/Ed25519 wire subset. `verifyNativeEnvelope` checks the expected transaction hash and chain-bound signature, **not** replay validity, balance, nonce availability, PoW, adoption or finality. A library-only transfer signer accepts an explicit caller callback, decimal-string amount, nonce, parents, timestamp and chain; it loads no keys and broadcasts nothing. It supports only the documented transfer-body subset, never naming transactions; the default CLI/API/MCP expose no signing operation.
+- Checkpoint signature-bundle verification requires caller-supplied expected root/height, trusted public signers and threshold. Quorum does **not** establish root computation, network binding, external anchors or finality. The upstream checkpoint-signature body has no chain ID. No unapproved signer set or threshold is selected.
+- The Pages builder uses these real public reads, or publishes an unavailable document if the node cannot be read. The eight-file bundle contains no fixture ledger. Observations expire after 15 minutes and are hidden when stale/invalid. Refresh rereads the published build, not a live subscription. An observed native ledger is not an operational naming registry.
+
+[Exact upstream interfaces and verification boundaries](docs/NATIVE.md).
 
 ## Verify
 
@@ -38,6 +52,7 @@ Node 22.15+ is required (tested with Node 24). CI uses Ubuntu 24.04 and locked d
 ```sh
 npm run check
 bash scripts/gitleaks.sh
+npm run native:smoke # explicit GET-only public-network smoke; requires node availability
 ```
 
 The complete check includes production guard/API/CLI/MCP regressions, production smoke, the retained isolated reference test suite, both browser test surfaces, Unicode subset audit and npm advisory checks. Tests use ephemeral unfunded keys and synthetic fixtures only where explicitly testing the reference engine; no real PoA state is changed. [Test details](docs/TESTING.md).
@@ -68,7 +83,7 @@ The fixture reserved names are exactly `system` and `admin` (`src/config.ts`); t
 
 ## Actual limitations
 
-This independently runnable reference is **not a native PoA extension or adopted naming/NFT protocol**, has no consensus/ingress proof or network transaction adapter, and is not safe for real assets. There is no external-chain settlement, bridge, oracle, custody service, identity linking, arbitration/dispute mechanism, post-bid outage cancellation or key recovery. Such actions are absent/unsupported, not administratively improvised.
+This independently runnable reference is **not a native PoA extension or adopted naming/NFT protocol**, has no consensus/ingress proof or adopted naming transaction adapter, and is not safe for real assets. There is no external-chain settlement, bridge, oracle, custody service, identity linking, arbitration/dispute mechanism, post-bid outage cancellation or key recovery. Such actions are absent/unsupported, not administratively improvised.
 
 The journal replays the complete history; there is no checkpoint acceleration, horizontal writer coordination or authenticated public resolver proof. Filesystem integrity and the local operator/clock are trusted. A stale writer lock after a crash requires operator verification/recovery, not automatic lock stealing. State growth and public reads are not production-scale DoS defenses. UI state can be stale: `asOf` and sequence describe the last local commit, not elapsed wall time or chain finality.
 

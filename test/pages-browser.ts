@@ -21,7 +21,7 @@ export async function verifyStaticPage(url: string, screenshot?: string) {
     });
     const allowed = new Set([
       expected.pathname,
-      ...["app.js", "style.css", "icon.svg", "config.json", "status.json"].map(
+      ...["app.js", "style.css", "icon.svg", "config.json", "status.json", "network.json"].map(
         (file) => expected.pathname + file,
       ),
     ]);
@@ -84,6 +84,24 @@ export async function verifyStaticPage(url: string, screenshot?: string) {
     checks.push(
       "refresh reads only fixed same-origin availability documents, never a backend",
     );
+    const observedAt = Date.now();
+    const observation = { kind: "native-network-observation", source: "https://minepoa.com", chainId: "poa-mainnet-1", observedAt, expiresAt: observedAt + 900000, verification: "node-reported-unverified", finalityVerified: false, registryReady: false, checkpoint: { height: 50, cutoffTs: Math.floor(observedAt / 1000) - 1 }, epochsClosed: 1, agentsJoined: 2, transactions: 3, reportedFinalTransactions: 2, attestationThreshold: 5, engineSha256: "a".repeat(64), paramsSha256: "b".repeat(64) };
+    // Browser-only controlled responses: never emitted by the production build.
+    await page.route("**/network.json", route => route.fulfill({ contentType: "application/json", body: JSON.stringify(observation) }));
+    await page.locator("#refresh").click();
+    await page.waitForFunction(() => document.querySelector("#network-status")?.textContent?.includes("Official-node observation"));
+    assert.match(await page.locator("#network-details").innerText(), /Network: poa-mainnet-1/);
+    assert.match(await page.locator("#network-status").innerText(), /unverified/);
+    checks.push("node observation is explicitly unverified and never changes naming readiness");
+    for (const value of [{ ...observation, observedAt: observedAt - 900001, expiresAt: observedAt - 1 }, { ...observation, registryReady: true }, { ...observation, chainId: '<img src=x onerror="window.pwned=true">' }, { kind: "native-network-unavailable" }]) {
+      await page.route("**/network.json", route => route.fulfill({ contentType: "application/json", body: JSON.stringify(value) }));
+      await page.locator("#refresh").click();
+      await page.waitForFunction(() => document.querySelector("#network-status")?.textContent?.includes("no current network state"));
+      assert.equal(await page.locator("#network-details").innerText(), "");
+      assert.equal(await page.locator("img").count(), 0);
+    }
+    await page.unroute("**/network.json");
+    checks.push("stale, absent, forged-ready or injected observations show no network values and no synthetic fallback");
     await page.route("**/status.json", (route) =>
       route.fulfill({
         contentType: "application/json",

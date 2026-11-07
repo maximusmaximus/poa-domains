@@ -28,11 +28,18 @@
         </p>
         <p id="source">
           No connection to a native registry. This is application availability
-          information, not live chain state or a capability probe.
+          information, not naming ownership or a capability probe.
         </p>
         <p id="status" role="status">Fail-closed: unavailable</p>
         <p id="error" role="alert"></p>
         <button id="refresh" type="button">Refresh availability</button>
+      </section>
+      <section aria-labelledby="network-title">
+        <h2 id="network-title">Native network observation</h2>
+        <p>Read from the official public node at build time, not a live subscription. Node-reported information is not cryptographically verified consensus, ownership or finality. No registry capability is inferred.</p>
+        <p id="network-status" role="status">Network observation unavailable.</p>
+        <pre id="network-details"></pre>
+        <p>After 15 minutes the observation expires; refresh only rereads this published build. The API, CLI and MCP support explicit current public-node reads.</p>
       </section>
       <footer>
         <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer"
