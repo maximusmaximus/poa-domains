@@ -266,3 +266,54 @@ test("submitted packet and returned snapshots cannot mutate committed state", ()
     c.e.config.feeBps = 9999;
   });
 });
+test("browser shared module maintains exact canonical, normalization, parser, and digest parity with engine", async () => {
+  const web: any = await import(
+    new URL("../../web/shared.js", import.meta.url).href
+  );
+  const c = setup();
+  const cap = capabilities(c.e);
+  for (const a of manifest.aliases) {
+    assert.equal(web.normalize(a.input, manifest), a.canonical);
+  }
+  assert.equal(web.normalize("poa:ALPHA.🚀", manifest), "alpha.🚀");
+  for (const badKey of ["a\u0000b", "a\ud800b"]) {
+    assert.throws(() => canonical({ [badKey]: 1 }));
+    assert.throws(() => web.canonical({ [badKey]: 1 }));
+    assert.throws(() =>
+      web.parsePublicJSON(JSON.stringify({ [badKey]: "ok" })),
+    );
+  }
+  for (const badJson of [
+    '{"a":1,"a":2}',
+    '{"a":1.5}',
+    '{"privateKey":"x"}',
+    '{"a":"\\u0000"}',
+    '{"a":"\\ud800"}',
+    "[" + "0,".repeat(256) + "0]",
+  ]) {
+    assert.throws(() => web.parsePublicJSON(badJson));
+  }
+  const input = {
+    signer: c.alice.id,
+    coSigners: [c.bob.id],
+    requestId: "parity-check-1",
+    nonce: 0,
+    notBefore: 100,
+    deadline: 200,
+    maxTotal: "500",
+    maxNetworkFee: "0",
+    action: "transfer",
+    params: {
+      name: "poa:ALPHA",
+      expectedDeedId: "deed-1",
+      expectedVersion: 1,
+      recipient: c.carol.id,
+    },
+  };
+  const engineBody = prepare(input, cap);
+  const webBody = web.makeBody(input, cap);
+  assert.deepEqual(webBody, engineBody);
+  assert.equal(web.canonical(webBody), canonical(engineBody));
+  assert.equal(await web.digest(webBody), intentId(engineBody));
+  assert.match(web.instructions(webBody, intentId(engineBody)), /submit_intent/);
+});

@@ -11,9 +11,11 @@
     "poa-domains": "dist/src/cli.js"
   },
   "scripts": {
+    "clean": "node -e \"import('node:fs').then(fs => fs.rmSync('dist', { recursive: true, force: true }))\"",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test dist/test/*.test.js",
+    "test:coverage": "npm run build && node --test --experimental-test-coverage dist/test/*.test.js",
     "smoke": "npm run build && node dist/test/smoke.js",
     "demo": "npm run build && node dist/src/demo.js",
     "unicode:audit": "node scripts/unicode-audit.mjs",

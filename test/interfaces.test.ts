@@ -190,6 +190,42 @@ test("API and CLI preserve exact signed body, nonce, receipt and canonical resol
     assert.deepEqual(cap.actions, ACTIONS);
     assert.equal(Object.keys(cap.actions).length, 17);
     assert.equal(cap.livePoA, false);
+    const nonceOut = JSON.parse(
+      (
+        await exec(process.execPath, [
+          cli,
+          "nonce",
+          "--url",
+          s.url,
+          "--signer",
+          c.alice.id,
+        ])
+      ).stdout,
+    );
+    assert.equal(nonceOut.nonce, c.e.nextNonce(c.alice.id));
+    const handoffOut = JSON.parse(
+      (
+        await exec(process.execPath, [
+          cli,
+          "handoff",
+          "--file",
+          unsignedFile,
+        ])
+      ).stdout,
+    );
+    assert.equal(handoffOut.intentId, intentId(prepared));
+    const stateFile = join(dir, "state-export.json");
+    await exec(process.execPath, [
+      cli,
+      "state",
+      "--url",
+      s.url,
+      "--out",
+      stateFile,
+    ]);
+    const home = await fetch(s.url + "/");
+    assert.equal(home.status, 200);
+    assert.match(home.headers.get("content-security-policy") ?? "", /default-src 'none'/);
     if (process.platform !== "win32") {
       const insecureKey = join(dir, "insecure.pem");
       writeFileSync(
@@ -271,6 +307,12 @@ test("MCP stdio handshake and exact signed intent share HTTP receipt/idempotency
       rpc(3, "tools/call", { name: "read_capabilities", arguments: {} }),
       rpc(4, "tools/call", { name: "submit_intent", arguments: packet }),
       rpc(5, "tools/call", { name: "submit_intent", arguments: packet }),
+      rpc(6, "ping"),
+      rpc(7, "tools/call", { name: "read_state", arguments: {} }),
+      rpc(8, "resources/list"),
+      rpc(9, "prompts/list"),
+      rpc(10, "tools/call", { name: "unknown_tool", arguments: {} }),
+      rpc(11, "unknown/method"),
     ]);
     assert.equal(replies[0].result.protocolVersion, "2025-11-25");
     assert.equal(replies[1].result.tools.length, 3);
@@ -280,6 +322,17 @@ test("MCP stdio handshake and exact signed intent share HTTP receipt/idempotency
     assert.deepEqual(a, b);
     assert.equal(a.intentId, intentId(packet.body));
     assert.equal(c.deed("alpha").owner, c.carol.id);
+    assert.deepEqual(replies[5].result, {});
+    assert.equal(
+      JSON.parse(replies[6].result.content[0].text).state.deeds[
+        c.deed("alpha").id
+      ].owner,
+      c.carol.id,
+    );
+    assert.deepEqual(replies[7].result, { resources: [] });
+    assert.deepEqual(replies[8].result, { prompts: [] });
+    assert.equal(replies[9].result.isError, true);
+    assert.equal(replies[10].error.message, "METHOD_NOT_FOUND");
   } finally {
     await s.close();
   }
