@@ -190,6 +190,25 @@ test("API and CLI preserve exact signed body, nonce, receipt and canonical resol
     assert.deepEqual(cap.actions, ACTIONS);
     assert.equal(Object.keys(cap.actions).length, 17);
     assert.equal(cap.livePoA, false);
+    if (process.platform !== "win32") {
+      const insecureKey = join(dir, "insecure.pem");
+      writeFileSync(
+        insecureKey,
+        c.alice.key.export({ format: "pem", type: "pkcs8" }),
+        { mode: 0o644 },
+      );
+      await assert.rejects(
+        exec(process.execPath, [
+          cli,
+          "sign",
+          "--file",
+          unsignedFile,
+          "--key-file",
+          insecureKey,
+        ]),
+        /KEY_FILE_PERMISSIONS/,
+      );
+    }
   } finally {
     await s.close();
     c.e.close();
