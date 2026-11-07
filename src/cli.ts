@@ -55,7 +55,9 @@ try {
     const keys = v["key-file"].map((path) => {
       const st = statSync(path);
       need(
-        st.isFile() && st.size <= 8192 && (st.mode & 0o077) === 0,
+        st.isFile() &&
+          st.size <= 8192 &&
+          (process.platform === "win32" || (st.mode & 0o077) === 0),
         "KEY_FILE_PERMISSIONS",
       );
       const key = createPrivateKey(readFileSync(path));

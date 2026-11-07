@@ -40,9 +40,12 @@ export class Journal implements Persistence {
       throw new Fault("WRITER_LOCKED");
     }
     try {
-      writeSync(lockFd, String(process.pid) + "\n");
-      fsyncSync(lockFd);
-      closeSync(lockFd);
+      try {
+        writeSync(lockFd, String(process.pid) + "\n");
+        fsyncSync(lockFd);
+      } finally {
+        closeSync(lockFd);
+      }
       const manifestPath = join(dir, "manifest.json");
       if (!existsSync(manifestPath)) {
         const mf = openSync(manifestPath, "wx", 0o600);
@@ -75,10 +78,10 @@ export class Journal implements Persistence {
         constants.O_RDWR |
           constants.O_CREAT |
           constants.O_APPEND |
-          constants.O_NOFOLLOW,
+          (constants.O_NOFOLLOW ?? 0),
         0o600,
       );
-      if (created) {
+      if (created && process.platform !== "win32") {
         const dfd = openSync(dir, "r");
         try {
           fsyncSync(dfd);
@@ -90,8 +93,17 @@ export class Journal implements Persistence {
       const end = bytes.lastIndexOf(10) + 1;
       // Only an unterminated tail is recoverable. An acknowledged record has newline + fsync.
       if (end < bytes.length) {
-        ftruncateSync(this.fd, end);
-        fsyncSync(this.fd);
+        const tfd = openSync(
+          path,
+          constants.O_RDWR | (constants.O_NOFOLLOW ?? 0),
+          0o600,
+        );
+        try {
+          ftruncateSync(tfd, end);
+          fsyncSync(tfd);
+        } finally {
+          closeSync(tfd);
+        }
       }
       for (const line of bytes
         .subarray(0, end)
