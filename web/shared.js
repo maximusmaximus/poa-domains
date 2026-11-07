@@ -1,7 +1,15 @@
 // Browser utilities: untrusted content stays data, never HTML or executable code.
 export function canonical(value) {
-  if (value === null || typeof value === "boolean" || typeof value === "string")
+  if (value === null || typeof value === "boolean")
     return JSON.stringify(value);
+  if (typeof value === "string") {
+    if (
+      value.length > 1000000 ||
+      /[\u0000-\u001f\ud800-\udfff]/u.test(value)
+    )
+      throw Error("Invalid canonical string");
+    return JSON.stringify(value);
+  }
   if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0)
     return String(value);
   if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
@@ -10,7 +18,11 @@ export function canonical(value) {
       "{" +
       Object.keys(value)
         .sort()
-        .map((k) => JSON.stringify(k) + ":" + canonical(value[k]))
+        .map((k) => {
+          if (k.length > 1024 || /[\u0000-\u001f\ud800-\udfff]/u.test(k))
+            throw Error("Invalid canonical key");
+          return JSON.stringify(k) + ":" + canonical(value[k]);
+        })
         .join(",") +
       "}"
     );
@@ -18,9 +30,21 @@ export function canonical(value) {
 }
 export function safeObject(value, depth = 0) {
   if (depth > 24) throw Error("Depth");
-  if (value && typeof value === "object")
+  if (typeof value === "string") {
+    if (
+      value.length > 16384 ||
+      /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/.test(value) ||
+      /[\u0000-\u001f\ud800-\udfff]/u.test(value)
+    )
+      throw Error("Unsafe string");
+  } else if (Array.isArray(value)) {
+    if (value.length > 256) throw Error("Size");
+    for (const item of value) safeObject(item, depth + 1);
+  } else if (value && typeof value === "object") {
     for (const [key, item] of Object.entries(value)) {
       if (
+        key.length > 1024 ||
+        /[\u0000-\u001f\ud800-\udfff]/u.test(key) ||
         ["__proto__", "constructor", "prototype"].includes(key) ||
         /^(private.?key|seed|mnemonic|api.?key|password|authorization|secret)$/i.test(
           key,
@@ -29,12 +53,11 @@ export function safeObject(value, depth = 0) {
         throw Error("Secret or unsafe field");
       safeObject(item, depth + 1);
     }
-  if (
-    typeof value === "string" &&
-    (/-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/.test(value) ||
-      /[\u0000-\u001f\ud800-\udfff]/u.test(value))
-  )
-    throw Error("Unsafe string");
+  } else if (typeof value === "number") {
+    if (!Number.isSafeInteger(value) || value < 0) throw Error("Integer");
+  } else if (value !== null && typeof value !== "boolean") {
+    throw Error("Invalid value");
+  }
 }
 export function normalize(value, manifest) {
   if (typeof value !== "string") throw Error("Name");
@@ -147,7 +170,12 @@ export function parsePublicJSON(source) {
     const begin = i++;
     while (i < source.length) {
       const c = source[i++];
-      if (c === '"') return JSON.parse(source.slice(begin, i));
+      if (c === '"') {
+        const s = JSON.parse(source.slice(begin, i));
+        if (s.length > 49152 || /[\u0000-\u001f\ud800-\udfff]/u.test(s))
+          throw Error("Unsafe string");
+        return s;
+      }
       if (c === "\\") i++;
     }
     throw Error("JSON");

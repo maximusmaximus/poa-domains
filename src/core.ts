@@ -76,7 +76,7 @@ export function canonical(v: any): string {
     "{" +
     Object.keys(o)
       .sort()
-      .map((k) => JSON.stringify(k) + ":" + canonical(o[k]))
+      .map((k) => JSON.stringify(text(k, 1024)) + ":" + canonical(o[k]))
       .join(",") +
     "}"
   );
@@ -95,6 +95,7 @@ export function noSecrets(v: any, depth = 0): void {
     for (const x of v) noSecrets(x, depth + 1);
   } else if (v && typeof v === "object")
     for (const [k, x] of Object.entries(v)) {
+      text(k, 1024);
       need(
         !["__proto__", "prototype", "constructor"].includes(k),
         "UNSAFE_KEY",
