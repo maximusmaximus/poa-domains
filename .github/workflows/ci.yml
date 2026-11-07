@@ -18,11 +18,7 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-      - run: npm ci --ignore-scripts
-      - run: npx playwright install --with-deps chromium
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run smoke
-      - run: npm run unicode:audit
-      - run: npm run security
-      - run: bash scripts/gitleaks.sh
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm ci --ignore-scripts
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npx playwright install --with-deps chromium
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm run check
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 bash scripts/gitleaks.sh

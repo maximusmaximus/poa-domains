@@ -2,7 +2,9 @@
 
 Working TypeScript naming/deed registry with a localhost API, CLI, MCP adapter and read-only agent-handoff UI.
 
-**This is not deployed to PoA and does not create live PoA NFTs.** Balances and deeds are synthetic local state, not tokens, real funds or blockchain finality. No mining, live writes, IPFS uploads, wallet connection or deployment is performed.
+**Public synthetic demo:** https://maximusmaximus.github.io/poa-domains/ — self-contained GitHub Pages explorer, fixture names/auctions/records and all 17 inert handoff examples. No localhost or hosted naming backend is required; no real ownership, funds or transactions are shown.
+
+**This is not deployed to PoA and does not create live PoA NFTs.** Balances and deeds are synthetic local state, not tokens, real funds or blockchain finality. No mining, live PoA writes, IPFS uploads, wallet connection or financial-protocol deployment is performed. Only the read-only static synthetic interface is published.
 
 ## Run and verify
 
@@ -14,6 +16,7 @@ npx playwright install --with-deps chromium
 npm run typecheck
 npm test
 npm run smoke
+npm run pages:smoke
 npm run unicode:audit
 npm run security
 # Requires a git commit for history scanning:
@@ -63,4 +66,8 @@ The journal replays the complete history; there is no checkpoint acceleration, h
 
 Unicode coverage and CID codec support are intentionally limited and explicit. Initial leases use a disclosed absolute expiry, not a moving fill-time duration. Consensual retirement/negotiated renewal cannot add or alter encumbrances while the parent is auction-locked; original guaranteed options remain exercisable. No full economic simulation, native-chain integration test or independent security audit is claimed.
 
-Source and CI live on GitHub. The optional static `web/config.json` holds only a public API origin; no Pages setting or deployment is enabled by this repository. CI has `contents: read`, no deployment job and needs no user secrets. No project-wide license has been selected; vendored Unicode data carries its own license.
+Source and CI live on GitHub. `npm run pages:build` creates an allowlisted `_site/` bundle containing only web assets and engine-derived public fixture JSON. Ephemeral fixture signing keys stay in memory and are discarded, never exported to JSON. `npm run pages:smoke` serves this exact bundle locally under `/poa-domains/` with no API and checks all 17 action handoffs in real Chromium. Demo instructions forbid signing/submitting its bodies; `npm run smoke` reproduces an independently generated local transaction flow instead.
+
+The ordinary local UI retains its local API mode. Static Pages mode has `publicApiBase:null` and fetches only relative same-origin JSON. Names, protected children, records, auction phases and synthetic as-of/finality labels are rendered from that frozen snapshot; refresh never implies live chain progress. No wallet is connected and no browser POST occurs.
+
+CI uses `contents: read`. The separate main-only Pages workflow runs checks/builds with a sanitized environment, uploads only `_site/`, and grants `pages: write` plus `id-token: write` only to the deployment job running the official pinned deployment action. No repository/user secrets are referenced by either workflow or the frontend; no treasury credential or public treasury variable is used for the synthetic fixture. No project-wide license has been selected; vendored Unicode data carries its own license.

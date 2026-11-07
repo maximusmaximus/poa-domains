@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PoA domains — local reference</title>
+    <title>PoA domains — read-only reference</title>
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
@@ -16,17 +17,31 @@
     </header>
     <main>
       <section>
-        <h2>Committed local state</h2>
+        <h2>Registry explorer</h2>
+        <p id="freshness"></p>
+        <div id="stats" class="stats"></div>
+        <h3>Names &amp; protected child rights</h3>
+        <div id="names" class="cards"></div>
+        <h3>Ascending auctions</h3>
+        <div id="auctions" class="cards"></div>
         <button id="refresh" type="button">Refresh public state</button>
-        <pre id="state"></pre>
+        <details>
+          <summary>Raw committed state and receipts</summary>
+
+          <pre id="state"></pre>
+        </details>
       </section>
       <section>
         <h2>Prepare an agent handoff</h2>
         <p>
           This creates inert unsigned data only. Independently verify everything
-          before authorizing a local signer. Never paste a private key or
-          credential.
+          before authorizing a local signer. Static demo examples must never be
+          signed or submitted. Never paste a private key or credential.
         </p>
+        <button type="button" id="example" hidden>
+          Load synthetic example for selected action
+        </button>
+        <p id="exampleNotice"></p>
         <form id="handoff">
           <label
             >Action
@@ -67,7 +82,7 @@
         <pre id="body"></pre>
         <h3>Operation digest</h3>
         <pre id="digest"></pre>
-        <button type="button" id="copy">
+        <button type="button" id="copy" disabled>
           Copy instructions and exact body
         </button>
       </section>

@@ -34,3 +34,9 @@ The server binds `127.0.0.1`, validates Host, rejects browser-origin POSTs, limi
 UI content uses `textContent`, never `innerHTML`, eval or embedded executable instructions. The browser makes GET requests only. Generated data/code is untrusted: independently check allowlisted origin, policies, normalization, canonical name, deed/generation/version, asset, beneficiary, caps, nonce and deadline, and obtain signing authorization. A copied handoff is not authorization to sign. The static configuration may contain only a public API origin; no credential or wallet fields. Headless tests exercise XSS/injection and compare browser/engine digests, but do not constitute a full browser security audit.
 
 Use GitHub's private vulnerability-reporting channel if the repository enables one. Do not publish secret material in issues.
+
+## Public static Pages demo
+
+Only the allowlisted `_site/` assets and engine-derived public fixture JSON are published. The public demo has no backend endpoint, signs/submits nothing, makes only same-origin static GETs and uses a restrictive CSP. Throwaway fixture keys are generated only in memory and discarded. The Pages examples illustrate schemas/digests, are not authorizations, and must not be signed or submitted. Real credentials and existing treasury configuration are not read or referenced by the build, workflow, artifacts or frontend. Builds/tests run with an allowlisted environment (HOME/PATH/LANG), excluding inherited credentials; no environment dumps occur.
+
+The trusted-main-only Pages build job has contents-read permission. A separate deployment job has only Pages-write/OIDC-write, checks out no source and runs the pinned official deploy action. Pull-request jobs cannot trigger this deployment or receive these privileges. `_site/` alone is uploaded, never the repository, runtime data, key files, environment files, test evidence or process state.

@@ -20,7 +20,9 @@
     "demo": "npm run build && node dist/src/demo.js",
     "unicode:audit": "node scripts/unicode-audit.mjs",
     "security": "node scripts/security-scan.mjs && npm audit --audit-level=high",
-    "check": "npm run typecheck && npm test && npm run smoke && npm run unicode:audit && npm run security"
+    "check": "npm run typecheck && npm test && npm run smoke && npm run pages:smoke && npm run unicode:audit && npm run security",
+    "pages:build": "npm run build && node dist/src/pages-build.js",
+    "pages:smoke": "npm run pages:build && node dist/test/pages-smoke.js"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

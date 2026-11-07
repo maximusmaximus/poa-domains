@@ -30,8 +30,20 @@ export async function browserSmoke(
       () => document.querySelectorAll("#action option").length === 17,
     );
     assert.match(await page.locator("#mode").innerText(), /Not live PoA/);
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector("#state")
+          ?.textContent?.includes("local-committed-only") ||
+        document.querySelector("#error")?.textContent,
+    );
+    assert.equal(
+      await page.locator("#error").textContent(),
+      "",
+      "local UI bootstrap",
+    );
     assert.match(
-      await page.locator("#state").innerText(),
+      (await page.locator("#state").textContent()) ?? "",
       /local-committed-only/,
     );
     checks.push(

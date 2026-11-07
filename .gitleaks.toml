@@ -7,3 +7,14 @@ regex = '''\bpk_[A-Za-z0-9_-]{24,}\b'''
 entropy = 3.0
 [allowlist]
 paths = ['''(^|/)node_modules/''', '''(^|/)dist/''', '''(^|/)\.git/''']
+
+# Public name IDs are hashes, not signing/API keys. The builder/tests independently
+# verify each against nameKey(registryId, canonicalName). No whole file is skipped.
+[[rules]]
+id = "generic-api-key"
+[[rules.allowlists]]
+description = "Derived public name-id fields in engine-generated Pages snapshot only"
+condition = "AND"
+paths = ['''(^|/)(_site/)?demo/state\.json$''']
+regexTarget = "line"
+regexes = ['''^\s*"key":\s*"[a-f0-9]{64}",?$''']

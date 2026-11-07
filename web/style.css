@@ -56,3 +56,78 @@ pre {
 code {
   overflow-wrap: anywhere;
 }
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+.stats > div {
+  background: #0c202b;
+  border: 1px solid #31535c;
+  border-radius: 0.6rem;
+  padding: 1rem;
+}
+.stats strong {
+  display: block;
+  font-size: 2rem;
+  color: #75e0b5;
+}
+.stats span {
+  font-size: 0.85rem;
+  color: #bdd4df;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.card {
+  padding: 1rem;
+  background: #10212c;
+  border: 1px solid #31535c;
+  border-radius: 0.6rem;
+  overflow: hidden;
+}
+.card h4 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #9cffe0;
+}
+.card p,
+.card code {
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+.badge {
+  color: #ffd18b;
+}
+.record {
+  font-family: monospace;
+}
+details {
+  margin: 1.5rem 0;
+}
+summary {
+  cursor: pointer;
+}
+#mode {
+  padding: 1rem;
+  border: 1px solid #c99d54;
+  border-radius: 0.5rem;
+  background: #302a1c;
+}
+#exampleNotice,
+#freshness {
+  font-size: 0.9rem;
+  color: #b4cad6;
+}
+button[hidden] {
+  display: none;
+}
+#example {
+  margin: 0.5rem 0;
+}
+h2 {
+  color: #9cffe0;
+}

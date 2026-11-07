@@ -5,6 +5,7 @@ import { capabilities } from "./interface.js";
 import { Fault, need, parseJSON, text } from "./core.js";
 import { normalizeName } from "./names.js";
 const files: Record<string, [string, string]> = {
+  "/icon.svg": ["icon.svg", "image/svg+xml"],
   "/": ["index.html", "text/html; charset=utf-8"],
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
   "/shared.js": ["shared.js", "text/javascript; charset=utf-8"],
@@ -26,7 +27,7 @@ export async function startServer(
     res.setHeader("referrer-policy", "no-referrer");
     res.setHeader(
       "content-security-policy",
-      "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https: http://127.0.0.1:*; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self' https: http://127.0.0.1:*; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     );
     try {
       need((req.url?.length ?? 0) <= 4096, "URL_SIZE");
