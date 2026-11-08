@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { readFileSync, existsSync, statSync } from "node:fs";
-import { resolve, extname } from "node:path";
+import { resolve, extname, sep } from "node:path";
 import { verifyStaticPage } from "./pages-browser.js";
 
 const directory = resolve("_site"),
@@ -31,7 +31,7 @@ const server = createServer((req, res) => {
     return res.end();
   }
   if (
-    !path.startsWith(directory + "/") ||
+    !path.startsWith(directory + sep) ||
     !existsSync(path) ||
     !statSync(path).isFile()
   ) {
