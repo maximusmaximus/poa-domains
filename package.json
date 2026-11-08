@@ -19,7 +19,7 @@
     "smoke": "npm run build && node dist/test/smoke.js",
     "unicode:audit": "node scripts/unicode-audit.mjs",
     "security": "node scripts/security-scan.mjs && npm audit --audit-level=high",
-    "check": "npm run typecheck && npm test && npm run production:smoke && npm run smoke && npm run reference:pages:smoke && npm run pages:smoke && npm run unicode:audit && npm run security && npm run metadata:check && npm run test:live-network",
+    "check": "npm run typecheck && npm test && npm run production:smoke && npm run smoke && npm run reference:pages:smoke && npm run pages:smoke && npm run unicode:audit && npm run security && npm run metadata:check && npm run test:live-network && npm run test:emoji-format && npm run test:emoji-format:browser",
     "pages:build": "npm run build && node dist/src/pages-build.js",
     "pages:smoke": "npm run pages:build && node dist/test/pages-smoke.js",
     "reference:demo": "npm run build && node dist/src/reference-demo.js",
@@ -28,7 +28,9 @@
     "production:smoke": "npm run build && node dist/test/production-smoke.js",
     "native:smoke": "npm run build && node dist/test/native-live-smoke.js",
     "metadata:check": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/metadata-backup/tests -v",
-    "test:live-network": "node --test test/live-network.test.mjs"
+    "test:live-network": "node --test test/live-network.test.mjs",
+    "test:emoji-format": "node --test test/emoji-format-checker.test.mjs",
+    "test:emoji-format:browser": "playwright test --config=test/playwright.emoji-format.config.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

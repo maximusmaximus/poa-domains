@@ -27,7 +27,7 @@ export async function verifyStaticPage(url: string, screenshot?: string) {
   assert.ok(entry.pathname.endsWith('/') || entry.pathname.endsWith('/index.html'), 'Use the explicit page directory or index.html');
   const base = new URL('./', entry);
   const asset = (name: string) => new URL(name, base).href;
-  const permitted = new Set([base.href, asset('index.html'), ...['app.js', 'live-network.js', 'style.css', 'icon.svg', 'config.json', 'status.json'].map(asset)]);
+  const permitted = new Set([base.href, asset('index.html'), ...['app.js', 'live-network.js', 'emoji-format-checker.mjs', 'emoji-format-checker.css', 'emoji17.mjs', 'emoji17-data.mjs', 'style.css', 'icon.svg', 'config.json', 'status.json'].map(asset)]);
   const counts = { requests: 0, backend: 0, mutationAttempts: 0 };
   const violations: string[] = [], routeErrors: string[] = [], pageErrors: string[] = [];
   const consoleErrors: string[] = [];

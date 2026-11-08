@@ -102,3 +102,7 @@ No project-wide license has been selected; vendored Unicode data carries its own
 The local Python utility in `tools/metadata-backup/` prepares and verifies exact-byte, individually reviewed metadata backups, retains imported history, and restores files locally. Run `npm run metadata:check` for its tests; they are also included in `npm run check`. Usage and security limitations are documented in [the utility README](tools/metadata-backup/README.md).
 
 This utility supports only canonical base32 CIDv1 raw sha2-256 metadata and its deliberately narrow ASCII schema; UnixFS/DAG and the production emoji namespace are not supported by this utility. No real metadata is bundled. It does not fetch, pin, publish, synchronize GitHub backups, or enable native naming or settlement.
+
+## Local emoji spelling check
+
+The read-only web checker recognizes exact emoji-only Unicode 17 spellings and counts 1–32 whole emoji sequences. It runs locally with fixed options and does not transmit, persist, trim or normalize the entered spelling. Results describe format only, not name availability, ownership, pricing or registration. Native registry operations remain disabled. The bundle contains only the pinned public Unicode runtime, data, license and source provenance plus the checker module and external stylesheet; candidate equivalence data is not included.

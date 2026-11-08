@@ -16,3 +16,6 @@ local-data/
 .DS_Store
 
 _site/
+
+# Local browser-test output; never a public runtime artifact.
+test-results/

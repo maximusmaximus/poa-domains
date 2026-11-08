@@ -8,6 +8,7 @@ const directory = resolve("_site"),
 const types: Record<string, string> = {
   ".html": "text/html",
   ".js": "text/javascript",
+  ".mjs": "text/javascript",
   ".json": "application/json",
   ".css": "text/css",
   ".svg": "image/svg+xml",
