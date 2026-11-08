@@ -19,14 +19,15 @@
     "smoke": "npm run build && node dist/test/smoke.js",
     "unicode:audit": "node scripts/unicode-audit.mjs",
     "security": "node scripts/security-scan.mjs && npm audit --audit-level=high",
-    "check": "npm run typecheck && npm test && npm run production:smoke && npm run smoke && npm run reference:pages:smoke && npm run pages:smoke && npm run unicode:audit && npm run security",
+    "check": "npm run typecheck && npm test && npm run production:smoke && npm run smoke && npm run reference:pages:smoke && npm run pages:smoke && npm run unicode:audit && npm run security && npm run metadata:check",
     "pages:build": "npm run build && node dist/src/pages-build.js",
     "pages:smoke": "npm run pages:build && node dist/test/pages-smoke.js",
     "reference:demo": "npm run build && node dist/src/reference-demo.js",
     "reference:pages:smoke": "npm run build && node dist/test/reference-pages-smoke.js",
     "start": "node dist/src/cli.js serve",
     "production:smoke": "npm run build && node dist/test/production-smoke.js",
-    "native:smoke": "npm run build && node dist/test/native-live-smoke.js"
+    "native:smoke": "npm run build && node dist/test/native-live-smoke.js",
+    "metadata:check": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/metadata-backup/tests -v"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
