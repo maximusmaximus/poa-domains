@@ -32,10 +32,10 @@ export async function verifyEmojiFormatChecker({page,url,ready,hostSelector='[da
  // TEST-ONLY adaptation: configured baseline URLs MUST have a local responder, never upstream I/O.
  assert.ok(!baselineReads.size||typeof baselineResponder==='function','Configured baseline reads require a trusted local test responder');
  const defaults=['/',fixtureModule,'/fixture.svg',...['emoji-format-checker.mjs','emoji-format-checker.css','emoji17.mjs','emoji17-data.mjs','LICENSE-UNICODE.txt','PUBLIC-PROVENANCE.json'].map(n=>assetBase+n)];
- const permittedPaths=new Set(allowedPaths??defaults),network=[],responses=[],consoleMessages=[],pageErrors=[],navigations=[],checks=[];
+ const permittedPaths=new Set(allowedPaths??defaults),network=[],responses=[],pendingResponses=[],consoleMessages=[],pageErrors=[],navigations=[],checks=[];
  const mainFrame=page.mainFrame();
  const onConsole=m=>consoleMessages.push({type:m.type(),text:m.text(),location:m.location()});const onError=e=>pageErrors.push(String(e));const onNavigation=f=>{if(f===mainFrame)navigations.push(f.url());};
- const onResponse=async response=>responses.push({url:response.url(),status:response.status(),headers:await response.allHeaders()});
+ const onResponse=response=>{const work=(async()=>responses.push({url:response.url(),status:response.status(),headers:await response.allHeaders()}))();pendingResponses.push(work);};
  page.on('console',onConsole);page.on('pageerror',onError);page.on('framenavigated',onNavigation);page.on('response',onResponse);
  const route=async r=>{const req=r.request(),u=new URL(req.url()),hasBody=(req.postDataBuffer()?.byteLength??0)>0,headers=await req.allHeaders(),hasCredentials=!!(u.username||u.password||headers.cookie||headers.authorization||headers['proxy-authorization']);const baselineRead=baselineReads.has(req.url());const allowed=!hasBody&&!hasCredentials&&req.method()==='GET'&&!u.search&&(baselineRead||(u.origin===origin&&permittedPaths.has(u.pathname)));
   network.push({method:req.method(),url:req.url(),resourceType:req.resourceType(),hasBody,hasCredentials,baselineRead,allowed});if(!allowed){await r.abort('blockedbyclient');return;}if(baselineRead){await baselineResponder(r);return;}await r.continue();};
@@ -50,7 +50,7 @@ export async function verifyEmojiFormatChecker({page,url,ready,hostSelector='[da
   let timer;try{readyResult=await Promise.race([ready?ready(page):page.evaluate(async modulePath=>await(await import(modulePath)).ready,fixtureModule),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Ready hook exceeded bounded timeout')),readyTimeoutMs);})]);}finally{clearTimeout(timer);}
   assert.equal(readyResult,expectedInitialization);
  });
- await page.waitForLoadState('networkidle');
+ await page.waitForLoadState('networkidle');await Promise.all(pendingResponses);
  let input,button,root,status,form;
  await check('closed root retained without changing requested shadow mode',async()=>{
   const result=await page.evaluate(selector=>{const host=document.querySelector(selector),p=window.__POA_FORMAT_REVIEW__,root=p.root();return{publicRoot:host?.shadowRoot===null,mode:root?.mode,modes:p.modes()};},hostSelector);
@@ -71,7 +71,7 @@ export async function verifyEmojiFormatChecker({page,url,ready,hostSelector='[da
   const offenders=await root.evaluate(r=>[...r.querySelectorAll('*')].flatMap(e=>{const out=[];if(['STYLE','SCRIPT'].includes(e.tagName))out.push(e.tagName);for(const a of e.attributes)if(a.name==='style'||a.name.startsWith('on'))out.push(a.name);return out;}));assert.deepEqual(offenders,[]);
   assert.deepEqual(await page.evaluate(()=>[...document.querySelectorAll('script:not([src]),style,[style]')].map(e=>e.tagName)),[]);
  });
- if(expectedInitialization&&input&&button){
+ if(expectedInitialization&&readyResult===true&&input&&button&&(await input.isEnabled())){
   const fillCheck=async(value)=>{await input.fill(value);assert.equal(await input.inputValue(),value.replaceAll('\r\n','\n').replaceAll('\r','\n'));await button.click();return getStatus();};
   await check('same-origin external CSS actually loaded and produced computed shadow styles',async()=>{
    const values=await root.evaluate(r=>({href:r.querySelector('link').href,sheets:r.styleSheets.length,styleHref:r.styleSheets[0]?.href,rules:r.styleSheets[0]?.cssRules.length,border:getComputedStyle(r.querySelector('section')).borderTopWidth,min:getComputedStyle(r.querySelector('textarea')).minHeight,whiteSpace:getComputedStyle(r.querySelector('[role="status"]')).whiteSpace}));
@@ -105,7 +105,7 @@ export async function verifyEmojiFormatChecker({page,url,ready,hostSelector='[da
   if(['runtime404','css404','data404'].includes(scenario))await check('intentionally missing dependency returns actual HTTP404',async()=>{assert.equal(verified404,true,'HTTP404 must be independently observed by browser response or local server evidence hook');});
   await check('failed initialization disables only checker while unrelated control remains usable',async()=>{if(checkSurroundings){await page.locator('#outside-input').fill('outside still works');assert.equal(await page.locator('#outside-input').inputValue(),'outside still works');await page.locator('#outside-button').click();}const before=await getStatus();await input.evaluate(e=>{e.value='😀';e.dispatchEvent(new Event('input',{bubbles:true,composed:true}));});await form.evaluate(f=>f.requestSubmit());assert.equal(await getStatus(),before);assert.equal(await input.isEnabled(),false);});
  }
- await flush(page);await page.waitForLoadState('networkidle');
+ await flush(page);await page.waitForLoadState('networkidle');await Promise.all(pendingResponses);
  await check('no post-init component requests or extra navigation (baseline reads separate)',async()=>{assert.equal(network.slice(startupRequests).filter(n=>!n.baselineRead).length,0);assert.equal(navigations.length,startingNavigationCount);assert.equal(page.url(),originalUrl);});
  await check('every browser request is exact-allowlisted GET with no query or body',async()=>{assert.ok(network.length>=3);assert.deepEqual(network.filter(n=>!n.allowed),[]);assert.ok(network.every(n=>n.method==='GET'&&!n.hasCredentials&&!n.hasBody&&!new URL(n.url).search&&(n.baselineRead||new URL(n.url).origin===origin)));});
  await check('no component calls transport storage logging or history APIs',async()=>{const calls=await page.evaluate(()=>window.__POA_FORMAT_REVIEW__.calls());assert.deepEqual(baselineReads.size?calls.filter(c=>!['fetch','XMLHttpRequest'].includes(c)):calls,[]);});

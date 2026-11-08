@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { readFileSync, existsSync, statSync } from "node:fs";
-import { resolve, extname } from "node:path";
+import { resolve, extname, sep } from "node:path";
 import { verifyReferenceStaticPage } from "./reference-pages-browser.js";
 import { buildReferenceBundle } from "./reference-pages-build.js";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -35,7 +35,7 @@ const server = createServer((req, res) => {
     return res.end();
   }
   if (
-    !path.startsWith(directory + "/") ||
+    !path.startsWith(directory + sep) ||
     !existsSync(path) ||
     !statSync(path).isFile()
   ) {

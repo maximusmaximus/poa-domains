@@ -7,8 +7,9 @@ export function publicHttps(url: string, init: RequestInit): Promise<Response> {
   need(/^https:\/\/minepoa\.com\/chain\/poa-mainnet-1\/api\/(?:status|network-facts|receipt\/[a-f0-9]{64})$/.test(url), "NATIVE_ROUTE");
   need(init.method === "GET" && init.credentials === "omit" && init.redirect === "error" && init.body === undefined, "NATIVE_TRANSPORT");
   return new Promise((resolve, reject) => {
-    const child = spawn("curl", ["--disable", "--silent", "--show-error", "--proto", "=https", "--max-time", "10", "--max-filesize", "65536", "--include", "--header", "Accept: application/json", "--url", url], {
-      env: { PATH: "/usr/local/bin:/usr/bin:/bin", LANG: "C.UTF-8" }, stdio: ["ignore", "pipe", "pipe"],
+    const win32 = process.platform === "win32";
+    const child = spawn(win32 ? "C:\\Windows\\System32\\curl.exe" : "curl", ["--disable", "--silent", "--show-error", "--proto", "=https", "--max-time", "10", "--max-filesize", "65536", "--include", "--header", "Accept: application/json", "--url", url], {
+      env: win32 ? { PATH: "C:\\Windows\\System32", SystemRoot: "C:\\Windows", LANG: "C.UTF-8" } : { PATH: "/usr/local/bin:/usr/bin:/bin", LANG: "C.UTF-8" }, stdio: ["ignore", "pipe", "pipe"],
     });
     const chunks: Buffer[] = [];
     let bytes = 0, failed = false;

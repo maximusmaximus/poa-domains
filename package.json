@@ -27,7 +27,7 @@
     "start": "node dist/src/cli.js serve",
     "production:smoke": "npm run build && node dist/test/production-smoke.js",
     "native:smoke": "npm run build && node dist/test/native-live-smoke.js",
-    "metadata:check": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/metadata-backup/tests -v",
+    "metadata:check": "node -e \"import('node:child_process').then(({execFileSync})=>execFileSync(process.platform==='win32'?'wsl':'python3',process.platform==='win32'?['--','env','PYTHONDONTWRITEBYTECODE=1','python3','-B','-m','unittest','discover','-s','tools/metadata-backup/tests','-v']:['-B','-m','unittest','discover','-s','tools/metadata-backup/tests','-v'],{stdio:'inherit',env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}}))\"",
     "test:live-network": "node --test test/live-network.test.mjs",
     "test:emoji-format": "node --test test/emoji-format-checker.test.mjs",
     "test:emoji-format:browser": "playwright test --config=test/playwright.emoji-format.config.mjs"
