@@ -32,14 +32,14 @@
         </p>
         <p id="status" role="status">Fail-closed: unavailable</p>
         <p id="error" role="alert"></p>
-        <button id="refresh" type="button">Refresh availability</button>
+        <button id="refresh" type="button">Refresh availability and network</button>
       </section>
       <section aria-labelledby="network-title">
         <h2 id="network-title">Native network observation</h2>
-        <p>Read from the official public node at build time, not a live subscription. Node-reported information is not cryptographically verified consensus, ownership or finality. No registry capability is inferred.</p>
+        <p>Read directly from the official public node when this page opens or you refresh, not a live subscription. Node-reported information is not cryptographically verified consensus, ownership or finality. No registry capability is inferred.</p>
         <p id="network-status" role="status">Network observation unavailable.</p>
         <pre id="network-details"></pre>
-        <p>After 15 minutes the observation expires; refresh only rereads this published build. The API, CLI and MCP support explicit current public-node reads.</p>
+        <p>After 15 minutes the observation expires. Refresh makes two fixed read-only requests to the official node; failed or inconsistent responses clear the displayed values. No published snapshot is substituted.</p>
       </section>
       <footer>
         <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer"

@@ -19,6 +19,7 @@ import { productionStatus } from "./production.js";
 export const PUBLIC_FILES = [
   "index.html",
   "app.js",
+  "live-network.js",
   "style.css",
   "icon.svg",
   "config.json",
@@ -67,7 +68,7 @@ export function buildProductionBundle(directory = resolve("_site"), observation:
     rmSync(output, { recursive: true });
   }
   mkdirSync(output);
-  for (const file of ["index.html", "app.js", "style.css", "icon.svg"])
+  for (const file of ["index.html", "app.js", "live-network.js", "style.css", "icon.svg"])
     copyFileSync(join("web", file), join(output, file));
   const config = JSON.parse(readFileSync("web/config.json", "utf8"));
   need(
@@ -93,7 +94,7 @@ export function buildProductionBundle(directory = resolve("_site"), observation:
   noSecrets(network);
   writeFileSync(join(output, "network.json"), JSON.stringify(network, null, 2) + "\n");
   const policy =
-    "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'";
+    "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https://minepoa.com/chain/poa-mainnet-1/api/status https://minepoa.com/chain/poa-mainnet-1/api/network-facts; img-src 'self'; base-uri 'none'; form-action 'none'";
   writeFileSync(
     join(output, "index.html"),
     readFileSync(join(output, "index.html"), "utf8").replace(

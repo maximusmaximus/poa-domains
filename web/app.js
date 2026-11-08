@@ -1,4 +1,7 @@
-// Availability display only. No signer, ledger, simulated fallback or API client.
+import { createLiveNetworkReader, LiveNetworkError } from "./live-network.js";
+// Official-node read-only observations. No signer, ledger or simulated fallback.
+const liveReader = createLiveNetworkReader();
+let refreshFlight;
 const error = document.getElementById("error");
 async function read(path) {
   const response = await fetch(new URL(path, location.href), {
@@ -36,7 +39,7 @@ function renderNetwork(value) {
   document.getElementById("network-details").textContent = "Network: " + value.chainId + "\nReported checkpoint: " + value.checkpoint.height + "\nClosed epochs: " + value.epochsClosed + "\nJoined agents: " + value.agentsJoined + "\nReported transactions: " + value.transactions + "\nReported engine SHA-256: " + value.engineSha256 + "\nReported params SHA-256: " + value.paramsSha256;
   expiryTimer = setTimeout(() => clearNetwork("Network observation expired; no current network state is displayed."), Math.min(value.expiresAt - now + 1, 900001));
 }
-async function refresh() {
+async function refreshOnce() {
   clearNetwork("Network observation unavailable or expired.");
   error.textContent = "";
   try {
@@ -77,14 +80,29 @@ async function refresh() {
       throw Error("Unavailable");
     document.getElementById("status").textContent =
       "Verified application guard: native registry unavailable; all operations disabled.";
-    try { renderNetwork(await read("./network.json")); }
-    catch { clearNetwork("Network observation unavailable or expired; no current network state is displayed."); }
+    try { renderNetwork(await liveReader.observe()); }
+    catch (failure) {
+      const detail = failure instanceof LiveNetworkError
+        ? failure.code + ": " + failure.message
+        : "Live network observation could not be validated.";
+      clearNetwork(detail + " No current network state is displayed.");
+    }
   } catch {
     document.getElementById("status").textContent =
       "Fail-closed: native registry unavailable; all operations disabled.";
     error.textContent =
       "Availability document could not be validated. No backend or reference fallback is used.";
   }
+}
+function refresh() {
+  if (refreshFlight) return refreshFlight;
+  const button = document.getElementById("refresh");
+  button.disabled = true;
+  refreshFlight = refreshOnce().finally(() => {
+    refreshFlight = undefined;
+    button.disabled = false;
+  });
+  return refreshFlight;
 }
 document.getElementById("refresh").addEventListener("click", refresh);
 await refresh();
