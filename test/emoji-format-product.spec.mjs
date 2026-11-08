@@ -10,7 +10,7 @@ for(const scenario of ['normal','runtime404','css404','data404'])test(`integrate
  let beforeGuard,component;
  const integration=[];const check=async(name,fn)=>test.step(name,async()=>{try{await fn();integration.push({name,pass:true});}catch(error){integration.push({name,pass:false,error:String(error.stack??error)});}});
  try{
-  component=await verifyEmojiFormatChecker({page,url:server.url,ready:async p=>{const ready=await waitForIntegratedChecker(p);beforeGuard=await readNativeGuard(p);return ready;},hostSelector:'[data-component="emoji-format-checker"]',assetBase:server.pathPrefix,allowedPaths:server.allowedPaths,checkSurroundings:false,expectedCSP:PRODUCT_CSP,expectedInitialization:scenario==='normal',scenario,baselineReadURLs:[...OFFICIAL_READ_URLS],baselineResponder:synthetic.respond,httpEvidence:()=>server.requests});
+  component=await test.step('full emoji format component verifier',()=>verifyEmojiFormatChecker({page,url:server.url,ready:async p=>{const ready=await waitForIntegratedChecker(p);beforeGuard=await readNativeGuard(p);return ready;},hostSelector:'[data-component="emoji-format-checker"]',assetBase:server.pathPrefix,allowedPaths:server.allowedPaths,checkSurroundings:false,expectedCSP:PRODUCT_CSP,expectedInitialization:scenario==='normal',scenario,baselineReadURLs:[...OFFICIAL_READ_URLS],baselineResponder:synthetic.respond,httpEvidence:()=>server.requests}));
   // Fixture-only sentinels are explicitly inapplicable on the product; no component failures are omitted.
   const fixtureOnly=component.checks.find(x=>x.name==='surrounding page and existing mount children remain unchanged');if(fixtureOnly){fixtureOnly.skipped=true;fixtureOnly.reason='Explicit checkSurroundings:false; actual product guard assertions below replace fixture sentinels.';}
   await check('all15 built assets and six reviewed public identities verified before serving',async()=>{assert.equal(Object.keys(server.artifact.hashes).length,15);assert.deepEqual(Object.keys(server.artifact.hashes).sort(),[...BUILD_FILES].sort());for(const [name,pin]of Object.entries(PUBLIC_PINS))assert.equal(server.artifact.hashes[name].sha256,pin);});
@@ -31,7 +31,7 @@ for(const scenario of ['normal','runtime404','css404','data404'])test(`integrate
   await testInfo.attach('integrated-format-checks.json',{body:Buffer.from(JSON.stringify(report,null,2)),contentType:'application/json'});
   expect(component.checks.filter(c=>!c.pass),'Original full component verifier failures must not be omitted').toEqual([]);
   expect(integration.filter(c=>!c.pass),'Product integration checks must all pass').toEqual([]);
- }finally{await server.close();}
+ }finally{await test.step('close strict built-artifact server',()=>server.close());}
 });
 
 // Pure adapter-negative checks: fake routes, no browser navigation or network I/O.
