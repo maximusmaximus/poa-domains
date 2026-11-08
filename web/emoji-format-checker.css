@@ -1,0 +1,15 @@
+/* ORIGINAL fixed external shadow stylesheet; no imports, URLs, fonts or user-derived content. */
+:host{display:block;color:#19232d;font:1rem/1.5 system-ui,sans-serif}
+*{box-sizing:border-box}
+section{border:1px solid #9aa6b2;border-radius:.6rem;padding:1rem;background:#fff;max-width:42rem}
+h2{font-size:1.25rem;margin:0 0 .5rem}
+p{margin:.5rem 0}
+fieldset{border:0;padding:0;margin:1rem 0 0;min-width:0}
+label{display:block;font-weight:600}
+label span{display:block;margin-bottom:.4rem}
+textarea{width:100%;resize:vertical;font:1.15rem/1.5 system-ui,sans-serif;padding:.6rem;border:1px solid #5e6d7b;border-radius:.3rem;min-height:44px}
+textarea:focus-visible,button:focus-visible{outline:3px solid #005fcc;outline-offset:3px}
+button{font:inherit;min-height:44px;padding:.5rem 1rem;margin:.75rem 0 0;border:1px solid #334c65;border-radius:.3rem;background:#eef4fa;color:#102d48;cursor:pointer}
+button:disabled,textarea:disabled{opacity:.65;cursor:not-allowed}
+.help,.notice{font-size:.94rem}
+.status{min-height:1.5em;white-space:pre-wrap;overflow-wrap:anywhere}

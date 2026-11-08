@@ -1,4 +1,11 @@
 import { createLiveNetworkReader, LiveNetworkError } from "./live-network.js";
+// Local-only spelling analysis, independent of network reads and all registry gates.
+const checkerContainer = document.getElementById("emoji-format-checker");
+import("./emoji-format-checker.mjs")
+  .then(({ mountEmojiFormatChecker }) => mountEmojiFormatChecker(checkerContainer).ready)
+  .catch(() => {
+    checkerContainer.textContent = "The local emoji spelling checker is unavailable. Native naming and payments remain disabled.";
+  });
 // Official-node read-only observations. No signer, ledger or simulated fallback.
 const liveReader = createLiveNetworkReader();
 let refreshFlight;

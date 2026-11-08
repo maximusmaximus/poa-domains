@@ -113,3 +113,9 @@ Business receipt: `intentId,requestId,signer,sequence,time,status,code,result`, 
 The isolated `reference-cli.js mcp --url ORIGIN` stdio MCP adapter implements the **2025-11-25** initialization handshake, `tools/list`, `read_state`, `read_capabilities` and `submit_intent`. Every implemented action uses the same packet under `submit_intent`. This is a bounded adapter, not a claim of full protocol-version compatibility. No HTTP MCP transport or signing service is exposed.
 
 The isolated reference UI lists all 17 reference actions and builds unsigned local test handoffs. It lives in `reference-web/`, not in the production Pages artifact. Its static fixture variant is exercised only in a temporary test directory. Production CLI/MCP/API do not consume these bodies, states, receipts or fixture capabilities.
+
+## Local emoji spelling check
+
+The read-only web checker recognizes exact emoji-only Unicode 17 spellings and counts 1–32 whole emoji sequences. It runs locally with fixed options and does not transmit, persist, trim or normalize the entered spelling. Results describe format only, not name availability, ownership, pricing or registration. Native registry operations remain disabled. The bundle contains only the pinned public Unicode runtime, data, license and source provenance plus the checker module and external stylesheet; candidate equivalence data is not included.
+
+The local `web/emoji17.mjs` module exports `getDataInfo()` and `tokenizeEmojiLabel(input, { qualification: "listed", presentation: "emoji-test-only" })`. This is exact spelling recognition, not a registry API. `canonicalizeOwnershipLabel` always rejects with `CANONICAL_POLICY_UNAPPROVED`; display qualification must not be used as an ownership key.

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   copyFileSync,
   existsSync,
@@ -16,10 +17,43 @@ import { NativeMonitor, nativeFailure, validateNetworkDocument } from "./native.
 import { Fault } from "./core.js";
 import { productionStatus } from "./production.js";
 
+const unicodePublicPins: Record<string, { bytes: number; sha256: string }> = {
+  "emoji17.mjs": {
+    "bytes": 7417,
+    "sha256": "1a937b91d2e54b1c68af66a8ac0c780980f2b9ddeb7e48e90a74274ada142d0c"
+  },
+  "emoji17-data.mjs": {
+    "bytes": 754062,
+    "sha256": "5e511ed00485deeff7e9f382dd9722807c031cc67f92d8ad7f550c436251296c"
+  },
+  "LICENSE-UNICODE.txt": {
+    "bytes": 1995,
+    "sha256": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96"
+  },
+  "PUBLIC-PROVENANCE.json": {
+    "bytes": 2042,
+    "sha256": "5b8ffbe6a6a4caf49770fd4dfb972743209a7c5b4f7f9c2550fc3fc80db287f5"
+  },
+  "emoji-format-checker.mjs": {
+    "bytes": 11294,
+    "sha256": "f7c6e412c63951c6a617ff79e59ddd7b36cceba2be39b57c882a131a4783869b"
+  },
+  "emoji-format-checker.css": {
+    "bytes": 1064,
+    "sha256": "32d2c62e558ee2997b0c37d7a42f104fd334240e16afb5b772868f88737bb120"
+  }
+};
+
 export const PUBLIC_FILES = [
   "index.html",
   "app.js",
   "live-network.js",
+  "emoji17.mjs",
+  "emoji-format-checker.mjs",
+  "emoji-format-checker.css",
+  "emoji17-data.mjs",
+  "LICENSE-UNICODE.txt",
+  "PUBLIC-PROVENANCE.json",
   "style.css",
   "icon.svg",
   "config.json",
@@ -68,7 +102,7 @@ export function buildProductionBundle(directory = resolve("_site"), observation:
     rmSync(output, { recursive: true });
   }
   mkdirSync(output);
-  for (const file of ["index.html", "app.js", "live-network.js", "style.css", "icon.svg"])
+  for (const file of ["index.html", "app.js", "live-network.js", "style.css", "icon.svg", ...Object.keys(unicodePublicPins)])
     copyFileSync(join("web", file), join(output, file));
   const config = JSON.parse(readFileSync("web/config.json", "utf8"));
   need(
@@ -117,9 +151,13 @@ export function buildProductionBundle(directory = resolve("_site"), observation:
     need(
       lstatSync(path).isFile() &&
         !lstatSync(path).isSymbolicLink() &&
-        lstatSync(path).size < 100000,
+        lstatSync(path).size < (file === "emoji17-data.mjs" ? 800000 : 100000),
       "PUBLIC_ARTIFACT",
     );
+  }
+  for (const [file, pin] of Object.entries(unicodePublicPins)) {
+    const bytes = readFileSync(join(output, file));
+    need(bytes.length === pin.bytes && createHash("sha256").update(bytes).digest("hex") === pin.sha256, "UNICODE_PUBLIC_ARTIFACT_IDENTITY");
   }
   return {
     status: "built",

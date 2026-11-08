@@ -1,0 +1,6 @@
+/* ORIGINAL minimal local fixture styles; no images, fonts, URLs or animation. */
+:root { color-scheme: light; font-family: system-ui, sans-serif; color: #19232d; background: #f4f6f8; }
+body { margin: 0; padding: 1rem; }
+main { max-width: 48rem; margin: 1rem auto; }
+h1 { font-size: 1.5rem; }
+p { line-height: 1.5; }
