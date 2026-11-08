@@ -8,7 +8,7 @@ Configuration/ledger injection into the production server is rejected; only a nu
 
 `cli.js mcp` supports the initialization handshake, read-only `registry_status`, ping and empty resources/prompts. The additional `native_network` and `native_receipt` tools use fixed public read-only routes; no caller-selected endpoint is accepted. Reference tool names such as `read_state` and `submit_intent` return `isError:true` with the unavailable document; no caller-selected provider, fixture, local ledger or signer is loaded.
 
-Public Pages serves a fixed availability interface and expiring build-time native-node observation. It has no API, state explorer, wallet, unsigned-body builder or transaction form. Browser configuration is exactly `mode:production-only`, `publicApiBase:null`, `statusFile:./status.json`, `networkFile:./network.json`; any demo mode, provider override or simulated state fails closed.
+Public Pages serves a fixed availability interface and explicit current read-only native-node observations on load and refresh, with no snapshot fallback. It has no API, state explorer, wallet, unsigned-body builder or transaction form. Browser configuration is exactly `mode:production-only`, `publicApiBase:null`, `statusFile:./status.json`, `networkFile:./network.json`; any demo mode, provider override or simulated state fails closed.
 
 ## Native public reads (not naming)
 
