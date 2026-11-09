@@ -5,7 +5,7 @@ import { base58 } from "../../src/native-crypto.js";
 import { canonical } from "../../src/core.js";
 import { Escrow, invariant, replay } from "../escrow.js";
 import { CHAIN, WorkerSecretSigner, micros, decimal, txid, verifyCommand, verifyTransfer } from "../escrow-codec.js";
-import { PoaHttpNetwork } from "../escrow-network.js";
+import { PoaHttpNetwork, MAINNET_ENGINE_SHA256, MAINNET_PARAMS_SHA256, PILOT_PER_TX, PILOT_DAILY } from "../escrow-network.js";
 import { MockNetwork, MemoryJournal, policy, who, key, seed, signer, command, depositBody, root, parents } from "./escrow-fixture.js";
 function fixture(crash=(point:string)=>{}, p=policy){
   const journal=new MemoryJournal(p),net=new MockNetwork();let enabled=true;
@@ -188,4 +188,56 @@ test("fixed-origin native adapter validates receipt/body bindings and checkpoint
  return Response.json(b,{status:b?200:404});})as typeof fetch;
  const n=new PoaHttpNetwork(()=>false,request,{engine:root,params:root}),s=await n.status(),o=await n.lookup(id);assert.equal(o?.checkpoint?.height,10);
  const cut=await n.cut(policy.wallet,[id],s);assert.deepEqual(cut.covered,[id]);assert.equal(cut.balance,"1.000000");assert.ok(paths.length>=8);
+});
+
+test("native adapter supports post-8:59-PST /chain/poa-mainnet-1/api/status schema, network-facts, cutoff context, and rollback tripwire",async()=>{
+ const body=depositBody(3,policy.wallet,"5.000000","live-schema"),id=txid(body);
+ const ownTx=depositBody(1,who(2),"1.000000","prev-out"),ownId=txid(ownTx);
+ const p1="b".repeat(64),p2="c".repeat(64);
+ let cpHeight=593855,cutoffTs=1794228787,nowMs=1794250522000;
+ const request=(async(input:any)=>{const u=new URL(input);
+  if(u.pathname==="/chain/poa-mainnet-1/api/status")return Response.json({checkpoint:{height:cpHeight,cutoff_ts:cutoffTs},network:"PoA prototype",K:5,open_ballots:0,chain_id:CHAIN,supply:"26020127390.293810",txs:13078,final:13007,invalid:0,agents_joined:9959,epochs_closed:63,holders:4968});
+  if(u.pathname==="/chain/poa-mainnet-1/api/network-facts")return Response.json({chain_id:CHAIN,open_epoch:63,engine_sha256:MAINNET_ENGINE_SHA256,params_sha256:MAINNET_PARAMS_SHA256,economics:{K:5}});
+  if(u.pathname===`/chain/poa-mainnet-1/api/explorer/tx/${id}`)return Response.json({id,body,atts:3,checkpointed:{height:593800},checkpoint_height:cpHeight});
+  if(u.pathname===`/chain/poa-mainnet-1/api/receipt/${id}`)return Response.json({txid:id,status:"included",from:body.from,type:"transfer",valid_in_open_window:false,checkpoint_covered:true,next_nonce:2});
+  if(u.pathname===`/chain/poa-mainnet-1/api/explorer/address/${policy.wallet}`)return Response.json({address:policy.wallet,balance:"5.000000",balance_as_of:{checkpoint_height:cpHeight},txs:[]});
+  if(u.pathname===`/chain/poa-mainnet-1/api/receipt/${ownId}`)return Response.json({txid:ownId,status:"included",from:policy.wallet,type:"transfer",valid_in_open_window:false,checkpoint_covered:true,next_nonce:7});
+  if(u.pathname==="/chain/poa-mainnet-1/api/explorer/txs")return Response.json([{id:p1},{id:p2}]);
+  if(u.pathname===`/chain/poa-mainnet-1/api/receipt/${p1}`||u.pathname===`/chain/poa-mainnet-1/api/receipt/${p2}`)return Response.json({txid:u.pathname.split("/").pop(),status:"included",from:who(2),type:"transfer",valid_in_open_window:true,checkpoint_covered:false});
+  return Response.json(null,{status:404});
+ }) as typeof fetch;
+ const n=new PoaHttpNetwork(()=>false,request,{engine:MAINNET_ENGINE_SHA256,params:MAINNET_PARAMS_SHA256},()=>nowMs);
+ const s=await n.status();
+ assert.equal(s.height,593855);assert.equal(s.cutoff,1794228787);assert.equal(s.stale,false);assert.match(s.root,/^[0-9a-f]{64}$/);
+ const o=await n.lookup(id);assert.equal(o?.checkpoint?.height,593855);assert.equal(o?.checkpoint?.root,s.root);
+ const cut=await n.cut(policy.wallet,[id],s);assert.deepEqual(cut.covered,[id]);
+ const ctx=await n.context(policy.wallet,ownId);assert.equal(ctx.nextNonce,7);assert.equal(ctx.cutoff,1794228787);assert.deepEqual(ctx.parents,[p1,p2]);
+ cpHeight=593854;await assert.rejects(n.status(),/ROLLBACK/);
+ assert.equal(PILOT_PER_TX,"250000.000000");assert.equal(PILOT_DAILY,"1000000.000000");
+});
+
+test("rebroadcast recovers pre-acceptance timeout with identical signed bytes and nonce, never double-paying",async()=>{
+ const f=fixture(),a=await auction(f);await settle(f,a);
+ f.net.mode="before-timeout";await f.e.tick();
+ const stuck=Object.values(f.e.state().payments).find(p=>p.status==="UNKNOWN")!;
+ assert.ok(stuck&&stuck.body);assert.equal(f.net.submitted.length,0);
+ f.net.mode="normal";
+ await f.e.rebroadcast();
+ for(let i=0;i<5;i++)await f.e.tick();
+ assert.equal(f.owner(),who(3));assert.equal(f.count(),1);
+ assert.equal(f.net.submitted.length,2);
+ assert.deepEqual(f.net.submitted.map(b=>b.nonce),[1,2]);
+ assert.equal(f.net.submitted[0]!.sig,stuck.body.sig);
+ invariant(f.e.state());
+});
+
+test("duplicate sender nonce across deposit intents is rejected",async()=>{
+ const f=fixture();
+ const i1=await f.e.command(command(who(3),"i1","intent",{amount:"1.000000"})) as any;
+ const i2=await f.e.command(command(who(3),"i2","intent",{amount:"1.000000"})) as any;
+ const t1=f.net.add(depositBody(3,policy.wallet,"1.000000",i1.intent,1));
+ const t2=f.net.add(depositBody(3,policy.wallet,"1.000000",i2.intent,1));
+ await f.e.command(command(who(3),"d1","detect",{intent:i1.intent,txid:t1}));
+ await assert.rejects(f.e.command(command(who(3),"d2","detect",{intent:i2.intent,txid:t2})),/DUPLICATE/);
+ assert.equal(f.e.state().assets,"1000000");
 });
