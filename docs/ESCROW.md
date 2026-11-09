@@ -1,7 +1,6 @@
 # Disabled custodial escrow module
 
-This module is **off by default** and does not change the existing registry UI or
-its `livePoA: false` capability. Mock tests are not evidence of mainnet readiness.
+This module is **off by default** and keeps the payments UI neutral while disabled and retains the registry’s `livePoA: false` capability. Mock tests are not evidence of mainnet readiness.
 It is a bounded, single-custodian implementation, not native naming escrow.
 
 ## Boundaries
@@ -9,7 +8,7 @@ It is a bounded, single-custodian implementation, not native naming escrow.
 - One registry SQLite Durable Object coordinates the escrow wallet's outgoing nonce
   lane, ledger, bids, refunds, and title reservations. Practice balances and starter
   grants are never escrow assets. Only verified incoming transfers credit funds.
-- The supported auction path is resale of an existing, unencumbered permanent deed.
+- The supported market path is fixed-price resale or auction of an existing, unencumbered permanent deed.
   No new-name issuance, leases, renewals, or new dispute rules are introduced.
   The seller chooses a positive reserve; existing premium/standard auction durations,
   quiet windows, strict >10% bid increment, no highest-bidder self-raise, and registry
@@ -94,6 +93,9 @@ Command parameter schemas (all fields required; no extras):
 |---|---|
 | `intent` | `amount` (returns unique intent, exact memo, public recipient) |
 | `detect` | `intent`, `txid` |
+| `list` | `name`, `price` (fixed-price escrow listing) |
+| `buy` | `auction`, `amount` (exact fixed price; reserves credited funds) |
+| `view` | no parameters (public signed account read only) |
 | `open` | `name`, `reserve` |
 | `bid` | `auction`, `amount` |
 | `cancel` / `expire` | `auction` |
@@ -162,9 +164,50 @@ is excluded. Isolated restore validates the escrow journal, forces a pause recor
 sets a permanent `RESTORED_ARCHIVE_READ_ONLY` halt so unpausing a restored archive can
 never replay old payouts; live-target restore is refused.
 
-Run `npm run escrow:test`: 38 unit/adversarial/model tests (including 1,200 generated
+Run `npm run escrow:test`: 61 unit/adversarial/model tests (including 1,200 generated
 model transitions) plus 18 real local workerd/SQLite integration checks. The runtime
 suite uses the real engine/journal/title adapter, a simulated PoA transport, full
 process restarts after deposit and payout, and concurrent recovery. It tests no real
 wallet, network signature submission, deposit or payout. Existing checks remain
 separate. Deterministic public test keys are never operational credentials.
+
+## Public API and agent-first screens
+
+`GET /v1/capabilities` advertises the escrow capability. `GET /v1/escrow/capabilities`
+reports enabled/paused/held, the public receiving address, limits and source freshness.
+Disabled deployments return a neutral “POA payments not open”; all other escrow routes
+are absent, without creating a ledger or contacting the chain.
+
+When enabled, `GET /v1/escrow/market`, `/domain?name=...` and
+`/intent?id=...&txid=...` expose bounded sanitized market/history and receipt projections,
+never journals, title-consent packets, signing material or administrative credentials.
+Receipt previews never credit a deposit: even an observed final transfer remains “seen”
+until its payer signs `detect` and the ledger independently verifies and credits it.
+
+`POST /v1/escrow/intent`, `/withdraw`, `/account` and `/command` require the exact
+`{command,signature}` envelope above, with a valid actor signature and an expiry within
+one hour. The first three routes bind the actions `intent`, `withdraw`, and `view`.
+The generic command route permits only the documented actor-signed market/deposit actions,
+not administrator controls. Unknown post-dispatch/storage outcomes return 503 with
+`accepted:"unknown"`; retain/retry the exact packet and query the signed account, never
+create a fresh payment or request key. Account reads expose only the signed payer's balances and
+refunds and do not schedule recovery. JSON envelopes are bounded to 64 KiB with strict
+UTF-8, duplicate/prototype-key rejection and no extra fields. Cross-origin browser calls
+and admin credentials on public writes are refused. Admin routes remain token-only.
+
+The **My POA** tab supplies copy-prompts for an agent to sign requests externally;
+the browser never signs, asks for keys, or saves signed requests to disk/storage. A
+payment intent returns the exact recipient, amount and unique `poadomains:<intent>` memo.
+Funding an account is not a bid, reservation, purchase, or title transfer. After final
+credit, the payer separately signs `bid` or `buy`. Seller consent is a separately signed
+registry transfer inside `settle`, never a direct transfer submitted ahead of payment.
+Fixed-price reservations still require seller handover and final seller/fee payments.
+Existing registry-only fixed offers are not silently converted; their owner must cancel
+the old encumbrance before creating a POA escrow listing. No issuance or lease support
+is added. Refund requests have no redirect field: payment goes only to the original payer.
+
+`npm run escrow:ui` drives these exact signed public HTTP boundaries and the real
+workerd/SQLite ledger/title store against the isolated mock chain: deposit waiting/seen/
+final/refund, auction settlement, fixed-price handover, stale/pause holds, and OFF screens.
+It checks Chromium/Firefox/WebKit at all seven supported viewports (including 320px),
+and captures clearly labeled MOCK screens at 390px and 1280px. No real funds are used.

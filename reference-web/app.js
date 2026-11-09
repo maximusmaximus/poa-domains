@@ -1,3 +1,4 @@
+import { mountEscrow } from "./escrow.js?v=def778b939a8";
 import {
   makeBody,
   digest,
@@ -61,6 +62,7 @@ let currentDomainName = null;
 let currentOwnerId = null;
 let networkStatus = { level: "checking", hold: false, message: "⚪ Checking PoA network…" };
 let networkTimer = null;
+let escrowUI = null;
 
 const TICKER_MS = 12000;
 const NETWORK_MS = 20000;
@@ -261,6 +263,7 @@ function applyRoute() {
     owner.hidden = true;
     if (tabs) tabs.hidden = true;
     if (latestState) renderDomainPage(currentDomainName);
+    escrowUI?.domain(currentDomainName);
   } else if (route.kind === "owner") {
     home.hidden = true;
     domain.hidden = true;
@@ -1678,6 +1681,8 @@ try {
     }),
   );
   await refresh();
+  escrowUI=mountEscrow({base,capability:cap.escrow,registryId:cap.registryId,
+    section:el("escrowSection"),domain:el("escrowDomain"),selectTab:()=>{navigateHome();setSectionTab("escrow");}});
   renderCart();
   applyRoute();
   setSectionTab(activeSectionTab, false);

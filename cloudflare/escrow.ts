@@ -34,9 +34,9 @@ export interface Payment {
   id: string; kind: "refund" | "seller" | "fee"; to: string; amount: string; status: PayStatus;
   day: string | null; body: Transfer | null; txid: string | null;
 }
-interface Deposit { payer: string; amount: string; tx: string | null; }
+interface Deposit { payer: string; amount: string; tx: string | null; createdAt?: number; }
 interface Auction {
-  id: string; name: string; seller: string; reserve: string; closes: number; quiet: number;
+  id: string; name: string; seller: string; reserve: string; closes: number; quiet: number; kind?: "auction" | "fixed"; createdAt?: number; history?: {event:string;at:number;amount?:string}[];
   high: { payer: string; amount: string } | null; status: "OPEN" | "CANCELLED" | "SETTLING" | "COMPLETE";
 }
 interface Settlement { auction: string; packet: Packet; payments: string[]; status: "PAYING" | "TITLE_PENDING" | "COMPLETE"; }
@@ -153,6 +153,31 @@ export class Escrow {
     });
   }
   private halt(code:string): void { if(this.state().halt!==code)this.journal.append("halt",{code},s=>{s.halt=code;}); }
+  private publicFresh?: { until: number; value: Promise<{ held: boolean; reason: string | null; asOf: number | null }> };
+  /** Display-only cached read. Commands always run the uncached financial gate. */
+  readiness(): Promise<{ held: boolean; reason: string | null; asOf: number | null }> {
+    if (!this.publicFresh || this.publicFresh.until <= this.now()) this.publicFresh = { until: this.now()+10000,
+      value: this.fresh().then(s=>({held:false,reason:null,asOf:s.asOf})).catch(()=>({held:true,reason:"Network freshness or verification is held",asOf:null})) };
+    return this.publicFresh.value;
+  }
+  /** Read-only receipt preview: never credits funds or signs/sends a transaction. */
+  async depositView(id: string, candidate?: string): Promise<unknown> {
+    need(/^[0-9a-f]{64}$/.test(id),"ESCROW_DEPOSIT_INTENT");
+    const s=this.state(),d=s.deposits[id];need(d,"ESCROW_DEPOSIT_INTENT");
+    let status="waiting",seenAt:number|null=null;
+    const tx=d.tx??candidate??null;
+    if(d.tx) status="final";
+    else if(tx){
+      need(/^[0-9a-f]{64}$/.test(tx),"ESCROW_TXID");
+      try { const o=await this.network.lookup(tx);
+        if(o && o.id===tx && o.chain===CHAIN && o.valid===true){
+          verifyTransfer(o.body);need(txid(o.body)===tx && o.body.to===this.policy.wallet && o.body.from===d.payer && o.body.amount===d.amount && o.body.memo===`poadomains:${id}`,"ESCROW_DEPOSIT_BINDING");
+          status="seen";seenAt=o.body.ts*1000;
+        }
+      }catch { /* Unknown or invalid observations never imply a credit. */ }
+    }
+    return {intent:id,payer:d.payer,to:this.policy.wallet,amount:d.amount,memo:`poadomains:${id}`,status,txid:tx,createdAt:d.createdAt??null,seenAt,finalAt:d.tx?(s.credited[d.tx]?.ts??0)*1000:null};
+  }
   private async fresh(): Promise<Status> {
     let status:Status;
     try { status=await this.network.status(); }
@@ -193,8 +218,9 @@ export class Escrow {
     switch(c.action){
       case "intent": case "withdraw": exact(p,["amount"]); need(micros(p.amount)>0n,"ESCROW_AMOUNT"); break;
       case "detect": exact(p,["intent","txid"]); text(p.intent,80); need(/^[0-9a-f]{64}$/.test(text(p.txid,64)),"ESCROW_TXID"); break;
+      case "list": exact(p,["name","price"]); text(p.name,256); need(micros(p.price)>0n && micros(p.price)<=micros(this.policy.perTx),"ESCROW_AMOUNT"); break;
       case "open": exact(p,["name","reserve"]); text(p.name,256); need(micros(p.reserve)>0n,"ESCROW_RESERVE"); break;
-      case "bid": exact(p,["auction","amount"]); text(p.auction,64); need(micros(p.amount)>0n,"ESCROW_AMOUNT"); break;
+      case "buy": case "bid": exact(p,["auction","amount"]); text(p.auction,64); need(micros(p.amount)>0n,"ESCROW_AMOUNT"); break;
       case "cancel": case "expire": exact(p,["auction"]); text(p.auction,64); break;
       case "settle": case "repair-title": {
         exact(p,["auction","transfer"]); text(p.auction,64);
@@ -242,32 +268,34 @@ export class Escrow {
         case "intent": {
           need(s.sequence<PILOT_ADMISSION_LIMIT,"ESCROW_JOURNAL_CAPACITY");
           exact(p,["amount"]); need(micros(p.amount)>0n,"ESCROW_AMOUNT");
-          const id=digest([rk,c]); s.deposits[id]={payer:c.actor,amount:String(p.amount),tx:null}; result={intent:id,memo:`poadomains:${id}`,to:this.policy.wallet}; break;
+          const id=digest([rk,c]); s.deposits[id]={payer:c.actor,amount:String(p.amount),tx:null,createdAt:this.now()}; result={intent:id,memo:`poadomains:${id}`,to:this.policy.wallet}; break;
         }
-        case "open": {
+        case "list": case "open": {
           need(s.sequence<PILOT_ADMISSION_LIMIT,"ESCROW_JOURNAL_CAPACITY");
-          exact(p,["name","reserve"]); const name=text(p.name,256), terms=this.titles.terms(name,c.actor);
-          need(micros(p.reserve)>=micros(terms.reserve),"ESCROW_RESERVE");
+          const fixed=c.action==="list";exact(p,fixed?["name","price"]:["name","reserve"]); const reserve=String(fixed?p.price:p.reserve);const name=text(p.name,256), terms=this.titles.terms(name,c.actor);
+          need(micros(reserve)>=micros(terms.reserve) && micros(reserve)<=micros(this.policy.perTx),"ESCROW_RESERVE");
           need(!Object.values(s.auctions).some(a=>a.name===name&&(a.status==="OPEN"||a.status==="SETTLING")),"ESCROW_TITLE_RESERVED");
-          const id=digest([rk,c]); s.auctions[id]={id,name,seller:c.actor,reserve:String(micros(p.reserve)),
+          const id=digest([rk,c]); s.auctions[id]={id,name,seller:c.actor,reserve:String(micros(reserve)),kind:fixed?"fixed":"auction",createdAt:this.now(),history:[{event:fixed?"Listed for POA":"Auction opened",at:this.now()}],
             closes:this.now()+terms.window,quiet:terms.quiet,high:null,status:"OPEN"};result={auction:id};break;
         }
-        case "bid": {
+        case "buy": case "bid": {
           need(s.sequence<PILOT_JOURNAL_LIMIT-32,"ESCROW_JOURNAL_CAPACITY");
           exact(p,["auction","amount"]);const a=s.auctions[text(p.auction,64)]; need(a&&a.status==="OPEN"&&this.now()<a.closes,"ESCROW_AUCTION_CLOSED");
-          const n=micros(p.amount);need(n<=micros(this.policy.perTx),"ESCROW_PAYOUT_LIMIT");need(c.actor!==a.seller,"ESCROW_SELF_SALE");need(a.high?.payer!==c.actor,"ESCROW_SELF_RAISE");
+          need(c.action==="buy"?a.kind==="fixed"&&a.high===null:a.kind!=="fixed","ESCROW_MARKET_KIND");
+          const n=micros(p.amount);if(c.action==="buy")need(n===BigInt(a.reserve),"ESCROW_PRICE");need(n<=micros(this.policy.perTx),"ESCROW_PAYOUT_LIMIT");need(c.actor!==a.seller,"ESCROW_SELF_SALE");need(a.high?.payer!==c.actor,"ESCROW_SELF_RAISE");
           // Existing strict >10% rule, in integer micros (not rounded decimal floats).
           need(n>=BigInt(a.reserve)&&(!a.high||n*10n>BigInt(a.high.amount)*11n),"ESCROW_BID_INCREMENT");
           need(BigInt(s.available[c.actor]??"0")>=n,"ESCROW_INSUFFICIENT_FUNDS");
           if(a.high) this.refund(s,`outbid-${a.id}-${rk}`,a.high.payer,a.high.amount);
           s.available[c.actor]=String(BigInt(s.available[c.actor]??"0")-n);a.high={payer:c.actor,amount:String(n)};
-          a.closes=Math.max(a.closes,this.now()+a.quiet);break;
+          (a.history??=[]).push({event:c.action==="buy"?"Purchase reserved; seller handover needed":"Bid placed",at:this.now(),amount:String(n)});a.history=a.history.slice(-100);
+          a.closes=c.action==="buy"?this.now():Math.max(a.closes,this.now()+a.quiet);break;
         }
         case "cancel": case "expire": {
           exact(p,["auction"]);const a=s.auctions[text(p.auction,64)];need(a&&a.status==="OPEN","ESCROW_AUCTION_CLOSED");
           need(c.action==="cancel"?a.seller===c.actor:this.now()>=a.closes,"ESCROW_CANCEL_NOT_ALLOWED");
           // Expiry without a title consent is a failure refund, never silently pays a seller.
-          if(a.high)this.refund(s,`cancel-${a.id}`,a.high.payer,a.high.amount);a.status="CANCELLED";break;
+          if(a.high)this.refund(s,`cancel-${a.id}`,a.high.payer,a.high.amount);a.status="CANCELLED";(a.history??=[]).push({event:"Cancelled; original payer refund due",at:this.now()});break;
         }
         case "withdraw": {
           exact(p,["amount"]);const n=micros(p.amount);need(n<=micros(this.policy.perTx),"ESCROW_PAYOUT_LIMIT");need(n>0n&&BigInt(s.available[c.actor]??"0")>=n,"ESCROW_INSUFFICIENT_FUNDS");
@@ -282,7 +310,7 @@ export class Escrow {
           for(const [kind,to,n] of [["seller",a.seller,net],["fee",this.policy.treasury,fee]] as const) if(n>0n){
             const id=`${kind}-${a.id}`;s.payments[id]={id,kind,to,amount:String(n),status:"READY",day:null,body:null,txid:null};payments.push(id);
           }
-          a.status="SETTLING";s.settlements[a.id]={auction:a.id,packet,payments,status:"PAYING"};break;
+          (a.history??=[]).push({event:"Seller handover signed; settling",at:this.now()});a.status="SETTLING";s.settlements[a.id]={auction:a.id,packet,payments,status:"PAYING"};break;
         }
         case "repair-title": {
           exact(p,["auction","transfer"]);const a=s.auctions[text(p.auction,64)], st=s.settlements[String(p.auction)];
@@ -290,7 +318,7 @@ export class Escrow {
           const packet=authenticate(p.transfer);this.titles.validate(packet,a.name,a.seller,a.high!.payer);
           st.packet=packet;
           if(st.payments.every(id=>s.payments[id]!.status==="FINAL")){
-            this.titles.commit(packet);st.status="COMPLETE";a.status="COMPLETE";
+            this.titles.commit(packet);st.status="COMPLETE";a.status="COMPLETE";(a.history??=[]).push({event:"Title repaired; handover complete",at:this.now()});
           } else {
             st.status="PAYING";
           }
@@ -313,7 +341,7 @@ export class Escrow {
           need(this.enabled(),"ESCROW_DISABLED");need(!s.paused,"ESCROW_PAUSED");need(!s.halt,"ESCROW_HALTED");
           const cur=s.auctions[a.id];if(!cur||cur.status!=="OPEN")return;
           if(cur.high)this.refund(s,`cancel-${cur.id}`,cur.high.payer,cur.high.amount);
-          cur.status="CANCELLED";
+          cur.status="CANCELLED";(cur.history??=[]).push({event:"Expired; original payer refund due",at:this.now()});
         });
       }
     }
@@ -360,7 +388,7 @@ export class Escrow {
       if(valid){
         this.journal.append("title-complete",{auction:a.id},s=>{
           need(this.enabled(),"ESCROW_DISABLED");need(!s.paused,"ESCROW_PAUSED");need(!s.halt,"ESCROW_HALTED");
-          this.titles.commit(st.packet);s.settlements[a.id]!.status="COMPLETE";s.auctions[a.id]!.status="COMPLETE";
+          this.titles.commit(st.packet);s.settlements[a.id]!.status="COMPLETE";s.auctions[a.id]!.status="COMPLETE";(s.auctions[a.id]!.history??=[]).push({event:"Payment and title complete",at:this.now()});
         });
       }
     }
