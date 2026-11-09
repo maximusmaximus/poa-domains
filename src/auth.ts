@@ -9,6 +9,7 @@ import {
   text,
   hash,
 } from "./core.js";
+import { base58, nativeAddress, unbase58 } from "./native-crypto.js";
 export const DOMAIN = "poa-domains.local.intent.v1";
 export interface Body {
   domain: string;
@@ -35,23 +36,53 @@ export interface Packet {
 }
 export function principal(v: unknown): string {
   const s = text(v, 80);
-  need(/^ed25519:[0-9a-f]{64}$/.test(s), "PRINCIPAL");
-  return s;
+  if (/^ed25519:[0-9a-f]{64}$/.test(s)) return s;
+  if (s.startsWith("poa1")) {
+    try {
+      unbase58(s.slice(4), 32);
+      return s;
+    } catch {
+      need(false, "PRINCIPAL");
+    }
+  }
+  need(false, "PRINCIPAL");
 }
 export function publicPrincipal(key: KeyObject): string {
   const pub = createPublicKey(key).export({ format: "jwk" });
   need(pub.crv === "Ed25519" && pub.x, "PRINCIPAL");
   return "ed25519:" + Buffer.from(pub.x, "base64url").toString("hex");
 }
+export function nativePrincipal(key: KeyObject): string {
+  const pub = createPublicKey(key).export({ format: "jwk" });
+  need(pub.crv === "Ed25519" && pub.x, "PRINCIPAL");
+  return nativeAddress(Buffer.from(pub.x, "base64url"));
+}
 export function message(body: Body): Buffer {
   return Buffer.from(canonical([DOMAIN, body]), "utf8");
 }
 export function signBody(body: Body, keys: KeyObject[]): Packet {
   const signatures: Record<string, string> = {};
-  for (const key of keys)
-    signatures[publicPrincipal(key)] = sign(null, message(body), key).toString(
-      "hex",
-    );
+  const who = [
+    body.signer,
+    ...(Array.isArray(body.coSigners) ? body.coSigners : []),
+  ];
+  for (const key of keys) {
+    const edId = publicPrincipal(key);
+    const poaId = nativePrincipal(key);
+    const rawSig = sign(null, message(body), key);
+    if (who.includes(poaId)) {
+      signatures[poaId] = base58(rawSig);
+    } else if (who.includes(edId)) {
+      signatures[edId] = rawSig.toString("hex");
+    } else if (
+      typeof body.signer === "string" &&
+      body.signer.startsWith("poa1")
+    ) {
+      signatures[poaId] = base58(rawSig);
+    } else {
+      signatures[edId] = rawSig.toString("hex");
+    }
+  }
   return { body, signatures };
 }
 export function validateBody(v: unknown): Body {
@@ -116,19 +147,28 @@ export function authenticate(v: unknown): Packet {
   );
   for (const id of who) {
     const sig = text(signatures[id], 128);
-    need(/^[0-9a-f]{128}$/.test(sig), "SIGNATURE");
+    let sigBytes: Buffer;
+    if (/^[0-9a-f]{128}$/.test(sig)) {
+      sigBytes = Buffer.from(sig, "hex");
+    } else {
+      try {
+        sigBytes = unbase58(sig, 64);
+      } catch {
+        need(false, "SIGNATURE");
+      }
+    }
+    const rawPub = id.startsWith("poa1")
+      ? unbase58(id.slice(4), 32)
+      : Buffer.from(id.slice(8), "hex");
     const key = createPublicKey({
       key: {
         kty: "OKP",
         crv: "Ed25519",
-        x: Buffer.from(id.slice(8), "hex").toString("base64url"),
+        x: rawPub.toString("base64url"),
       },
       format: "jwk",
     });
-    need(
-      verify(null, message(body), key, Buffer.from(sig, "hex")),
-      "SIGNATURE",
-    );
+    need(verify(null, message(body), key, sigBytes), "SIGNATURE");
   }
   return p as Packet;
 }

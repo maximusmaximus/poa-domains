@@ -124,6 +124,24 @@ export function normalize(value, manifest) {
     })
     .join(".");
 }
+const b58Alphabet =
+  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+export function validPrincipal(s) {
+  if (typeof s !== "string") return false;
+  if (/^ed25519:[0-9a-f]{64}$/.test(s)) return true;
+  if (!s.startsWith("poa1") || s.length < 36 || s.length > 48) return false;
+  const payload = s.slice(4);
+  let n = 0n;
+  for (const c of payload) {
+    const d = b58Alphabet.indexOf(c);
+    if (d < 0) return false;
+    n = n * 58n + BigInt(d);
+  }
+  const hex = n === 0n ? "" : n.toString(16);
+  const bodyLen = Math.ceil(hex.length / 2);
+  const leadingOnes = payload.length - payload.replace(/^1+/, "").length;
+  return leadingOnes + bodyLen === 32;
+}
 export function makeBody(input, cap) {
   safeObject(input);
   const params = structuredClone(input.params);
@@ -151,10 +169,10 @@ export function makeBody(input, cap) {
     params,
   };
   if (
-    !/^ed25519:[0-9a-f]{64}$/.test(body.signer) ||
+    !validPrincipal(body.signer) ||
     !Array.isArray(body.coSigners) ||
     body.coSigners.length > 3 ||
-    body.coSigners.some((x) => !/^ed25519:[0-9a-f]{64}$/.test(x))
+    body.coSigners.some((x) => !validPrincipal(x))
   )
     throw Error("Principals");
   if (

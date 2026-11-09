@@ -33,7 +33,13 @@ import {
 import { setup, witness } from "./helpers.js";
 import { rightsHash } from "../src/model.js";
 import { prepare, handoff, capabilities } from "../src/interface.js";
-import { intentId, signBody } from "../src/auth.js";
+import {
+  authenticate,
+  intentId,
+  nativePrincipal,
+  principal,
+  signBody,
+} from "../src/auth.js";
 
 test("strict JSON rejects duplicate/unsafe/secret keys, floats, depth and excess bytes", () => {
   for (const s of [
@@ -281,6 +287,53 @@ test("real Ed25519 signature rejects forgery before consuming nonce", () => {
   assert.throws(() => c.e.submit(p), /SIGNATURE/);
   assert.equal(c.e.stateHash(), before);
   assert.equal(c.e.nextNonce(c.alice.id), 0);
+});
+test("native poa1 Base58 principals and signatures authenticate and maintain browser parity", async () => {
+  const c = setup();
+  const alicePoa = nativePrincipal(c.alice.key);
+  const bobPoa = nativePrincipal(c.bob.key);
+  assert.ok(alicePoa.startsWith("poa1"));
+  assert.equal(principal(alicePoa), alicePoa);
+  assert.equal(principal(bobPoa), bobPoa);
+  for (const invalid of [
+    "poa1",
+    "poa10000",
+    "poa1" + "1".repeat(31),
+    "poa1" + "1".repeat(33),
+    "poa2" + alicePoa.slice(4),
+  ]) {
+    assert.throws(() => principal(invalid), /PRINCIPAL/);
+  }
+  const web: any = await import(
+    new URL("../../reference-web/shared.js", import.meta.url).href
+  );
+  const cap = capabilities(c.e);
+  const coSigners = [bobPoa].sort();
+  const input = {
+    signer: alicePoa,
+    coSigners,
+    requestId: "poa1-auth-test-1",
+    nonce: 0,
+    notBefore: 100,
+    deadline: 200,
+    maxTotal: "100",
+    maxNetworkFee: "0",
+    action: "transfer",
+    params: {
+      name: "poa:ALPHA",
+      expectedDeedId: "deed-1",
+      expectedVersion: 1,
+      recipient: bobPoa,
+    },
+  };
+  const body = prepare(input, cap);
+  assert.deepEqual(web.makeBody(input, cap), body);
+  const signed = signBody(body, [c.alice.key, c.bob.key]);
+  assert.ok(!/^[0-9a-f]{128}$/.test(signed.signatures[alicePoa]!));
+  assert.deepEqual(authenticate(signed), signed);
+  const forged = structuredClone(signed);
+  forged.signatures[alicePoa] = signed.signatures[bobPoa]!;
+  assert.throws(() => authenticate(forged), /SIGNATURE/);
 });
 test("domain, network/genesis, registry, policy and normalization replay protection", () => {
   const c = setup();
