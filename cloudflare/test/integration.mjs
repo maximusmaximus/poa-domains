@@ -73,10 +73,12 @@ try {
     const pills = html.match(/class="quick-pills"([\s\S]*?)<\/div>/)?.[0] ?? "";
     assert.equal((pills.match(/<button/g) ?? []).length,6); assert.ok(pills.includes("100k POA single emoji")); assert.ok(pills.includes("1k POA multi-emoji"));
     assert.match(html, /local reference\. Not live PoA/i);
-    for (const id of ["siteTitle","liveTicker","floatingCartBtn","floatingCartPanel","copyCheckoutBtn","auctionsSection"]) assert.ok(html.includes(`id="${id}"`), id);
+    for (const id of ["siteTitle","liveTicker","floatingCartBtn","floatingCartPanel","copyCheckoutBtn","auctionsSection","marketSection","sectionTabs","domainMain"]) assert.ok(html.includes(`id="${id}"`), id);
     assert.ok(home.headers.get("content-security-policy")); assert.equal(home.headers.get("x-content-type-options"),"nosniff");
   });
-  for (const asset of ["/app.js","/shared.js","/style.css","/config.json","/icon.svg"]) { const status=(await fetch(base+asset)).status; check(`asset ${asset}`,()=>assert.equal(status,200)); }
+  const domainPage = await fetch(base + "/d/nexus"); const domainHtml = await domainPage.text();
+  check("SPA domain page serves HTML shell", () => { assert.equal(domainPage.status, 200); assert.ok(domainHtml.includes('id="domainMain"')); assert.ok(domainHtml.includes('id="siteTitle"')); });
+    for (const asset of ["/app.js","/shared.js","/style.css","/config.json","/icon.svg"]) { const status=(await fetch(base+asset)).status; check(`asset ${asset}`,()=>assert.equal(status,200)); }
   const initial = (await api("/v1/state")).body; save("state-initial.json", initial);
   check("seeded showcase domains, auctions, standing child offer, resale and records", () => {
     const s = initial.state;

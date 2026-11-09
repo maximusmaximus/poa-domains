@@ -21,6 +21,13 @@ export async function browserSmoke(base, evidence) {
     const prompt=await page.locator("#cartPrompt").innerText();
     for(const needle of ["keygen"," act ","submit_intent","quantum"]) assert.ok(prompt.includes(needle),needle);
     assert.equal(await page.locator("#copyCartPrompt").isEnabled(),true);
+    assert.equal(await page.locator("#sectionTabs").count(),1);
+    assert.equal(await page.locator("#marketSection").count(),1);
+    assert.equal(await page.locator("#domainMain").count(),1);
+    await page.goto(base + "/d/nexus",{waitUntil:"networkidle"});
+    await page.waitForFunction(()=>document.querySelector("#domainTitle") && document.querySelector("#domainTitle").textContent.includes("nexus"));
+    assert.match(await page.locator("#domainStatus").innerText(), /Owned|For sale|Auction|Available|Leased|Reserved/i);
+    await page.goto(base,{waitUntil:"networkidle"});
     assert.equal(await page.locator("#floatingCartBtn").count(),1);
     assert.equal(await page.locator("#liveTicker").count(),1);
     assert.ok((await page.locator("#liveTickerTrack .ticker-chip").count()) + (await page.locator("#liveTickerTrack .ticker-empty").count()) >= 1);

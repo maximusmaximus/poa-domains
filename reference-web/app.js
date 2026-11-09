@@ -15,6 +15,17 @@ import {
   historyForTarget,
   loadCart,
   saveCart,
+  domainPath,
+  parseDomainPath,
+  parseOwnerPath,
+  resolveDomainView,
+  activeResaleOffers,
+  offerIsActive,
+  buildListingPrompt,
+  loadTabSeen,
+  saveTabSeen,
+  tabWatermarks,
+  tabHasNew,
 } from "./shared.js";
 
 const el = (id) => document.getElementById(id);
@@ -32,6 +43,11 @@ let cap,
   tickerTimer = null,
   detailTarget = null;
 let generation = 0;
+let activeSectionTab = "find";
+let tabSeen = {};
+let route = { kind: "home" };
+let currentDomainName = null;
+let currentOwnerId = null;
 
 const TICKER_MS = 12000;
 
@@ -76,6 +92,113 @@ function add(parent, tag, text, css) {
   if (css) node.className = css;
   parent.append(node);
   return node;
+}
+
+
+function nameLink(parent, name, css = "domain-link") {
+  if (!name) return add(parent, "span", "—", css);
+  const a = document.createElement("a");
+  a.href = domainPath(name);
+  a.className = css;
+  a.textContent = name;
+  a.addEventListener("click", (event) => {
+    event.preventDefault();
+    navigateDomain(name);
+  });
+  parent.append(a);
+  return a;
+}
+
+function ownerLink(parent, ownerId, label) {
+  const a = document.createElement("a");
+  a.href = "/p/" + encodeURIComponent(ownerId);
+  a.className = "domain-link";
+  a.textContent = label || ownerId.slice(0, 18) + "…";
+  a.addEventListener("click", (event) => {
+    event.preventDefault();
+    navigateOwner(ownerId);
+  });
+  parent.append(a);
+  return a;
+}
+
+function navigateHome() {
+  route = { kind: "home" };
+  currentDomainName = null;
+  currentOwnerId = null;
+  history.pushState(route, "", "/");
+  applyRoute();
+}
+
+function navigateDomain(name) {
+  route = { kind: "domain", name };
+  currentDomainName = name;
+  currentOwnerId = null;
+  history.pushState(route, "", domainPath(name));
+  applyRoute();
+}
+
+function navigateOwner(ownerId) {
+  route = { kind: "owner", ownerId };
+  currentOwnerId = ownerId;
+  currentDomainName = null;
+  history.pushState(route, "", "/p/" + encodeURIComponent(ownerId));
+  applyRoute();
+}
+
+function applyRoute() {
+  const home = el("homeMain");
+  const domain = el("domainMain");
+  const owner = el("ownerMain");
+  const tabs = el("sectionTabs");
+  if (route.kind === "domain") {
+    home.hidden = true;
+    domain.hidden = false;
+    owner.hidden = true;
+    if (tabs) tabs.hidden = true;
+    if (latestState) renderDomainPage(currentDomainName);
+  } else if (route.kind === "owner") {
+    home.hidden = true;
+    domain.hidden = true;
+    owner.hidden = false;
+    if (tabs) tabs.hidden = true;
+    if (latestState) renderOwnerPage(currentOwnerId);
+  } else {
+    home.hidden = false;
+    domain.hidden = true;
+    owner.hidden = true;
+    if (tabs) tabs.hidden = false;
+  }
+}
+
+function setSectionTab(tabId, markSeen = true) {
+  activeSectionTab = tabId;
+  for (const btn of document.querySelectorAll(".section-tab")) {
+    const on = btn.getAttribute("data-tab") === tabId;
+    btn.classList.toggle("is-active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+  }
+  for (const section of document.querySelectorAll("main#homeMain > section[data-section]")) {
+    const on = section.getAttribute("data-section") === tabId;
+    section.classList.toggle("is-active-section", on);
+  }
+  if (markSeen && latestState) {
+    const marks = tabWatermarks(latestState);
+    tabSeen = { ...tabSeen, [tabId]: marks[tabId] ?? latestState.sequence ?? 0 };
+    saveTabSeen(globalThis.localStorage, tabSeen);
+    updateTabDots(latestState);
+  }
+}
+
+function updateTabDots(state) {
+  const marks = tabWatermarks(state);
+  for (const btn of document.querySelectorAll(".section-tab")) {
+    const id = btn.getAttribute("data-tab");
+    const dot = btn.querySelector(".tab-dot");
+    if (!dot) continue;
+    const show = tabHasNew(id, marks, tabSeen);
+    dot.hidden = !show;
+  }
 }
 
 function person(id) {
@@ -152,7 +275,8 @@ function renderFloatingCart() {
   }
   cart.forEach((item, index) => {
     const card = add(list, "div", "", "card");
-    add(card, "h4", item.name);
+    const h = add(card, "h4", "");
+    nameLink(h, item.name);
     add(card, "p", `${item.action} · ${item.amount} ${item.asset}`, "badge");
     add(card, "p", item.summary);
     const btn = add(card, "button", "Remove", "secondary small");
@@ -175,7 +299,8 @@ function renderCart() {
   }
   cart.forEach((item, index) => {
     const card = add(listNode, "div", "", "card");
-    add(card, "h4", item.name);
+    const h = add(card, "h4", "");
+    nameLink(h, item.name);
     add(
       card,
       "p",
@@ -247,7 +372,10 @@ function renderTicker(state) {
     chip.className = "ticker-chip";
     chip.textContent = item.label;
     chip.setAttribute("aria-label", `Open ${item.label}`);
-    chip.addEventListener("click", () => openDetail(item));
+    chip.addEventListener("click", () => {
+      if (item.name) navigateDomain(item.name);
+      else openDetail(item);
+    });
     track.append(chip);
   }
 }
@@ -278,6 +406,14 @@ function openDetail(item) {
   }
   const actions = el("detailActions");
   actions.replaceChildren();
+  if (item.name) {
+    const openBtn = add(actions, "button", "Open page", "secondary");
+    openBtn.type = "button";
+    openBtn.addEventListener("click", () => {
+      closeDetail();
+      navigateDomain(item.name);
+    });
+  }
   const cartBtn = add(actions, "button", "Add to cart");
   cartBtn.type = "button";
   cartBtn.id = "detailAddToCart";
@@ -375,15 +511,19 @@ function runSearch(rawQuery) {
   const s = latestState;
   const name = info.canonical;
   const card = add(container, "div", "", "card");
-  add(card, "h4", name);
+  const title = add(card, "h4", "");
+  nameLink(title, name);
+  const openPage = add(card, "button", "Open page", "secondary small");
+  openPage.type = "button";
+  openPage.addEventListener("click", () => navigateDomain(name));
   add(
     card,
     "p",
-    `Canonical: ${name} · ${info.isRoot ? "Root domain" : "Direct child of " + info.parent} · ${info.tokenCounts.join(" + ")} token(s) · Tier: ${info.tier.toUpperCase()}`,
+    `${info.isRoot ? "Root" : "Child of " + info.parent} · ${info.tier.toUpperCase()}`,
   );
 
   if (info.isRoot && reservedSet.has(name)) {
-    add(card, "p", "RESERVED ROOT DOMAIN (PROTECTED)", "badge-warn");
+    add(card, "p", "🔒 Reserved — not for sale", "badge-warn");
     add(card, "p", `${reservedSet.size}-name reservation catalog`);
     return;
   }
@@ -400,7 +540,7 @@ function runSearch(rawQuery) {
     const minBid = liveAuction.high
       ? minimumNextBid(liveAuction.high.amount, cap.increment)
       : liveAuction.reserve;
-    add(card, "p", "IN LIVE ASCENDING AUCTION", "badge");
+    add(card, "p", "🏷️ In auction now", "badge");
     add(
       card,
       "p",
@@ -448,7 +588,7 @@ function runSearch(rawQuery) {
 
   if (entry?.activeId && s.deeds[entry.activeId]) {
     const d = s.deeds[entry.activeId];
-    add(card, "p", `OWNED (${d.rights.kind.toUpperCase()} DEED)`, "badge");
+    add(card, "p", `✅ Owned (${d.rights.kind})`, "badge");
     add(
       card,
       "p",
@@ -466,7 +606,7 @@ function runSearch(rawQuery) {
       add(
         card,
         "p",
-        `Active fixed-price resale listing: ${resaleOffer.price} ${resaleOffer.asset} (valid until second ${resaleOffer.validUntil})`,
+        `💰 For sale: ${resaleOffer.price} ${resaleOffer.asset} (until ${resaleOffer.validUntil}) — Active fixed-price resale listing: ${resaleOffer.price} ${resaleOffer.asset}`,
         "badge-ok",
       );
       const btn = add(card, "button", "Add to cart", "small");
@@ -514,7 +654,7 @@ function runSearch(rawQuery) {
       add(
         card,
         "p",
-        `AVAILABLE VIA STANDING CHILD OFFER (${childOffer.price} ${childOffer.asset})`,
+        `🟢 Child offer open (${childOffer.price} ${childOffer.asset})`,
         "badge-ok",
       );
       const btn = add(card, "button", "Add to cart", "small");
@@ -549,7 +689,7 @@ function runSearch(rawQuery) {
         });
       });
     } else {
-      add(card, "p", "UNMINTED CHILD DOMAIN (NO OPEN OFFER)", "badge");
+      add(card, "p", "⚪ Child not minted — no open offer", "badge");
     }
     return;
   }
@@ -571,7 +711,7 @@ function runSearch(rawQuery) {
       ? "1k POA multi-emoji minimum bid"
       : `${reserve} POA minimum bid`;
   const windowSec = info.tier === "premium" ? 86400 : 3600;
-  add(card, "p", "AVAILABLE ROOT DOMAIN", "badge-ok");
+  add(card, "p", "🟢 Available", "badge-ok");
   add(
     card,
     "p",
@@ -633,7 +773,8 @@ function renderAuctions(s) {
               ? "open / funded"
               : "open / no bids"
             : "eligible to close";
-    add(card, "h4", a.name);
+    const ah = add(card, "h4", "");
+    nameLink(ah, a.name);
     add(card, "p", phase, "badge");
     add(
       card,
@@ -685,6 +826,242 @@ function renderAuctions(s) {
       }),
     );
   }
+}
+
+
+function statusLabel(status) {
+  const map = {
+    available: "🟢 Available",
+    reserved: "🔒 Reserved",
+    owned: "✅ Owned",
+    listed: "💰 For sale",
+    leased: "📅 Leased",
+    "listed-lease": "💰 For sale (lease)",
+    "lease-grace": "⚠️ Lease grace",
+    "lease-expired": "⌛ Lease expired",
+    "auction-current": "🏷️ Auction open",
+    "auction-upcoming": "🗓️ Auction upcoming",
+    "auction-past": "📜 Auction ended",
+    "child-offer": "🟢 Child offer open",
+    "unminted-child": "⚪ Child not minted",
+    unknown: "❓ Unknown",
+  };
+  return map[status] || status;
+}
+
+function renderMarketplace(s) {
+  const box = el("marketplace");
+  if (!box) return;
+  box.replaceChildren();
+  const listings = activeResaleOffers(s).filter((x) => x.asset === "POA");
+  if (!listings.length) {
+    add(box, "p", "No POA listings right now", "muted");
+    return;
+  }
+  for (const row of listings) {
+    const card = add(box, "article", "", "card");
+    const h = add(card, "h4", "");
+    nameLink(h, row.name);
+    add(card, "p", `💰 ${row.price} POA`, "badge-ok");
+    const ownerLine = add(card, "p", "Seller: ");
+    if (row.offer?.owner) ownerLink(ownerLine, row.offer.owner, person(row.offer.owner));
+    add(card, "p", `Until ${row.offer.validUntil}`);
+    const btn = add(card, "button", "Add to cart", "small");
+    btn.type = "button";
+    btn.addEventListener("click", () => {
+      addToCart({
+        name: row.name,
+        tier: "standard",
+        isRoot: !String(row.name).includes("."),
+        action: "buyFixed",
+        asset: "POA",
+        amount: row.price,
+        summary: `Buy "${row.name}" at ${row.price} POA via offer ${row.offer.id.slice(0, 16)}…`,
+        params: {
+          offerId: row.offer.id,
+          expectedVersion: row.offer.version,
+          asset: "POA",
+          amount: row.price,
+        },
+      });
+    });
+  }
+}
+
+function renderDomainPage(name) {
+  if (!latestState || !name) return;
+  const view = resolveDomainView(latestState, name, reservedSet);
+  el("domainTitle").textContent = "";
+  nameLink(el("domainTitle"), name);
+  el("domainStatus").textContent = statusLabel(view.status);
+  const ownerNode = el("domainOwner");
+  ownerNode.replaceChildren();
+  if (view.owner) {
+    ownerNode.append("Owner: ");
+    ownerLink(ownerNode, view.owner, person(view.owner));
+  } else {
+    ownerNode.textContent = "No owner yet";
+  }
+
+  const listingBox = el("domainListing");
+  listingBox.hidden = !view.listing;
+  listingBox.replaceChildren();
+  if (view.listing) {
+    add(listingBox, "p", `💰 Listed for ${view.listing.price} ${view.listing.asset}`, "badge-ok");
+    add(listingBox, "p", `Until ${view.listing.validUntil} · offer ${view.listing.id.slice(0, 18)}…`);
+  }
+
+  const actions = el("domainActions");
+  actions.replaceChildren();
+  if (view.auction && view.auction.status === "live" && view.auctionBucket === "current") {
+    const minBid = view.auction.high
+      ? minimumNextBid(view.auction.high.amount, cap.increment)
+      : view.auction.reserve;
+    const bidBtn = add(actions, "button", `🏷️ Bid from ${minBid}`);
+    bidBtn.type = "button";
+    bidBtn.addEventListener("click", () => {
+      addToCart({
+        name,
+        tier: view.auction.window === 86400 ? "premium" : "standard",
+        isRoot: true,
+        action: "bid",
+        asset: view.auction.asset,
+        amount: minBid,
+        summary: `Bid ${minBid} ${view.auction.asset} on ${name}`,
+        params: {
+          auctionId: view.auction.id,
+          expectedVersion: view.auction.version,
+          asset: view.auction.asset,
+          amount: minBid,
+          beneficiary: el("cartSigner").value.trim() || "<YOUR_BENEFICIARY_PRINCIPAL>",
+        },
+      });
+      setFloatingCartOpen(true);
+    });
+  }
+  if (view.listing && view.listing.asset === "POA") {
+    const buyBtn = add(actions, "button", `🛒 Buy ${view.listing.price} POA`);
+    buyBtn.type = "button";
+    buyBtn.addEventListener("click", () => {
+      addToCart({
+        name,
+        tier: "standard",
+        isRoot: !name.includes("."),
+        action: "buyFixed",
+        asset: "POA",
+        amount: view.listing.price,
+        summary: `Buy ${name} for ${view.listing.price} POA`,
+        params: {
+          offerId: view.listing.id,
+          expectedVersion: view.listing.version,
+          asset: "POA",
+          amount: view.listing.price,
+        },
+      });
+      setFloatingCartOpen(true);
+    });
+  }
+  if (view.status === "available") {
+    const startBtn = add(actions, "button", "🟢 Start auction (add to cart)");
+    startBtn.type = "button";
+    startBtn.addEventListener("click", () => {
+      addDetailToCart({ name, kind: "available" });
+      setFloatingCartOpen(true);
+    });
+  }
+
+  const tools = el("domainOwnerTools");
+  tools.hidden = !view.deed;
+  el("listingPromptStatus").textContent = "";
+  if (view.listing?.price) el("listPriceInput").value = view.listing.price;
+
+  const hist = el("domainHistory");
+  hist.replaceChildren();
+  if (!view.history.length) add(hist, "p", "No history yet", "muted");
+  for (const row of view.history) {
+    const card = add(hist, "div", "", "card");
+    add(card, "p", row.text);
+    add(card, "p", `#${row.sequence} · ${row.kind}`, "badge");
+  }
+}
+
+function renderOwnerPage(ownerId) {
+  if (!latestState || !ownerId) return;
+  el("ownerTitle").textContent = "👤 Owner profile";
+  el("ownerPrincipal").textContent = ownerId;
+  const namesBox = el("ownerNames");
+  const listBox = el("ownerListings");
+  namesBox.replaceChildren();
+  listBox.replaceChildren();
+  const owned = Object.values(latestState.names ?? {}).filter(
+    (n) => n.activeId && latestState.deeds[n.activeId]?.owner === ownerId,
+  );
+  if (!owned.length) add(namesBox, "p", "No names", "muted");
+  for (const n of owned) {
+    const d = latestState.deeds[n.activeId];
+    const card = add(namesBox, "article", "", "card");
+    const h = add(card, "h4", "");
+    nameLink(h, n.name);
+    add(card, "p", d.rights.kind, "badge");
+  }
+  const listings = activeResaleOffers(latestState).filter(
+    (x) => x.offer.owner === ownerId && x.asset === "POA",
+  );
+  if (!listings.length) add(listBox, "p", "No active listings", "muted");
+  for (const row of listings) {
+    const card = add(listBox, "article", "", "card");
+    const h = add(card, "h4", "");
+    nameLink(h, row.name);
+    add(card, "p", `💰 ${row.price} POA`, "badge-ok");
+  }
+}
+
+function copyDomainListingPrompt(kind) {
+  if (!latestState || !currentDomainName || !cap) return;
+  const view = resolveDomainView(latestState, currentDomainName, reservedSet);
+  if (!view.deed) {
+    el("listingPromptStatus").textContent = "Only the owner can list";
+    return;
+  }
+  const priceRaw = el("listPriceInput").value.trim();
+  const secsRaw = el("listValidSeconds").value.trim() || "604800";
+  if (kind !== "unlist") {
+    if (!/^(0|[1-9][0-9]{0,38})$/.test(priceRaw) || priceRaw === "0") {
+      el("listingPromptStatus").textContent = "Enter a POA price greater than 0";
+      return;
+    }
+  }
+  if (kind === "unlist" && !view.listing) {
+    el("listingPromptStatus").textContent = "Nothing listed";
+    return;
+  }
+  if (kind === "change" && !view.listing) {
+    el("listingPromptStatus").textContent = "List first, then change price";
+    return;
+  }
+  if (!/^[1-9][0-9]{0,8}$/.test(secsRaw)) {
+    el("listingPromptStatus").textContent = "Valid-for seconds required";
+    return;
+  }
+  const validUntil = latestState.time + Number(secsRaw);
+  const text = buildListingPrompt({
+    kind,
+    name: currentDomainName,
+    deed: view.deed,
+    offer: view.listing,
+    price: priceRaw,
+    validUntil,
+    endpointUrl: endpointBase(),
+  });
+  el("listingPromptBox").textContent = text;
+  navigator.clipboard.writeText(text).then(
+    () => {
+      el("listingPromptStatus").textContent = "Copied";
+    },
+    () => {
+      el("listingPromptStatus").textContent = "Clipboard unavailable — copy from the box";
+    },
+  );
 }
 
 function render(payload) {
@@ -756,13 +1133,11 @@ function render(payload) {
   for (const n of names) {
     const d = s.deeds[n.activeId],
       card = add(el("names"), "article", "", "card");
-    add(card, "h4", n.name);
-    add(
-      card,
-      "p",
-      (demo ? "Synthetic " : "") + d.rights.kind + " deed · " + person(d.owner),
-      "badge",
-    );
+    const nh = add(card, "h4", "");
+    nameLink(nh, n.name);
+    const ownerLine = add(card, "p", "", "badge");
+    ownerLine.append((demo ? "Synthetic " : "") + d.rights.kind + " deed · ");
+    ownerLink(ownerLine, d.owner, person(d.owner));
     add(
       card,
       "p",
@@ -790,6 +1165,10 @@ function render(payload) {
 
   renderAuctions(s);
   renderTicker(s);
+  renderMarketplace(s);
+  updateTabDots(s);
+  if (route.kind === "domain" && currentDomainName) renderDomainPage(currentDomainName);
+  if (route.kind === "owner" && currentOwnerId) renderOwnerPage(currentOwnerId);
 
   el("offers").replaceChildren();
   for (const o of offers) {
@@ -804,13 +1183,14 @@ function render(payload) {
         : s.time >= o.validUntil
           ? "expired"
           : "active";
-    add(
-      card,
-      "h4",
-      o.kind === "child"
-        ? `Child offer on .${targetName}`
-        : `Resale of ${targetName}`,
-    );
+    const oh = add(card, "h4", "");
+    if (o.kind === "child") {
+      oh.append("Child offer on .");
+      nameLink(oh, targetName);
+    } else {
+      oh.append("Resale of ");
+      nameLink(oh, targetName);
+    }
     add(
       card,
       "p",
@@ -881,7 +1261,9 @@ function render(payload) {
     const a = s.auctions[b.auctionId];
     const domainName = a ? a.name : b.auctionId.slice(0, 14);
     const card = add(el("history"), "div", "", "card");
-    add(card, "h4", `${domainName} — ${b.amount} ${a ? a.asset : "POA"}`);
+    const hh = add(card, "h4", "");
+    nameLink(hh, domainName);
+    hh.append(` — ${b.amount} ${a ? a.asset : "POA"}`);
     add(
       card,
       "p",
@@ -952,8 +1334,21 @@ function render(payload) {
 try {
   applySiteTitle();
   cart = loadCart(globalThis.localStorage);
+  tabSeen = loadTabSeen(globalThis.localStorage);
 
-  const config = await json(new URL("./config.json", location.href));
+  const pathDomain = parseDomainPath(location.pathname);
+  const pathOwner = parseOwnerPath(location.pathname);
+  if (pathDomain) {
+    route = { kind: "domain", name: pathDomain };
+    currentDomainName = pathDomain;
+  } else if (pathOwner) {
+    route = { kind: "owner", ownerId: pathOwner };
+    currentOwnerId = pathOwner;
+  } else {
+    route = { kind: "home" };
+  }
+
+  const config = await json(new URL("/config.json", location.origin));
   configMode = config.mode;
   demo = config.mode === "static-synthetic-demo";
   let read;
@@ -1015,6 +1410,44 @@ try {
   );
   await refresh();
   renderCart();
+  applyRoute();
+  setSectionTab(activeSectionTab, false);
+  updateTabDots(latestState);
+
+  for (const btn of document.querySelectorAll(".section-tab")) {
+    btn.addEventListener("click", () => {
+      setSectionTab(btn.getAttribute("data-tab") || "find", true);
+    });
+  }
+  el("domainHomeLink")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    navigateHome();
+  });
+  el("ownerHomeLink")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    navigateHome();
+  });
+  el("copyListPromptBtn")?.addEventListener("click", () => copyDomainListingPrompt("list"));
+  el("copyChangePromptBtn")?.addEventListener("click", () => copyDomainListingPrompt("change"));
+  el("copyUnlistPromptBtn")?.addEventListener("click", () => copyDomainListingPrompt("unlist"));
+  window.addEventListener("popstate", () => {
+    const d = parseDomainPath(location.pathname);
+    const o = parseOwnerPath(location.pathname);
+    if (d) {
+      route = { kind: "domain", name: d };
+      currentDomainName = d;
+      currentOwnerId = null;
+    } else if (o) {
+      route = { kind: "owner", ownerId: o };
+      currentOwnerId = o;
+      currentDomainName = null;
+    } else {
+      route = { kind: "home" };
+      currentDomainName = null;
+      currentOwnerId = null;
+    }
+    applyRoute();
+  });
 
   el("searchBtn").addEventListener("click", () =>
     runSearch(el("searchInput").value),

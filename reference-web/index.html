@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
-    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./style.css" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
     <header>
@@ -27,12 +27,31 @@
       </div>
     </div>
 
-    <nav class="view-tabs" aria-label="Views">
-      <a class="view-tab" href="#searchSection">Search</a>
-      <a class="view-tab" href="#auctionsSection">Auctions</a>
-      <a class="view-tab" href="#cartAnchor">Cart</a>
-      <a class="view-tab" href="#explorerSection">Explorer</a>
-      <a class="view-tab" href="#handoffSection">Handoff</a>
+    <nav id="sectionTabs" class="section-tabs" role="tablist" aria-label="Site sections">
+      <button type="button" class="section-tab is-active" role="tab" aria-selected="true" data-tab="find" id="tabFind">
+        <span class="tab-label">🔍 Find</span><span class="tab-dot" hidden aria-label="New"></span>
+      </button>
+      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="auctions" id="tabAuctions">
+        <span class="tab-label">🏷️ Auctions</span><span class="tab-dot" hidden aria-label="New"></span>
+      </button>
+      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="market" id="tabMarket">
+        <span class="tab-label">💰 For sale</span><span class="tab-dot" hidden aria-label="New"></span>
+      </button>
+      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="explore" id="tabExplore">
+        <span class="tab-label">🧭 Explore</span><span class="tab-dot" hidden aria-label="New"></span>
+      </button>
+      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="handoff" id="tabHandoff">
+        <span class="tab-label">🧾 Handoff</span><span class="tab-dot" hidden aria-label="New"></span>
+      </button>
+    </nav>
+
+    <nav class="view-tabs desktop-only-nav" aria-label="Views">
+      <a class="view-tab" href="#searchSection">🔍 Find</a>
+      <a class="view-tab" href="#auctionsSection">🏷️ Auctions</a>
+      <a class="view-tab" href="#marketSection">💰 For sale</a>
+      <a class="view-tab" href="#cartAnchor">🛒 Cart</a>
+      <a class="view-tab" href="#explorerSection">🧭 Explore</a>
+      <a class="view-tab" href="#handoffSection">🧾 Handoff</a>
     </nav>
 
     <aside id="detailView" class="detail-view" hidden>
@@ -45,13 +64,14 @@
       <div id="detailActions" class="button-row"></div>
     </aside>
 
-    <main>
-      <section id="searchSection">
-        <h2>Search</h2>
+    <main id="homeMain">
+      <section id="searchSection" data-section="find" class="is-active-section">
+        <h2>🔍 Find a name</h2>
+        <p class="howto">Type a name → Check → Add to cart or open its page.</p>
         <div class="search-bar">
           <input
             id="searchInput"
-            placeholder="domain or emoji"
+            placeholder="name or emoji"
             autocomplete="off"
             aria-label="Search domain"
           />
@@ -69,7 +89,7 @@
 
         <div id="cartAnchor" class="cart-panel">
           <div class="cart-header">
-            <h3>Cart (<span id="cartCount">0</span>)</h3>
+            <h3>🛒 Cart (<span id="cartCount">0</span>)</h3>
             <button id="clearCart" type="button" class="secondary" disabled>Clear</button>
           </div>
           <label>
@@ -83,7 +103,7 @@
           </label>
           <div id="cartList" class="cards"></div>
           <h4>Agent prompt</h4>
-          <pre id="cartPrompt" class="prompt-box">Add one or more domains from availability search, live auctions, or standing offers to generate your agent prompt.</pre>
+          <pre id="cartPrompt" class="prompt-box">Add names from Find, Auctions, or For sale to build a prompt.</pre>
           <div class="button-row">
             <button id="copyCartPrompt" type="button" disabled>Copy prompt</button>
             <span id="cartStatus" class="muted"></span>
@@ -91,8 +111,9 @@
         </div>
       </section>
 
-      <section id="auctionsSection">
-        <h2>Auctions</h2>
+      <section id="auctionsSection" data-section="auctions">
+        <h2>🏷️ Auctions</h2>
+        <p class="howto">Past · Current · Upcoming. Tap a name for history.</p>
         <div class="auction-tabs" role="tablist" aria-label="Auction filters">
           <button type="button" class="auction-tab is-active" role="tab" aria-selected="true" data-auction-tab="current">Current</button>
           <button type="button" class="auction-tab" role="tab" aria-selected="false" data-auction-tab="upcoming">Upcoming</button>
@@ -101,8 +122,14 @@
         <div id="auctions" class="cards"></div>
       </section>
 
-      <section id="explorerSection">
-        <h2>Explorer</h2>
+      <section id="marketSection" data-section="market">
+        <h2>💰 For sale</h2>
+        <p class="howto">Fixed-price listings in POA. Open a name to buy or manage.</p>
+        <div id="marketplace" class="cards"></div>
+      </section>
+
+      <section id="explorerSection" data-section="explore">
+        <h2>🧭 Explore</h2>
         <p id="freshness"></p>
         <div id="stats" class="stats"></div>
         <h3>Names</h3>
@@ -120,8 +147,9 @@
         </details>
       </section>
 
-      <section id="handoffSection">
-        <h2>Handoff</h2>
+      <section id="handoffSection" data-section="handoff">
+        <h2>🧾 Handoff</h2>
+        <p class="howto">Build an unsigned intent for your agent. No keys here.</p>
         <button type="button" id="example" hidden>Load example</button>
         <p id="exampleNotice"></p>
         <form id="handoff">
@@ -148,7 +176,7 @@
         <button type="button" id="copy" disabled>Copy</button>
       </section>
 
-      <section id="resourcesSection" class="span-2">
+      <section id="resourcesSection" class="span-2" data-section="explore">
         <h2>Resources</h2>
         <div class="cards">
           <article class="card">
@@ -176,6 +204,50 @@
       </section>
     </main>
 
+    <main id="domainMain" hidden>
+      <p class="breadcrumb"><a href="/" id="domainHomeLink">← Home</a></p>
+      <section id="domainSection">
+        <h2 id="domainTitle">Domain</h2>
+        <p id="domainStatus" class="badge"></p>
+        <p id="domainOwner" class="muted"></p>
+        <div id="domainListing" class="card" hidden></div>
+        <div id="domainActions" class="button-row"></div>
+        <div id="domainOwnerTools" class="owner-tools" hidden>
+          <h3>💰 Sell (POA only)</h3>
+          <p class="howto">Owners list, change price, or unlist. Copy a prompt for your agent — nothing submits here.</p>
+          <label>
+            Price (POA)
+            <input id="listPriceInput" inputmode="numeric" placeholder="2500" aria-label="List price in POA" />
+          </label>
+          <label>
+            Valid for (seconds)
+            <input id="listValidSeconds" inputmode="numeric" value="604800" aria-label="Listing lifetime seconds" />
+          </label>
+          <div class="button-row">
+            <button type="button" id="copyListPromptBtn">Copy listing prompt</button>
+            <button type="button" id="copyChangePromptBtn" class="secondary">Copy change-price prompt</button>
+            <button type="button" id="copyUnlistPromptBtn" class="secondary">Copy unlist prompt</button>
+          </div>
+          <pre id="listingPromptBox" class="prompt-box">Set a POA price, then copy a prompt.</pre>
+          <p id="listingPromptStatus" class="muted" role="status"></p>
+        </div>
+        <h3>History</h3>
+        <div id="domainHistory" class="cards"></div>
+      </section>
+    </main>
+
+    <main id="ownerMain" hidden>
+      <p class="breadcrumb"><a href="/" id="ownerHomeLink">← Home</a></p>
+      <section id="ownerSection">
+        <h2 id="ownerTitle">Owner</h2>
+        <p id="ownerPrincipal" class="muted"></p>
+        <h3>Names</h3>
+        <div id="ownerNames" class="cards"></div>
+        <h3>💰 Listings</h3>
+        <div id="ownerListings" class="cards"></div>
+      </section>
+    </main>
+
     <button
       type="button"
       id="floatingCartBtn"
@@ -198,7 +270,7 @@
       hidden
     >
       <div class="floating-cart-header">
-        <h2 id="floatingCartHeading">Cart</h2>
+        <h2 id="floatingCartHeading">🛒 Cart</h2>
         <button type="button" id="floatingCartClose" class="secondary" aria-label="Close cart">Close</button>
       </div>
       <div id="floatingCartList" class="cards"></div>
@@ -209,6 +281,6 @@
       <p id="floatingCartStatus" class="muted" role="status"></p>
     </div>
 
-    <script type="module" src="./app.js"></script>
+    <script type="module" src="/app.js"></script>
   </body>
 </html>

@@ -656,6 +656,7 @@ export class Engine {
         const d = this.deed(s, p);
         this.owner(d, b, time);
         const asset = this.asset(p.asset);
+        need(asset === "POA", "RESALE_POA_ONLY");
         const offerId = hash("offer-id/v1", [d.id, id]);
         s.offers[offerId] = {
           id: offerId,

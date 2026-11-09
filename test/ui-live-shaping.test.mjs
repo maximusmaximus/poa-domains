@@ -11,6 +11,19 @@ import {
   loadCart,
   saveCart,
   CART_STORAGE_KEY,
+  titleCodePointsOk,
+  TITLE_SAFE_CODEPOINTS,
+  domainPath,
+  parseDomainPath,
+  parseOwnerPath,
+  resolveDomainView,
+  activeResaleOffers,
+  buildListingPrompt,
+  tabWatermarks,
+  tabHasNew,
+  loadTabSeen,
+  saveTabSeen,
+  TAB_SEEN_KEY,
 } from "../reference-web/shared.js";
 
 test("emoji site title stylizations cover poadomains letters", () => {
@@ -156,4 +169,129 @@ test("cart localStorage helpers round-trip and reject junk", () => {
   assert.equal(loadCart(storage)[0].name, "a");
   mem.set(CART_STORAGE_KEY, "{bad");
   assert.deepEqual(loadCart(storage), []);
+});
+
+
+test("every title stylization uses only vetted safe code points", () => {
+  for (let i = 0; i < TITLE_STYLES.length; i++) {
+    const title = pickSiteTitle(() => i / TITLE_STYLES.length);
+    assert.equal(titleCodePointsOk(title), true, title);
+    assert.match(title, /poa|POA|domains|DOMAINS|P · O · A/i);
+    // No regional-indicator A–Z range
+    for (const ch of title) {
+      const cp = ch.codePointAt(0);
+      assert.ok(cp < 0x1f1e6 || cp > 0x1f1ff, `regional ${cp.toString(16)}`);
+    }
+  }
+  assert.ok(TITLE_SAFE_CODEPOINTS.has("p".codePointAt(0)));
+  assert.ok(TITLE_SAFE_CODEPOINTS.has(0x1f680));
+});
+
+test("domain and owner path helpers round-trip", () => {
+  assert.equal(domainPath("nexus"), "/d/nexus");
+  assert.equal(domainPath("🚀🚀"), "/d/" + encodeURIComponent("🚀🚀"));
+  assert.equal(parseDomainPath("/d/nexus"), "nexus");
+  assert.equal(parseDomainPath("/d/" + encodeURIComponent("🧍‍♀️.👩‍🦰")), "🧍‍♀️.👩‍🦰");
+  assert.equal(parseDomainPath("/x"), null);
+  assert.equal(parseOwnerPath("/p/poa1abc"), "poa1abc");
+  assert.equal(parseOwnerPath("/d/nexus"), null);
+});
+
+test("resolveDomainView covers available owned listed auction states", () => {
+  const state = {
+    time: 1000,
+    names: {
+      owned: { activeId: "d1", name: "owned" },
+      listed: { activeId: "d2", name: "listed" },
+    },
+    deeds: {
+      d1: { id: "d1", name: "owned", owner: "poa1a", version: 1, rights: { kind: "permanent" } },
+      d2: { id: "d2", name: "listed", owner: "poa1b", version: 2, rights: { kind: "permanent" } },
+    },
+    auctions: {
+      a: { id: "a", name: "live", status: "live", openAt: 900, window: 3600, quiet: 3600, reserve: "1", asset: "POA", sequence: 3 },
+    },
+    offers: {
+      o: {
+        id: "o",
+        kind: "resale",
+        parentId: "d2",
+        owner: "poa1b",
+        price: "2500",
+        asset: "POA",
+        cancelled: false,
+        uses: 0,
+        maxUses: 1,
+        validUntil: 5000,
+        version: 1,
+        sequence: 9,
+      },
+    },
+    bids: {},
+    receipts: {},
+  };
+  assert.equal(resolveDomainView(state, "fresh").status, "available");
+  assert.equal(resolveDomainView(state, "owned").status, "owned");
+  assert.equal(resolveDomainView(state, "listed").status, "listed");
+  assert.equal(resolveDomainView(state, "live").status, "auction-current");
+  assert.equal(resolveDomainView(state, "google", new Set(["google"])).status, "reserved");
+  const listings = activeResaleOffers(state);
+  assert.equal(listings.length, 1);
+  assert.equal(listings[0].name, "listed");
+});
+
+test("listing prompts are POA-only and unsigned", () => {
+  const list = buildListingPrompt({
+    kind: "list",
+    name: "nexus",
+    deed: { id: "deed1", version: 2 },
+    price: "2500",
+    validUntil: 12345,
+    endpointUrl: "https://example.test",
+  });
+  assert.match(list, /sellFixed/);
+  assert.match(list, /"asset":"POA"/);
+  assert.match(list, /\/d\/nexus/);
+  assert.doesNotMatch(list, /PRIVATE KEY/);
+  const change = buildListingPrompt({
+    kind: "change",
+    name: "nexus",
+    deed: { id: "deed1", version: 2 },
+    offer: { id: "off1", version: 1 },
+    price: "3000",
+    validUntil: 999,
+    endpointUrl: "https://example.test",
+  });
+  assert.match(change, /cancelOffer/);
+  assert.match(change, /sellFixed/);
+  const unlist = buildListingPrompt({
+    kind: "unlist",
+    name: "nexus",
+    deed: { id: "deed1", version: 2 },
+    offer: { id: "off1", version: 1 },
+    endpointUrl: "https://example.test",
+  });
+  assert.match(unlist, /cancelOffer/);
+});
+
+test("tab new-dots use watermarks and clear after seen", () => {
+  const state = {
+    sequence: 20,
+    auctions: { a: { sequence: 12 } },
+    bids: { b: { sequence: 18 } },
+    offers: { o: { kind: "resale", sequence: 15, version: 1 } },
+  };
+  const marks = tabWatermarks(state);
+  assert.ok(marks.auctions >= 18);
+  assert.ok(marks.market >= 15);
+  assert.equal(tabHasNew("auctions", marks, {}), true);
+  assert.equal(tabHasNew("auctions", marks, { auctions: marks.auctions }), false);
+  const mem = new Map();
+  const storage = {
+    getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+    setItem: (k, v) => mem.set(k, String(v)),
+  };
+  saveTabSeen(storage, { find: 5 });
+  assert.equal(loadTabSeen(storage).find, 5);
+  assert.equal(TAB_SEEN_KEY, "poadomains.tabSeen.v1");
 });
