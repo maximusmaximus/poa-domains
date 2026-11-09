@@ -190,10 +190,10 @@ export class PoaRegistry extends DurableObject<Env> {
     await this.ctx.storage.setAlarm(Date.now() + 60000);
   }
   /** Authenticated Worker RPC only. There is no browser signing, key-read, or generic send route. */
-  async escrowAdmin(value: unknown): Promise<RegistryReply> {
+  async escrowAdmin(packetText: string): Promise<RegistryReply> {
     try {
       need(String(this.env.POA_ESCROW_ENABLED) === "true", "ESCROW_DISABLED");
-      const v = exact(value, ["action"], ["packet", "paused"]), escrow = this.escrow();
+      const value = parseJSON(packetText), v = exact(value, ["action"], ["packet", "paused"]), escrow = this.escrow();
       if (String(this.env.POA_ESCROW_NETWORK_WRITES) === "approved-v1") await this.ctx.storage.setAlarm(Date.now() + 60000);
       switch (v.action) {
         case "status": exact(value, ["action"]); return { status: 200, jsonText: JSON.stringify(escrow.state()) };

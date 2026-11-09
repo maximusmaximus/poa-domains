@@ -15,4 +15,6 @@ if(!process.argv.includes("--unit")){
  const runtime=spawnSync(process.execPath,["cloudflare/test/escrow-runtime.mjs"],{cwd:root,stdio:"inherit",
  env:{...process.env,ESCROW_FIXTURE_MODULE:pathToFileURL(join(work,"fixture.mjs")).href}});
  if(runtime.status!==0)process.exit(runtime.status??1);
+ const admin=spawnSync(process.execPath,["cloudflare/test/escrow-admin-runtime.mjs"],{cwd:root,stdio:"inherit"});
+ if(admin.status!==0)process.exit(admin.status??1);
 }

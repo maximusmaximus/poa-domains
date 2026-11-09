@@ -429,3 +429,21 @@ test("pending intents reserve detection and all capped withdrawal chunks",async(
  assert.equal(f.e.state().sequence,PILOT_JOURNAL_LIMIT);
  assert.deepEqual(replay(f.journal.rows,f.e.policy),f.e.state());
 });
+
+test("native adapter binds fetch's global receiver and rejects redirects without following",async()=>{
+ let calls=0;
+ const request=(async function(this:typeof globalThis,input:any,init:any){
+  assert.equal(this,globalThis);assert.equal(new URL(input).origin,"https://minepoa.com");assert.equal(init.redirect,"manual");calls++;
+  return new Response(null,{status:302,headers:{location:"https://not-allowed.invalid/"}});
+ }) as typeof fetch;
+ await assert.rejects(new PoaHttpNetwork(()=>false,request).status(),/ESCROW_NODE_REDIRECT/);assert.equal(calls,2);
+});
+test("native submission retains write gate and never follows a redirect",async()=>{
+ let calls=0;const body=depositBody(3,policy.wallet,"1.000000","redirect-fixture");
+ const request=(async function(this:typeof globalThis,input:any,init:any){
+  assert.equal(this,globalThis);assert.equal(new URL(input).origin,"https://minepoa.com");assert.equal(init.method,"POST");assert.equal(init.redirect,"manual");calls++;
+  return new Response(null,{status:307,headers:{location:"https://not-allowed.invalid/"}});
+ }) as typeof fetch;
+ await assert.rejects(new PoaHttpNetwork(()=>false,request).submit(body),/ESCROW_NETWORK_WRITES_DISABLED/);assert.equal(calls,0);
+ await assert.rejects(new PoaHttpNetwork(()=>true,request).submit(body),/ESCROW_NODE_REDIRECT/);assert.equal(calls,1);
+});
