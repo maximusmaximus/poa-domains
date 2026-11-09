@@ -2,8 +2,16 @@ import { ACTIONS, Action } from "./actions.js";
 import { Body, DOMAIN, validateBody, intentId } from "./auth.js";
 import { canonical, exact, need } from "./core.js";
 import { Engine } from "./engine.js";
-import { NORMALIZATION_HASH, normalizeName, manifest } from "./names.js";
+import {
+  EMOJI17_RECORD_COUNT,
+  emoji17Manifest,
+  manifest,
+  normalizationModeForHash,
+  normalizeName,
+} from "./names.js";
 export function capabilities(e: Engine): any {
+  const mode = e.normalizationMode;
+  const activeManifest = mode === "emoji17-full" ? emoji17Manifest : manifest;
   return {
     mode: "local-reference-only",
     livePoA: false,
@@ -13,10 +21,11 @@ export function capabilities(e: Engine): any {
     genesisHash: e.config.genesisHash,
     registryId: e.registryId,
     policyHash: e.policyHash,
-    normalizationHash: NORMALIZATION_HASH,
-    normalizationVersion: manifest.version,
-    emojiAliases: manifest.aliases.length,
-    emojiManifest: manifest,
+    normalizationHash: e.config.normalizationHash,
+    normalizationVersion: activeManifest.version,
+    emojiAliases:
+      mode === "emoji17-full" ? EMOJI17_RECORD_COUNT : manifest.aliases.length,
+    emojiManifest: activeManifest,
     assets: e.config.assets,
     increment: e.config.increment,
     feeBps: e.config.feeBps,
@@ -53,11 +62,12 @@ export function prepare(input: unknown, cap: any): Body {
   need(Object.hasOwn(ACTIONS, i.action), "UNSUPPORTED_ACTION");
   const params = structuredClone(i.params);
   exact(params, [...ACTIONS[i.action as Action]]);
+  const mode = normalizationModeForHash(cap.normalizationHash);
   for (const k of ["name", "parent"])
     if (Object.hasOwn(params, k))
-      params[k] = normalizeName(params[k]).canonical;
+      params[k] = normalizeName(params[k], mode).canonical;
   if (Object.hasOwn(params, "label")) {
-    const n = normalizeName(params.label);
+    const n = normalizeName(params.label, mode);
     need(n.labels.length === 1, "NAME_DEPTH");
     params.label = n.canonical;
   }
