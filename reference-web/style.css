@@ -605,8 +605,33 @@ h4 {
 }
 .network-status-icon {
   flex: none;
-  font-size: 1rem;
-  line-height: 1;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  font-size: 0;
+  line-height: 0;
+  color: transparent;
+  background: #8aa0ad;
+  box-shadow: 0 0 8px rgba(138, 160, 173, 0.55);
+}
+.network-status-bar[data-level="online"] .network-status-icon {
+  background: #3dff9a;
+  box-shadow: 0 0 10px rgba(61, 255, 154, 0.7);
+}
+.network-status-bar[data-level="degraded"] .network-status-icon {
+  background: #ffd18b;
+  box-shadow: 0 0 10px rgba(255, 209, 139, 0.7);
+}
+.network-status-bar[data-level="down"] .network-status-icon {
+  background: #ff6b6b;
+  box-shadow: 0 0 10px rgba(255, 107, 107, 0.7);
+}
+.network-status-bar[data-level="checking"] .network-status-icon {
+  background: #8aa0ad;
+  animation: network-pulse 1.2s ease-in-out infinite;
+}
+@keyframes network-pulse {
+  50% { opacity: 0.35; }
 }
 .network-status-text {
   flex: 1;

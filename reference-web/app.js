@@ -180,7 +180,7 @@ function renderNetworkStatus() {
   bar.dataset.color = networkBannerColor(level);
   const icon = el("networkStatusIcon");
   const label = el("networkStatusText");
-  if (icon) icon.textContent = networkStatus.emoji || text.slice(0, 2);
+  if (icon) icon.textContent = "";
   if (label) label.textContent = text;
   const dismissed = isNetworkBannerDismissed(globalThis.sessionStorage, level);
   bar.hidden = !!dismissed;
