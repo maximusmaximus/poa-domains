@@ -12,7 +12,9 @@ The Worker `poadomains-registry` is deployed at:
 
 Health reports `durability: durable-object-sqlite`. Bootstrap Ed25519 role keys are
 generated once inside the Durable Object and are never returned by an endpoint.
-No Worker secrets, D1, R2 or KV bindings are required. The existing Worker
+The only binding besides the Durable Object and assets is the private R2 bucket used for
+scheduled backups (see `docs/cloudflare-backups.md`); its only secret is the manual-backup
+admin token. The existing Worker
 `artshow-crypto-cron` is untouched. Configured public explorer URL:
 `https://poadomains.grok.me`.
 
