@@ -174,7 +174,7 @@ export class PoaRegistry extends DurableObject<Env> {
       if (String(this.env.POA_ESCROW_NETWORK_WRITES) === "approved-v1") await this.ctx.storage.setAlarm(Date.now() + 60000);
       switch (v.action) {
         case "status": exact(value, ["action"]); return { status: 200, jsonText: JSON.stringify(escrow.state()) };
-        case "pause": exact(value, ["action", "paused"]); escrow.pause(v.paused); break;
+        case "pause": exact(value, ["action", "paused"]); await escrow.pause(v.paused); break;
         case "reconcile": exact(value, ["action"]); await escrow.reconcile(); break;
         case "tick": exact(value, ["action"]); await escrow.tick(); break;
         case "rebroadcast": exact(value, ["action"]); await escrow.rebroadcast(); break;

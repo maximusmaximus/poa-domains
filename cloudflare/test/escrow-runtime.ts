@@ -34,8 +34,8 @@ export class EscrowHarness extends DurableObject<TestEnv> {
   });}
   async run(v:any):Promise<unknown>{
     try{
-      if(v.op==="unpause")this.escrow.pause(false);
-      if(v.op==="pause")this.escrow.pause(true);
+      if(v.op==="unpause")await this.escrow.pause(false);
+      if(v.op==="pause")await this.escrow.pause(true);
       if(v.op==="advance"){this.net.now+=v.ms;this.clock.overrideTime=Math.floor(this.net.now/1000);}
       if(v.op==="mode")this.net.mode=v.mode;
       if(v.op==="stale")this.net.stale=v.value;

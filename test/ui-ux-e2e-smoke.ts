@@ -100,6 +100,18 @@ async function startStaticDirServer(
   };
 }
 
+// The offline reference app intentionally has no Worker node-monitor route.
+// Supply only that exact loopback GET; monitor behavior is tested separately.
+async function syntheticNetworkStatus(page:Page,appUrl:string){
+  const u=new URL("/v1/network-status",appUrl);assert.equal(u.hostname,"127.0.0.1");
+  await page.route(u.href,async route=>{
+    assert.equal(route.request().method(),"GET");
+    await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({
+      level:"online",hold:false,message:"Synthetic UI-only network fixture",chainId:"poa-mainnet-1",
+      livePoA:false,source:"synthetic-ui-only",checkedAt:Date.now(),failures:0,latencyMs:0,detail:null})});
+  });
+}
+
 async function assertResponsiveGeometry(
   page: Page,
   vp: ViewportSpec,
@@ -111,28 +123,25 @@ async function assertResponsiveGeometry(
   await page.evaluate(
     () => new Promise((r) => requestAnimationFrame(() => r(true))),
   );
-  const metrics = await page.evaluate((ids) => {
-    const doc = document.documentElement;
-    const boxes = ids.map((id) => {
-      const node = document.getElementById(id);
-      if (!node)
-        return { id, missing: true, width: 0, height: 0, left: 0, right: 0 };
-      const rect = node.getBoundingClientRect();
-      return {
-        id,
-        missing: false,
-        width: Math.round(rect.width),
-        height: Math.round(rect.height),
-        left: Math.round(rect.left),
-        right: Math.round(rect.right),
-      };
-    });
-    return {
-      clientWidth: doc.clientWidth,
-      scrollWidth: doc.scrollWidth,
-      boxes,
-    };
-  }, selectorIds);
+  // Mobile navigation intentionally hides inactive sections. Measure each
+  // requested box only after selecting its real tab, never by forcing CSS.
+  const boxes=[];
+  let clientWidth=vp.width,scrollWidth=0;
+  for(const id of selectorIds){
+    const tab=await page.evaluate(id=>document.getElementById(id)?.closest("[data-section]")?.getAttribute("data-section"),id);
+    if(tab&&await page.locator(`.section-tab[data-tab="${tab}"]`).count()){
+      await page.locator(`.section-tab[data-tab="${tab}"]`).click();
+      await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>r(true))));
+    }
+    const metric=await page.evaluate(id=>{
+      const node=document.getElementById(id),rect=node?.getBoundingClientRect(),doc=document.documentElement;
+      return {box:{id,missing:!node,width:Math.round(rect?.width??0),height:Math.round(rect?.height??0),
+        left:Math.round(rect?.left??0),right:Math.round(rect?.right??0)},clientWidth:doc.clientWidth,scrollWidth:doc.scrollWidth};
+    },id);
+    boxes.push(metric.box);clientWidth=metric.clientWidth;scrollWidth=Math.max(scrollWidth,metric.scrollWidth);
+  }
+  const metrics={boxes,clientWidth,scrollWidth};
+  const find=page.locator('.section-tab[data-tab="find"]');if(await find.count())await find.click();
 
   assert.ok(
     metrics.scrollWidth <= metrics.clientWidth + 1,
@@ -178,6 +187,7 @@ async function runFullUiUxFlowsOnRegistryApp(
     }
   });
 
+  await syntheticNetworkStatus(page,appUrl);
   await page.goto(appUrl);
   await page.waitForFunction(
     () =>
@@ -284,7 +294,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   );
   assert.match(
     await page.locator("#searchResult").innerText(),
-    /Tier: PREMIUM/,
+    /Root · PREMIUM/,
   );
   assert.match(
     await page.locator("#searchResult").innerText(),
@@ -304,7 +314,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   );
   assert.match(
     await page.locator("#searchResult").innerText(),
-    /Tier: STANDARD/,
+    /Root · STANDARD/,
   );
   assert.match(
     await page.locator("#searchResult").innerText(),
@@ -324,7 +334,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   );
   assert.match(
     await page.locator("#searchResult").innerText(),
-    /Tier: STANDARD/,
+    /Root · STANDARD/,
   );
   await page.locator("#addToCartBtn").click();
   assert.equal(await page.locator("#cartCount").innerText(), "1");
@@ -407,7 +417,9 @@ async function runFullUiUxFlowsOnRegistryApp(
 
   // 10. Test mobile viewport (375x812) with populated 3-item cart to ensure cart cards don't overflow
   await page.setViewportSize({ width: 375, height: 812 });
+  await page.locator('.section-tab[data-tab="auctions"]').click();
   await page.locator("#auctions article button").first().click();
+  await page.locator('.section-tab[data-tab="explore"]').click();
   await offerButtons.nth(0).click();
   await assertResponsiveGeometry(
     page,
@@ -458,6 +470,7 @@ async function runAgentRoundtripVerification(
   dataDir: string,
   app: Awaited<ReturnType<typeof startRegistryApp>>,
 ) {
+  await syntheticNetworkStatus(page,app.url);
   await page.goto(app.url);
   await page.waitForFunction(
     () => document.querySelectorAll("#names article").length >= 3,
@@ -599,8 +612,11 @@ async function runAgentRoundtripVerification(
 
   // Verify #balances now shows carol's 100000 POA withdrawable outbid escrow refund
   const balancesText = await page.locator("#balances").innerText();
-  assert.match(balancesText, /Refund credit: 100000 POA/);
-  assert.match(balancesText, /Withdrawable by/);
+  assert.match(balancesText, /Refund: 100000 POA/);
+  const refund=page.locator("#balances .card").filter({has:page.getByRole("heading",{name:"Refund: 100000 POA",exact:true})});
+  assert.equal(await refund.count(),1);
+  assert.ok((await refund.innerText()).includes(app.principals.carol!.slice(0,18)),"refund belongs to displaced payer");
+  assert.match(await refund.innerText(),/🌐 · v1/);
 }
 
 async function runStaticReferenceMultiBrowserSmoke(staticUrl: string) {
@@ -758,6 +774,7 @@ async function runPublicProductionPagesMultiBrowserSmoke(prodUrl: string) {
           page,
           vp,
           [
+            "explorer-mirror-title",
             "availability",
             "operations",
             "status",
@@ -769,6 +786,16 @@ async function runPublicProductionPagesMultiBrowserSmoke(prodUrl: string) {
           `${name}:public-pages`,
         );
       }
+
+      // Ubuntu's system-ui resolves to wider metrics than this box's default.
+      // Reproduce the original 356px overflow from the unbreakable explorer URL.
+      await page.evaluate(()=>{document.documentElement.style.fontFamily='"DejaVu Sans", monospace';});
+      await assertResponsiveGeometry(page,{name:"mobile-xs-wide-font",width:320,height:568},
+        ["explorer-mirror-title","availability","operations","status","emoji-format-checker","network-details"],
+        `${name}:public-pages-wide-font`);
+      assert.ok(await page.locator(".resource-panel").evaluate(el=>el.scrollWidth<=el.clientWidth+1),
+        `${name}: long explorer URLs stay within their panel, without clipping`);
+      await page.evaluate(()=>{document.documentElement.style.removeProperty("font-family");});
 
       // Test the Shadow-DOM Unicode 17 emoji format checker across Chromium, Firefox, and WebKit
       const emojiCheckResult = await page.evaluate(async () => {
@@ -799,7 +826,7 @@ async function runPublicProductionPagesMultiBrowserSmoke(prodUrl: string) {
       );
       assert.ok(
         (await page
-          .locator('.mirror-nav a[href="https://poadomains.grok.me"]')
+          .locator('a.hero-cta[href="https://poadomains.grok.me"]')
           .count()) >= 1,
         `${name}: public GitHub Pages mirror links to poadomains.grok.me`,
       );
