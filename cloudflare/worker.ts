@@ -84,7 +84,11 @@ async function admin(request: Request, env: Env, u: URL): Promise<Response> {
     if (String(env.POA_ESCROW_ENABLED) !== "true" || expected.length < 32 || !auth.startsWith("Bearer ") || !(await tokenMatches(auth.slice(7), expected)))
       return json(404, { code: "NOT_FOUND" });
     need(u.search === "", "QUERY_NOT_ALLOWED");
-    const reply = await env.REGISTRY.getByName(SINGLETON).escrowAdmin(await readPacket(request));
+    // The strict parser returns null-prototype records, which workerd RPC cannot
+    // clone. Keep duplicate/key validation at HTTP ingress, then transport JSON
+    // bytes to the DO exactly like the other signed-command RPC boundaries.
+    const packetText = JSON.stringify(await readPacket(request));
+    const reply = await env.REGISTRY.getByName(SINGLETON).escrowAdmin(packetText);
     return new Response(reply.jsonText, { status: reply.status, headers: { ...SECURITY, "content-type": "application/json" } });
   }
   if (u.pathname === "/v1/admin/backup") {

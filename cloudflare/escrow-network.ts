@@ -11,9 +11,15 @@ export class PoaHttpNetwork implements Network {
   private lastCutoff?: number;
   constructor(private writesAllowed:()=>boolean, private request:typeof fetch=fetch,
     private pins:{engine:string;params:string}={engine:MAINNET_ENGINE_SHA256,params:MAINNET_PARAMS_SHA256},
-    private clock:()=>number=Date.now) {}
+    private clock:()=>number=Date.now) {
+    // Native workerd fetch requires its global receiver, not this network adapter.
+    // Arrow-function mocks and already-bound injected clients retain their behavior.
+    this.request=request.bind(globalThis);
+  }
   private async get(path:string, limit=2000000):Promise<any> {
-    const r=await this.request(`https://minepoa.com${path}`,{signal:AbortSignal.timeout(12000),redirect:"error",headers:{Accept:"application/json"}});
+    const r=await this.request(`https://minepoa.com${path}`,{signal:AbortSignal.timeout(12000),redirect:"manual",headers:{Accept:"application/json"}});
+    // workerd supports manual, not error. Never follow a redirected node URL.
+    if(r.status>=300&&r.status<400){await r.body?.cancel();throw new Error("ESCROW_NODE_REDIRECT");}
     if(r.status===404)return null;need(r.ok,"ESCROW_NODE_HTTP");
     const age=r.headers.get("age");if(age!==null)need(/^\d+$/.test(age)&&Number(age)<=120,"ESCROW_STALE");
     const reader=r.body!.getReader();let size=0;const chunks:Uint8Array[]=[];
@@ -129,9 +135,10 @@ export class PoaHttpNetwork implements Network {
   }
   async submit(body:Transfer):Promise<void> {
     need(this.writesAllowed(),"ESCROW_NETWORK_WRITES_DISABLED");verifyTransfer(body);
-    const r=await this.request(`https://minepoa.com/chain/${CHAIN}/api/submit`,{method:"POST",redirect:"error",signal:AbortSignal.timeout(12000),
+    const r=await this.request(`https://minepoa.com/chain/${CHAIN}/api/submit`,{method:"POST",redirect:"manual",signal:AbortSignal.timeout(12000),
       headers:{"content-type":"application/json"},body:JSON.stringify({kind:"tx",body})});
     // The service always resolves submission by tx lookup, including 202 and 4xx. No retries here.
     await r.body?.cancel();
+    need(r.status<300||r.status>=400,"ESCROW_NODE_REDIRECT");
   }
 }

@@ -164,8 +164,11 @@ is excluded. Isolated restore validates the escrow journal, forces a pause recor
 sets a permanent `RESTORED_ARCHIVE_READ_ONLY` halt so unpausing a restored archive can
 never replay old payouts; live-target restore is refused.
 
-Run `npm run escrow:test`: 61 unit/adversarial/model tests (including 1,200 generated
-model transitions) plus 18 real local workerd/SQLite integration checks. The runtime
+Run `npm run escrow:test`: 63 unit/adversarial/model tests (including 1,200 generated
+model transitions) plus 18 real local workerd/SQLite integration checks and 27 real
+HTTP admin-boundary workerd/SQLite checks. The admin suite uses synthetic credentials
+and intercepts every chain request; it covers strict-parser RPC transport, native
+fetch/redirect behavior, freshness holds, and disabled/authentication gates. The runtime
 suite uses the real engine/journal/title adapter, a simulated PoA transport, full
 process restarts after deposit and payout, and concurrent recovery. It tests no real
 wallet, network signature submission, deposit or payout. Existing checks remain
