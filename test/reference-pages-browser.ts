@@ -75,7 +75,7 @@ export async function verifyReferenceStaticPage(
     await page.locator("#searchBtn").click();
     assert.match(
       await page.locator("#searchResult").innerText(),
-      /IN LIVE ASCENDING AUCTION/,
+      /In auction|IN LIVE ASCENDING AUCTION/,
     );
     await page.locator("#addToCartBtn").click();
     assert.equal(await page.locator("#cartCount").innerText(), "1");

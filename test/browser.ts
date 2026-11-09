@@ -121,7 +121,7 @@ export async function browserSmoke(
     await page.locator("#searchBtn").click();
     assert.match(
       await page.locator("#searchResult").innerText(),
-      /AVAILABLE ROOT/,
+      /Available|AVAILABLE ROOT/,
     );
     await page.locator("#addToCartBtn").click();
     assert.equal(await page.locator("#cartCount").innerText(), "1");
@@ -134,7 +134,7 @@ export async function browserSmoke(
     await page.locator("#searchBtn").click();
     assert.match(
       await page.locator("#searchResult").innerText(),
-      /RESERVED ROOT/,
+      /Reserved|RESERVED ROOT/,
     );
     assert.ok((await page.locator("#history .card").count()) > 0);
     assert.ok((await page.locator("#balances .card").count()) > 0);

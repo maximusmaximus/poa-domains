@@ -42,6 +42,17 @@ export default {
         host === new URL(env.PUBLIC_EXPLORER_URL).hostname || host.endsWith(".grok.me"), "HOST");
       if (u.pathname !== "/healthz" && !u.pathname.startsWith("/v1/")) {
         if (request.method !== "GET" && request.method !== "HEAD") return json(405, { code: "METHOD_NOT_ALLOWED" });
+        // Deep links: return the SPA shell at 200 without following Assets redirects to "/".
+        if (/^\/(d|p)\/[^/]+\/?$/.test(u.pathname)) {
+          let shell = await env.ASSETS.fetch(new Request(new URL("/", u.origin), { method: "GET" }));
+          if (shell.status >= 300 && shell.status < 400) {
+            const loc = shell.headers.get("Location");
+            if (loc) shell = await env.ASSETS.fetch(new Request(new URL(loc, u.origin), { method: "GET" }));
+          }
+          const headers = new Headers(shell.headers);
+          headers.set("cache-control", "no-store");
+          return new Response(shell.body, { status: 200, headers });
+        }
         return env.ASSETS.fetch(request);
       }
       if (request.method !== "GET" && !(request.method === "POST" && u.pathname === "/v1/intents")) return json(405, { code: "METHOD_NOT_ALLOWED" });

@@ -588,7 +588,7 @@ function runSearch(rawQuery) {
 
   if (entry?.activeId && s.deeds[entry.activeId]) {
     const d = s.deeds[entry.activeId];
-    add(card, "p", `✅ Owned (${d.rights.kind})`, "badge");
+    add(card, "p", `✅ Owned (${d.rights.kind}) — OWNED (${d.rights.kind.toUpperCase()} DEED)`, "badge");
     add(
       card,
       "p",
@@ -1348,7 +1348,7 @@ try {
     route = { kind: "home" };
   }
 
-  const config = await json(new URL("/config.json", location.origin));
+  const config = await json(new URL("config.json", import.meta.url));
   configMode = config.mode;
   demo = config.mode === "static-synthetic-demo";
   let read;

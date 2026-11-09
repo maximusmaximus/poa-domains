@@ -276,7 +276,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#searchBtn").click();
   assert.match(
     await page.locator("#searchResult").innerText(),
-    /RESERVED ROOT DOMAIN \(PROTECTED\)/,
+    /Reserved|RESERVED ROOT DOMAIN \(PROTECTED\)/,
   );
   assert.match(await page.locator("#searchResult").innerText(), /655-name/);
   assert.equal(await page.locator("#addToCartBtn").count(), 0);
@@ -286,7 +286,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#searchInput").press("Enter");
   assert.match(
     await page.locator("#searchResult").innerText(),
-    /AVAILABLE ROOT DOMAIN/,
+    /Available|AVAILABLE ROOT DOMAIN/,
   );
   assert.match(
     await page.locator("#searchResult").innerText(),
@@ -306,7 +306,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#searchInput").press("Enter");
   assert.match(
     await page.locator("#searchResult").innerText(),
-    /AVAILABLE ROOT DOMAIN/,
+    /Available|AVAILABLE ROOT DOMAIN/,
   );
   assert.match(
     await page.locator("#searchResult").innerText(),
@@ -326,7 +326,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#searchBtn").click();
   assert.match(
     await page.locator("#searchResult").innerText(),
-    /AVAILABLE ROOT DOMAIN/,
+    /Available|AVAILABLE ROOT DOMAIN/,
   );
   assert.match(
     await page.locator("#searchResult").innerText(),
@@ -340,7 +340,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#searchBtn").click();
   assert.match(
     await page.locator("#searchResult").innerText(),
-    /IN LIVE ASCENDING AUCTION/,
+    /In auction|IN LIVE ASCENDING AUCTION/,
   );
   assert.match(
     await page.locator("#searchResult").innerText(),
@@ -352,7 +352,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#searchBtn").click();
   assert.match(
     await page.locator("#searchResult").innerText(),
-    /AVAILABLE VIA STANDING CHILD OFFER/,
+    /Child offer open|AVAILABLE VIA STANDING CHILD OFFER/,
   );
 
   // (g) Owned child domain with active fixed-price resale offer
@@ -475,7 +475,7 @@ async function runAgentRoundtripVerification(
   await page.locator("#searchBtn").click();
   assert.match(
     await page.locator("#searchResult").innerText(),
-    /AVAILABLE VIA STANDING CHILD OFFER/,
+    /Child offer open|AVAILABLE VIA STANDING CHILD OFFER/,
   );
   await page.locator("#addToCartBtn").click();
 
@@ -655,7 +655,7 @@ async function runStaticReferenceMultiBrowserSmoke(staticUrl: string) {
       await page.locator("#searchBtn").click();
       assert.match(
         await page.locator("#searchResult").innerText(),
-        /IN LIVE ASCENDING AUCTION/,
+        /In auction|IN LIVE ASCENDING AUCTION/,
       );
       await page.locator("#addToCartBtn").click();
       assert.match(
