@@ -1,6 +1,7 @@
 import { Fault, need, parseJSON } from "../src/core.js";
 import { SINGLETON } from "./registry.js";
 import { networkStatusMonitor } from "./network-status.js";
+import { BackupKind, RETENTION_DAYS, backupObjectKey, kindForCron } from "./backup-codec.js";
 export { PoaRegistry } from "./registry.js";
 
 const SECURITY: Record<string, string> = {
@@ -31,7 +32,77 @@ async function readPacket(request: Request): Promise<unknown> {
   for (const part of chunks) { bytes.set(part, offset); offset += part.byteLength; }
   return parseJSON(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
 }
+const RESTORE_TARGET = /^restore-[a-z0-9-]{1,48}$/;
+async function readLimited(request: Request, limit: number): Promise<string> {
+  const reader = request.body?.getReader(); need(reader, "EMPTY_BODY");
+  const chunks: Uint8Array[] = []; let size = 0;
+  try {
+    while (true) {
+      const { value, done } = await reader.read(); if (done) break;
+      size += value.byteLength;
+      if (size > limit) { await reader.cancel(); throw new Fault("BODY_TOO_LARGE"); }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  const bytes = new Uint8Array(size); let offset = 0;
+  for (const part of chunks) { bytes.set(part, offset); offset += part.byteLength; }
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+}
+async function tokenMatches(given: string, expected: string): Promise<boolean> {
+  const [a, b] = await Promise.all([given, expected].map((v) => crypto.subtle.digest("SHA-256", new TextEncoder().encode(v))));
+  const x = new Uint8Array(a!), y = new Uint8Array(b!); let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x[i]! ^ y[i]!;
+  return diff === 0;
+}
+export interface BackupResult { key: string; size: number; sha256: string; sequence: number; stateHash: string; createdAt: string; kind: BackupKind; created: boolean; }
+/** Export the live registry and write one immutable, checksummed object to the private R2 bucket. */
+export async function runBackup(env: Env, kind: BackupKind): Promise<BackupResult> {
+  const exp = await env.REGISTRY.getByName(SINGLETON).exportBackup(kind);
+  const key = backupObjectKey(kind, exp.createdAt, exp.sequence, exp.sha256);
+  const existing = await env.BACKUPS.head(key);
+  if (!existing) {
+    await env.BACKUPS.put(key, exp.bodyText, {
+      sha256: exp.sha256,
+      httpMetadata: { contentType: "application/json" },
+      customMetadata: { format: "poadomains-registry-backup/v1", kind, sha256: exp.sha256, sequence: String(exp.sequence),
+        stateHash: exp.stateHash, createdAt: exp.createdAt, retentionDays: String(RETENTION_DAYS[kind]) },
+    });
+  }
+  const result: BackupResult = { key, size: exp.size, sha256: exp.sha256, sequence: exp.sequence, stateHash: exp.stateHash, createdAt: exp.createdAt, kind, created: !existing };
+  // Small pointer for operators (metadata only, no registry contents or secrets).
+  await env.BACKUPS.put(`v1/latest-${kind}.json`, JSON.stringify(result), { httpMetadata: { contentType: "application/json" } });
+  console.log(JSON.stringify({ event: "registry-backup", ...result }));
+  return result;
+}
+async function admin(request: Request, env: Env, u: URL): Promise<Response> {
+  if (request.method !== "POST") return json(405, { code: "METHOD_NOT_ALLOWED" });
+  need(!request.headers.has("origin") && !request.headers.has("sec-fetch-site"), "BROWSER_WRITES_DISABLED");
+  if (u.pathname === "/v1/admin/backup") {
+    const expected = env.BACKUP_ADMIN_TOKEN ?? "";
+    const auth = request.headers.get("authorization") ?? "";
+    if (expected.length < 32 || !auth.startsWith("Bearer ") || !(await tokenMatches(auth.slice(7), expected)))
+      return json(404, { code: "NOT_FOUND" });
+    return json(200, await runBackup(env, "manual"));
+  }
+  if (u.pathname === "/v1/admin/restore") {
+    const host = u.hostname.toLowerCase();
+    if (env.BACKUP_RESTORE_ENABLED !== "local-only" || (host !== "127.0.0.1" && host !== "localhost")) return json(404, { code: "NOT_FOUND" });
+    const target = u.searchParams.get("target") ?? "";
+    need(RESTORE_TARGET.test(target) && target !== SINGLETON, "RESTORE_TARGET");
+    need(request.headers.get("content-type") === "application/json", "CONTENT_TYPE");
+    const body = JSON.parse(await readLimited(request, 16 * 1024 * 1024)) as { backup: string; keys: Record<string, string> };
+    const result = await env.REGISTRY.getByName(target).restoreBackup(body.backup, body.keys);
+    return json(200, { target, ...result });
+  }
+  return json(404, { code: "NOT_FOUND" });
+}
 export default {
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(runBackup(env, kindForCron(controller.cron)).then(() => undefined, (error: unknown) => {
+      console.error(JSON.stringify({ event: "registry-backup-failed", cron: controller.cron, code: error instanceof Error ? error.message.slice(0, 80) : "UNKNOWN" }));
+      throw error;
+    }));
+  },
   async fetch(request: Request, env: Env): Promise<Response> {
     let submitting = false, dispatched = false;
     try {
@@ -64,6 +135,7 @@ export default {
         }
         return env.ASSETS.fetch(request);
       }
+      if (u.pathname.startsWith("/v1/admin/")) return await admin(request, env, u);
       if (request.method !== "GET" && !(request.method === "POST" && u.pathname === "/v1/intents")) return json(405, { code: "METHOD_NOT_ALLOWED" });
 
       // Hold state-changing writes while the public PoA network is Down (2 consecutive failures).

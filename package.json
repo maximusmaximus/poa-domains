@@ -14,7 +14,7 @@
     "clean": "node -e \"import('node:fs').then(fs => fs.rmSync('dist', { recursive: true, force: true }))\"",
     "build": "npm run clean && tsc",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test dist/test/*.test.js test/ui-live-shaping.test.mjs && node --experimental-strip-types --test test/network-status-worker.test.mjs",
+    "test": "npm run build && node --test dist/test/*.test.js test/ui-live-shaping.test.mjs && node --experimental-strip-types --test test/network-status-worker.test.mjs test/backup-codec.test.mjs",
     "test:coverage": "npm run build && node --test --experimental-test-coverage dist/test/*.test.js",
     "smoke": "npm run build && node dist/test/smoke.js",
     "unicode:audit": "node scripts/unicode-audit.mjs",
@@ -40,7 +40,10 @@
     "cf:typecheck": "npm run cf:prepare && npm run cf:types && tsc --project cloudflare/tsconfig.json --noEmit",
     "cf:dev": "npm run cf:prepare && wrangler dev --local --ip 127.0.0.1 --port 18879 --persist-to ./.local-cf-state",
     "cf:dry-run": "npm run cf:prepare && wrangler deploy --dry-run --outdir ./.deploy-dry-run",
-    "cf:test": "npm run build && node cloudflare/test/integration.mjs"
+    "cf:test": "npm run build && node cloudflare/test/integration.mjs",
+    "cf:test:backup": "node --experimental-strip-types cloudflare/test/backup-restore.mjs",
+    "backup:now": "node scripts/registry-backup.mjs",
+    "backup:restore": "node --experimental-strip-types scripts/registry-restore.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

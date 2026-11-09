@@ -8,6 +8,10 @@ import { capabilities } from "../src/interface.js";
 import { normalizeName } from "../src/names.js";
 import { BootableSystemClock, seedRegistry } from "../src/seed.js";
 import { SQLiteJournal } from "./sqlite-journal.js";
+import { BackupKind, JournalRow, buildBackup, encryptSecrets, journalHeadOf, secretAad, verifyBackup } from "./backup-codec.js";
+
+export interface BackupExport { bodyText: string; sha256: string; size: number; sequence: number; stateHash: string; createdAt: string; }
+export interface RestoreResult { sequence: number; stateHash: string; journalHead: string | null; principals: Record<string, string>; }
 
 export const DURABILITY = "durable-object-sqlite";
 export const SINGLETON = "poa-mainnet-registry-v1"; // Never include a build/version id here.
@@ -79,6 +83,42 @@ export class PoaRegistry extends DurableObject<Env> {
     }
     console.log(JSON.stringify({ event: "registry-ready", sequence: this.engine.snapshot().sequence,
       durability: DURABILITY, livePoA: false, principals: this.principals }));
+  }
+  // Backup export. Registry rows are read synchronously (one consistent point in time);
+  // role keys leave this object only inside an envelope encrypted to BACKUP_PUBLIC_KEY_SPKI.
+  async exportBackup(kind: BackupKind): Promise<BackupExport> {
+    const sql = this.ctx.storage.sql;
+    const saved = JSON.parse(sql.exec<{ value: string }>("SELECT value FROM bootstrap WHERE id=1").one().value) as Bootstrap;
+    const journal: JournalRow[] = sql.exec<{ sequence: number; record: string }>("SELECT sequence, record FROM journal ORDER BY sequence ASC")
+      .toArray().map((r) => ({ sequence: Number(r.sequence), record: String(r.record) }));
+    const sequence = this.engine.snapshot().sequence, stateHash = this.engine.stateHash();
+    need(journal.length === sequence, "BACKUP_SEQUENCE_MISMATCH");
+    const head = { sequence, stateHash, journalHead: journalHeadOf(journal) };
+    const createdAt = new Date().toISOString();
+    const secrets = await encryptSecrets({ keys: saved.keys }, this.env.BACKUP_PUBLIC_KEY_SPKI ?? "", secretAad(saved.policyHash, head));
+    const { bodyText, sha256, size } = await buildBackup({ createdAt, kind, head, journal, secrets,
+      registry: { singleton: SINGLETON, bootstrapFormat: saved.format, config: saved.config, policyHash: saved.policyHash, principals: saved.principals } });
+    return { bodyText, sha256, size, sequence, stateHash, createdAt };
+  }
+  // Restore into THIS object. Only allowed in local dev (BACKUP_RESTORE_ENABLED=local-only)
+  // and never into the production singleton. Full signature/hash-chain replay validates it.
+  async restoreBackup(backupText: string, keys: Record<string, string>): Promise<RestoreResult> {
+    need(this.env.BACKUP_RESTORE_ENABLED === "local-only", "RESTORE_DISABLED");
+    need(!this.ctx.id.equals(this.env.REGISTRY.idFromName(SINGLETON)), "RESTORE_TARGET_IS_LIVE");
+    const b = await verifyBackup(JSON.parse(backupText));
+    exact(keys, [...ROLES]);
+    const bootstrap: Bootstrap = { format: "poa-do-sqlite-v1", config: b.registry.config as Config, policyHash: b.registry.policyHash, principals: b.registry.principals, keys };
+    const sql = this.ctx.storage.sql;
+    this.ctx.storage.transactionSync(() => {
+      sql.exec("DELETE FROM journal"); sql.exec("DELETE FROM bootstrap");
+      sql.exec("INSERT INTO bootstrap(id, value) VALUES (1, ?)", JSON.stringify(bootstrap));
+      for (const row of b.journal) sql.exec("INSERT INTO journal(sequence, record) VALUES (?, ?)", row.sequence, row.record);
+    });
+    try { this.#initialize(); }
+    catch { this.ctx.abort("Restore validation failed"); throw new Error("RESTORE_VALIDATION_FAILED"); }
+    const rows = sql.exec<{ sequence: number; record: string }>("SELECT sequence, record FROM journal ORDER BY sequence ASC").toArray()
+      .map((r) => ({ sequence: Number(r.sequence), record: String(r.record) }));
+    return { sequence: this.engine.snapshot().sequence, stateHash: this.engine.stateHash(), journalHead: journalHeadOf(rows), principals: this.principals };
   }
   // RPC only; the public Worker bounds/validates HTTP before invoking this method.
   // No await between reading registry state and synchronously appending a commit.
