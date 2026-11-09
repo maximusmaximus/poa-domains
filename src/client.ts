@@ -6,7 +6,8 @@ export function endpoint(value: string): string {
     (u.hostname === "127.0.0.1" || u.hostname === "localhost");
   const isOfficialHttps =
     u.protocol === "https:" &&
-    (u.hostname === "poadomains.grok.me" || u.hostname.endsWith(".grok.me"));
+    (u.hostname === "poadomains.grok.me" || u.hostname.endsWith(".grok.me") ||
+      u.hostname === "poadomains-registry.maxinfeld-artshow.workers.dev");
   need(
     (isLocalHttp || isOfficialHttps) &&
       !u.username &&

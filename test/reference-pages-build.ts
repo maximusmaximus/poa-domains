@@ -50,12 +50,17 @@ export function buildReferenceBundle(directory: string) {
     copyFileSync(join("reference-web", file), join(output, file));
   const policy =
     "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'";
-  const html = readFileSync(join(output, "index.html"), "utf8").replace(
+  let html = readFileSync(join(output, "index.html"), "utf8").replace(
     "<head>",
     '<head>\n<meta http-equiv="Content-Security-Policy" content="' +
       policy +
       '">',
   );
+  // Subpath static hosting (/poa-domains/): root-absolute Worker assets become relative.
+  html = html
+    .replaceAll('href="/icon.svg"', 'href="./icon.svg"')
+    .replace(/href="\/style\.css(\?v=[0-9a-f]+)?"/, 'href="./style.css$1"')
+    .replace(/src="\/app\.js(\?v=[0-9a-f]+)?"/, 'src="./app.js$1"');
   writeFileSync(join(output, "index.html"), html);
   writeFileSync(
     join(output, "config.json"),

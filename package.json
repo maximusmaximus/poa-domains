@@ -14,7 +14,7 @@
     "clean": "node -e \"import('node:fs').then(fs => fs.rmSync('dist', { recursive: true, force: true }))\"",
     "build": "npm run clean && tsc",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test dist/test/*.test.js",
+    "test": "npm run build && node --test dist/test/*.test.js test/ui-live-shaping.test.mjs && node --experimental-strip-types --test test/network-status-worker.test.mjs",
     "test:coverage": "npm run build && node --test --experimental-test-coverage dist/test/*.test.js",
     "smoke": "npm run build && node dist/test/smoke.js",
     "unicode:audit": "node scripts/unicode-audit.mjs",
@@ -33,11 +33,25 @@
     "metadata:check": "node -e \"import('node:child_process').then(({execFileSync})=>execFileSync(process.platform==='win32'?'wsl':'python3',process.platform==='win32'?['--','env','PYTHONDONTWRITEBYTECODE=1','python3','-B','-m','unittest','discover','-s','tools/metadata-backup/tests','-v']:['-B','-m','unittest','discover','-s','tools/metadata-backup/tests','-v'],{stdio:'inherit',env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}}))\"",
     "test:live-network": "node --test test/live-network.test.mjs",
     "test:emoji-format": "node --test test/emoji-format-checker.test.mjs",
-    "test:emoji-format:browser": "playwright test --config=test/playwright.emoji-format.config.mjs"
+    "test:emoji-format:browser": "playwright test --config=test/playwright.emoji-format.config.mjs",
+    "cf:prepare": "node scripts/cloudflare-prepare.mjs && node scripts/stamp-assets.mjs",
+    "assets:stamp": "node scripts/stamp-assets.mjs",
+    "cf:types": "wrangler types",
+    "cf:typecheck": "npm run cf:prepare && npm run cf:types && tsc --project cloudflare/tsconfig.json --noEmit",
+    "cf:dev": "npm run cf:prepare && wrangler dev --local --ip 127.0.0.1 --port 18879 --persist-to ./.local-cf-state",
+    "cf:dry-run": "npm run cf:prepare && wrangler deploy --dry-run --outdir ./.deploy-dry-run",
+    "cf:test": "npm run build && node cloudflare/test/integration.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
     "@types/node": "26.6.6",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "wrangler": "4.158.0"
+  },
+  "imports": {
+    "#poa-unicode-data": {
+      "types": "./src/unicode-data.ts",
+      "default": "./dist/src/unicode-data.js"
+    }
   }
 }

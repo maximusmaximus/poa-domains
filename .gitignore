@@ -19,3 +19,14 @@ _site/
 
 # Local browser-test output; never a public runtime artifact.
 test-results/
+
+# Cloudflare local state contains private bootstrap keys. Never publish.
+.wrangler/
+.local-cf-state/
+.deploy-dry-run/
+.dev.vars*
+.env*
+cloudflare/generated/
+cloudflare/test/evidence/
+.local-cf-state-*/
+cloudflare/test/evidence-v*/

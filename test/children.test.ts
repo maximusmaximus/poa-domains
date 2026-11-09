@@ -70,7 +70,7 @@ test("free child transfer and fixed resale preserve absolute expiry, renewal pol
     "sellFixed",
     {
       ...c.vp("agent.alpha"),
-      asset: "TEST",
+      asset: "POA",
       price: "300",
       validUntil: c.clock.now() + 100,
     },
@@ -83,7 +83,7 @@ test("free child transfer and fixed resale preserve absolute expiry, renewal pol
       {
         offerId: sale.result.offerId,
         expectedVersion: 1,
-        asset: "TEST",
+        asset: "POA",
         amount: "300",
       },
       c.bob,
