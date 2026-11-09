@@ -22,6 +22,8 @@
     "check": "npm run typecheck && npm test && npm run production:smoke && npm run smoke && npm run reference:pages:smoke && npm run pages:smoke && npm run unicode:audit && npm run security && npm run metadata:check && npm run test:live-network && npm run test:emoji-format && npm run test:emoji-format:browser",
     "pages:build": "npm run build && node dist/src/pages-build.js",
     "pages:smoke": "npm run pages:build && node dist/test/pages-smoke.js",
+    "app": "npm run build && node dist/src/app.js",
+    "app:cli": "node dist/src/reference-cli.js",
     "reference:demo": "npm run build && node dist/src/reference-demo.js",
     "reference:pages:smoke": "npm run build && node dist/test/reference-pages-smoke.js",
     "start": "node dist/src/cli.js serve",
