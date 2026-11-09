@@ -57,10 +57,14 @@ return 404. Never put the bearer value in a URL. Actions:
 
 - `{"action":"status"}`: private ledger state and pending outcomes.
 - `{"action":"pause","paused":true}`: immediate administrative hold; false unpauses
-  but does not clear a reconciliation halt.
+  but does not clear a reconciliation or restored-archive halt.
 - `{"action":"reconcile"}`: compare checkpoint-aligned observations and liabilities.
-- `{"action":"tick"}`: recover known transactions, complete titles, or prepare one
-  eligible outgoing transfer. A recovery alarm does the same when the write gate is on.
+- `{"action":"tick"}`: recover known transactions, auto-expire abandoned auctions,
+  complete titles, or prepare one eligible outgoing transfer. A recovery alarm does
+  the same when the write gate is on.
+- `{"action":"rebroadcast"}`: re-transmit the exact retained signed bytes of an
+  `UNKNOWN` outgoing transfer if and only if it is unseen on-chain and the wallet's
+  ledger `next_nonce` still matches the transfer's nonce.
 - `{"action":"command","packet":{"command":...,"signature":...}}`: a separately
   actor-signed request. The admin credential alone cannot create seller/bidder consent.
 
@@ -144,9 +148,9 @@ state records; this is not an unrestricted-volume storage design.
 
 Private financial records are exported only inside the existing RSA-OAEP/AES-GCM
 backup envelope, alongside encrypted registry bootstrap keys. The escrow Worker secret
-is excluded. Isolated restore validates the escrow journal and adds a pause record;
-live-target restore is refused. Restoring an old ledger cannot undo real network
-payments and is not permission to repay them.
+is excluded. Isolated restore validates the escrow journal, forces a pause record, and
+sets a permanent `RESTORED_ARCHIVE_READ_ONLY` halt so unpausing a restored archive can
+never replay old payouts; live-target restore is refused.
 
 Run `npm run escrow:test`: 24 unit/adversarial/model tests (including 1,200 generated
 model transitions) plus 17 real local workerd/SQLite integration checks. The runtime

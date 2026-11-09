@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { sign, verify, createPublicKey, createPrivateKey } from "node:crypto";
 import { base58 } from "../../src/native-crypto.js";
 import { canonical } from "../../src/core.js";
-import { Escrow, invariant, replay } from "../escrow.js";
+import { Escrow, PILOT_ADMISSION_LIMIT, PILOT_JOURNAL_LIMIT, invariant, nextEntry, replay } from "../escrow.js";
 import { CHAIN, WorkerSecretSigner, micros, decimal, txid, verifyCommand, verifyTransfer } from "../escrow-codec.js";
 import { PoaHttpNetwork, MAINNET_ENGINE_SHA256, MAINNET_PARAMS_SHA256, PILOT_PER_TX, PILOT_DAILY } from "../escrow-network.js";
 import { MockNetwork, MemoryJournal, policy, who, key, seed, signer, command, depositBody, root, parents } from "./escrow-fixture.js";
@@ -240,4 +240,110 @@ test("duplicate sender nonce across deposit intents is rejected",async()=>{
  await f.e.command(command(who(3),"d1","detect",{intent:i1.intent,txid:t1}));
  await assert.rejects(f.e.command(command(who(3),"d2","detect",{intent:i2.intent,txid:t2})),/DUPLICATE/);
  assert.equal(f.e.state().assets,"1000000");
+});
+
+test("TITLE_PENDING does not spam journal or block READY refunds, and repair-title completes handover",async()=>{
+ let failTitle=false;
+ const journal=new MemoryJournal(policy),net=new MockNetwork();
+ let owner=who(2),transferCount=0;
+ const titles={
+  terms:()=>({reserve:"1.000000",window:1000,quiet:1000}),
+  validate:(_p:any,_n:string,s:string,_b:string)=>{if(failTitle)throw Error("ESCROW_TITLE_NOT_READY");assert.equal(owner,s);},
+  commit:(p:any)=>{owner=p.body.params.recipient;transferCount++;}
+ };
+ const e=new Escrow(journal,net,signer(),titles,policy,()=>net.now,()=>true);e.pause(false);
+ const f={e,journal,net,make:()=>new Escrow(journal,net,signer(),titles,policy,()=>net.now,()=>true),owner:()=>owner,count:()=>transferCount,disable:()=>{}};
+ await fund(f,3,"10.000000","a");
+ const openRes=await e.command(command(who(2),"open","open",{name:"test",reserve:"1.000000"})) as any;
+ const a=openRes.auction as string;
+ await e.command(command(who(3),"bid","bid",{auction:a,amount:"2.000000"}));
+ await settle(f,a);
+ await e.command(command(who(3),"w1","withdraw",{amount:"1.000000"}));
+ failTitle=true;
+ // Pay seller and fee; title validation fails once -> TITLE_PENDING
+ await e.tick();await e.tick();await e.tick();
+ assert.equal(e.state().settlements[a]!.status,"TITLE_PENDING");
+ const seqAtPending=e.state().sequence;
+ // Subsequent ticks do not spam title-pending and still pay the READY withdrawal refund
+ await e.tick();await e.tick();
+ assert.equal(e.state().payments["withdraw-" + who(3) + ":w1"]!.status,"FINAL");
+ const seqAfterRefund=e.state().sequence;
+ await e.tick();await e.tick();
+ assert.equal(e.state().sequence,seqAfterRefund);
+ assert.ok(seqAtPending<seqAfterRefund);
+ // Repair title immediately completes handover when payments are already FINAL
+ failTitle=false;
+ await e.command(command(who(2),"repair","repair-title",{auction:a,transfer:consent(f)}));
+ assert.equal(e.state().settlements[a]!.status,"COMPLETE");
+ assert.equal(e.state().auctions[a]!.status,"COMPLETE");
+ assert.equal(owner,who(3));assert.equal(transferCount,1);
+ invariant(e.state());
+});
+
+test("short-deadline seller consent is rejected before payout begins",async()=>{
+ const f=fixture(),a=await auction(f);f.net.now+=1001;
+ const c=consent(f);
+ c.body.deadline=Math.floor(f.net.now/1000)+60; // < 600s required window
+ const resigned=signBody(c.body,[key(2)]);
+ await assert.rejects(f.e.command(command(who(2),"settle-short","settle",{auction:a,transfer:resigned})),/CONSENT_EXPIRING/);
+ assert.equal(f.e.state().auctions[a]!.status,"OPEN");
+});
+
+test("abandoned OPEN auctions auto-expire in tick and release title lock + refund bidder",async()=>{
+ const f=fixture();await fund(f,3,"10.000000","a");
+ const o1=await f.e.command(command(who(2),"open1","open",{name:"empty",reserve:"1.000000"})) as any;
+ assert.equal(f.e.titleLocked(),true);
+ f.net.now+=1001;
+ await f.e.tick();
+ assert.equal(f.e.state().auctions[o1.auction]!.status,"CANCELLED");
+ assert.equal(f.e.titleLocked(),false);
+ // Now test with a high bid abandoned past closes + quiet
+ const o2=await f.e.command(command(who(2),"open2","open",{name:"bid-abandoned",reserve:"1.000000"})) as any;
+ await f.e.command(command(who(3),"bid2","bid",{auction:o2.auction,amount:"2.000000"}));
+ f.net.now+=1001; // past closes, within quiet grace window -> still OPEN so seller can settle
+ await f.e.tick();
+ assert.equal(f.e.state().auctions[o2.auction]!.status,"OPEN");
+ f.net.now+=1000; // past closes + quiet -> auto-expired and refunded
+ await f.e.tick();
+ assert.equal(f.e.state().auctions[o2.auction]!.status,"CANCELLED");
+ assert.equal(f.e.titleLocked(),false);
+ assert.ok(f.e.state().payments[`cancel-${o2.auction}`]);
+ invariant(f.e.state());
+});
+
+test("two Escrow instances sharing a Journal serialize requests and recovery without double refund",async()=>{
+ const f=fixture(),a=await auction(f),recovery=f.make();
+ f.net.now+=1001;
+ await Promise.allSettled([
+  f.e.command(command(who(2),"cancel","cancel",{auction:a})),
+  recovery.command(command(who(4),"expire","expire",{auction:a})),
+  f.e.tick(),
+  recovery.tick(),
+ ]);
+ await f.e.tick();await recovery.tick();
+ assert.equal(Object.keys(f.e.state().payments).length,1);
+ assert.equal(f.net.calls,1);
+ invariant(f.e.state());
+});
+
+test("pilot journal admission cap reserves headroom for settlement and recovery",async()=>{
+ const f=fixture(),a=await auction(f);
+ while(f.journal.rows.length<PILOT_ADMISSION_LIMIT){
+  const prev=f.journal.rows.at(-1)!;
+  f.journal.rows.push(nextEntry(prev.state,prev.checksum,"noop",{},()=>{}));
+ }
+ await assert.rejects(f.e.command(command(who(3),"new-intent","intent",{amount:"1.000000"})),/CAPACITY/);
+ await assert.rejects(f.e.command(command(who(2),"new-open","open",{name:"other",reserve:"1.000000"})),/CAPACITY/);
+ // In-flight auction can still settle and complete title handover within reserved headroom
+ await settle(f,a);
+ for(let i=0;i<5;i++)await f.e.tick();
+ assert.equal(f.owner(),who(3));
+ assert.ok(f.e.state().sequence<PILOT_JOURNAL_LIMIT);
+ invariant(f.e.state());
+});
+
+test("malformed Worker secret never leaks in error message",()=>{
+ const b=depositBody(3,policy.wallet,"1.000000","test"),{sig,...raw}=b;
+ const s=new WorkerSecretSigner(who(1),()=>"not-valid-base58-secret!!!",()=>true);
+ assert.throws(()=>s.transfer({...raw,from:who(1)}),(err:any)=>err instanceof Error&&err.message==="ESCROW_KEY_OR_TRANSFER_INVALID"&&!err.message.includes("not-valid"));
 });
