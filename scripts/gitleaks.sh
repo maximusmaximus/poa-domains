@@ -15,8 +15,9 @@ case "$os:$arch" in
   MINGW*:x86_64|MSYS*:x86_64|CYGWIN*:x86_64) archive="gitleaks_${version}_windows_x64.zip"; bin="gitleaks.exe" ;;
   *) echo "Unsupported platform: $os:$arch" >&2; exit 1 ;;
 esac
-curl --fail --silent --show-error --location "$base/$archive" --output "$work/$archive"
-curl --fail --silent --show-error --location "$base/gitleaks_${version}_checksums.txt" --output "$work/checksums.txt"
+# Bounded retries: GitHub release CDN intermittently returns 504.
+curl --fail --silent --show-error --location --retry 5 --retry-all-errors --retry-delay 5 --connect-timeout 20 --max-time 120 "$base/$archive" --output "$work/$archive"
+curl --fail --silent --show-error --location --retry 5 --retry-all-errors --retry-delay 5 --connect-timeout 20 --max-time 120 "$base/gitleaks_${version}_checksums.txt" --output "$work/checksums.txt"
 node --input-type=module - "$work" "$archive" "$bin" <<'JS'
 import fs from "node:fs";
 import path from "node:path";
