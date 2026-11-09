@@ -1,5 +1,6 @@
 import { Fault, need, parseJSON } from "../src/core.js";
 import { SINGLETON } from "./registry.js";
+import { networkStatusMonitor } from "./network-status.js";
 export { PoaRegistry } from "./registry.js";
 
 const SECURITY: Record<string, string> = {
@@ -40,6 +41,14 @@ export default {
       const host = u.hostname.toLowerCase();
       need(host === "localhost" || host === "127.0.0.1" || host === env.BACKEND_HOST ||
         host === new URL(env.PUBLIC_EXPLORER_URL).hostname || host.endsWith(".grok.me"), "HOST");
+
+      // Same-origin network status: Worker probes minepoa.com; browser never needs a PoA key.
+      if (u.pathname === "/v1/network-status") {
+        if (request.method !== "GET" && request.method !== "HEAD") return json(405, { code: "METHOD_NOT_ALLOWED" });
+        const status = await networkStatusMonitor.getStatus();
+        return json(200, status, true);
+      }
+
       if (u.pathname !== "/healthz" && !u.pathname.startsWith("/v1/")) {
         if (request.method !== "GET" && request.method !== "HEAD") return json(405, { code: "METHOD_NOT_ALLOWED" });
         // Deep links: return the SPA shell at 200 without following Assets redirects to "/".
@@ -56,6 +65,22 @@ export default {
         return env.ASSETS.fetch(request);
       }
       if (request.method !== "GET" && !(request.method === "POST" && u.pathname === "/v1/intents")) return json(405, { code: "METHOD_NOT_ALLOWED" });
+
+      // Hold state-changing writes while the public PoA network is Down (2 consecutive failures).
+      if (request.method === "POST" && u.pathname === "/v1/intents") {
+        const net = networkStatusMonitor.peekStatus();
+        if (net.hold) {
+          return json(503, {
+            code: "NETWORK_HELD",
+            accepted: false,
+            hold: true,
+            level: net.level,
+            message: net.message,
+            livePoA: false,
+          });
+        }
+      }
+
       const packet = request.method === "POST" ? await readPacket(request) : undefined;
       submitting = request.method === "POST";
       dispatched = true;

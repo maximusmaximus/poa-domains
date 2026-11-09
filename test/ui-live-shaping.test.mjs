@@ -295,3 +295,98 @@ test("tab new-dots use watermarks and clear after seen", () => {
   assert.equal(loadTabSeen(storage).find, 5);
   assert.equal(TAB_SEEN_KEY, "poadomains.tabSeen.v1");
 });
+
+import {
+  classifyNetworkProbe,
+  shouldHoldTransactions,
+  networkBannerCopy,
+  networkBannerColor,
+  isNetworkBannerDismissed,
+  dismissNetworkBanner,
+  clearNetworkBannerDismiss,
+  htmlHasVisibleXeroEmoji,
+  NETWORK_BANNER_DISMISS_KEY,
+} from "../reference-web/shared.js";
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+test("classifyNetworkProbe: online / degraded / 2-failure down", () => {
+  assert.equal(
+    classifyNetworkProbe({ ok: true, latencyMs: 1200, consecutiveFailures: 0, everSucceeded: true }),
+    "online",
+  );
+  assert.equal(
+    classifyNetworkProbe({ ok: true, latencyMs: 5000, consecutiveFailures: 0, everSucceeded: true }),
+    "degraded",
+  );
+  assert.equal(
+    classifyNetworkProbe({ ok: true, latencyMs: 800, stale: true, consecutiveFailures: 0, everSucceeded: true }),
+    "degraded",
+  );
+  assert.equal(
+    classifyNetworkProbe({ ok: false, consecutiveFailures: 1, everSucceeded: false }),
+    "checking",
+  );
+  assert.equal(
+    classifyNetworkProbe({ ok: false, consecutiveFailures: 1, everSucceeded: true }),
+    "degraded",
+  );
+  assert.equal(
+    classifyNetworkProbe({ ok: false, consecutiveFailures: 2, everSucceeded: false }),
+    "down",
+  );
+  assert.equal(
+    classifyNetworkProbe({ ok: false, consecutiveFailures: 2, everSucceeded: true }),
+    "down",
+  );
+});
+
+test("shouldHoldTransactions only when down", () => {
+  assert.equal(shouldHoldTransactions("online"), false);
+  assert.equal(shouldHoldTransactions("degraded"), false);
+  assert.equal(shouldHoldTransactions("checking"), false);
+  assert.equal(shouldHoldTransactions("down"), true);
+});
+
+test("network banner copy/color and dismiss until level changes", () => {
+  assert.match(networkBannerCopy("online"), /Online/);
+  assert.match(networkBannerCopy("down"), /held/i);
+  assert.equal(networkBannerColor("down"), "red");
+  assert.equal(networkBannerColor("online"), "green");
+  assert.equal(networkBannerColor("degraded"), "amber");
+  assert.equal(networkBannerColor("checking"), "grey");
+  const store = new Map();
+  const storage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  assert.equal(isNetworkBannerDismissed(storage, "online"), false);
+  dismissNetworkBanner(storage, "online");
+  assert.equal(store.get(NETWORK_BANNER_DISMISS_KEY), "online");
+  assert.equal(isNetworkBannerDismissed(storage, "online"), true);
+  assert.equal(isNetworkBannerDismissed(storage, "down"), false);
+  clearNetworkBannerDismiss(storage);
+  assert.equal(isNetworkBannerDismissed(storage, "online"), false);
+});
+
+test("served UI HTML has no visible xero emoji phrasing", () => {
+  const html = readFileSync(resolve(root, "reference-web/index.html"), "utf8");
+  assert.equal(htmlHasVisibleXeroEmoji(html), false);
+  assert.equal(htmlHasVisibleXeroEmoji('<a href="#">🎨 xeroemoji</a>'), true);
+  assert.equal(htmlHasVisibleXeroEmoji("<h3>Xero Emoji · bids</h3>"), true);
+  assert.equal(
+    htmlHasVisibleXeroEmoji("<style>@font-face{font-family:'Xero Emoji'}</style><p>ok</p>"),
+    false,
+  );
+  assert.match(html, /maxi\.grok\.me/);
+  assert.match(html, /Tesselate Army/);
+  assert.match(html, /networkStatusBar/);
+  assert.ok(!html.includes("view-tabs"));
+  assert.ok(html.includes('id="sectionTabs"'));
+  assert.ok(html.includes("skip-link"));
+  assert.ok(html.includes("siteFooter"));
+});

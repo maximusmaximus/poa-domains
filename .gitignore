@@ -28,3 +28,5 @@ test-results/
 .env*
 cloudflare/generated/
 cloudflare/test/evidence/
+.local-cf-state-*/
+cloudflare/test/evidence-v*/

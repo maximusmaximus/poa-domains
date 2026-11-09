@@ -69,12 +69,26 @@ try {
   check("home UI ids, six pills, ecosystem links and reference disclosure", () => {
     assert.equal(home.status, 200);
     for (const id of ["searchInput","searchBtn","cartList","cartPrompt","copyCartPrompt","stats","names","auctions","offers","history","balances","handoff"]) assert.ok(html.includes(`id="${id}"`), id);
-    for (const link of ["https://poadomains.grok.me","https://maximusmaximus.github.io/poa-domains/","minepoa.com","https://poa.grok.me","xeroemoji","github.com/maximusmaximus/poa-domains"]) assert.ok(html.includes(link), link);
+    for (const link of ["https://poadomains.grok.me","https://maximusmaximus.github.io/poa-domains/","minepoa.com","https://poa.grok.me","github.com/maximusmaximus/poa-domains","https://maxi.grok.me"]) assert.ok(html.includes(link), link);
+    assert.equal(/xero[\s-]?emoji/i.test(html.replace(/<style[\s\S]*?<\/style>/gi,"")), false, "no visible xero emoji phrasing");
+    assert.ok(!html.includes("view-tabs"), "duplicate view-tabs removed");
+    assert.ok(html.includes('id="networkStatusBar"'));
+    assert.ok(html.includes('id="siteFooter"'));
+    assert.match(html, /Tesselate Army/);
     const pills = html.match(/class="quick-pills"([\s\S]*?)<\/div>/)?.[0] ?? "";
     assert.equal((pills.match(/<button/g) ?? []).length,6); assert.ok(pills.includes("100k POA single emoji")); assert.ok(pills.includes("1k POA multi-emoji"));
     assert.match(html, /local reference\. Not live PoA/i);
-    for (const id of ["siteTitle","liveTicker","floatingCartBtn","floatingCartPanel","copyCheckoutBtn","auctionsSection","marketSection","sectionTabs","domainMain"]) assert.ok(html.includes(`id="${id}"`), id);
+    for (const id of ["siteTitle","liveTicker","floatingCartBtn","floatingCartPanel","copyCheckoutBtn","auctionsSection","marketSection","sectionTabs","domainMain","networkStatusBar","siteFooter"]) assert.ok(html.includes(`id="${id}"`), id);
     assert.ok(home.headers.get("content-security-policy")); assert.equal(home.headers.get("x-content-type-options"),"nosniff");
+  });
+  const net = await api("/v1/network-status"); save("network-status.json", net.body);
+  check("network-status endpoint shape", () => {
+    assert.equal(net.status, 200);
+    assert.ok(["checking","online","degraded","down"].includes(net.body.level), net.body.level);
+    assert.equal(typeof net.body.hold, "boolean");
+    assert.equal(net.body.livePoA, false);
+    assert.equal(net.body.chainId, "poa-mainnet-1");
+    assert.ok(typeof net.body.message === "string" && net.body.message.length > 0);
   });
   const domainPage = await fetch(base + "/d/nexus"); const domainHtml = await domainPage.text();
   check("SPA domain page serves HTML shell", () => { assert.equal(domainPage.status, 200); assert.ok(domainHtml.includes('id="domainMain"')); assert.ok(domainHtml.includes('id="siteTitle"')); });

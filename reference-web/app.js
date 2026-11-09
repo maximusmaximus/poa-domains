@@ -26,6 +26,11 @@ import {
   saveTabSeen,
   tabWatermarks,
   tabHasNew,
+  shouldHoldTransactions,
+  networkBannerCopy,
+  networkBannerColor,
+  isNetworkBannerDismissed,
+  dismissNetworkBanner,
 } from "./shared.js";
 
 const el = (id) => document.getElementById(id);
@@ -48,8 +53,11 @@ let tabSeen = {};
 let route = { kind: "home" };
 let currentDomainName = null;
 let currentOwnerId = null;
+let networkStatus = { level: "checking", hold: false, message: "⚪ Checking PoA network…" };
+let networkTimer = null;
 
 const TICKER_MS = 12000;
+const NETWORK_MS = 20000;
 
 function clearHandoff() {
   generation++;
@@ -136,6 +144,96 @@ function navigateDomain(name) {
   currentOwnerId = null;
   history.pushState(route, "", domainPath(name));
   applyRoute();
+}
+
+async function refreshNetworkStatus() {
+  try {
+    const response = await fetch(endpointBase() + "/v1/network-status", {
+      method: "GET",
+      credentials: "omit",
+      cache: "no-store",
+    });
+    if (!response.ok) throw Error("status");
+    const body = await response.json();
+    if (!body || typeof body.level !== "string") throw Error("shape");
+    networkStatus = body;
+  } catch {
+    // Conservative: one client miss does not flip to Down; Worker owns the 2-failure rule.
+    if (!networkStatus || networkStatus.level === "checking") {
+      networkStatus = {
+        level: "checking",
+        hold: false,
+        message: "⚪ Checking PoA network…",
+      };
+    }
+  }
+  renderNetworkStatus();
+  applyNetworkHold();
+}
+
+function renderNetworkStatus() {
+  const bar = el("networkStatusBar");
+  if (!bar) return;
+  const level = networkStatus.level || "checking";
+  const text = networkStatus.message || networkBannerCopy(level);
+  bar.dataset.level = level;
+  bar.dataset.color = networkBannerColor(level);
+  const icon = el("networkStatusIcon");
+  const label = el("networkStatusText");
+  if (icon) icon.textContent = networkStatus.emoji || text.slice(0, 2);
+  if (label) label.textContent = text;
+  const dismissed = isNetworkBannerDismissed(globalThis.sessionStorage, level);
+  bar.hidden = !!dismissed;
+}
+
+function applyNetworkHold() {
+  const hold = shouldHoldTransactions(networkStatus.level) || !!networkStatus.hold;
+  const heldIds = [
+    "copyCheckoutBtn",
+    "copyCartPrompt",
+    "copyListPromptBtn",
+    "copyChangePromptBtn",
+    "copyUnlistPromptBtn",
+    "copy",
+  ];
+  for (const id of heldIds) {
+    const node = el(id);
+    if (!node) continue;
+    if (hold) {
+      node.disabled = true;
+      node.classList.add("action-held");
+      node.title = "Held ⏸️ until the PoA network is back";
+    } else {
+      node.classList.remove("action-held");
+      node.removeAttribute("title");
+      // Re-enable based on existing cart/copy rules on next renderCart / route.
+    }
+  }
+  // Re-run cart enablement when not held.
+  if (!hold) renderCart();
+  let note = el("networkHoldNote");
+  if (hold) {
+    if (!note) {
+      note = document.createElement("p");
+      note.id = "networkHoldNote";
+      note.className = "hold-note";
+      note.setAttribute("role", "status");
+      const panel = el("floatingCartPanel");
+      if (panel) panel.appendChild(note);
+    }
+    note.textContent = "⏸️ Held until the PoA network is back. Reads still work; this registry is local-reference (not live PoA).";
+    note.hidden = false;
+  } else if (note) {
+    note.hidden = true;
+  }
+  document.querySelectorAll("[data-requires-network]").forEach((node) => {
+    if (hold) {
+      node.disabled = true;
+      node.classList.add("action-held");
+    } else {
+      node.classList.remove("action-held");
+    }
+  });
 }
 
 function navigateOwner(ownerId) {
@@ -267,7 +365,10 @@ function renderFloatingCart() {
     cart.length ? `Open cart, ${cart.length} items` : "Open cart",
   );
   clearBtn.disabled = cart.length === 0;
-  copyBtn.disabled = cart.length === 0;
+  const held = shouldHoldTransactions(networkStatus.level) || !!networkStatus.hold;
+  copyBtn.disabled = cart.length === 0 || held;
+  if (held) copyBtn.classList.add("action-held");
+  else copyBtn.classList.remove("action-held");
   list.replaceChildren();
   if (!cart.length) {
     add(list, "p", "Cart empty", "muted");
@@ -288,7 +389,12 @@ function renderFloatingCart() {
 function renderCart() {
   el("cartCount").textContent = String(cart.length);
   el("clearCart").disabled = cart.length === 0;
-  el("copyCartPrompt").disabled = cart.length === 0;
+  {
+    const held = shouldHoldTransactions(networkStatus.level) || !!networkStatus.hold;
+    el("copyCartPrompt").disabled = cart.length === 0 || held;
+    if (held) el("copyCartPrompt").classList.add("action-held");
+    else el("copyCartPrompt").classList.remove("action-held");
+  }
   el("cartStatus").textContent = "";
   const listNode = el("cartList");
   listNode.replaceChildren();
@@ -1017,6 +1123,10 @@ function renderOwnerPage(ownerId) {
 }
 
 function copyDomainListingPrompt(kind) {
+  if (shouldHoldTransactions(networkStatus.level) || networkStatus.hold) {
+    el("listingPromptStatus").textContent = "Held ⏸️ until the PoA network is back";
+    return;
+  }
   if (!latestState || !currentDomainName || !cap) return;
   const view = resolveDomainView(latestState, currentDomainName, reservedSet);
   if (!view.deed) {
@@ -1470,6 +1580,10 @@ try {
   });
   el("clearCart").addEventListener("click", clearAllCart);
   el("copyCartPrompt").addEventListener("click", async () => {
+    if (shouldHoldTransactions(networkStatus.level) || networkStatus.hold) {
+      el("cartStatus").textContent = "Held ⏸️ until the PoA network is back";
+      return;
+    }
     const text = el("cartPrompt").textContent;
     if (!text || !cart.length) return;
     try {
@@ -1504,6 +1618,10 @@ try {
   );
   el("floatingCartClear").addEventListener("click", clearAllCart);
   el("copyCheckoutBtn").addEventListener("click", async () => {
+    if (shouldHoldTransactions(networkStatus.level) || networkStatus.hold) {
+      el("floatingCartStatus").textContent = "Held ⏸️ until the PoA network is back";
+      return;
+    }
     if (!cart.length || !cap) return;
     const text = buildAgentCheckoutHandoff(
       cart,
@@ -1525,10 +1643,25 @@ try {
     else if (!el("detailView").hidden) closeDetail();
   });
 
+  const dismissBtn = el("networkStatusDismiss");
+  if (dismissBtn) {
+    dismissBtn.addEventListener("click", () => {
+      const level = networkStatus.level || "checking";
+      dismissNetworkBanner(globalThis.sessionStorage, level);
+      renderNetworkStatus();
+    });
+  }
+
   if (!demo) {
     tickerTimer = setInterval(() => {
       refresh().catch(() => {});
     }, TICKER_MS);
+    refreshNetworkStatus().catch(() => {});
+    networkTimer = setInterval(() => {
+      refreshNetworkStatus().catch(() => {});
+    }, NETWORK_MS);
+  } else {
+    renderNetworkStatus();
   }
 
   el("example").addEventListener("click", () => {

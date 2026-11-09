@@ -1001,3 +1001,104 @@ export function buildAgentCheckoutHandoff(
   ];
   return lines.join("\n");
 }
+
+/** Network banner / hold helpers (UI). Levels match Worker /v1/network-status. */
+export const NETWORK_BANNER_DISMISS_KEY = "poadomains.networkBanner.dismissedLevel";
+
+export function shouldHoldTransactions(level) {
+  return level === "down";
+}
+
+export function networkBannerCopy(level) {
+  switch (level) {
+    case "online":
+      return "🟢 PoA network Online";
+    case "degraded":
+      return "🟡 PoA network Slow — actions still work, expect delays";
+    case "down":
+      return "🔴 PoA network Down — actions held ⏸️ until the network is back";
+    default:
+      return "⚪ Checking PoA network…";
+  }
+}
+
+export function networkBannerColor(level) {
+  switch (level) {
+    case "online":
+      return "green";
+    case "degraded":
+      return "amber";
+    case "down":
+      return "red";
+    default:
+      return "grey";
+  }
+}
+
+/** Dismiss stays until the level changes. */
+export function isNetworkBannerDismissed(storage, level) {
+  try {
+    return storage?.getItem?.(NETWORK_BANNER_DISMISS_KEY) === level;
+  } catch {
+    return false;
+  }
+}
+
+export function dismissNetworkBanner(storage, level) {
+  try {
+    storage?.setItem?.(NETWORK_BANNER_DISMISS_KEY, level);
+  } catch {
+    /* private mode */
+  }
+}
+
+export function clearNetworkBannerDismiss(storage) {
+  try {
+    storage?.removeItem?.(NETWORK_BANNER_DISMISS_KEY);
+  } catch {
+    /* private mode */
+  }
+}
+
+/**
+ * Classify a probe result into online/degraded/down/checking.
+ * Requires 2 consecutive failures before Down.
+ */
+export function classifyNetworkProbe({
+  ok,
+  latencyMs = null,
+  stale = null,
+  staleAgeS = null,
+  consecutiveFailures = 0,
+  everSucceeded = false,
+  slowMs = 4000,
+  failThreshold = 2,
+}) {
+  if (!ok) {
+    if (consecutiveFailures >= failThreshold) return "down";
+    return everSucceeded ? "degraded" : "checking";
+  }
+  const slow = (latencyMs ?? 0) >= slowMs;
+  const isStale =
+    stale === true || (typeof staleAgeS === "number" && staleAgeS > 120);
+  if (slow || isStale) return "degraded";
+  return "online";
+}
+
+/** Strip user-visible "xero emoji" phrasing from a string (case-insensitive). */
+export function stripXeroEmojiPhrasing(text) {
+  if (typeof text !== "string") return text;
+  return text.replace(/xero[\s-]?emoji/gi, "").replace(/ {2,}/g, " ").trim();
+}
+
+/** True when HTML/UI source still contains a user-visible xero-emoji mention. */
+export function htmlHasVisibleXeroEmoji(html) {
+  if (typeof html !== "string") return false;
+  // Ignore CSS @font-face / font-family and font file paths.
+  const withoutCss = html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/url\([^)]*XeroEmoji[^)]*\)/gi, "")
+    .replace(/font-family:\s*["']?Xero\s*Emoji["']?/gi, "")
+    .replace(/font-family:\s*["']?XeroEmoji["']?/gi, "");
+  return /xero[\s-]?emoji/i.test(withoutCss);
+}

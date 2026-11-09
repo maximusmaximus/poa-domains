@@ -16,10 +16,15 @@
         <a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer">🛡️ GitHub Pages</a>
         <a href="https://minepoa.com" rel="noreferrer">⛏️ minepoa.com</a>
         <a href="https://poa.grok.me" rel="noreferrer">📡 poa.grok.me</a>
-        <a href="https://github.com/maximusmaximus/xeroemoji" rel="noreferrer">🎨 xeroemoji</a>
         <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer">📦 poa-domains</a>
       </nav>
     </header>
+
+    <div id="networkStatusBar" class="network-status-bar" data-level="checking" role="status" aria-live="polite" hidden>
+      <span id="networkStatusIcon" class="network-status-icon" aria-hidden="true">⚪</span>
+      <span id="networkStatusText" class="network-status-text">Checking PoA network…</span>
+      <button type="button" id="networkStatusDismiss" class="network-status-dismiss" aria-label="Dismiss network status">✕</button>
+    </div>
 
     <div id="liveTicker" class="live-ticker" role="region" aria-label="Live actions">
       <div id="liveTickerTrack" class="live-ticker-track">
@@ -45,14 +50,7 @@
       </button>
     </nav>
 
-    <nav class="view-tabs desktop-only-nav" aria-label="Views">
-      <a class="view-tab" href="#searchSection">🔍 Find</a>
-      <a class="view-tab" href="#auctionsSection">🏷️ Auctions</a>
-      <a class="view-tab" href="#marketSection">💰 For sale</a>
-      <a class="view-tab" href="#cartAnchor">🛒 Cart</a>
-      <a class="view-tab" href="#explorerSection">🧭 Explore</a>
-      <a class="view-tab" href="#handoffSection">🧾 Handoff</a>
-    </nav>
+    <a class="skip-link" href="#homeMain">Skip to content</a>
 
     <aside id="detailView" class="detail-view" hidden>
       <div class="detail-header">
@@ -185,8 +183,7 @@
             <p><a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer">https://maximusmaximus.github.io/poa-domains/</a></p>
           </article>
           <article class="card">
-            <h3>Xero Emoji · bids</h3>
-            <p><a href="https://github.com/maximusmaximus/xeroemoji" rel="noreferrer">Xero Emoji (COLRv1)</a></p>
+            <h3>🎨 Emoji bids</h3>
             <p><strong>Single emoji:</strong> 100,000 POA · 24h</p>
             <p><strong>Multi-emoji / ASCII:</strong> 1,000 POA · 1h</p>
           </article>
@@ -247,6 +244,10 @@
         <div id="ownerListings" class="cards"></div>
       </section>
     </main>
+
+    <footer id="siteFooter" class="site-footer">
+      made with ❤️ in SF by Tesselate Army | <a href="https://maxi.grok.me" rel="noreferrer">maxi.grok.me</a>
+    </footer>
 
     <button
       type="button"
