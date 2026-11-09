@@ -1,10 +1,5 @@
 #!/usr/bin/env node
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createPrivateKey, generateKeyPairSync, KeyObject } from "node:crypto";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -181,6 +176,16 @@ export async function startRegistryApp(
         metadata: makeWitness(asciiRoot),
       }).auctionId as string;
 
+      const liveAuction = submitAs("issuer", "announceAuction", {
+        name: "🌐",
+        asset: "POA",
+        reserve: "100000000",
+        openAt: baseNow + 172800,
+        expectedDeedId: null,
+        expectedVersion: 0,
+        metadata: makeWitness("🌐"),
+      }).auctionId as string;
+
       clock.overrideTime = baseNow + 86400;
       submitAs("alice", "bid", {
         auctionId: emojiAuction,
@@ -207,6 +212,15 @@ export async function startRegistryApp(
         expectedVersion: 2,
       }).deedId as string;
 
+      clock.overrideTime = baseNow + 172850;
+      submitAs("carol", "bid", {
+        auctionId: liveAuction,
+        expectedVersion: 1,
+        asset: "POA",
+        amount: "100000000",
+        beneficiary: principals.carol!,
+      });
+
       clock.overrideTime = baseNow + 172900;
       submitAs("alice", "setRecords", {
         name: asciiRoot,
@@ -214,8 +228,24 @@ export async function startRegistryApp(
         expectedVersion: 1,
         records: [
           { type: "service", url: "https://nexus.poa.domains/agent" },
-          { type: "wallet", chain: "poa-mainnet-1", address: principals.alice! },
+          {
+            type: "wallet",
+            chain: "poa-mainnet-1",
+            address: principals.alice!,
+          },
         ],
+      });
+
+      submitAs("alice", "createChildOffer", {
+        parent: asciiRoot,
+        parentDeedId: asciiDeedId,
+        expectedOwnerVersion: 1,
+        asset: "POA",
+        price: "2500000",
+        validUntil: baseNow + 800000,
+        rights: { kind: "permanent" },
+        labels: null,
+        maxUses: 10,
       });
 
       const childOfferId = submitAs("alice", "createChildOffer", {
@@ -231,7 +261,7 @@ export async function startRegistryApp(
       }).offerId as string;
 
       const childName = `🫪.${emojiRoot}`;
-      submitAs("bob", "fillChildOffer", {
+      const childDeedId = submitAs("bob", "fillChildOffer", {
         offerId: childOfferId,
         expectedVersion: 1,
         expectedGeneration: 1,
@@ -239,18 +269,16 @@ export async function startRegistryApp(
         asset: "POA",
         amount: "5000000",
         metadata: makeWitness(childName, { kind: "permanent" }, emojiDeedId),
-      });
+      }).deedId as string;
 
-      const liveAuction = submitAs("issuer", "announceAuction", {
-        name: "🌐",
+      submitAs("bob", "sellFixed", {
+        name: childName,
+        expectedDeedId: childDeedId,
+        expectedVersion: 1,
         asset: "POA",
-        reserve: "100000000",
-        openAt: baseNow + 172900 + 86400,
-        expectedDeedId: null,
-        expectedVersion: 0,
-        metadata: makeWitness("🌐"),
-      }).auctionId as string;
-      void liveAuction;
+        price: "25000000",
+        validUntil: baseNow + 800000,
+      });
     }
   } catch (err) {
     engine.close();
@@ -346,7 +374,8 @@ if (isMain) {
     process.on("SIGTERM", () => void stop());
   } catch (e) {
     process.stderr.write(
-      JSON.stringify({ code: e instanceof Fault ? e.code : "APP_ERROR" }) + "\n",
+      JSON.stringify({ code: e instanceof Fault ? e.code : "APP_ERROR" }) +
+        "\n",
     );
     process.exitCode = 1;
   }

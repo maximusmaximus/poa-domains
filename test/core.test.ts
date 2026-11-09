@@ -141,8 +141,14 @@ test("full Unicode 17 emoji canonicalization supports all 5,216 non-component se
   assert.match(EMOJI17_NORMALIZATION_HASH, /^[0-9a-f]{64}$/);
   assert.notEqual(EMOJI17_NORMALIZATION_HASH, NORMALIZATION_HASH);
   assert.equal(normalizationHashFor("reference-subset"), NORMALIZATION_HASH);
-  assert.equal(normalizationHashFor("emoji17-full"), EMOJI17_NORMALIZATION_HASH);
-  assert.equal(normalizationModeForHash(NORMALIZATION_HASH), "reference-subset");
+  assert.equal(
+    normalizationHashFor("emoji17-full"),
+    EMOJI17_NORMALIZATION_HASH,
+  );
+  assert.equal(
+    normalizationModeForHash(NORMALIZATION_HASH),
+    "reference-subset",
+  );
   assert.equal(
     normalizationModeForHash(EMOJI17_NORMALIZATION_HASH),
     "emoji17-full",
@@ -162,11 +168,11 @@ test("full Unicode 17 emoji canonicalization supports all 5,216 non-component se
     );
     assert.equal(web.normalize(a.input, emoji17Manifest), a.canonical);
   }
-  assert.equal(normalizeName("poa:👩‍🦰.🫪🫯", "emoji17-full").canonical, "👩‍🦰.🫪🫯");
   assert.equal(
-    normalizeName("❤.#⃣", "emoji17-full").canonical,
-    "❤️.#️⃣",
+    normalizeName("poa:👩‍🦰.🫪🫯", "emoji17-full").canonical,
+    "👩‍🦰.🫪🫯",
   );
+  assert.equal(normalizeName("❤.#⃣", "emoji17-full").canonical, "❤️.#️⃣");
   assert.match(nameKey("reg-1", "👩‍🦰", "emoji17-full"), /^[0-9a-f]{64}$/);
   for (const bad of [
     "🏻",
@@ -226,9 +232,7 @@ test("missing mandatory fixture policies and unsupported live assets fail closed
   }
   const c = setup().config;
   assert.equal(c.assets.POA!.kind, "local-fixture");
-  assert.throws(() =>
-    validateConfig({ ...c, reserved: ["system", "system"] }),
-  );
+  assert.throws(() => validateConfig({ ...c, reserved: ["system", "system"] }));
 });
 test("reserved list covers letters a-z, protocol/system/anti-phishing names, and 500 brand/product names", () => {
   assert.equal(SINGLE_LETTER_RESERVED.length, 26);
@@ -614,6 +618,50 @@ test("browser shared module maintains exact canonical, normalization, parser, an
     web.instructions(webBody, intentId(engineBody)),
     /submit_intent/,
   );
+  const inspectedRoot = web.inspectName("poa:ALPHA", manifest);
+  assert.equal(inspectedRoot.name, "alpha");
+  assert.equal(inspectedRoot.kind, "root");
+  assert.equal(inspectedRoot.tier, "standard");
+  assert.equal(inspectedRoot.tokenCount, 5);
+  const inspectedPremium = web.inspectName("🌐", emoji17Manifest);
+  assert.equal(inspectedPremium.name, "🌐");
+  assert.equal(inspectedPremium.kind, "root");
+  assert.equal(inspectedPremium.tier, "premium");
+  assert.equal(inspectedPremium.tokenCount, 1);
+  assert.equal(
+    web.minimumNextBid("1000", {
+      kind: "eos10Percent",
+      bps: 1000,
+      minUnit: "1",
+    }),
+    "1101",
+  );
+  const promptText = web.buildAgentCartPrompt(
+    [
+      {
+        name: "quantum",
+        action: "open_and_bid",
+        amount: "100",
+        tier: "standard",
+        note: "Open root auction & place opening bid",
+      },
+      {
+        name: "🌐",
+        action: "bid",
+        amount: "1321",
+        tier: "premium",
+        note: "Place ascending bid on live auction",
+      },
+    ],
+    cap,
+    c.alice.id,
+    "http://127.0.0.1:8787",
+    { liveBackend: true },
+  );
+  assert.match(promptText, /POA DOMAINS REGISTRY CART/);
+  assert.match(promptText, /quantum/);
+  assert.match(promptText, /1321/);
+  assert.match(promptText, /submit_intent/);
 });
 test("launchable full-stack registry app initializes mainnet profile, serves Unicode 17 emoji domains, and replays from journal across restarts", async () => {
   const dir = mkdtempSync(join(tmpdir(), "poa-app-test-"));
@@ -630,6 +678,11 @@ test("launchable full-stack registry app initializes mainnet profile, serves Uni
       const cap: any = await capRes.json();
       assert.equal(cap.emojiAliases, 5216);
       assert.equal(cap.chainId, "poa-mainnet-1");
+      assert.equal(cap.reservedCount, 655);
+      assert.ok(
+        typeof cap.reservedCatalog === "string" &&
+          cap.reservedCatalog.split(",").includes("google"),
+      );
       const resolveEmoji = await fetch(
         app1.url + "/v1/resolve?name=" + encodeURIComponent("🫪.👩‍🦰"),
       );
@@ -643,8 +696,15 @@ test("launchable full-stack registry app initializes mainnet profile, serves Uni
       const resolvedNexus: any = await resolveAscii.json();
       assert.equal(resolvedNexus.deed.owner, app1.principals.alice);
       assert.equal(resolvedNexus.deed.records.length, 2);
+      const snap1 = app1.engine.snapshot();
+      assert.equal(
+        snap1.auctions[snap1.names["🌐"]!.auctionId!]?.high?.amount,
+        "100000000",
+      );
+      assert.ok(Object.keys(snap1.offers).length >= 2);
+      assert.ok(Object.keys(snap1.bids).length >= 3);
       stateHash1 = app1.engine.stateHash();
-      sequence1 = app1.engine.snapshot().sequence;
+      sequence1 = snap1.sequence;
       assert.ok(sequence1 > 0);
     } finally {
       await app1.close();

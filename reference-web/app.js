@@ -5,14 +5,21 @@ import {
   canonical,
   parsePublicJSON,
   safeObject,
+  inspectName,
+  minimumNextBid,
+  buildAgentCartPrompt,
 } from "./shared.js";
 const el = (id) => document.getElementById(id);
 let cap,
   base = "",
   copy = "",
   demo = false,
+  configMode = "local-reference-only",
   examples = {},
-  details = {};
+  details = {},
+  latestState = null,
+  reservedSet = new Set(),
+  cart = [];
 let generation = 0;
 function clearHandoff() {
   generation++;
@@ -60,8 +67,364 @@ function person(id) {
   );
   return role ? "Fixture " + role : id.slice(0, 18) + "…";
 }
+
+function addToCart(item) {
+  const existingIdx = cart.findIndex(
+    (x) => x.name === item.name && x.action === item.action,
+  );
+  if (existingIdx >= 0) {
+    cart[existingIdx] = item;
+  } else {
+    cart.push(item);
+  }
+  renderCart();
+}
+
+function renderCart() {
+  el("cartCount").textContent = String(cart.length);
+  el("clearCart").disabled = cart.length === 0;
+  el("copyCartPrompt").disabled = cart.length === 0;
+  el("cartStatus").textContent = "";
+  const listNode = el("cartList");
+  listNode.replaceChildren();
+  if (!cart.length) {
+    el("cartPrompt").textContent =
+      "Add one or more domains from availability search, live auctions, or standing offers to generate your agent prompt.";
+    return;
+  }
+  cart.forEach((item, index) => {
+    const card = add(listNode, "div", "", "card");
+    add(card, "h4", item.name);
+    add(
+      card,
+      "p",
+      `${item.action} · ${item.tier} ${item.isRoot ? "root" : "child"}`,
+      "badge",
+    );
+    add(card, "p", item.summary);
+    const controls = add(card, "div", "", "inline-controls");
+    const amountInput = document.createElement("input");
+    amountInput.value = item.amount;
+    amountInput.setAttribute("inputmode", "numeric");
+    amountInput.setAttribute(
+      "aria-label",
+      "Amount or max bid for " + item.name,
+    );
+    amountInput.addEventListener("input", () => {
+      if (/^(0|[1-9][0-9]{0,38})$/.test(amountInput.value.trim())) {
+        item.amount = amountInput.value.trim();
+        if (Object.hasOwn(item.params, "amount"))
+          item.params.amount = item.amount;
+        if (Object.hasOwn(item.params, "reserve"))
+          item.params.reserve = item.amount;
+        updatePromptText();
+      }
+    });
+    const removeBtn = add(controls, "button", "Remove", "secondary small");
+    removeBtn.type = "button";
+    removeBtn.addEventListener("click", () => {
+      cart.splice(index, 1);
+      renderCart();
+    });
+    controls.prepend(amountInput);
+  });
+  updatePromptText();
+}
+
+function updatePromptText() {
+  if (!cart.length || !cap) return;
+  const endpoint = demo ? "http://127.0.0.1:8787" : base || location.origin;
+  el("cartPrompt").textContent = buildAgentCartPrompt(
+    cart,
+    cap,
+    el("cartSigner").value.trim(),
+    endpoint,
+    configMode,
+  );
+}
+
+function runSearch(rawQuery) {
+  const container = el("searchResult");
+  container.replaceChildren();
+  const q = (rawQuery ?? "").trim();
+  if (!q || !cap || !latestState) return;
+  let info;
+  try {
+    info = inspectName(q, cap.emojiManifest);
+  } catch {
+    const card = add(container, "div", "", "card");
+    add(card, "h4", q);
+    add(card, "p", "INVALID DOMAIN FORMAT", "badge-warn");
+    add(
+      card,
+      "p",
+      "Domains must be 1–2 labels (root or child.root), 1–32 tokens per label, using lowercase ASCII a-z0-9 or supported Unicode 17 emoji sequences without hyphens or standalone skin/hair components.",
+    );
+    return;
+  }
+  const s = latestState;
+  const name = info.canonical;
+  const card = add(container, "div", "", "card");
+  add(card, "h4", name);
+  const tokenDesc = info.tokenCounts.join(" + ") + " token(s)";
+  add(
+    card,
+    "p",
+    `Canonical: ${name} · ${info.isRoot ? "Root domain" : "Direct child of " + info.parent} · ${tokenDesc} · Tier: ${info.tier.toUpperCase()}`,
+  );
+
+  if (info.isRoot && reservedSet.has(name)) {
+    add(card, "p", "RESERVED ROOT DOMAIN (PROTECTED)", "badge-warn");
+    add(
+      card,
+      "p",
+      `This root domain is part of the ${reservedSet.size}-name reservation catalog (single-letter a–z, core PoA protocol/system terms, or top 500 global brands & products) and cannot be auctioned.`,
+    );
+    return;
+  }
+
+  const entry = s.names[name];
+  const liveAuction =
+    entry?.auctionId && s.auctions[entry.auctionId]?.status === "live"
+      ? s.auctions[entry.auctionId]
+      : Object.values(s.auctions).find(
+          (a) => a.name === name && a.status === "live",
+        );
+
+  if (liveAuction) {
+    const minBid = liveAuction.high
+      ? minimumNextBid(liveAuction.high.amount, cap.increment)
+      : liveAuction.reserve;
+    add(card, "p", "IN LIVE ASCENDING AUCTION", "badge");
+    add(
+      card,
+      "p",
+      `Auction ID: ${liveAuction.id.slice(0, 18)}… · Version ${liveAuction.version} · Reserve: ${liveAuction.reserve} ${liveAuction.asset} · ${liveAuction.high ? "Current high bid: " + liveAuction.high.amount + " by " + person(liveAuction.high.payer) : "No bids yet"}`,
+    );
+    add(
+      card,
+      "p",
+      `Minimum next valid bid: ${minBid} ${liveAuction.asset} base units.`,
+      "badge-ok",
+    );
+    const controls = add(card, "div", "", "inline-controls");
+    const bidInput = document.createElement("input");
+    bidInput.value = minBid;
+    bidInput.setAttribute("inputmode", "numeric");
+    controls.append(bidInput);
+    const btn = add(controls, "button", "Add bid to agent cart", "small");
+    btn.id = "addToCartBtn";
+    btn.type = "button";
+    btn.addEventListener("click", () => {
+      const chosen = /^(0|[1-9][0-9]{0,38})$/.test(bidInput.value.trim())
+        ? bidInput.value.trim()
+        : minBid;
+      addToCart({
+        name,
+        tier: info.tier,
+        isRoot: info.isRoot,
+        action: "bid",
+        asset: liveAuction.asset,
+        amount: chosen,
+        summary: `Place ascending bid of ${chosen} ${liveAuction.asset} on live auction ${liveAuction.id.slice(0, 16)}… (expectedVersion=${liveAuction.version}, minValidBid=${minBid}).`,
+        params: {
+          auctionId: liveAuction.id,
+          expectedVersion: liveAuction.version,
+          asset: liveAuction.asset,
+          amount: chosen,
+          beneficiary:
+            el("cartSigner").value.trim() || "<YOUR_BENEFICIARY_PRINCIPAL>",
+        },
+      });
+    });
+    return;
+  }
+
+  if (entry?.activeId && s.deeds[entry.activeId]) {
+    const d = s.deeds[entry.activeId];
+    add(card, "p", `OWNED (${d.rights.kind.toUpperCase()} DEED)`, "badge");
+    add(
+      card,
+      "p",
+      `Owner: ${person(d.owner)} · Generation ${d.generation} · Owner version ${d.ownerVersion} · Deed version ${d.version}`,
+    );
+    const resaleOffer = Object.values(s.offers).find(
+      (o) =>
+        o.kind === "resale" &&
+        o.parentId === d.id &&
+        !o.cancelled &&
+        o.uses < o.maxUses &&
+        s.time < o.validUntil,
+    );
+    if (resaleOffer) {
+      add(
+        card,
+        "p",
+        `Active fixed-price resale listing: ${resaleOffer.price} ${resaleOffer.asset} (valid until second ${resaleOffer.validUntil})`,
+        "badge-ok",
+      );
+      const btn = add(
+        card,
+        "button",
+        `Add instant buy (${resaleOffer.price} ${resaleOffer.asset}) to agent cart`,
+        "small",
+      );
+      btn.id = "addToCartBtn";
+      btn.type = "button";
+      btn.addEventListener("click", () => {
+        addToCart({
+          name,
+          tier: info.tier,
+          isRoot: info.isRoot,
+          action: "buyFixed",
+          asset: resaleOffer.asset,
+          amount: resaleOffer.price,
+          summary: `Buy ${name} at fixed resale price ${resaleOffer.price} ${resaleOffer.asset} via offer ${resaleOffer.id.slice(0, 16)}… (expectedVersion=${resaleOffer.version}).`,
+          params: {
+            offerId: resaleOffer.id,
+            expectedVersion: resaleOffer.version,
+            asset: resaleOffer.asset,
+            amount: resaleOffer.price,
+          },
+        });
+      });
+    }
+    return;
+  }
+
+  if (!info.isRoot) {
+    const parentEntry = s.names[info.parent];
+    const parentDeed = parentEntry?.activeId
+      ? s.deeds[parentEntry.activeId]
+      : null;
+    const childOffer = parentDeed
+      ? Object.values(s.offers).find(
+          (o) =>
+            o.kind === "child" &&
+            o.parentId === parentDeed.id &&
+            !o.cancelled &&
+            o.uses < o.maxUses &&
+            s.time < o.validUntil &&
+            (o.labels === null || o.labels.includes(info.childLabel)),
+        )
+      : null;
+    if (childOffer) {
+      const nextGen = (entry?.generation ?? 0) + 1;
+      add(
+        card,
+        "p",
+        `AVAILABLE VIA STANDING CHILD OFFER (${childOffer.price} ${childOffer.asset})`,
+        "badge-ok",
+      );
+      add(
+        card,
+        "p",
+        `Parent ${info.parent} has an open ${childOffer.rights.kind} child offer (${childOffer.uses}/${childOffer.maxUses} used, valid until ${childOffer.validUntil}).`,
+      );
+      const btn = add(
+        card,
+        "button",
+        `Add child purchase (${childOffer.price} ${childOffer.asset}) to agent cart`,
+        "small",
+      );
+      btn.id = "addToCartBtn";
+      btn.type = "button";
+      btn.addEventListener("click", () => {
+        addToCart({
+          name,
+          tier: info.tier,
+          isRoot: false,
+          action: "fillChildOffer",
+          asset: childOffer.asset,
+          amount: childOffer.price,
+          summary: `Mint child domain ${name} via standing parent offer ${childOffer.id.slice(0, 16)}… for ${childOffer.price} ${childOffer.asset} (expectedGeneration=${nextGen}).`,
+          params: {
+            offerId: childOffer.id,
+            expectedVersion: childOffer.version,
+            expectedGeneration: nextGen,
+            label: info.childLabel,
+            asset: childOffer.asset,
+            amount: childOffer.price,
+            metadata: {
+              cid: "<COMPUTED_CIDV1_SHA256>",
+              document: {
+                schema: "poa-domains.metadata.v1",
+                name,
+                rightsHash: "<PARENT_OFFER_RIGHTS_HASH>",
+                description: `Child domain ${name}`,
+              },
+            },
+          },
+        });
+      });
+    } else {
+      add(card, "p", "UNMINTED CHILD DOMAIN (NO OPEN OFFER)", "badge");
+      add(
+        card,
+        "p",
+        parentDeed
+          ? `Parent root "${info.parent}" is owned by ${person(parentDeed.owner)}, but has no active standing child offer matching label "${info.childLabel}".`
+          : `Parent root "${info.parent}" is not yet minted. Acquire the root domain first before minting "${name}".`,
+      );
+    }
+    return;
+  }
+
+  const poaPolicy = cap.assets?.POA ?? {
+    premiumReserve: "1000",
+    standardReserve: "100",
+  };
+  const reserve =
+    info.tier === "premium"
+      ? poaPolicy.premiumReserve
+      : poaPolicy.standardReserve;
+  const windowSec = info.tier === "premium" ? 86400 : 3600;
+  add(card, "p", "AVAILABLE ROOT DOMAIN", "badge-ok");
+  add(
+    card,
+    "p",
+    `Unclaimed ${info.tier} root domain. Opening auction reserve: ${reserve} POA base units (${windowSec}s minimum window + ${windowSec}s quiet period).`,
+  );
+  const controls = add(card, "div", "", "inline-controls");
+  const maxBidInput = document.createElement("input");
+  maxBidInput.value = reserve;
+  maxBidInput.setAttribute("inputmode", "numeric");
+  controls.append(maxBidInput);
+  const btn = add(
+    controls,
+    "button",
+    "Add to agent cart (announce + bid)",
+    "small",
+  );
+  btn.id = "addToCartBtn";
+  btn.type = "button";
+  btn.addEventListener("click", () => {
+    const chosen = /^(0|[1-9][0-9]{0,38})$/.test(maxBidInput.value.trim())
+      ? maxBidInput.value.trim()
+      : reserve;
+    addToCart({
+      name,
+      tier: info.tier,
+      isRoot: true,
+      action: "announceAuction+bid",
+      asset: "POA",
+      amount: chosen,
+      summary: `Request root auction announcement for "${name}" (reserve=${reserve} POA) and place opening bid up to maxTotal=${chosen} POA.`,
+      params: {
+        name,
+        asset: "POA",
+        reserve,
+        maxBid: chosen,
+        expectedDeedId: null,
+        expectedVersion: 0,
+      },
+    });
+  });
+}
+
 function render(payload) {
   const s = payload.state;
+  latestState = s;
   el("state").textContent = JSON.stringify(payload, null, 2);
   el("freshness").textContent =
     (demo ? "STATIC SYNTHETIC DEMO · " : "LOCAL COMMITTED STATE · ") +
@@ -75,8 +438,27 @@ function render(payload) {
         timeStyle: "short",
       }).format(new Date(details.generatedAt)) +
       " Pacific time.";
+
   const names = Object.values(s.names).filter((n) => n.activeId),
-    auctions = Object.values(s.auctions);
+    auctions = Object.values(s.auctions),
+    offers = Object.values(s.offers ?? {}),
+    bids = Object.values(s.bids ?? {}),
+    receipts = Object.values(s.receipts ?? {});
+
+  const rootDeeds = names.filter((n) => !s.deeds[n.activeId].parentId).length;
+  const childDeeds = names.length - rootDeeds;
+  const activeOffers = offers.filter(
+    (o) => !o.cancelled && o.uses < o.maxUses && s.time < o.validUntil,
+  );
+  let settledVolume = 0n;
+  for (const b of bids) {
+    if (b.status === "won" || b.status === "high")
+      settledVolume += BigInt(b.amount);
+  }
+  for (const o of offers) {
+    if (o.uses > 0) settledVolume += BigInt(o.price) * BigInt(o.uses);
+  }
+
   el("stats").replaceChildren();
   for (const [value, label] of [
     [names.length, "owned fixture names"],
@@ -85,11 +467,26 @@ function render(payload) {
       "unsettled fixture auctions",
     ],
     [Object.keys(cap.actions).length, "implemented handoff actions"],
+    [`${rootDeeds} / ${childDeeds}`, "root / child active deeds"],
+    [
+      `${activeOffers.length} / ${offers.length}`,
+      "active / total standing offers",
+    ],
+    [
+      `${bids.length} / ${receipts.length}`,
+      "recorded bids / committed receipts",
+    ],
+    [settledVolume.toString(), "POA base units settled & bid"],
+    [
+      `${cap.emojiAliases ?? 140} / ${reservedSet.size || (cap.reservedCount ?? 655)}`,
+      "emoji sequences / reserved roots",
+    ],
   ]) {
     const box = add(el("stats"), "div", "");
     add(box, "strong", String(value));
     add(box, "span", label);
   }
+
   el("names").replaceChildren();
   for (const n of names) {
     const d = s.deeds[n.activeId],
@@ -126,6 +523,7 @@ function render(payload) {
   }
   if (!names.length)
     add(el("names"), "p", "No owned names in this committed snapshot.");
+
   el("auctions").replaceChildren();
   for (const a of auctions) {
     const card = add(el("auctions"), "article", "", "card");
@@ -154,10 +552,212 @@ function render(payload) {
       "p",
       `Minimum window ${a.window}s + quiet ${a.quiet}s; eligibility at fixture second ${close}.`,
     );
+    if (a.status === "live") {
+      const nextMin = a.high
+        ? minimumNextBid(a.high.amount, cap.increment)
+        : a.reserve;
+      add(
+        card,
+        "p",
+        `Minimum next bid: ${nextMin} ${a.asset} (version ${a.version})`,
+        "badge-ok",
+      );
+      const btn = add(
+        card,
+        "button",
+        `Add bid (${nextMin} ${a.asset}) to cart`,
+        "small",
+      );
+      btn.type = "button";
+      btn.addEventListener("click", () => {
+        addToCart({
+          name: a.name,
+          tier: a.window === 86400 ? "premium" : "standard",
+          isRoot: true,
+          action: "bid",
+          asset: a.asset,
+          amount: nextMin,
+          summary: `Place ascending bid of ${nextMin} ${a.asset} on auction ${a.id.slice(0, 16)}… for "${a.name}" (expectedVersion=${a.version}).`,
+          params: {
+            auctionId: a.id,
+            expectedVersion: a.version,
+            asset: a.asset,
+            amount: nextMin,
+            beneficiary:
+              el("cartSigner").value.trim() || "<YOUR_BENEFICIARY_PRINCIPAL>",
+          },
+        });
+      });
+    }
+  }
+
+  el("offers").replaceChildren();
+  for (const o of offers) {
+    const card = add(el("offers"), "div", "", "card");
+    const targetDeed = s.deeds[o.parentId];
+    const targetName = targetDeed ? targetDeed.name : o.parentId.slice(0, 14);
+    const active = !o.cancelled && o.uses < o.maxUses && s.time < o.validUntil;
+    const statusText = o.cancelled
+      ? "cancelled"
+      : o.uses >= o.maxUses
+        ? "filled"
+        : s.time >= o.validUntil
+          ? "expired"
+          : "active";
+    add(
+      card,
+      "h4",
+      o.kind === "child"
+        ? `Child offer on .${targetName}`
+        : `Resale of ${targetName}`,
+    );
+    add(
+      card,
+      "p",
+      `${o.kind} offer · ${statusText} · price ${o.price} ${o.asset}`,
+      active ? "badge-ok" : "badge",
+    );
+    add(
+      card,
+      "p",
+      `Seller: ${person(o.owner)} · Uses: ${o.uses}/${o.maxUses} · Valid until second ${o.validUntil}`,
+    );
+    if (o.kind === "child" && o.rights) {
+      add(
+        card,
+        "p",
+        `Child rights: ${o.rights.kind} · Allowed labels: ${o.labels ? o.labels.join(", ") : "any valid label"}`,
+      );
+    }
+    if (active) {
+      const sampleLabel =
+        o.kind === "child"
+          ? o.labels && o.labels.length
+            ? o.labels[0]
+            : "sub"
+          : null;
+      const fullTarget =
+        o.kind === "child" ? `${sampleLabel}.${targetName}` : targetName;
+      const btn = add(
+        card,
+        "button",
+        `Add ${fullTarget} (${o.price} ${o.asset}) to cart`,
+        "small",
+      );
+      btn.type = "button";
+      btn.addEventListener("click", () => {
+        addToCart({
+          name: fullTarget,
+          tier: "standard",
+          isRoot: o.kind !== "child",
+          action: o.kind === "child" ? "fillChildOffer" : "buyFixed",
+          asset: o.asset,
+          amount: o.price,
+          summary:
+            o.kind === "child"
+              ? `Fill standing child offer ${o.id.slice(0, 16)}… to mint "${fullTarget}" for ${o.price} ${o.asset}.`
+              : `Buy "${fullTarget}" at fixed resale price ${o.price} ${o.asset} via offer ${o.id.slice(0, 16)}….`,
+          params:
+            o.kind === "child"
+              ? {
+                  offerId: o.id,
+                  expectedVersion: o.version,
+                  expectedGeneration:
+                    (s.names[fullTarget]?.generation ?? 0) + 1,
+                  label: sampleLabel,
+                  asset: o.asset,
+                  amount: o.price,
+                }
+              : {
+                  offerId: o.id,
+                  expectedVersion: o.version,
+                  asset: o.asset,
+                  amount: o.price,
+                },
+        });
+      });
+    }
+  }
+  if (!offers.length)
+    add(el("offers"), "p", "No standing child or resale offers recorded.");
+
+  el("history").replaceChildren();
+  const sortedBids = [...bids].sort((a, b) => b.sequence - a.sequence);
+  for (const b of sortedBids) {
+    const a = s.auctions[b.auctionId];
+    const domainName = a ? a.name : b.auctionId.slice(0, 14);
+    const card = add(el("history"), "div", "", "card");
+    add(card, "h4", `${domainName} — ${b.amount} ${a ? a.asset : "POA"}`);
+    add(
+      card,
+      "p",
+      `Bid status: ${b.status.toUpperCase()} · Sequence #${b.sequence} · Second ${b.at}`,
+      b.status === "won" || b.status === "high" ? "badge-ok" : "badge",
+    );
+    add(
+      card,
+      "p",
+      `Payer: ${person(b.payer)} · Beneficiary: ${person(b.beneficiary)}`,
+    );
+  }
+  const purchaseReceipts = [...receipts]
+    .filter(
+      (r) =>
+        r.status === "succeeded" &&
+        r.result &&
+        (r.result.deedId || r.result.offerId || r.result.recordsVersion),
+    )
+    .sort((a, b) => b.sequence - a.sequence);
+  for (const r of purchaseReceipts) {
+    const deed = r.result.deedId ? s.deeds[r.result.deedId] : null;
+    const label = r.result.name
+      ? `Child purchase: ${r.result.name}`
+      : deed
+        ? `Deed settled: ${deed.name}`
+        : r.result.offerId
+          ? `Offer published`
+          : `Records updated`;
+    const card = add(el("history"), "div", "", "card");
+    add(card, "h4", label);
+    add(
+      card,
+      "p",
+      `Receipt #${r.sequence} · Second ${r.time} · Status: ${r.status}`,
+      "badge",
+    );
+    add(card, "p", `Signer: ${person(r.signer)} · Request: ${r.requestId}`);
+    add(card, "code", `intentId: ${r.intentId.slice(0, 24)}…`);
+  }
+  if (!sortedBids.length && !purchaseReceipts.length)
+    add(el("history"), "p", "No bids or purchases recorded yet.");
+
+  el("balances").replaceChildren();
+  for (const c of Object.values(s.credits ?? {})) {
+    if (c.amount === "0") continue;
+    const card = add(el("balances"), "div", "", "card");
+    const a = s.auctions[c.auctionId];
+    add(card, "h4", `Refund credit: ${c.amount} ${c.asset}`);
+    add(
+      card,
+      "p",
+      `Withdrawable by ${person(c.payer)} from auction ${a ? a.name : c.auctionId.slice(0, 12)} (credit version ${c.version})`,
+      "badge-ok",
+    );
+  }
+  for (const [who, wallet] of Object.entries(s.balances ?? {})) {
+    const card = add(el("balances"), "div", "", "card");
+    add(card, "h4", person(who));
+    const entries = Object.entries(wallet)
+      .map(([asset, amt]) => `${amt} ${asset}`)
+      .join(" · ");
+    add(card, "p", entries, "record");
+    add(card, "code", who);
   }
 }
+
 try {
   const config = await json(new URL("./config.json", location.href));
+  configMode = config.mode;
   demo = config.mode === "static-synthetic-demo";
   let read;
   if (demo) {
@@ -194,6 +794,9 @@ try {
   }
   if (cap.livePoA !== false)
     throw Error("Only local reference profile is supported");
+  if (typeof cap.reservedCatalog === "string" && cap.reservedCatalog.length) {
+    reservedSet = new Set(cap.reservedCatalog.split(",").filter(Boolean));
+  }
   for (const action of Object.keys(cap.actions)) {
     const option = document.createElement("option");
     option.value = action;
@@ -214,6 +817,40 @@ try {
     }),
   );
   await refresh();
+
+  el("searchBtn").addEventListener("click", () =>
+    runSearch(el("searchInput").value),
+  );
+  el("searchInput").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      runSearch(el("searchInput").value);
+    }
+  });
+  for (const pill of document.querySelectorAll(".pill")) {
+    pill.addEventListener("click", () => {
+      const q = pill.getAttribute("data-query") ?? "";
+      el("searchInput").value = q;
+      runSearch(q);
+    });
+  }
+  el("cartSigner").addEventListener("input", updatePromptText);
+  el("clearCart").addEventListener("click", () => {
+    cart = [];
+    renderCart();
+  });
+  el("copyCartPrompt").addEventListener("click", async () => {
+    const text = el("cartPrompt").textContent;
+    if (!text || !cart.length) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      el("cartStatus").textContent = "Agent prompt copied to clipboard.";
+    } catch {
+      el("cartStatus").textContent =
+        "Clipboard unavailable; select and copy the prompt box manually.";
+    }
+  });
+
   el("example").addEventListener("click", () => {
     const x = examples[el("action").value];
     if (!x) return;

@@ -117,6 +117,30 @@ export async function browserSmoke(
     await page.locator("button[type=submit]").click();
     assert.equal(await page.locator("#body").innerText(), "");
     checks.push("UI rejects duplicate keys and private credential fields");
+    await page.locator("#searchInput").fill("quantum");
+    await page.locator("#searchBtn").click();
+    assert.match(
+      await page.locator("#searchResult").innerText(),
+      /AVAILABLE ROOT/,
+    );
+    await page.locator("#addToCartBtn").click();
+    assert.equal(await page.locator("#cartCount").innerText(), "1");
+    assert.match(
+      await page.locator("#cartPrompt").innerText(),
+      /POA DOMAINS REGISTRY CART/,
+    );
+    assert.match(await page.locator("#cartPrompt").innerText(), /quantum/);
+    await page.locator("#searchInput").fill("google");
+    await page.locator("#searchBtn").click();
+    assert.match(
+      await page.locator("#searchResult").innerText(),
+      /RESERVED ROOT/,
+    );
+    assert.ok((await page.locator("#history .card").count()) > 0);
+    assert.ok((await page.locator("#balances .card").count()) > 0);
+    checks.push(
+      "UI availability search, reserved detection, Agent Bid Cart prompt generation, and purchase/bid history verified",
+    );
     assert.deepEqual(writes, []);
     assert.deepEqual(external, []);
     assert.deepEqual(errors, []);

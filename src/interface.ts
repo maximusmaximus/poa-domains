@@ -26,6 +26,8 @@ export function capabilities(e: Engine): any {
     emojiAliases:
       mode === "emoji17-full" ? EMOJI17_RECORD_COUNT : manifest.aliases.length,
     emojiManifest: activeManifest,
+    reservedCount: e.config.reserved.length,
+    reservedCatalog: e.config.reserved.join(","),
     assets: e.config.assets,
     increment: e.config.increment,
     feeBps: e.config.feeBps,

@@ -68,6 +68,25 @@ export async function verifyReferenceStaticPage(
     checks.push(
       "owned names, protected leased/permanent children, records and ascending auctions render from snapshot",
     );
+    assert.ok((await page.locator("#offers .card").count()) > 0);
+    assert.ok((await page.locator("#history .card").count()) > 0);
+    assert.ok((await page.locator("#balances .card").count()) > 0);
+    await page.locator("#searchInput").fill("orbit");
+    await page.locator("#searchBtn").click();
+    assert.match(
+      await page.locator("#searchResult").innerText(),
+      /IN LIVE ASCENDING AUCTION/,
+    );
+    await page.locator("#addToCartBtn").click();
+    assert.equal(await page.locator("#cartCount").innerText(), "1");
+    assert.match(
+      await page.locator("#cartPrompt").innerText(),
+      /STATIC SYNTHETIC DEMO CART/,
+    );
+    assert.match(await page.locator("#cartPrompt").innerText(), /orbit/);
+    checks.push(
+      "standing offers, purchase/bid history, escrow balances, availability search, and Agent Cart prompt render from snapshot",
+    );
     const actions = await page
       .locator("#action option")
       .evaluateAll((nodes) => nodes.map((n) => (n as HTMLOptionElement).value));
