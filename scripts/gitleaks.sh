@@ -5,8 +5,6 @@ version=8.30.1
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 base="https://github.com/gitleaks/gitleaks/releases/download/v${version}"
-# Public read-through mirror of the same GitHub release asset (used only when
-# github.com/releases returns sustained 504). SHA256 verification is unchanged.
 mirror_base="https://ghproxy.net/https://github.com/gitleaks/gitleaks/releases/download/v${version}"
 os=$(uname -s)
 arch=$(uname -m)
@@ -19,7 +17,20 @@ case "$os:$arch" in
   *) echo "Unsupported platform: $os:$arch" >&2; exit 1 ;;
 esac
 
-# Max's resilient curl flags; outer backoff + official-then-mirror URL list.
+# Prefer GitHub API asset download when authenticated (avoids releases CDN 504s).
+api_get() {
+  local name="$1" out="$2"
+  command -v gh >/dev/null 2>&1 || return 1
+  [ -n "${GITHUB_TOKEN:-}${GH_TOKEN:-}" ] || return 1
+  local id
+  id=$(gh api "repos/gitleaks/gitleaks/releases/tags/v${version}" \
+    --jq ".assets[] | select(.name==\"${name}\") | .id") || return 1
+  [ -n "$id" ] || return 1
+  echo "gitleaks: fetching $name via GitHub API asset $id" >&2
+  gh api -H "Accept: application/octet-stream" \
+    "/repos/gitleaks/gitleaks/releases/assets/${id}" > "$out"
+}
+
 curl_get() {
   local url="$1" out="$2"
   curl --fail --silent --show-error --location \
@@ -32,13 +43,12 @@ download() {
   local name="$1" out="$2"
   local attempt=1
   local max_attempts=8
-  local urls=(
-    "$base/$name"
-    "$mirror_base/$name"
-  )
   while [ "$attempt" -le "$max_attempts" ]; do
+    if api_get "$name" "$out"; then
+      return 0
+    fi
     local url
-    for url in "${urls[@]}"; do
+    for url in "$base/$name" "$mirror_base/$name"; do
       echo "gitleaks: fetching $name from $url (attempt $attempt)" >&2
       if curl_get "$url" "$out"; then
         return 0
@@ -48,7 +58,7 @@ download() {
     sleep $((5 * attempt))
     attempt=$((attempt + 1))
   done
-  echo "Failed to download $name after $max_attempts attempts across official + mirror" >&2
+  echo "Failed to download $name after $max_attempts attempts" >&2
   return 1
 }
 
