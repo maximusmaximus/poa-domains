@@ -77,6 +77,13 @@ export async function runBackup(env: Env, kind: BackupKind): Promise<BackupResul
 async function admin(request: Request, env: Env, u: URL): Promise<Response> {
   if (request.method !== "POST") return json(405, { code: "METHOD_NOT_ALLOWED" });
   need(!request.headers.has("origin") && !request.headers.has("sec-fetch-site"), "BROWSER_WRITES_DISABLED");
+  if (u.pathname === "/v1/admin/escrow") {
+    const expected = env.ESCROW_ADMIN_TOKEN ?? "", auth = request.headers.get("authorization") ?? "";
+    if (String(env.POA_ESCROW_ENABLED) !== "true" || expected.length < 32 || !auth.startsWith("Bearer ") || !(await tokenMatches(auth.slice(7), expected)))
+      return json(404, { code: "NOT_FOUND" });
+    const reply = await env.REGISTRY.getByName(SINGLETON).escrowAdmin(await readPacket(request));
+    return new Response(reply.jsonText, { status: reply.status, headers: { ...SECURITY, "content-type": "application/json" } });
+  }
   if (u.pathname === "/v1/admin/backup") {
     const expected = env.BACKUP_ADMIN_TOKEN ?? "";
     const auth = request.headers.get("authorization") ?? "";
@@ -90,8 +97,8 @@ async function admin(request: Request, env: Env, u: URL): Promise<Response> {
     const target = u.searchParams.get("target") ?? "";
     need(RESTORE_TARGET.test(target) && target !== SINGLETON, "RESTORE_TARGET");
     need(request.headers.get("content-type") === "application/json", "CONTENT_TYPE");
-    const body = JSON.parse(await readLimited(request, 16 * 1024 * 1024)) as { backup: string; keys: Record<string, string> };
-    const result = await env.REGISTRY.getByName(target).restoreBackup(body.backup, body.keys);
+    const body = JSON.parse(await readLimited(request, 16 * 1024 * 1024)) as { backup: string; keys: Record<string, string>; escrow?: import("./registry.js").EscrowExport };
+    const result = await env.REGISTRY.getByName(target).restoreBackup(body.backup, body.keys, body.escrow);
     return json(200, { target, ...result });
   }
   return json(404, { code: "NOT_FOUND" });

@@ -1,0 +1,10 @@
+{
+  "name":"poadomains-escrow-local-tests",
+  "main":"escrow-runtime.ts",
+  "compatibility_date":"2026-11-08",
+  "compatibility_flags":["nodejs_compat"],
+  "workers_dev":false,
+  "alias":{"#poa-unicode-data":"../unicode-data.ts"},
+  "durable_objects":{"bindings":[{"name":"TEST","class_name":"EscrowHarness"}]},
+  "migrations":[{"tag":"local-test-v1","new_sqlite_classes":["EscrowHarness"]}]
+}

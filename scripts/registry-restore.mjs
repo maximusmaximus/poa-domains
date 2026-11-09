@@ -43,7 +43,7 @@ export async function restoreBackup({ file, key, privateKeyPath, expectSha256, p
     const backup = await codec.verifyBackup(JSON.parse(text));
     const der = new Uint8Array(createPrivateKey(readFileSync(privateKeyPath ?? join(homedir(), ".config/poadomains-backup/backup-decrypt-rsa4096.pem")))
       .export({ type: "pkcs8", format: "der" }));
-    const { keys } = await codec.decryptSecrets(backup.secrets, der, codec.secretAad(backup.registry.policyHash, backup.head));
+    const { keys, escrow } = await codec.decryptSecrets(backup.secrets, der, codec.secretAad(backup.registry.policyHash, backup.head));
 
     const persist = join(work, "state"), base = `http://127.0.0.1:${port}`;
     const log = openSync(join(work, "wrangler.log"), "w", 0o600);
@@ -58,12 +58,13 @@ export async function restoreBackup({ file, key, privateKeyPath, expectSha256, p
     }
     const target = `restore-${new Date().toISOString().toLowerCase().replace(/[^0-9a-z]/g, "-").slice(0, 40)}`;
     const res = await fetch(`${base}/v1/admin/restore?target=${target}`, { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ backup: text, keys }), signal: AbortSignal.timeout(60000) });
+      body: JSON.stringify({ backup: text, keys, ...(escrow ? { escrow } : {}) }), signal: AbortSignal.timeout(60000) });
     const restored = await res.json();
     if (res.status !== 200) throw Error(`RESTORE_HTTP_${res.status}_${restored.code ?? ""}`);
     const liveRefused = await fetch(`${base}/v1/admin/restore?target=poa-mainnet-registry-v1`, { method: "POST",
       headers: { "content-type": "application/json" }, body: "{}" }).then((r) => r.status);
     const checks = {
+      escrow: !escrow || restored.escrowSourceHead === createHash("sha256").update(codec.stableStringify(escrow)).digest("hex"),
       sequence: restored.sequence === backup.head.sequence,
       stateHash: restored.stateHash === backup.head.stateHash,
       journalHead: restored.journalHead === backup.head.journalHead,

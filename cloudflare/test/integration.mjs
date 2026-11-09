@@ -53,6 +53,8 @@ try {
   const first = await start("startup"); save("healthz-initial.json", first);
   if(process.env.CF_EXPECT_FRESH)check("fresh atomic bootstrap has exactly 15 seed commits",()=>assert.equal(first.sequence,15));
   check("healthz", () => { assert.equal(first.status, "ok"); assert.equal(first.processAlive, true); assert.equal(first.chainId, "poa-mainnet-1"); assert.equal(first.revision, "poa-mainnet-v1"); assert.equal(first.durability, "durable-object-sqlite"); });
+  const escrowOff = await api("/v1/admin/escrow?POA_ESCROW_ENABLED=true", { method: "POST", headers: { "content-type": "application/json" }, body: '{"action":"tick"}' });
+  check("escrow defaults off and cannot be enabled by caller input", () => { assert.equal(escrowOff.status,404); assert.equal(escrowOff.body.code,"NOT_FOUND"); });
   const cap = (await api("/v1/capabilities")).body; save("capabilities.json", cap);
   check("capabilities", () => {
     assert.equal(cap.emojiAliases, 5216); assert.equal(cap.reservedCount, 655);

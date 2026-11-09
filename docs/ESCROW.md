@@ -1,0 +1,156 @@
+# Disabled custodial escrow module
+
+This module is **off by default** and does not change the existing registry UI or
+its `livePoA: false` capability. Mock tests are not evidence of mainnet readiness.
+It is a bounded, single-custodian implementation, not native naming escrow.
+
+## Boundaries
+
+- One registry SQLite Durable Object coordinates the escrow wallet's outgoing nonce
+  lane, ledger, bids, refunds, and title reservations. Practice balances and starter
+  grants are never escrow assets. Only verified incoming transfers credit funds.
+- The supported auction path is resale of an existing, unencumbered permanent deed.
+  No new-name issuance, leases, renewals, or new dispute rules are introduced.
+  The seller chooses a positive reserve; existing premium/standard auction durations,
+  quiet windows, strict >10% bid increment, no highest-bidder self-raise, and registry
+  fee basis points are retained. Escrow API amounts are six-decimal POA strings;
+  internal accounting uses integer micros, not floating point.
+- While any escrow auction is open or settling, **all ordinary registry writes are
+  conservatively held** to preserve title and signed-transfer nonce reservations.
+  Reads continue. These reservations survive disabling the feature.
+- An external payout and a registry name transfer are **not atomic**. The durable
+  saga is `PAYING -> TITLE_PENDING -> COMPLETE`. Seller/fee payments must be verified
+  final before a local SQLite transaction commits the signed title transfer and
+  settlement journal. If consent expires, payment is not repeated: title remains
+  reserved until the seller supplies a valid `repair-title` consent. There is no
+  automatic refund after any uncertain or verified payout.
+- A custodian/runtime/account compromise can drain held money. Worker secrets do not
+  protect against compromised application code. No independent security approval or
+  independent consensus-proof verification is implied by this module.
+
+## Gates and credentials
+
+The committed Wrangler configuration has `POA_ESCROW_ENABLED=false` and
+`POA_ESCROW_NETWORK_WRITES=false`. Caller inputs cannot override either value.
+An enabled instance still starts **paused**, requires an explicit public
+`POA_ESCROW_ADDRESS`, positive `POA_ESCROW_PER_TX` / `POA_ESCROW_DAILY` limits, and
+an authenticated administrator. The native transport also requires public
+`POA_ESCROW_ENGINE_SHA256` and `POA_ESCROW_PARAMS_SHA256` version pins; a different
+node-advertised engine/parameter version holds operations. These pins detect changes,
+not prove that an engine is safe. Policy changes against an existing ledger fail closed.
+Signing and transport submission additionally require the server-side write gate
+`POA_ESCROW_NETWORK_WRITES=approved-v1`.
+
+The only signing-key input is the Worker secret `POA_ESCROW_KEY`, a base58-encoded
+32-byte Ed25519 seed. It is loaded lazily after both gates and its derived address
+must match the configured public escrow address. No key is returned, logged, placed
+in SQL, included in application backups, or accepted in HTTP commands. The secret
+must never be placed in a query string, repository, local env file, or command argv.
+`ESCROW_ADMIN_TOKEN` is a separate Worker secret (at least 32 characters).
+There is no wallet creation, enrollment, generic signing, or generic send endpoint.
+
+## Administrative API
+
+`POST /v1/admin/escrow` accepts exact `application/json`, a bearer admin credential,
+no browser Origin/fetch metadata, and at most 64 KiB. Disabled/unauthenticated requests
+return 404. Never put the bearer value in a URL. Actions:
+
+- `{"action":"status"}`: private ledger state and pending outcomes.
+- `{"action":"pause","paused":true}`: immediate administrative hold; false unpauses
+  but does not clear a reconciliation halt.
+- `{"action":"reconcile"}`: compare checkpoint-aligned observations and liabilities.
+- `{"action":"tick"}`: recover known transactions, complete titles, or prepare one
+  eligible outgoing transfer. A recovery alarm does the same when the write gate is on.
+- `{"action":"command","packet":{"command":...,"signature":...}}`: a separately
+  actor-signed request. The admin credential alone cannot create seller/bidder consent.
+
+The signed command is sorted-key, whitespace-free JSON:
+
+```
+{
+  "domain": "poa-domains.escrow.v1",
+  "chainId": "poa-mainnet-1",
+  "registryId": "<exact registry id>",
+  "actor": "<payer or seller public poa1 address>",
+  "key": "<unique idempotency key>",
+  "expires": 2000000000,
+  "action": "intent",
+  "params": {"amount": "1.000000"}
+}
+```
+
+The actor signs those exact UTF-8 canonical bytes with Ed25519; signature is base58.
+Domain, chain, registry, actor, expiry, and full payload are authenticated. A reused
+actor/key with a different payload conflicts. Query private status after any ambiguous
+HTTP outcome instead of creating a new payment/request key.
+
+Command parameter schemas (all fields required; no extras):
+
+| Action | Parameters |
+|---|---|
+| `intent` | `amount` (returns unique intent, exact memo, public recipient) |
+| `detect` | `intent`, `txid` |
+| `open` | `name`, `reserve` |
+| `bid` | `auction`, `amount` |
+| `cancel` / `expire` | `auction` |
+| `withdraw` | `amount` (original payer only; no redirect) |
+| `settle` / `repair-title` | `auction`, `transfer` (seller-signed existing registry transfer packet) |
+
+Outbid/cancel/expiry create original-payer refund obligations. Pausing or a network
+hold does not erase liabilities. Expiry without executable seller consent refunds
+instead of assuming a sale. New commands other than cancel/expire require fresh
+network status and reconciliation. Reconciliation mismatches persist a halt and
+quarantine observation without crediting unexplained funds; there is no generic
+remote "clear halt" endpoint.
+
+## Native transport and finality
+
+The narrow codec follows public `https://minepoa.com/go.md` and
+`https://minepoa.com/client/poa.mjs`: recursively sorted JSON excluding `sig`, Ed25519,
+base58 signatures/address keys, SHA-256 unsigned-body transaction ids, sequential
+sender nonces, recent accepted parents, checkpoint-cutoff-aware timestamp, six decimals.
+The complete native engine is not imported or executed.
+
+The adapter is fixed to `https://minepoa.com`, bounded responses, timeouts, and no
+redirects. It verifies transfer signature/id/chain/body, recipient, original payer,
+exact amount and intent memo. It accepts finality via five node-reported peer
+attestations or node-reported checkpoint coverage at a matching checkpoint cut.
+**This explicitly trusts the node's validity, attestation count and checkpoint/anchor
+assertions.** A user-supplied `final` flag or HTTP 202 does not establish finality.
+Independent quorum/anchor proof verification is not implemented.
+
+Checkpoint-only balance is compared only with covered known incoming/outgoing
+transactions at the same checkpoint cut, not open-window balances. An unsupported
+response schema, missing freshness/chain/cutoff/receipt context, stale status, fee
+change, inconsistent cut, nonce gap, unavailable node, or asset mismatch holds writes.
+The native context reader deliberately refuses oversized snapshots (>8 MB) or an
+unestablished enrolled-sender nonce rather than guessing. These guards may prevent
+operation against a node that omits required observations.
+
+Before any network effect, exact signed bytes, tx id, nonce and cap reservation are
+durable. `SIGNED` is pre-I/O; `UNKNOWN` is committed before the first submit. Recovery
+may send a proven pre-I/O retained payload once. An `UNKNOWN` transaction is lookup-only:
+not-found, delayed indexing, timeout, rejection, or date changes **never** authorize
+another submission, a new nonce, or a replacement payment. Unresolved amounts remain
+reserved across restart/day change; transaction and daily caps include reservations.
+
+## Persistence and tests
+
+Escrow records are append-only, payload-bound, checksummed and replayed; no mutable
+snapshot is independently trusted. Ledger invariants require credited assets to equal
+available balances + bid holds + non-final payout/refund liabilities. Outbox nonces
+cannot be reused. The pilot journal is bounded to 2,000 records and replays stored
+state records; this is not an unrestricted-volume storage design.
+
+Private financial records are exported only inside the existing RSA-OAEP/AES-GCM
+backup envelope, alongside encrypted registry bootstrap keys. The escrow Worker secret
+is excluded. Isolated restore validates the escrow journal and adds a pause record;
+live-target restore is refused. Restoring an old ledger cannot undo real network
+payments and is not permission to repay them.
+
+Run `npm run escrow:test`: 24 unit/adversarial/model tests (including 1,200 generated
+model transitions) plus 17 real local workerd/SQLite integration checks. The runtime
+suite uses the real engine/journal/title adapter, a simulated PoA transport, full
+process restarts after deposit and payout, and concurrent recovery. It tests no real
+wallet, network signature submission, deposit or payout. Existing checks remain
+separate. Deterministic public test keys are never operational credentials.
