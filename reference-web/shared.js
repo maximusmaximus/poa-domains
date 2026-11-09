@@ -401,3 +401,324 @@ export function parsePublicJSON(source) {
   safeObject(result);
   return result;
 }
+
+const RI_BASE = 0x1f1e6;
+function regionalLetter(ch) {
+  const c = ch.toLowerCase();
+  if (c < "a" || c > "z") return ch;
+  return String.fromCodePoint(RI_BASE + (c.charCodeAt(0) - 97));
+}
+function regionalWord(word, join = "") {
+  return [...String(word)].map(regionalLetter).join(join);
+}
+
+/** Several emoji stylizations of the site name; pick one per page load. */
+export const TITLE_STYLES = [
+  () => regionalWord("poadomains", " "),
+  () => `🌐 ${regionalWord("poadomains", " ")} 🌐`,
+  () => `✨ ${regionalWord("poa", "")} · ${regionalWord("domains", "")} ✨`,
+  () => `🔑 ${regionalWord("poa", " ")} · ${regionalWord("domains", " ")} 🔑`,
+  () => `💎${regionalWord("poadomains", "")}💎`,
+  () => `🚀 ${regionalWord("poadomains", " ")} 🚀`,
+  () => `🔨 ${[...regionalWord("poadomains", "")].join("·")} 🔨`,
+  () => `✳️ ${regionalWord("po", "")} ${regionalWord("ad", "")} ${regionalWord("om", "")} ${regionalWord("ai", "")} ${regionalWord("ns", "")} ✳️`,
+];
+
+export function pickSiteTitle(random = Math.random) {
+  const i = Math.floor(random() * TITLE_STYLES.length) % TITLE_STYLES.length;
+  return TITLE_STYLES[i]();
+}
+
+function auctionCloseAt(a) {
+  return a.high
+    ? Math.max(a.openAt + a.window, a.high.at + a.quiet)
+    : a.openAt + a.window;
+}
+
+/** Classify one auction relative to registry time. */
+export function classifyAuction(auction, time) {
+  if (!auction || typeof auction !== "object") return "past";
+  if (auction.status !== "live") return "past";
+  if (typeof time === "number" && time < auction.openAt) return "upcoming";
+  const close = auctionCloseAt(auction);
+  if (typeof time === "number" && time >= close) return "current";
+  return "current";
+}
+
+/** Split auctions into past / current / upcoming (stable name sort within). */
+export function partitionAuctions(auctions, time) {
+  const groups = { past: [], current: [], upcoming: [] };
+  const list = Array.isArray(auctions)
+    ? auctions
+    : Object.values(auctions ?? {});
+  for (const a of list) groups[classifyAuction(a, time)].push(a);
+  for (const key of Object.keys(groups))
+    groups[key].sort((x, y) => String(x.name).localeCompare(String(y.name)));
+  return groups;
+}
+
+/**
+ * Shape a polite live-actions ticker from committed registry state.
+ * No fabricated events — empty array when nothing actionable is present.
+ */
+export function shapeLiveActions(state, limit = 40) {
+  if (!state || typeof state !== "object") return [];
+  const items = [];
+  const auctions = Object.values(state.auctions ?? {});
+  const bids = Object.values(state.bids ?? {});
+  const receipts = Object.values(state.receipts ?? {});
+  const offers = Object.values(state.offers ?? {});
+  const time = state.time;
+
+  for (const a of auctions) {
+    const bucket = classifyAuction(a, time);
+    if (bucket === "past" && a.status !== "live") {
+      items.push({
+        id: `auction:${a.id}:final`,
+        kind: "auction-final",
+        label: `${a.name} · ${a.status}`,
+        name: a.name,
+        auctionId: a.id,
+        sequence: a.sequence ?? 0,
+        at: a.openAt ?? 0,
+      });
+    } else if (bucket === "upcoming") {
+      items.push({
+        id: `auction:${a.id}:upcoming`,
+        kind: "auction-upcoming",
+        label: `${a.name} · opens ${a.openAt}`,
+        name: a.name,
+        auctionId: a.id,
+        sequence: a.sequence ?? 0,
+        at: a.openAt ?? 0,
+      });
+    } else if (bucket === "current") {
+      const high = a.high
+        ? `high ${a.high.amount}`
+        : `reserve ${a.reserve}`;
+      items.push({
+        id: `auction:${a.id}:live`,
+        kind: "auction-live",
+        label: `${a.name} · live · ${high}`,
+        name: a.name,
+        auctionId: a.id,
+        sequence: a.sequence ?? 0,
+        at: a.high?.at ?? a.openAt ?? 0,
+      });
+    }
+  }
+
+  for (const b of bids) {
+    const a = state.auctions?.[b.auctionId];
+    const name = a?.name ?? b.auctionId?.slice?.(0, 12) ?? "bid";
+    items.push({
+      id: `bid:${b.id ?? b.sequence}`,
+      kind: "bid",
+      label: `${name} · bid ${b.amount} · ${b.status}`,
+      name,
+      auctionId: b.auctionId,
+      sequence: b.sequence ?? 0,
+      at: b.at ?? 0,
+    });
+  }
+
+  for (const r of receipts) {
+    if (r.status !== "succeeded") continue;
+    const name =
+      r.result?.name ??
+      (r.result?.deedId && state.deeds?.[r.result.deedId]?.name) ??
+      null;
+    if (!name && !r.result?.offerId) continue;
+    items.push({
+      id: `receipt:${r.intentId ?? r.sequence}`,
+      kind: "receipt",
+      label: name
+        ? `${name} · settled #${r.sequence}`
+        : `offer · settled #${r.sequence}`,
+      name: name ?? "",
+      auctionId: null,
+      sequence: r.sequence ?? 0,
+      at: r.time ?? 0,
+    });
+  }
+
+  for (const o of offers) {
+    const deed = state.deeds?.[o.parentId];
+    const target = deed?.name ?? o.parentId?.slice?.(0, 12) ?? "offer";
+    const active =
+      !o.cancelled && o.uses < o.maxUses && time < o.validUntil;
+    items.push({
+      id: `offer:${o.id}`,
+      kind: active ? "offer-active" : "offer",
+      label: `${o.kind} · ${target} · ${o.price} ${o.asset}`,
+      name: o.kind === "child" ? target : target,
+      auctionId: null,
+      offerId: o.id,
+      sequence: o.sequence ?? 0,
+      at: o.validUntil ?? 0,
+    });
+  }
+
+  items.sort((a, b) => b.sequence - a.sequence || b.at - a.at);
+  const seen = new Set();
+  const out = [];
+  for (const item of items) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    out.push(item);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/** History rows for a name or auction from committed state. */
+export function historyForTarget(state, { name, auctionId } = {}) {
+  if (!state) return [];
+  const rows = [];
+  const auctions = Object.values(state.auctions ?? {});
+  const matchAuction = (a) =>
+    (auctionId && a.id === auctionId) || (name && a.name === name);
+  for (const a of auctions.filter(matchAuction)) {
+    rows.push({
+      kind: "auction",
+      sequence: a.sequence ?? 0,
+      at: a.openAt ?? 0,
+      text: `${a.name} · ${a.status} · reserve ${a.reserve} ${a.asset}`,
+    });
+  }
+  for (const b of Object.values(state.bids ?? {})) {
+    const a = state.auctions?.[b.auctionId];
+    if (auctionId && b.auctionId !== auctionId) continue;
+    if (name && a?.name !== name) continue;
+    if (!auctionId && !name) continue;
+    rows.push({
+      kind: "bid",
+      sequence: b.sequence ?? 0,
+      at: b.at ?? 0,
+      text: `bid ${b.amount} · ${b.status} · #${b.sequence}`,
+    });
+  }
+  for (const r of Object.values(state.receipts ?? {})) {
+    const deedName = r.result?.deedId
+      ? state.deeds?.[r.result.deedId]?.name
+      : null;
+    const rName = r.result?.name ?? deedName;
+    if (name && rName !== name) continue;
+    if (!name && auctionId) continue;
+    if (!name && !auctionId) continue;
+    if (r.status !== "succeeded") continue;
+    rows.push({
+      kind: "receipt",
+      sequence: r.sequence ?? 0,
+      at: r.time ?? 0,
+      text: `receipt #${r.sequence} · ${rName ?? "ok"}`,
+    });
+  }
+  rows.sort((a, b) => b.sequence - a.sequence);
+  return rows;
+}
+
+export const CART_STORAGE_KEY = "poadomains.cart.v1";
+
+export function loadCart(storage) {
+  try {
+    const raw = storage?.getItem?.(CART_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (x) => x && typeof x === "object" && typeof x.name === "string",
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function saveCart(storage, cart) {
+  try {
+    storage?.setItem?.(CART_STORAGE_KEY, JSON.stringify(cart ?? []));
+  } catch {
+    /* quota / private mode — cart stays in-memory only */
+  }
+}
+
+/**
+ * Machine-readable agent checkout handoff (no keys, secrets, or signatures).
+ * Does not submit; documents GET/POST endpoints and CLI/MCP actions only.
+ */
+export function buildAgentCheckoutHandoff(
+  items,
+  cap,
+  signerPrincipal,
+  endpointUrl,
+  context = "local-reference-only",
+) {
+  if (!Array.isArray(items) || items.length === 0) return "";
+  const endpoint = endpointUrl || "http://127.0.0.1:8787";
+  const signer =
+    signerPrincipal && validPrincipal(signerPrincipal)
+      ? signerPrincipal
+      : null;
+  const payload = {
+    schema: "poa-domains.agent-checkout.v1",
+    livePoA: false,
+    context,
+    endpoint,
+    reads: {
+      healthz: `${endpoint}/healthz`,
+      capabilities: `${endpoint}/v1/capabilities`,
+      state: `${endpoint}/v1/state`,
+      nonce: `${endpoint}/v1/nonce?signer=<PRINCIPAL>`,
+      receipt: `${endpoint}/v1/receipts/<intentId>`,
+    },
+    writes: {
+      intents: {
+        method: "POST",
+        path: `${endpoint}/v1/intents`,
+        contentType: "application/json",
+        note: "Signed packet only; browser writes are rejected. Never auto-submit from this page.",
+      },
+    },
+    cli: {
+      keygen: "node dist/src/reference-cli.js keygen --out agent.pem",
+      act: "node dist/src/reference-cli.js act --url <ENDPOINT> --key-file agent.pem --action <ACTION> --params '<JSON>' --max-total <AMOUNT>",
+      prepare: "node dist/src/reference-cli.js prepare --url <ENDPOINT> --file item.json --out unsigned.json",
+      sign: "node dist/src/reference-cli.js sign --file unsigned.json --key-file agent.pem --out signed.json",
+      submit: "node dist/src/reference-cli.js submit --url <ENDPOINT> --file signed.json",
+    },
+    mcp: {
+      tool: "submit_intent",
+      note: "Same signed packet shape as POST /v1/intents. No keys in this handoff.",
+    },
+    chainId: cap?.chainId ?? null,
+    registryId: cap?.registryId ?? null,
+    policyHash: cap?.policyHash ?? null,
+    revision: cap?.revision ?? null,
+    signerPrincipal: signer,
+    itemCount: items.length,
+    items: items.map((item, index) => ({
+      index: index + 1,
+      name: item.name,
+      action: item.action,
+      tier: item.tier,
+      isRoot: item.isRoot,
+      asset: item.asset,
+      amount: item.amount,
+      summary: item.summary,
+      auctionId: item.params?.auctionId ?? null,
+      offerId: item.params?.offerId ?? null,
+      params: item.params,
+    })),
+  };
+  const lines = [
+    "POA DOMAINS AGENT CHECKOUT (UNSIGNED — NO KEYS, NO SIGNATURES, NO AUTO-SUBMIT)",
+    `Endpoint: ${endpoint}`,
+    `Items: ${items.length}`,
+    `Verify: GET ${endpoint}/v1/capabilities then GET ${endpoint}/v1/state`,
+    `Submit only via local CLI/MCP after independent review: POST ${endpoint}/v1/intents`,
+    `CLI act example uses --key-file on the agent host; never paste private keys here.`,
+    "",
+    JSON.stringify(payload, null, 2),
+  ];
+  return lines.join("\n");
+}

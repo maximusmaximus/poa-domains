@@ -21,11 +21,27 @@ export async function browserSmoke(base, evidence) {
     const prompt=await page.locator("#cartPrompt").innerText();
     for(const needle of ["keygen"," act ","submit_intent","quantum"]) assert.ok(prompt.includes(needle),needle);
     assert.equal(await page.locator("#copyCartPrompt").isEnabled(),true);
+    assert.equal(await page.locator("#floatingCartBtn").count(),1);
+    assert.equal(await page.locator("#liveTicker").count(),1);
+    assert.ok((await page.locator("#liveTickerTrack .ticker-chip").count()) + (await page.locator("#liveTickerTrack .ticker-empty").count()) >= 1);
+    assert.equal(await page.locator(".auction-tab").count(),3);
+    await page.locator("#floatingCartBtn").click();
+    assert.equal(await page.locator("#floatingCartPanel").isVisible(),true);
+    assert.equal(await page.locator("#copyCheckoutBtn").isEnabled(),true);
+    await page.locator("#floatingCartBackdrop").click();
+    assert.equal(await page.locator("#floatingCartPanel").isVisible(),false);
+    await page.locator("#floatingCartBtn").click();
+    await page.keyboard.press("Escape");
+    assert.equal(await page.locator("#floatingCartPanel").isVisible(),false);
+    await page.locator('.auction-tab[data-auction-tab="past"]').click();
+    await page.locator('.auction-tab[data-auction-tab="current"]').click();
     await page.locator('.pill[data-query="openai"]').click();
     assert.match(await page.locator("#searchResult").innerText(),/RESERVED/i);
     await page.evaluate(()=>document.fonts.ready);
     assert.equal(await page.locator("#error").innerText(),"");
     assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);
+    await page.locator("#floatingCartBtn").click();
+    assert.equal(await page.locator("#floatingCartPanel").isVisible(),true);
     await page.screenshot({path:resolve(evidence,"browser.png"),fullPage:true});
     return {actionOptions:17,quickPills:6,cartPrompt:true,pageErrors:errors,browserWrites:writes};
   } finally {await browser.close();}

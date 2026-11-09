@@ -3,262 +3,212 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PoA domains — read-only reference</title>
+    <title>PoA domains</title>
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
     <header>
-      <h1>PoA domains</h1>
-      <p id="mode">
-        Read-only local reference. Not live PoA. No wallet connection, browser
-        signing or browser writes.
-      </p>
-      <nav class="resource-nav" aria-label="PoA Domains Ecosystem Links">
-        <a href="https://poadomains.grok.me" rel="noreferrer"
-          >🌐 Live Explorer (poadomains.grok.me)</a
-        >
-        <a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer"
-          >🛡️ GitHub Pages Mirror &amp; Guard</a
-        >
-        <a href="https://minepoa.com" rel="noreferrer"
-          >⛏️ Proof of Agent (minepoa.com)</a
-        >
-        <a href="https://poa.grok.me" rel="noreferrer"
-          >📡 Proof Floor (poa.grok.me)</a
-        >
-        <a href="https://github.com/maximusmaximus/xeroemoji" rel="noreferrer"
-          >🎨 Xero Emoji Font</a
-        >
-        <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer"
-          >📦 GitHub Source &amp; Agent CLI/MCP</a
-        >
+      <h1 id="siteTitle" aria-label="poadomains">poadomains</h1>
+      <p id="mode">Local reference. Not live PoA.</p>
+      <nav class="resource-nav" aria-label="Links">
+        <a href="https://poadomains.grok.me" rel="noreferrer">🌐 poadomains.grok.me</a>
+        <a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer">🛡️ GitHub Pages</a>
+        <a href="https://minepoa.com" rel="noreferrer">⛏️ minepoa.com</a>
+        <a href="https://poa.grok.me" rel="noreferrer">📡 poa.grok.me</a>
+        <a href="https://github.com/maximusmaximus/xeroemoji" rel="noreferrer">🎨 xeroemoji</a>
+        <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer">📦 poa-domains</a>
       </nav>
     </header>
+
+    <div id="liveTicker" class="live-ticker" role="region" aria-label="Live actions">
+      <div id="liveTickerTrack" class="live-ticker-track">
+        <span class="ticker-empty muted">No live actions</span>
+      </div>
+    </div>
+
+    <nav class="view-tabs" aria-label="Views">
+      <a class="view-tab" href="#searchSection">Search</a>
+      <a class="view-tab" href="#auctionsSection">Auctions</a>
+      <a class="view-tab" href="#cartAnchor">Cart</a>
+      <a class="view-tab" href="#explorerSection">Explorer</a>
+      <a class="view-tab" href="#handoffSection">Handoff</a>
+    </nav>
+
+    <aside id="detailView" class="detail-view" hidden>
+      <div class="detail-header">
+        <h2 id="detailTitle">Detail</h2>
+        <button type="button" id="detailClose" class="secondary" aria-label="Close detail">Close</button>
+      </div>
+      <p id="detailSummary" class="badge"></p>
+      <div id="detailHistory" class="cards"></div>
+      <div id="detailActions" class="button-row"></div>
+    </aside>
+
     <main>
       <section id="searchSection">
-        <h2>Search domain availability &amp; build agent bid cart</h2>
-        <p class="muted">
-          Search any ASCII or Unicode 17 emoji domain (roots or
-          <code>child.root</code>, rendered with <strong>Xero Emoji</strong>) to
-          check live availability, reserve tier (single emoji minimum bid:
-          <strong>100,000 POA / 100k POA</strong>; more than one emoji:
-          <strong>1,000 POA / 1k POA</strong>), minimum next bid, or standing
-          offers. Add domains to your cart to generate a copy-and-paste prompt
-          for your AI agent.
-        </p>
+        <h2>Search</h2>
         <div class="search-bar">
           <input
             id="searchInput"
-            placeholder="Search domain (e.g. quantum, orbit, 🌐, 🚀, 🚀🚀, 👩‍🦰, agent.alpha, openai)..."
+            placeholder="domain or emoji"
             autocomplete="off"
+            aria-label="Search domain"
           />
-          <button id="searchBtn" type="button">Check availability</button>
+          <button id="searchBtn" type="button">Check</button>
         </div>
         <div class="quick-pills">
-          <span>Quick check:</span>
-          <button type="button" class="pill" data-query="quantum">
-            quantum (available)
-          </button>
-          <button type="button" class="pill" data-query="🚀">
-            🚀 (100k POA single emoji)
-          </button>
-          <button type="button" class="pill" data-query="🚀🚀">
-            🚀🚀 (1k POA multi-emoji)
-          </button>
-          <button type="button" class="pill" data-query="orbit">
-            orbit (live auction)
-          </button>
-          <button type="button" class="pill" data-query="alpha">
-            alpha (owned root)
-          </button>
-          <button type="button" class="pill" data-query="openai">
-            openai (reserved brand)
-          </button>
+          <button type="button" class="pill" data-query="quantum">quantum</button>
+          <button type="button" class="pill" data-query="🚀">🚀 (100k POA single emoji)</button>
+          <button type="button" class="pill" data-query="🚀🚀">🚀🚀 (1k POA multi-emoji)</button>
+          <button type="button" class="pill" data-query="orbit">orbit</button>
+          <button type="button" class="pill" data-query="alpha">alpha</button>
+          <button type="button" class="pill" data-query="openai">openai</button>
         </div>
         <div id="searchResult" class="search-result"></div>
 
-        <div class="cart-panel">
+        <div id="cartAnchor" class="cart-panel">
           <div class="cart-header">
-            <h3>
-              Agent bid &amp; purchase cart (<span id="cartCount">0</span>)
-            </h3>
-            <button id="clearCart" type="button" class="secondary" disabled>
-              Clear cart
-            </button>
+            <h3>Cart (<span id="cartCount">0</span>)</h3>
+            <button id="clearCart" type="button" class="secondary" disabled>Clear</button>
           </div>
           <label>
-            Your public signer principal (optional — inserted into agent prompt)
+            Signer
             <input
               id="cartSigner"
-              placeholder="poa1... or ed25519:..."
+              placeholder="poa1… or ed25519:…"
               autocomplete="off"
+              aria-label="Public signer principal"
             />
           </label>
           <div id="cartList" class="cards"></div>
-          <h4>Copy-and-paste prompt for your AI agent</h4>
-          <pre id="cartPrompt" class="prompt-box">
-Add one or more domains from availability search, live auctions, or standing offers to generate your agent prompt.</pre>
+          <h4>Agent prompt</h4>
+          <pre id="cartPrompt" class="prompt-box">Add one or more domains from availability search, live auctions, or standing offers to generate your agent prompt.</pre>
           <div class="button-row">
-            <button id="copyCartPrompt" type="button" disabled>
-              Copy agent prompt to clipboard
-            </button>
+            <button id="copyCartPrompt" type="button" disabled>Copy prompt</button>
             <span id="cartStatus" class="muted"></span>
           </div>
         </div>
       </section>
 
-      <section>
-        <h2>Registry explorer &amp; domain statistics</h2>
+      <section id="auctionsSection">
+        <h2>Auctions</h2>
+        <div class="auction-tabs" role="tablist" aria-label="Auction filters">
+          <button type="button" class="auction-tab is-active" role="tab" aria-selected="true" data-auction-tab="current">Current</button>
+          <button type="button" class="auction-tab" role="tab" aria-selected="false" data-auction-tab="upcoming">Upcoming</button>
+          <button type="button" class="auction-tab" role="tab" aria-selected="false" data-auction-tab="past">Past</button>
+        </div>
+        <div id="auctions" class="cards"></div>
+      </section>
+
+      <section id="explorerSection">
+        <h2>Explorer</h2>
         <p id="freshness"></p>
         <div id="stats" class="stats"></div>
-        <h3>Names &amp; protected child rights</h3>
+        <h3>Names</h3>
         <div id="names" class="cards"></div>
-        <h3>Ascending auctions</h3>
-        <div id="auctions" class="cards"></div>
-        <h3>Standing child &amp; fixed-price resale offers</h3>
+        <h3>Offers</h3>
         <div id="offers" class="cards"></div>
-        <h3>Purchase, bid &amp; settlement history</h3>
+        <h3>History</h3>
         <div id="history" class="cards"></div>
-        <h3>Escrow refunds &amp; account balances</h3>
+        <h3>Balances</h3>
         <div id="balances" class="cards"></div>
-        <button id="refresh" type="button">Refresh public state</button>
+        <button id="refresh" type="button">Refresh</button>
         <details>
-          <summary>Raw committed state and receipts</summary>
-
+          <summary>Raw state</summary>
           <pre id="state"></pre>
         </details>
       </section>
 
-      <section>
-        <h2>Prepare an agent handoff</h2>
-        <p>
-          This creates inert unsigned data only. Independently verify everything
-          before authorizing a local signer. Static demo examples must never be
-          signed or submitted. Never paste a private key or credential.
-        </p>
-        <button type="button" id="example" hidden>
-          Load synthetic example for selected action
-        </button>
+      <section id="handoffSection">
+        <h2>Handoff</h2>
+        <button type="button" id="example" hidden>Load example</button>
         <p id="exampleNotice"></p>
         <form id="handoff">
-          <label
-            >Action
-            <select id="action"></select
-          ></label>
-          <p>Exact required payload keys: <code id="keys"></code></p>
-          <label
-            >Public signer
-            <input id="signer" required autocomplete="off" /></label
-          ><label
-            >Public co-signers (sorted JSON array)
-            <input id="coSigners" value="[]" required /></label
-          ><label>Stable request ID <input id="requestId" required /></label
-          ><label
-            >Exact nonce
-            <input id="nonce" required inputmode="numeric" /></label
-          ><label
-            >Not before (integer seconds)
-            <input id="notBefore" required inputmode="numeric" /></label
-          ><label
-            >Exclusive deadline (integer seconds)
-            <input id="deadline" required inputmode="numeric" /></label
-          ><label
-            >Exact max total (base units)
-            <input id="maxTotal" required inputmode="numeric" /></label
-          ><label
-            >Max network fee (must be 0 locally)
-            <input id="maxNetworkFee" required inputmode="numeric" /></label
-          ><label
-            >Public action parameters (JSON)
-            <textarea id="params" rows="12" required>{}</textarea></label
-          ><button type="submit">Generate unsigned handoff</button>
+          <label>Action <select id="action"></select></label>
+          <p>Keys: <code id="keys"></code></p>
+          <label>Signer <input id="signer" required autocomplete="off" /></label>
+          <label>Co-signers <input id="coSigners" value="[]" required /></label>
+          <label>Request ID <input id="requestId" required /></label>
+          <label>Nonce <input id="nonce" required inputmode="numeric" /></label>
+          <label>Not before <input id="notBefore" required inputmode="numeric" /></label>
+          <label>Deadline <input id="deadline" required inputmode="numeric" /></label>
+          <label>Max total <input id="maxTotal" required inputmode="numeric" /></label>
+          <label>Max network fee <input id="maxNetworkFee" required inputmode="numeric" /></label>
+          <label>Params <textarea id="params" rows="12" required>{}</textarea></label>
+          <button type="submit">Generate</button>
         </form>
         <p id="error" role="alert"></p>
-        <h3>Instructions and matching API / CLI / MCP</h3>
+        <h3>Instructions</h3>
         <pre id="instructions"></pre>
-        <h3>Canonical unsigned body</h3>
+        <h3>Body</h3>
         <pre id="body"></pre>
-        <h3>Operation digest</h3>
+        <h3>Digest</h3>
         <pre id="digest"></pre>
-        <button type="button" id="copy" disabled>
-          Copy instructions and exact body
-        </button>
+        <button type="button" id="copy" disabled>Copy</button>
       </section>
 
       <section id="resourcesSection" class="span-2">
-        <h2>Ecosystem resources, pricing rules &amp; agent onboarding</h2>
+        <h2>Resources</h2>
         <div class="cards">
           <article class="card">
-            <h3>🌐 Live Explorer &amp; GitHub Pages Mirror</h3>
-            <p>
-              Primary interactive explorer:
-              <a href="https://poadomains.grok.me" rel="noreferrer"
-                >https://poadomains.grok.me</a
-              >
-            </p>
-            <p>
-              GitHub Pages mirror &amp; production read guard:
-              <a
-                href="https://maximusmaximus.github.io/poa-domains/"
-                rel="noreferrer"
-                >https://maximusmaximus.github.io/poa-domains/</a
-              >
-            </p>
+            <h3>Explorer</h3>
+            <p><a href="https://poadomains.grok.me" rel="noreferrer">https://poadomains.grok.me</a></p>
+            <p><a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer">https://maximusmaximus.github.io/poa-domains/</a></p>
           </article>
           <article class="card">
-            <h3>💎 Xero Emoji &amp; Minimum Bid Policy</h3>
-            <p>
-              All 5,216 official Unicode 17 emoji sequences are rendered with
-              <a
-                href="https://github.com/maximusmaximus/xeroemoji"
-                rel="noreferrer"
-                >Xero Emoji (COLRv1)</a
-              >.
-            </p>
-            <p>
-              <strong>Single emoji root (1 emoji):</strong> 100,000 POA (100k
-              POA) minimum opening bid · 24h window.
-            </p>
-            <p>
-              <strong>Multi-emoji (2–32 emojis) &amp; ASCII roots:</strong>
-              1,000 POA (1k POA) minimum opening bid · 1h window.
-            </p>
+            <h3>Xero Emoji · bids</h3>
+            <p><a href="https://github.com/maximusmaximus/xeroemoji" rel="noreferrer">Xero Emoji (COLRv1)</a></p>
+            <p><strong>Single emoji:</strong> 100,000 POA · 24h</p>
+            <p><strong>Multi-emoji / ASCII:</strong> 1,000 POA · 1h</p>
           </article>
           <article class="card">
-            <h3>🤖 One-Command Agent CLI &amp; MCP</h3>
-            <p>
-              Generate a <code>poa1...</code> Ed25519 keypair and execute any
-              cart item in a single command:
-            </p>
+            <h3>CLI / MCP</h3>
             <code>node dist/src/reference-cli.js keygen --out agent.pem</code>
-            <p>
-              Source, documentation &amp; MCP server:
-              <a
-                href="https://github.com/maximusmaximus/poa-domains"
-                rel="noreferrer"
-                >github.com/maximusmaximus/poa-domains</a
-              >
-            </p>
+            <p><a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer">github.com/maximusmaximus/poa-domains</a></p>
           </article>
           <article class="card">
-            <h3>⛏️ Proof of Agent Ecosystem</h3>
-            <p>
-              Mainnet &amp; mining:
-              <a href="https://minepoa.com" rel="noreferrer"
-                >https://minepoa.com</a
-              >
-            </p>
-            <p>
-              Live network pulse &amp; agent floor:
-              <a href="https://poa.grok.me" rel="noreferrer"
-                >https://poa.grok.me</a
-              >
-            </p>
+            <h3>PoA</h3>
+            <p><a href="https://minepoa.com" rel="noreferrer">https://minepoa.com</a></p>
+            <p><a href="https://poa.grok.me" rel="noreferrer">https://poa.grok.me</a></p>
           </article>
         </div>
       </section>
     </main>
+
+    <button
+      type="button"
+      id="floatingCartBtn"
+      class="floating-cart-btn"
+      aria-label="Open cart"
+      aria-controls="floatingCartPanel"
+      aria-expanded="false"
+    >
+      <span aria-hidden="true">🛒</span>
+      <span id="floatingCartBadge" class="floating-cart-badge" hidden>0</span>
+    </button>
+
+    <div id="floatingCartBackdrop" class="floating-cart-backdrop" hidden></div>
+    <div
+      id="floatingCartPanel"
+      class="floating-cart-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="floatingCartHeading"
+      hidden
+    >
+      <div class="floating-cart-header">
+        <h2 id="floatingCartHeading">Cart</h2>
+        <button type="button" id="floatingCartClose" class="secondary" aria-label="Close cart">Close</button>
+      </div>
+      <div id="floatingCartList" class="cards"></div>
+      <div class="button-row">
+        <button type="button" id="floatingCartClear" class="secondary" disabled>Clear</button>
+        <button type="button" id="copyCheckoutBtn" disabled>Copy checkout for agent</button>
+      </div>
+      <p id="floatingCartStatus" class="muted" role="status"></p>
+    </div>
+
     <script type="module" src="./app.js"></script>
   </body>
 </html>
