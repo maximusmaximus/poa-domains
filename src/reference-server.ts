@@ -57,7 +57,12 @@ export async function startReferenceServer(
         if (u.pathname === "/v1/resolve")
           return send(
             200,
-            engine.resolve(normalizeName(u.searchParams.get("name")).canonical),
+            engine.resolve(
+              normalizeName(
+                u.searchParams.get("name"),
+                engine.normalizationMode,
+              ).canonical,
+            ),
           );
         if (u.pathname === "/v1/nonce")
           return send(200, {

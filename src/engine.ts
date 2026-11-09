@@ -31,7 +31,8 @@ import {
   canonicalName,
   nameKey,
   normalizeLabel,
-  NORMALIZATION_HASH,
+  NormalizationMode,
+  normalizationModeForHash,
 } from "./names.js";
 import { Metadata, metadata, validCid } from "./metadata.js";
 import {
@@ -62,6 +63,7 @@ export class Engine {
   readonly config: Config;
   readonly policyHash: string;
   readonly registryId: string;
+  readonly normalizationMode: NormalizationMode;
   private readonly reservedSet: Set<string>;
   private state: State;
   private storage?: Persistence;
@@ -72,6 +74,9 @@ export class Engine {
   ) {
     this.config = validateConfig(config);
     freeze(this.config);
+    this.normalizationMode = normalizationModeForHash(
+      this.config.normalizationHash,
+    );
     this.reservedSet = new Set(this.config.reserved);
     this.policyHash = policyHash(this.config);
     this.registryId = registryId(this.config);
@@ -148,7 +153,7 @@ export class Engine {
         b.genesisHash === this.config.genesisHash &&
         b.registryId === this.registryId &&
         b.policyHash === this.policyHash &&
-        b.normalizationHash === NORMALIZATION_HASH,
+        b.normalizationHash === this.config.normalizationHash,
       "DOMAIN",
     );
     const id = intentId(b),
@@ -239,7 +244,7 @@ export class Engine {
     this.credit(s, this.config.treasury, a, fee);
   }
   private entry(s: State, name: unknown) {
-    const n = canonicalName(name);
+    const n = canonicalName(name, this.normalizationMode);
     need(!this.reservedSet.has(n.canonical), "RESERVED_NAME");
     return { n, e: s.names[n.canonical] };
   }
@@ -288,10 +293,10 @@ export class Engine {
     time: number,
     expectedGeneration?: number,
   ): Deed {
-    const n = canonicalName(name);
+    const n = canonicalName(name, this.normalizationMode);
     const e = (s.names[name] ??= {
       name,
-      key: nameKey(this.registryId, name),
+      key: nameKey(this.registryId, name, this.normalizationMode),
       generation: 0,
       activeId: null,
       auctionId: null,
@@ -399,7 +404,7 @@ export class Engine {
           e ??
           (s.names[n.canonical] = {
             name: n.canonical,
-            key: nameKey(this.registryId, n.canonical),
+            key: nameKey(this.registryId, n.canonical, this.normalizationMode),
             generation: 0,
             activeId: null,
             auctionId: null,
@@ -561,7 +566,7 @@ export class Engine {
           p.labels === null
             ? null
             : (p.labels as any[]).map((x: unknown) => {
-                const label = normalizeLabel(x).canonical;
+                const label = normalizeLabel(x, this.normalizationMode).canonical;
                 need(label === x, "NON_CANONICAL_NAME");
                 return label;
               });
@@ -598,7 +603,7 @@ export class Engine {
           "STALE_OFFER",
         );
         need(!root.lock, "TITLE_LOCKED");
-        const label = normalizeLabel(p.label).canonical;
+        const label = normalizeLabel(p.label, this.normalizationMode).canonical;
         need(
           label === p.label && (o.labels === null || o.labels.includes(label)),
           "LABELS",
@@ -781,7 +786,7 @@ export class Engine {
     }
   }
   resolve(value: unknown): any {
-    const { canonical: name } = canonicalName(value);
+    const { canonical: name } = canonicalName(value, this.normalizationMode);
     const e = this.state.names[name];
     const d = e?.activeId ? this.state.deeds[e.activeId] : null;
     const t = this.state.time;

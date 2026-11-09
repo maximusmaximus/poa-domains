@@ -10,7 +10,12 @@ import {
   text,
 } from "./core.js";
 import { principal } from "./auth.js";
-import { canonicalName, NORMALIZATION_HASH } from "./names.js";
+import {
+  canonicalName,
+  EMOJI17_NORMALIZATION_HASH,
+  NORMALIZATION_HASH,
+  normalizationModeForHash,
+} from "./names.js";
 import { DEFAULT_RESERVED_NAMES } from "./reserved.js";
 export {
   SINGLE_LETTER_RESERVED,
@@ -19,12 +24,12 @@ export {
   DEFAULT_RESERVED_NAMES,
 } from "./reserved.js";
 export interface Config {
-  revision: "local-reference-v1";
+  revision: "local-reference-v1" | "poa-mainnet-v1";
   chainId: string;
   genesisHash: string;
   instance: string;
   normalizationHash: string;
-  signingMode: "local-ed25519-fixture";
+  signingMode: "local-ed25519-fixture" | "poa1-ed25519";
   clockPolicy: "single-writer-local";
   issuer: string;
   treasury: string;
@@ -37,7 +42,7 @@ export interface Config {
     string,
     {
       decimals: number;
-      kind: "local-fixture";
+      kind: "local-fixture" | "poa-native";
       premiumReserve: string;
       standardReserve: string;
     }
@@ -63,21 +68,37 @@ export function validateConfig(value: unknown): Config {
     "balances",
     "reserved",
   ]);
+  const isMainnet = c.revision === "poa-mainnet-v1";
   need(
-    c.revision === "local-reference-v1" &&
-      c.signingMode === "local-ed25519-fixture" &&
-      c.clockPolicy === "single-writer-local",
+    (c.revision === "local-reference-v1" &&
+      c.signingMode === "local-ed25519-fixture") ||
+      (isMainnet && c.signingMode === "poa1-ed25519"),
     "POLICY_UNSET",
   );
+  need(c.clockPolicy === "single-writer-local", "POLICY_UNSET");
+  const chainId = text(c.chainId, 128);
   need(
-    text(c.chainId, 128).startsWith("local:") &&
+    (isMainnet ? chainId === "poa-mainnet-1" : chainId.startsWith("local:")) &&
       /^[0-9a-f]{64}$/.test(text(c.genesisHash, 64)) &&
       /^[a-z0-9-]{1,64}$/.test(text(c.instance, 64)),
     "CONFIG",
   );
-  need(c.normalizationHash === NORMALIZATION_HASH, "NORMALIZATION_POLICY");
-  principal(c.issuer);
-  principal(c.treasury);
+  need(
+    isMainnet
+      ? c.normalizationHash === EMOJI17_NORMALIZATION_HASH
+      : c.normalizationHash === NORMALIZATION_HASH ||
+          c.normalizationHash === EMOJI17_NORMALIZATION_HASH,
+    "NORMALIZATION_POLICY",
+  );
+  const mode = normalizationModeForHash(c.normalizationHash);
+  const issuer = principal(c.issuer);
+  const treasury = principal(c.treasury);
+  if (isMainnet) {
+    need(
+      issuer.startsWith("poa1") && treasury.startsWith("poa1"),
+      "PRINCIPAL",
+    );
+  }
   integer(c.feeBps, 0, 10000);
   need(c.highestSelfRaise === "reject", "POLICY_UNSET");
   const rule = obj(c.increment);
@@ -97,14 +118,18 @@ export function validateConfig(value: unknown): Config {
     need(/^[A-Z][A-Z0-9_]{0,15}$/.test(id), "ASSET");
     exact(a, ["decimals", "kind", "premiumReserve", "standardReserve"]);
     integer(a.decimals, 0, 18);
-    need(a.kind === "local-fixture", "ASSET");
+    need(
+      a.kind === (isMainnet ? "poa-native" : "local-fixture"),
+      "ASSET",
+    );
     amount(a.premiumReserve, true);
     amount(a.standardReserve, true);
   }
   const balances = obj(c.balances);
   const sums: Record<string, bigint> = {};
   for (const [who, wallet] of Object.entries(balances)) {
-    principal(who);
+    const p = principal(who);
+    if (isMainnet) need(p.startsWith("poa1"), "PRINCIPAL");
     obj(wallet);
     for (const [asset, n] of Object.entries(wallet)) {
       need(Object.hasOwn(assets, asset), "UNSUPPORTED_ASSET");
@@ -118,7 +143,7 @@ export function validateConfig(value: unknown): Config {
       new Set(c.reserved).size === c.reserved.length,
     "CONFIG",
   );
-  for (const name of c.reserved) canonicalName(name);
+  for (const name of c.reserved) canonicalName(name, mode);
   return structuredClone(c) as Config;
 }
 export const policyHash = (c: Config) => hash("local-config-policy/v1", c);
@@ -168,6 +193,50 @@ export function fixtureConfig(
         kind: "local-fixture",
         premiumReserve: "1000",
         standardReserve: "100",
+      },
+    },
+    balances,
+    reserved: [...DEFAULT_RESERVED_NAMES],
+  });
+}
+export function mainnetConfig(
+  issuer: string,
+  treasury: string,
+  buyers: string[] = [],
+  options: {
+    instance?: string;
+    genesisHash?: string;
+    initialBalanceMicros?: string;
+    premiumReserveMicros?: string;
+    standardReserveMicros?: string;
+    feeBps?: number;
+  } = {},
+): Config {
+  const initialBalance = options.initialBalanceMicros ?? "1000000000000";
+  const balances: Config["balances"] = {};
+  for (const p of [...new Set([issuer, treasury, ...buyers])])
+    balances[p] = { POA: initialBalance };
+  return validateConfig({
+    revision: "poa-mainnet-v1",
+    chainId: "poa-mainnet-1",
+    genesisHash:
+      options.genesisHash ??
+      hash("poa-mainnet-genesis/v1", [issuer, treasury, buyers]),
+    instance: options.instance ?? "poa-mainnet-registry",
+    normalizationHash: EMOJI17_NORMALIZATION_HASH,
+    signingMode: "poa1-ed25519",
+    clockPolicy: "single-writer-local",
+    issuer,
+    treasury,
+    feeBps: options.feeBps ?? 250,
+    highestSelfRaise: "reject",
+    increment: { kind: "eosStrict10" },
+    assets: {
+      POA: {
+        decimals: 6,
+        kind: "poa-native",
+        premiumReserve: options.premiumReserveMicros ?? "100000000",
+        standardReserve: options.standardReserveMicros ?? "10000000",
       },
     },
     balances,

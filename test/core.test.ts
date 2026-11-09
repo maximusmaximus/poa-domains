@@ -23,6 +23,7 @@ import {
 } from "../src/names.js";
 import { cidFor, metadata, validCid } from "../src/metadata.js";
 import {
+  mainnetConfig,
   minimumNext,
   validateConfig,
   SINGLE_LETTER_RESERVED,
@@ -30,6 +31,8 @@ import {
   TOP_BRAND_AND_PRODUCT_RESERVED,
   DEFAULT_RESERVED_NAMES,
 } from "../src/config.js";
+import { Engine } from "../src/engine.js";
+import { ManualClock } from "../src/clock.js";
 import { setup, witness } from "./helpers.js";
 import { rightsHash } from "../src/model.js";
 import { prepare, handoff, capabilities } from "../src/interface.js";
@@ -273,6 +276,114 @@ test("reserved list covers letters a-z, protocol/system/anti-phishing names, and
     assert.equal(r.status, "rejected");
     assert.equal(r.code, "RESERVED_NAME");
   }
+});
+test("poa-mainnet-v1 config profile executes full Unicode 17 emoji domain lifecycle with poa1 principals", () => {
+  const c = setup();
+  const issuerPoa = nativePrincipal(c.issuer.key);
+  const treasuryPoa = nativePrincipal(c.treasury.key);
+  const alicePoa = nativePrincipal(c.alice.key);
+  const bobPoa = nativePrincipal(c.bob.key);
+  assert.throws(() => mainnetConfig(c.issuer.id, treasuryPoa, [alicePoa]));
+  const cfg = mainnetConfig(issuerPoa, treasuryPoa, [alicePoa, bobPoa]);
+  assert.equal(cfg.revision, "poa-mainnet-v1");
+  assert.equal(cfg.chainId, "poa-mainnet-1");
+  assert.equal(cfg.signingMode, "poa1-ed25519");
+  assert.equal(cfg.normalizationHash, EMOJI17_NORMALIZATION_HASH);
+  assert.equal(cfg.assets.POA!.kind, "poa-native");
+  assert.equal(cfg.reserved.length, 655);
+  const clock = new ManualClock(1000000);
+  const e = new Engine(cfg, clock);
+  const cap = capabilities(e);
+  assert.equal(cap.emojiAliases, 5216);
+  let reqSeq = 0;
+  const submitPoa = (
+    signerId: string,
+    key: any,
+    action: string,
+    params: Record<string, any>,
+  ) => {
+    const body = prepare(
+      {
+        signer: signerId,
+        coSigners: [],
+        requestId: "mainnet-" + ++reqSeq,
+        nonce: e.nextNonce(signerId),
+        notBefore: 0,
+        deadline: clock.now() + 300000,
+        maxTotal: "10000000000",
+        maxNetworkFee: "0",
+        action,
+        params,
+      },
+      cap,
+    );
+    return e.submit(signBody(body, [key]));
+  };
+  const reservedTry = submitPoa(issuerPoa, c.issuer.key, "announceAuction", {
+    name: "openai",
+    asset: "POA",
+    reserve: "10000000",
+    openAt: clock.now() + 86400,
+    expectedDeedId: null,
+    expectedVersion: 0,
+    metadata: witness("openai"),
+  });
+  assert.equal(reservedTry.status, "rejected");
+  assert.equal(reservedTry.code, "RESERVED_NAME");
+  const rootName = "👩‍🦰";
+  const announced = submitPoa(issuerPoa, c.issuer.key, "announceAuction", {
+    name: rootName,
+    asset: "POA",
+    reserve: "100000000",
+    openAt: clock.now() + 86400,
+    expectedDeedId: null,
+    expectedVersion: 0,
+    metadata: witness(rootName),
+  });
+  assert.equal(announced.status, "succeeded", announced.code);
+  const auctionId = announced.result.auctionId;
+  clock.advance(86400);
+  const bidRes = submitPoa(alicePoa, c.alice.key, "bid", {
+    auctionId,
+    expectedVersion: 1,
+    asset: "POA",
+    amount: "100000000",
+    beneficiary: alicePoa,
+  });
+  assert.equal(bidRes.status, "succeeded", bidRes.code);
+  clock.advance(86400);
+  const finRes = submitPoa(bobPoa, c.bob.key, "finalize", {
+    auctionId,
+    expectedVersion: 2,
+  });
+  assert.equal(finRes.status, "succeeded", finRes.code);
+  const resolvedRoot = e.resolve(rootName);
+  assert.equal(resolvedRoot.deed.owner, alicePoa);
+  const childOffer = submitPoa(alicePoa, c.alice.key, "createChildOffer", {
+    parent: rootName,
+    parentDeedId: resolvedRoot.deed.id,
+    expectedOwnerVersion: 1,
+    asset: "POA",
+    price: "5000000",
+    validUntil: clock.now() + 86400,
+    rights: { kind: "permanent" },
+    labels: ["🫪"],
+    maxUses: 1,
+  });
+  assert.equal(childOffer.status, "succeeded", childOffer.code);
+  const childName = "🫪." + rootName;
+  const filled = submitPoa(bobPoa, c.bob.key, "fillChildOffer", {
+    offerId: childOffer.result.offerId,
+    expectedVersion: 1,
+    expectedGeneration: 1,
+    label: "🫪",
+    asset: "POA",
+    amount: "5000000",
+    metadata: witness(childName, { kind: "permanent" }, resolvedRoot.deed.id),
+  });
+  assert.equal(filled.status, "succeeded", filled.code);
+  assert.equal(e.resolve(childName).deed.owner, bobPoa);
+  e.assertInvariants();
 });
 test("real Ed25519 signature rejects forgery before consuming nonce", () => {
   const c = setup();
