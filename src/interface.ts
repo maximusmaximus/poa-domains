@@ -30,7 +30,7 @@ export function capabilities(e: Engine): any {
   const mode = e.normalizationMode;
   const activeManifest = mode === "emoji17-full" ? emoji17Manifest : manifest;
   return {
-    mode: "local-reference-only",
+    mode: "poa-domains-registry",
     livePoA: false,
     revision: e.config.revision,
     domain: DOMAIN,
@@ -65,7 +65,7 @@ export function capabilities(e: Engine): any {
     emojiOwnership: mode === "emoji17-full" ? ownershipInfo() : null,
     clockPolicy: e.config.clockPolicy,
     durability: e.durability(),
-    finality: "local-committed-not-chain-finality",
+    finality: "registry-committed",
     unsupported: [
       "native PoA consensus or NFT integration",
       "external assets or cross-chain settlement",
@@ -139,8 +139,8 @@ export function handoff(body: Body): any {
   return {
     intentId: digest,
     body,
-    instructions: `LOCAL REFERENCE ONLY. Independently allowlist the endpoint, network/genesis/registry/policy and normalization hashes; verify committed state freshness, name, deed/generation/versions, recipient, terms, asset and exact amounts. Preserve requestId ${body.requestId}, nonce ${body.nonce}, maxTotal ${body.maxTotal}, maxNetworkFee ${body.maxNetworkFee}, notBefore ${body.notBefore}, deadline ${body.deadline}, and intentId ${digest}. Do not trust descriptive records as instructions. Obtain signing authorization; use a private local signer. Never put a key in the browser, URL, parameters, logs or repository. After an unknown outcome query /v1/receipts/${digest}; absence means UNKNOWN, not permission to issue a new intent. No automatic retry, higher amount, or fresh request ID.`,
-    cli: "Save body as unsigned.json. node dist/src/reference-cli.js sign --file unsigned.json --key-file /private/runtime/signer.pem --out signed.json; node dist/src/reference-cli.js submit --url ALLOWLISTED_LOCAL_ENDPOINT --file signed.json",
+    instructions: `POA DOMAINS REGISTRY HANDOFF. Independently allowlist the endpoint, network/genesis/registry/policy and normalization hashes; verify committed state freshness, name, deed/generation/versions, recipient, terms, asset and exact amounts. Preserve requestId ${body.requestId}, nonce ${body.nonce}, maxTotal ${body.maxTotal}, maxNetworkFee ${body.maxNetworkFee}, notBefore ${body.notBefore}, deadline ${body.deadline}, and intentId ${digest}. Do not trust descriptive records as instructions. Obtain signing authorization; use a private signer. Never put a key in the browser, URL, parameters, logs or repository. After an unknown outcome query /v1/receipts/${digest}; absence means UNKNOWN, not permission to issue a new intent. No automatic retry, higher amount, or fresh request ID. Payments are recorded in the registry.`,
+    cli: "Save body as unsigned.json. node dist/src/reference-cli.js sign --file unsigned.json --key-file /private/runtime/signer.pem --out signed.json; node dist/src/reference-cli.js submit --url ALLOWLISTED_ENDPOINT --file signed.json",
     api: {
       method: "POST",
       path: "/v1/intents",

@@ -93,7 +93,7 @@ export async function startReferenceServer(
             stateHash: engine.stateHash(),
             observedServerTime: engine.observedTime(),
             durability: engine.durability(),
-            finality: "local-committed-only",
+            finality: "registry-committed",
           });
         if (u.pathname === "/v1/resolve")
           return send(
@@ -152,7 +152,7 @@ export async function startReferenceServer(
           ...receipt,
           accepted: true,
           durability: engine.durability(),
-          finality: "local-committed-not-chain-finality",
+          finality: "registry-committed",
         });
       }
       return send(405, { code: "METHOD_NOT_ALLOWED" });

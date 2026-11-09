@@ -377,12 +377,11 @@ async function runFullUiUxFlowsOnRegistryApp(
   await firstCartInput.dispatchEvent("input");
   assert.match(await page.locator("#cartPrompt").innerText(), /25000/);
 
-  // 6. Enter signer principal in #cartSigner and verify prompt updates live
-  await page.locator("#cartSigner").fill(carolPrincipal);
-  await page.locator("#cartSigner").dispatchEvent("input");
+  // 6. Cart has no signer field; prompt uses a placeholder for the agent to fill
+  assert.equal(await page.locator("#cartSigner").count(), 0);
   assert.ok(
     (await page.locator("#cartPrompt").innerText()).includes(
-      `Authorized Signer Principal: ${carolPrincipal}`,
+      "Authorized Signer Principal: <YOUR_POA1_OR_ED25519_PRINCIPAL>",
     ),
   );
 

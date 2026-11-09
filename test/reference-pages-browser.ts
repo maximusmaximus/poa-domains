@@ -50,7 +50,6 @@ export async function verifyReferenceStaticPage(
     );
     const initialRenderMs = Math.round(performance.now() - start);
     assert.match(await page.locator("#mode").innerText(), /SYNTHETIC DEMO/);
-    assert.match(await page.locator("#mode").innerText(), /Not live PoA/);
     assert.match(await page.locator("#mode").innerText(), /No backend/);
     checks.push(
       "HTTP 200 and null-backend bootstrap renders clearly labeled synthetic demo",

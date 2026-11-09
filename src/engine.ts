@@ -879,7 +879,7 @@ export class Engine {
         t < d.expiry! ||
         (d.rights.resolveDuringGrace && t < d.expiry! + d.rights.graceSeconds));
     return {
-      mode: "local-committed-not-chain-finality",
+      mode: "registry-committed",
       asOf: t,
       sequence: this.state.sequence,
       stateHash: this.stateHash(),

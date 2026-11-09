@@ -203,18 +203,16 @@ test("every title option uses only vetted code points, never regional indicators
   assert.equal(TITLE_SAFE_CODEPOINTS.has(0x1f1f5), false);
 });
 
-test("ideas only include names that pass the name rules and accept()", () => {
-  const ideas = buildIdeas({
+test("ideas are one word plus 1–3 emoji and only include accepted names", () => {
+  const empty = buildIdeas({
     count: 30,
     accept: (q) => {
       const info = inspectName(q, { sequences: {} });
       return info.isRoot && !info.isSingleEmoji;
     },
   });
-  // With an empty emoji manifest only ASCII names pass the rules.
-  assert.ok(ideas.length > 5);
-  for (const q of ideas) assert.match(q, /^[a-z0-9]{1,32}$/);
-  assert.equal(new Set(ideas).size, ideas.length);
+  // Empty emoji manifest rejects word+emoji ideas, so none survive.
+  assert.deepEqual(empty, []);
   const blocked = buildIdeas({ count: 10, accept: () => false });
   assert.deepEqual(blocked, []);
   const throwing = buildIdeas({ count: 10, accept: () => { throw Error("bad"); } });
@@ -222,10 +220,39 @@ test("ideas only include names that pass the name rules and accept()", () => {
   const manifest = { sequences: Object.fromEntries(IDEA_EMOJI.map((e) => [e, e])) };
   const mixed = buildIdeas({ count: 40, accept: (q) => { const i = inspectName(q, manifest); return i.isRoot && !i.isSingleEmoji; } });
   assert.equal(mixed.length, 40);
-  assert.ok(mixed.some((q) => /[^\x00-\x7f]/.test(q)));
+  assert.equal(new Set(mixed).size, mixed.length);
+  for (const q of mixed) {
+    assert.ok(/[a-z]/.test(q), q);
+    assert.ok(/[^\x00-\x7f]/.test(q), q);
+  }
   let withEmoji = 0;
-  for (let k = 0; k < 200; k++) if (/[^\x00-\x7f]/.test(randomIdea())) withEmoji++;
-  assert.ok(withEmoji > 20, "some ideas carry emoji");
+  let oneToThree = 0;
+  for (let k = 0; k < 200; k++) {
+    const q = randomIdea();
+    if (/[^\x00-\x7f]/.test(q)) withEmoji++;
+    const emojis = [...q].filter((ch) => ch.codePointAt(0) > 0x7f);
+    // rough: each IDEA_EMOJI is one visible emoji (some may be multi-codepoint — count via IDEA_EMOJI membership)
+    let count = 0;
+    let rest = q;
+    for (const e of IDEA_EMOJI) {
+      while (rest.includes(e)) { count++; rest = rest.replace(e, ""); }
+    }
+    if (count >= 1 && count <= 3 && /[a-z]/.test(rest)) oneToThree++;
+  }
+  assert.equal(withEmoji, 200, "every idea carries emoji");
+  assert.ok(oneToThree > 150, "ideas are one word + 1–3 emoji");
+});
+
+test("formatDuration and formatClock are human hours/minutes", async () => {
+  const { formatDuration, formatClock } = await import("../reference-web/shared.js");
+  assert.equal(formatDuration(45), "0m");
+  assert.equal(formatDuration(60), "1m");
+  assert.equal(formatDuration(3600), "1h");
+  assert.equal(formatDuration(4500), "1h 15m");
+  assert.equal(formatDuration(86400), "24h");
+  const clock = formatClock(1_700_000_000);
+  assert.match(clock, /[A-Za-z]{3} \d/);
+  assert.ok(!/second/i.test(clock));
 });
 
 test("masonryRows makes exactly 3 balanced rows", () => {
@@ -264,7 +291,14 @@ test("home HTML: skip link first, one-row tabs, ideas strip, footer links, no to
   const header = html.slice(html.indexOf("<header>"), html.indexOf("</header>"));
   assert.ok(!header.includes("<a "), "no links in header");
   assert.equal(/xero[\s-]?emoji/i.test(html), false);
+  assert.match(html, /Live PoA Domains registry/);
+  assert.ok(!html.includes("cartSigner"));
+  assert.ok(!html.includes("listValidSeconds"));
+  assert.ok(html.includes("listValidHours"));
+  assert.ok(!/local-committed-only/i.test(html));
   const css = readFileSync(new URL("../reference-web/style.css", import.meta.url), "utf8");
+  assert.match(css, /mask-image:[^;]*transparent/);
+  assert.match(css, /scrollbar-width:\s*none/);
   assert.ok(!/text-align:\s*justify/.test(css));
   assert.match(css, /\.skip-link:focus/);
 });

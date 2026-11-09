@@ -292,7 +292,7 @@ try {
         publicUrl: v["public-url"],
       });
       output({
-        mode: "local-reference-only",
+        mode: "poa-domains-registry",
         url: s.url,
         publicUrl: v["public-url"] ?? null,
       });

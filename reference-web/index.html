@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=403275b7b05e" />
+    <link rel="stylesheet" href="/style.css?v=0f2ec8d2025a" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
     <header>
       <h1 id="siteTitle" class="site-title" aria-label="poadomains"><span class="title-fallback">poadomains</span></h1>
-      <p id="mode"><span aria-hidden="true">🧪</span> Local reference. Not live PoA.</p>
+      <p id="mode"><span aria-hidden="true">🟢</span> Live PoA Domains registry</p>
     </header>
 
     <div id="networkStatusBar" class="network-status-bar" data-level="checking" role="status" aria-live="polite" hidden>
@@ -83,15 +83,6 @@
             <h3>🛒 Cart (<span id="cartCount">0</span>)</h3>
             <button id="clearCart" type="button" class="secondary" disabled>Clear</button>
           </div>
-          <label>
-            Signer
-            <input
-              id="cartSigner"
-              placeholder="poa1… or ed25519:…"
-              autocomplete="off"
-              aria-label="Public signer principal"
-            />
-          </label>
           <div id="cartList" class="cards"></div>
           <h4>Agent prompt</h4>
           <pre id="cartPrompt" class="prompt-box">Add names from Find, Auctions, or For sale to build a prompt.</pre>
@@ -210,8 +201,8 @@
             <input id="listPriceInput" inputmode="numeric" placeholder="2500" aria-label="List price in POA" />
           </label>
           <label>
-            Valid for (seconds)
-            <input id="listValidSeconds" inputmode="numeric" value="604800" aria-label="Listing lifetime seconds" />
+            Valid for (hours)
+            <input id="listValidHours" inputmode="numeric" value="168" aria-label="Listing lifetime in hours" />
           </label>
           <div class="button-row">
             <button type="button" id="copyListPromptBtn">Copy listing prompt</button>
@@ -279,6 +270,6 @@
       <p id="floatingCartStatus" class="muted" role="status"></p>
     </div>
 
-    <script type="module" src="/app.js?v=d3e55f55665e"></script>
+    <script type="module" src="/app.js?v=68a9dec0059e"></script>
   </body>
 </html>

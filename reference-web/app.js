@@ -35,7 +35,9 @@ import {
   networkBannerColor,
   isNetworkBannerDismissed,
   dismissNetworkBanner,
-} from "./shared.js?v=4ba24e093e7a";
+  formatDuration,
+  formatClock,
+} from "./shared.js?v=91878e6641ed";
 
 const el = (id) => document.getElementById(id);
 let cap,
@@ -225,7 +227,7 @@ function applyNetworkHold() {
       const panel = el("floatingCartPanel");
       if (panel) panel.appendChild(note);
     }
-    note.textContent = "⏸️ Held until the PoA network is back. Reads still work; this registry is local-reference (not live PoA).";
+    note.textContent = "⏸️ Held until the PoA network is back. Reads still work.";
     note.hidden = false;
   } else if (note) {
     note.hidden = true;
@@ -354,7 +356,7 @@ function updatePromptText() {
   el("cartPrompt").textContent = buildAgentCartPrompt(
     cart,
     cap,
-    el("cartSigner").value.trim(),
+    "",
     endpointBase(),
     configMode,
   );
@@ -506,6 +508,47 @@ function ideaAccepted(q) {
   return true;
 }
 
+let ideasAutoScroll = true;
+let ideasRaf = 0;
+
+function stopIdeasAutoScroll() {
+  ideasAutoScroll = false;
+  if (ideasRaf) {
+    cancelAnimationFrame(ideasRaf);
+    ideasRaf = 0;
+  }
+}
+
+function startIdeasAutoScroll() {
+  const strip = el("ideasStrip");
+  if (!strip) return;
+  const reduce = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  if (reduce) return;
+  stopIdeasAutoScroll();
+  ideasAutoScroll = true;
+  let last = performance.now();
+  const tick = (now) => {
+    if (!ideasAutoScroll) return;
+    const dt = Math.min(48, now - last);
+    last = now;
+    strip.scrollLeft += (dt / 1000) * 28;
+    const max = strip.scrollWidth - strip.clientWidth;
+    if (max > 4 && strip.scrollLeft >= max - 1) strip.scrollLeft = 0;
+    ideasRaf = requestAnimationFrame(tick);
+  };
+  ideasRaf = requestAnimationFrame(tick);
+}
+
+function wireIdeasScrollStop() {
+  const strip = el("ideasStrip");
+  if (!strip || strip.dataset.scrollWired) return;
+  strip.dataset.scrollWired = "1";
+  const stop = () => stopIdeasAutoScroll();
+  strip.addEventListener("wheel", stop, { passive: true });
+  strip.addEventListener("touchstart", stop, { passive: true });
+  strip.addEventListener("pointerdown", stop);
+}
+
 function renderIdeas() {
   const strip = el("ideasStrip");
   if (!strip) return;
@@ -527,6 +570,8 @@ function renderIdeas() {
       btn.addEventListener("click", () => pickIdea(btn, q));
     }
   }
+  wireIdeasScrollStop();
+  startIdeasAutoScroll();
 }
 
 function syncIdeaMarks() {
@@ -657,7 +702,7 @@ function addDetailToCart(item) {
         asset: liveAuction.asset,
         amount: minBid,
         beneficiary:
-          el("cartSigner").value.trim() || "<YOUR_BENEFICIARY_PRINCIPAL>",
+          "<YOUR_BENEFICIARY_PRINCIPAL>",
       },
     });
     return;
@@ -788,7 +833,7 @@ function runSearch(rawQuery) {
           asset: liveAuction.asset,
           amount: chosen,
           beneficiary:
-            el("cartSigner").value.trim() || "<YOUR_BENEFICIARY_PRINCIPAL>",
+            "<YOUR_BENEFICIARY_PRINCIPAL>",
         },
       });
     });
@@ -924,7 +969,7 @@ function runSearch(rawQuery) {
   add(
     card,
     "p",
-    `Unclaimed ${info.tier} root domain (${tierNote}). Opening auction reserve: ${reserve} POA (${windowSec}s minimum window + ${windowSec}s quiet period).`,
+    `Unclaimed ${info.tier} root domain (${tierNote}). Opening auction reserve: ${reserve} POA (${formatDuration(windowSec)} minimum window + ${formatDuration(windowSec)} quiet period).`,
   );
   const controls = add(card, "div", "", "inline-controls");
   const maxBidInput = document.createElement("input");
@@ -990,7 +1035,7 @@ function renderAuctions(s) {
       "p",
       `Reserve ${a.reserve} ${a.asset}. ${a.high ? "High bid " + a.high.amount + " by " + person(a.high.payer) : "No active high bid."}`,
     );
-    add(card, "p", `Window ${a.window}s + quiet ${a.quiet}s · close ${close}`);
+    add(card, "p", `Window ${formatDuration(a.window)} + quiet ${formatDuration(a.quiet)} · closes ${formatClock(close)}`);
     if (a.status === "live" && !(typeof s.time === "number" && s.time < a.openAt)) {
       const nextMin = a.high
         ? minimumNextBid(a.high.amount, cap.increment)
@@ -1018,7 +1063,7 @@ function renderAuctions(s) {
             asset: a.asset,
             amount: nextMin,
             beneficiary:
-              el("cartSigner").value.trim() || "<YOUR_BENEFICIARY_PRINCIPAL>",
+              "<YOUR_BENEFICIARY_PRINCIPAL>",
           },
         });
       });
@@ -1124,7 +1169,7 @@ function renderDomainPage(name) {
   listingBox.replaceChildren();
   if (view.listing) {
     add(listingBox, "p", `💰 Listed for ${view.listing.price} ${view.listing.asset}`, "badge-ok");
-    add(listingBox, "p", `Until ${view.listing.validUntil} · offer ${view.listing.id.slice(0, 18)}…`);
+    add(listingBox, "p", `Until ${formatClock(view.listing.validUntil)} · offer ${view.listing.id.slice(0, 18)}…`);
   }
 
   const actions = el("domainActions");
@@ -1149,7 +1194,7 @@ function renderDomainPage(name) {
           expectedVersion: view.auction.version,
           asset: view.auction.asset,
           amount: minBid,
-          beneficiary: el("cartSigner").value.trim() || "<YOUR_BENEFICIARY_PRINCIPAL>",
+          beneficiary: "<YOUR_BENEFICIARY_PRINCIPAL>",
         },
       });
       setFloatingCartOpen(true);
@@ -1244,7 +1289,7 @@ function copyDomainListingPrompt(kind) {
     return;
   }
   const priceRaw = el("listPriceInput").value.trim();
-  const secsRaw = el("listValidSeconds").value.trim() || "604800";
+  const hoursRaw = el("listValidHours").value.trim() || "168";
   if (kind !== "unlist") {
     if (!/^(0|[1-9][0-9]{0,38})$/.test(priceRaw) || priceRaw === "0") {
       el("listingPromptStatus").textContent = "Enter a POA price greater than 0";
@@ -1259,11 +1304,11 @@ function copyDomainListingPrompt(kind) {
     el("listingPromptStatus").textContent = "List first, then change price";
     return;
   }
-  if (!/^[1-9][0-9]{0,8}$/.test(secsRaw)) {
-    el("listingPromptStatus").textContent = "Valid-for seconds required";
+  if (!/^[1-9][0-9]{0,5}$/.test(hoursRaw)) {
+    el("listingPromptStatus").textContent = "Valid-for hours required";
     return;
   }
-  const validUntil = latestState.time + Number(secsRaw);
+  const validUntil = latestState.time + Number(hoursRaw) * 3600;
   const text = buildListingPrompt({
     kind,
     name: currentDomainName,
@@ -1289,8 +1334,8 @@ function render(payload) {
   latestState = s;
   el("state").textContent = JSON.stringify(payload, null, 2);
   el("freshness").textContent =
-    (demo ? "STATIC SYNTHETIC DEMO · " : "LOCAL COMMITTED STATE · ") +
-    `second ${s.time}, sequence ${s.sequence}. ${payload.finality}.`;
+    (demo ? "STATIC SYNTHETIC DEMO · " : "LIVE REGISTRY · ") +
+    `as of ${formatClock(s.time)}, sequence ${s.sequence}. ${payload.finality}.`;
   if (demo && details.generatedAt)
     el("freshness").textContent +=
       " Built " +
@@ -1422,7 +1467,7 @@ function render(payload) {
     add(
       card,
       "p",
-      `Seller: ${person(o.owner)} · Uses: ${o.uses}/${o.maxUses} · Until ${o.validUntil}`,
+      `Seller: ${person(o.owner)} · Uses: ${o.uses}/${o.maxUses} · Until ${formatClock(o.validUntil)}`,
     );
     if (o.kind === "child" && o.rights) {
       add(
@@ -1489,7 +1534,7 @@ function render(payload) {
     add(
       card,
       "p",
-      `Bid status: ${b.status.toUpperCase()} · Sequence #${b.sequence} · Second ${b.at}`,
+      `Bid status: ${b.status.toUpperCase()} · Sequence #${b.sequence} · ${formatClock(b.at)}`,
       b.status === "won" || b.status === "high" ? "badge-ok" : "badge",
     );
     add(
@@ -1520,7 +1565,7 @@ function render(payload) {
     add(
       card,
       "p",
-      `Receipt #${r.sequence} · Second ${r.time} · Status: ${r.status}`,
+      `Receipt #${r.sequence} · ${formatClock(r.time)} · Status: ${r.status}`,
       "badge",
     );
     add(card, "p", `Signer: ${person(r.signer)} · Request: ${r.requestId}`);
@@ -1589,7 +1634,9 @@ try {
     el("exampleNotice").textContent =
       "Synthetic examples only. Do not sign or submit.";
   } else {
-    if (config.mode !== "local-reference-only") throw Error("Unknown mode");
+    if (config.mode !== "local-reference-only" && config.mode !== "live-registry")
+      throw Error("Unknown mode");
+    el("mode").textContent = "🟢 Live PoA Domains registry";
     if (config.publicApiBase) {
       const u = new URL(config.publicApiBase);
       if (
@@ -1693,9 +1740,6 @@ try {
     el("ideasStatus").dataset.tone = "";
     el("ideasStrip").scrollLeft = 0;
   });
-  el("cartSigner").addEventListener("input", () => {
-    updatePromptText();
-  });
   el("clearCart").addEventListener("click", clearAllCart);
   el("copyCartPrompt").addEventListener("click", async () => {
     if (shouldHoldTransactions(networkStatus.level) || networkStatus.hold) {
@@ -1744,7 +1788,7 @@ try {
     const text = buildAgentCheckoutHandoff(
       cart,
       cap,
-      el("cartSigner").value.trim(),
+      "",
       endpointBase(),
       configMode,
     );
