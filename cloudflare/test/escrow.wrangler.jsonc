@@ -1,5 +1,6 @@
 {
   "name":"poadomains-escrow-local-tests",
+  "assets":{"directory":"../../reference-web","binding":"ASSETS","run_worker_first":true},
   "main":"escrow-runtime.ts",
   "compatibility_date":"2026-11-08",
   "compatibility_flags":["nodejs_compat"],

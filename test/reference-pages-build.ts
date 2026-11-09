@@ -43,6 +43,7 @@ export function buildReferenceBundle(directory: string) {
     "style.css",
     "app.js",
     "shared.js",
+    "escrow.js",
     "icon.svg",
     "XeroEmoji-COLRv1.woff2",
   ];

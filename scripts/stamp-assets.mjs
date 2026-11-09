@@ -12,8 +12,9 @@ const hash = (text) => createHash("sha256").update(text).digest("hex").slice(0, 
 
 export function stampAssets() {
   const shared = read("shared.js");
+  const escrow = read("escrow.js");
   const appIn = read("app.js");
-  const app = appIn.replace(/from "\.\/shared\.js(?:\?v=[0-9a-f]+)?"/, `from "./shared.js?v=${hash(shared)}"`);
+  const app = appIn.replace(/from "\.\/escrow\.js(?:\?v=[0-9a-f]+)?"/, `from "./escrow.js?v=${hash(escrow)}"`).replace(/from "\.\/shared\.js(?:\?v=[0-9a-f]+)?"/, `from "./shared.js?v=${hash(shared)}"`);
   const style = read("style.css");
   const htmlIn = read("index.html");
   const html = htmlIn

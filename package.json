@@ -44,6 +44,7 @@
     "cf:test:backup": "node --experimental-strip-types cloudflare/test/backup-restore.mjs",
     "backup:now": "node scripts/registry-backup.mjs",
     "backup:restore": "node --experimental-strip-types scripts/registry-restore.mjs",
+    "escrow:ui": "npm run build && node cloudflare/test/escrow-ui.mjs",
     "escrow:test": "node scripts/test-escrow.mjs",
     "escrow:test:unit": "node scripts/test-escrow.mjs --unit"
   },

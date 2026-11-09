@@ -1,3 +1,4 @@
+import { marketView, publicCommand } from "./escrow-public.js";
 import { registryTitles } from "./escrow-titles.js";
 import { DurableObject } from "cloudflare:workers";
 import { createPrivateKey, generateKeyPairSync, KeyObject } from "node:crypto";
@@ -149,6 +150,28 @@ export class PoaRegistry extends DurableObject<Env> {
       new WorkerSecretSigner(policy.wallet, () => this.env.POA_ESCROW_KEY, signing), titles, policy, () => Date.now(), enabled);
     return this.escrowService;
   }
+  async escrowRead(path:string,query:Record<string,string>):Promise<unknown>{
+    need(String(this.env.POA_ESCROW_ENABLED)==="true","ESCROW_DISABLED");
+    const escrow=this.escrow(),s=escrow.state();
+    if(path==="capabilities"){
+      const freshness=await escrow.readiness();const configured=String(this.env.POA_ESCROW_NETWORK_WRITES)==="approved-v1"&&!!this.env.POA_ESCROW_KEY&&(this.env.ESCROW_ADMIN_TOKEN?.length??0)>=32;
+      return {enabled:true,paused:s.paused,held:s.paused||!!s.halt||freshness.held||!configured,
+        holdReason:s.halt??(s.paused?"POA payments paused":!configured?"POA payments held for operator setup":freshness.reason),
+        address:escrow.policy.wallet,limits:{perTransaction:escrow.policy.perTx,daily:escrow.policy.daily},freshness,serverTime:Date.now(),registryId:this.engine.registryId};
+    }
+    if(path==="intent")return escrow.depositView(query.id!,query.txid);
+    if(path==="market"||path==="domain")return {items:marketView(s,path==="domain"?query.name:undefined),serverTime:Date.now()};
+    need(false,"ESCROW_ROUTE");
+  }
+  async escrowCommand(packet:string,endpoint:string):Promise<unknown>{
+    need(String(this.env.POA_ESCROW_ENABLED)==="true","ESCROW_DISABLED");
+    try{
+      const result=await publicCommand(()=>this.escrow(),packet,this.engine.registryId,endpoint,Date.now(),String(this.env.POA_ESCROW_NETWORK_WRITES)==="approved-v1"&&!!this.env.POA_ESCROW_KEY&&(this.env.ESCROW_ADMIN_TOKEN?.length??0)>=32);
+      if(result.action!=="view"&&String(this.env.POA_ESCROW_NETWORK_WRITES)==="approved-v1")await this.ctx.storage.setAlarm(Date.now()+1000);
+      return result;
+    }catch(e){if(e instanceof Fault||e instanceof Error&&/^ESCROW_[A-Z_]+$/.test(e.message))throw e;
+      this.ctx.abort("Escrow public command storage failure");throw new Error("ESCROW_UNAVAILABLE");}
+  }
   private escrowTitleLocked(): boolean {
     const sql = this.ctx.storage.sql;
     if (!sql.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='escrow_journal'").toArray().length) return false;
@@ -199,7 +222,7 @@ export class PoaRegistry extends DurableObject<Env> {
         if (call.path === "/healthz") return ok({ status: "ok", processAlive: true, chainId: e.config.chainId,
           revision: e.config.revision, sequence: e.snapshot().sequence, durability: DURABILITY,
           livePoA: false, principals: this.principals });
-        if (call.path === "/v1/capabilities") return ok({ ...capabilities(e), publicExplorerUrl: this.env.PUBLIC_EXPLORER_URL });
+        if (call.path === "/v1/capabilities") return ok({ ...capabilities(e), publicExplorerUrl: this.env.PUBLIC_EXPLORER_URL, escrow:{enabled:String(this.env.POA_ESCROW_ENABLED)==="true",capabilities:"/v1/escrow/capabilities"} });
         if (call.path === "/v1/state") return ok({ state: e.snapshot(), stateHash: e.stateHash(),
           observedServerTime: e.observedTime(), durability: DURABILITY, finality: "registry-committed" });
         if (call.path === "/v1/resolve") return ok(e.resolve(normalizeName(call.query.name, e.normalizationMode).canonical));

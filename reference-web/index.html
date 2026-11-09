@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=0f2ec8d2025a" />
+    <link rel="stylesheet" href="/style.css?v=53cab020d711" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -39,6 +39,7 @@
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="explore" id="tabExplore">
         <span class="tab-icon" aria-hidden="true">🧭</span><span class="tab-label">Explore</span><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
+      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="escrow" id="tabEscrow"><span class="tab-icon" aria-hidden="true">🪙</span><span class="tab-label">My POA</span><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span></button>
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="handoff" id="tabHandoff">
         <span class="tab-icon" aria-hidden="true">🧾</span><span class="tab-label">Handoff</span><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
@@ -183,6 +184,7 @@
           </article>
         </div>
       </section>
+      <section id="escrowSection" data-section="escrow"></section>
     </main>
 
     <main id="domainMain" hidden>
@@ -215,6 +217,7 @@
         <h3>History</h3>
         <div id="domainHistory" class="cards"></div>
       </section>
+      <section id="escrowDomain"></section>
     </main>
 
     <main id="ownerMain" hidden>
@@ -270,6 +273,6 @@
       <p id="floatingCartStatus" class="muted" role="status"></p>
     </div>
 
-    <script type="module" src="/app.js?v=68a9dec0059e"></script>
+    <script type="module" src="/app.js?v=c9fe3d34f656"></script>
   </body>
 </html>

@@ -65,3 +65,4 @@ jobs:
       - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 WRANGLER_SEND_METRICS=false CF_EXPECT_FRESH=1 npm run cf:test
       - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 WRANGLER_SEND_METRICS=false npm run cf:test:backup
       - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm run ui:e2e
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 WRANGLER_SEND_METRICS=false npm run escrow:ui

@@ -1,3 +1,4 @@
+import { escrowHttp } from "./escrow-http.js";
 import { Fault, need, parseJSON } from "../src/core.js";
 import { parseRestoreInput, RESTORE_INPUT_LIMIT } from "./restore-input.js";
 import { SINGLETON } from "./registry.js";
@@ -147,6 +148,7 @@ export default {
         }
         return env.ASSETS.fetch(request);
       }
+      if (u.pathname.startsWith("/v1/escrow/")) return escrowHttp(request,env,()=>env.REGISTRY.getByName(SINGLETON));
       if (u.pathname.startsWith("/v1/admin/")) return await admin(request, env, u);
       if (request.method !== "GET" && !(request.method === "POST" && u.pathname === "/v1/intents")) return json(405, { code: "METHOD_NOT_ALLOWED" });
 

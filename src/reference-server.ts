@@ -8,6 +8,7 @@ const files: Record<string, [string, string]> = {
   "/icon.svg": ["icon.svg", "image/svg+xml"],
   "/": ["index.html", "text/html; charset=utf-8"],
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
+  "/escrow.js": ["escrow.js", "text/javascript; charset=utf-8"],
   "/shared.js": ["shared.js", "text/javascript; charset=utf-8"],
   "/config.json": ["config.json", "application/json; charset=utf-8"],
   "/style.css": ["style.css", "text/css; charset=utf-8"],
