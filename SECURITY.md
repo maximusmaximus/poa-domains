@@ -62,3 +62,12 @@ Wire envelope signatures and checkpoint signer quorum are mathematical checks on
 ## Local emoji spelling check
 
 The read-only web checker recognizes exact emoji-only Unicode 17 spellings and counts 1–32 whole emoji sequences. It runs locally with fixed options and does not transmit, persist, trim or normalize the entered spelling. Results describe format only, not name availability, ownership, pricing or registration. Native registry operations remain disabled. The bundle contains only the pinned public Unicode runtime, data, license and source provenance plus the checker module and external stylesheet; candidate equivalence data is not included.
+
+## Practice registry admission
+
+New submissions use permanent ownership only. Lease rights, renewLease and expireLease
+are refused before commit. Historical lease code and expiry fields are retained for
+byte-exact journal replay, not enabled for new leases. Emoji registration checks the
+approved full ownership-class mapping (5216 spellings, 1704 classes, 1–32 tokens);
+a spelling cannot create a second owned/auctioned name in an occupied class. This
+admission layer does not rewrite historical names, deed IDs, policy hashes or receipts.

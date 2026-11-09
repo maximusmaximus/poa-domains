@@ -21,6 +21,8 @@ import {
   parseDomainPath,
   parseOwnerPath,
   resolveDomainView,
+  buildOwnershipIndex,
+  ownershipConflict,
   activeResaleOffers,
   offerIsActive,
   buildListingPrompt,
@@ -33,7 +35,7 @@ import {
   networkBannerColor,
   isNetworkBannerDismissed,
   dismissNetworkBanner,
-} from "./shared.js?v=80cc5c363743";
+} from "./shared.js?v=4ba24e093e7a";
 
 const el = (id) => document.getElementById(id);
 let cap,
@@ -483,12 +485,21 @@ function applySiteTitle() {
 }
 
 /* ---------- 💡 Name ideas (3-row masonry strip) ---------- */
+function ownershipView() {
+  const index = buildOwnershipIndex(cap?.emojiOwnership);
+  return index ? { manifest: cap.emojiManifest, index } : null;
+}
+function variantOwner(name) {
+  const o = ownershipView();
+  return o ? ownershipConflict(latestState, name, o.manifest, o.index) : null;
+}
 function ideaAccepted(q) {
   if (!cap || !latestState) return false;
   const info = inspectName(q, cap.emojiManifest);
   if (!info.isRoot || info.isSingleEmoji) return false;
   const name = info.canonical;
   if (reservedSet.has(name)) return false;
+  if (variantOwner(name)) return false;
   const entry = latestState.names?.[name];
   if (entry?.activeId || entry?.auctionId) return false;
   if (Object.values(latestState.auctions ?? {}).some((a) => a.name === name && a.status === "live")) return false;
@@ -714,6 +725,15 @@ function runSearch(rawQuery) {
   if (info.isRoot && reservedSet.has(name)) {
     add(card, "p", "🔒 Reserved — not for sale", "badge-warn");
     add(card, "p", `${reservedSet.size}-name reservation catalog`);
+    return;
+  }
+
+  const sameEmoji = variantOwner(name);
+  if (sameEmoji) {
+    add(card, "p", "🔒 Taken — same emoji as another name", "badge-warn");
+    const p = add(card, "p", "Owned or in auction as ");
+    nameLink(p, sameEmoji);
+    add(card, "p", "One owner per emoji, whatever the skin tone or style.");
     return;
   }
 
@@ -1022,12 +1042,14 @@ function statusLabel(status) {
   const map = {
     available: "🟢 Available",
     reserved: "🔒 Reserved",
-    owned: "✅ Owned",
-    listed: "💰 For sale",
-    leased: "📅 Leased",
-    "listed-lease": "💰 For sale (lease)",
-    "lease-grace": "⚠️ Lease grace",
-    "lease-expired": "⌛ Lease expired",
+    owned: "♾️ Owned forever",
+    listed: "💰 For sale (resale)",
+    // Legacy lease records only; new leases and renewals are off.
+    leased: "📜 Legacy lease record",
+    "listed-lease": "📜 Legacy lease record",
+    "lease-grace": "📜 Legacy lease record",
+    "lease-expired": "📜 Legacy lease record",
+    "variant-taken": "🔒 Taken (same emoji)",
     "auction-current": "🏷️ Auction open",
     "auction-upcoming": "🗓️ Auction upcoming",
     "auction-past": "📜 Auction ended",
@@ -1079,7 +1101,7 @@ function renderMarketplace(s) {
 
 function renderDomainPage(name) {
   if (!latestState || !name) return;
-  const view = resolveDomainView(latestState, name, reservedSet);
+  const view = resolveDomainView(latestState, name, reservedSet, ownershipView());
   el("domainTitle").textContent = "";
   nameLink(el("domainTitle"), name);
   el("domainStatus").textContent = statusLabel(view.status);
@@ -1088,6 +1110,11 @@ function renderDomainPage(name) {
   if (view.owner) {
     ownerNode.append("Owner: ");
     ownerLink(ownerNode, view.owner, person(view.owner));
+    ownerNode.append(" · ♾️ Owned forever · resale or transfer only");
+  } else if (view.variantOf) {
+    ownerNode.append("🔒 Same emoji as ");
+    nameLink(ownerNode, view.variantOf);
+    ownerNode.append(" · one owner per emoji");
   } else {
     ownerNode.textContent = "No owner yet";
   }
@@ -1211,7 +1238,7 @@ function copyDomainListingPrompt(kind) {
     return;
   }
   if (!latestState || !currentDomainName || !cap) return;
-  const view = resolveDomainView(latestState, currentDomainName, reservedSet);
+  const view = resolveDomainView(latestState, currentDomainName, reservedSet, ownershipView());
   if (!view.deed) {
     el("listingPromptStatus").textContent = "Only the owner can list";
     return;
@@ -1344,12 +1371,14 @@ function render(payload) {
           s.deeds[d.parentId].name +
           "; parent transfer does not remove these rights.",
       );
-    if (d.rights.kind === "lease")
-      add(
-        card,
-        "p",
-        `Expiry ${d.expiry}; grace ${d.rights.graceSeconds}s; resolveDuringGrace ${d.rights.resolveDuringGrace}; renewal ${d.rights.renewal.kind}.`,
-      );
+    add(
+      card,
+      "p",
+      d.rights.kind === "lease"
+        ? "📜 Legacy lease record · renewals are off"
+        : "♾️ Owned forever · resale or transfer only",
+      "badge-ok",
+    );
     for (const r of d.records)
       add(card, "p", r.type + ": " + (r.url ?? r.address ?? r.cid), "record");
     add(card, "code", d.metadata[d.metadata.length - 1].cid);

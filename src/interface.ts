@@ -1,4 +1,5 @@
 import { ACTIONS, Action } from "./actions.js";
+import { ownershipInfo } from "./emoji-ownership.js";
 import { Body, DOMAIN, validateBody, intentId } from "./auth.js";
 import { canonical, exact, need } from "./core.js";
 import { Engine } from "./engine.js";
@@ -53,6 +54,15 @@ export function capabilities(e: Engine): any {
     feeBps: e.config.feeBps,
     highestSelfRaise: e.config.highestSelfRaise,
     actions: ACTIONS,
+    ownership: {
+      model: "permanent",
+      summary: "Owned forever. No renewals or expiry. Names change hands only by resale or transfer.",
+      renewals: false,
+      leases: false,
+      changesHandsBy: ["resale", "transfer"],
+      disabledActions: ["renewLease", "expireLease"],
+    },
+    emojiOwnership: mode === "emoji17-full" ? ownershipInfo() : null,
     clockPolicy: e.config.clockPolicy,
     durability: e.durability(),
     finality: "local-committed-not-chain-finality",
