@@ -7,14 +7,14 @@ export interface Observation {
   checkpoint: { height: number; root: string; anchored: boolean; quorum: number } | null;
 }
 export interface Status {
-  chain: string; asOf: number; stale: boolean; height: number; root: string; fee: string;
+  chain: string; asOf: number; stale: boolean; height: number; root: string; fee: string; cutoff?: number;
 }
 export interface Context { nextNonce: number; parents: string[]; cutoff: number; }
 export interface Cut { chain: string; height: number; root: string; balance: string; covered: string[]; }
 /** These are trusted-node observations, not independent consensus-proof verification. */
 export interface Network {
   status(): Promise<Status>; lookup(id: string): Promise<Observation | null>;
-  context(wallet: string): Promise<Context>; cut(wallet: string, ids: string[], status: Status): Promise<Cut>;
+  context(wallet: string, knownTxid?: string): Promise<Context>; cut(wallet: string, ids: string[], status: Status): Promise<Cut>;
   submit(body: Transfer): Promise<void>;
 }
 export interface TitleStore {
@@ -58,6 +58,9 @@ export function invariant(s: State): void {
   need(liabilities === BigInt(s.assets) && liabilities >= 0n,"ESCROW_ACCOUNTING");
   const nonces = Object.values(s.payments).filter(p=>p.body).map(p=>p.body!.nonce);
   need(new Set(nonces).size === nonces.length,"ESCROW_NONCE_REUSE");
+  const depNonces = Object.values(s.credited).map(b=>`${b.from}:${b.nonce}`);
+  const depMemos = Object.values(s.credited).map(b=>b.memo);
+  need(new Set(depNonces).size === depNonces.length && new Set(depMemos).size === depMemos.length,"ESCROW_DEPOSIT_DUPLICATE");
   for(const p of Object.values(s.payments)) if(p.body) need(p.txid === txid(p.body) &&
     p.to === p.body.to && decimal(BigInt(p.amount)) === p.body.amount,"ESCROW_OUTBOX_CORRUPT");
 }
@@ -161,9 +164,11 @@ export class Escrow {
       need(!dep.tx && !s.credited[id],"ESCROW_DEPOSIT_DUPLICATE");
       const o=await this.network.lookup(id); need(o,"ESCROW_UNKNOWN_DEPOSIT"); this.final(o,id);
       need(o.body.to===this.policy.wallet && o.body.from===dep.payer && o.body.amount===dep.amount && o.body.memo===`poadomains:${p.intent}`,"ESCROW_DEPOSIT_BINDING");
+      need(!Object.values(s.credited).some(b=>(b.from===o.body.from&&b.nonce===o.body.nonce)||b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
       this.gate(); await this.fresh(); this.gate();
       this.journal.append("deposit",{rk,fingerprint,id},s=>{
         need(!s.credited[id] && !s.deposits[String(p.intent)]!.tx,"ESCROW_DEPOSIT_DUPLICATE");
+        need(!Object.values(s.credited).some(b=>(b.from===o.body.from&&b.nonce===o.body.nonce)||b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
         const d=s.deposits[String(p.intent)]!; d.tx=id;s.credited[id]=o.body;s.assets=String(BigInt(s.assets)+micros(d.amount));
         s.available[c.actor]=String(BigInt(s.available[c.actor]??"0")+micros(d.amount));
         s.requests[rk]={fingerprint,result};
@@ -266,7 +271,8 @@ export class Escrow {
     if(Object.values(this.state().payments).some(p=>p.status==="SIGNED"||p.status==="UNKNOWN"))return this.state();
     const rank={seller:0,fee:1,refund:2};
     const p=Object.values(this.state().payments).filter(p=>p.status==="READY").sort((a,b)=>rank[a.kind]-rank[b.kind]||a.id.localeCompare(b.id))[0];if(!p)return this.state();
-    const ctx=await this.network.context(this.policy.wallet);this.gate();await this.fresh();this.gate();
+    const lastOut=Object.values(this.state().payments).filter(x=>x.status==="FINAL"&&x.txid&&x.body).sort((a,b)=>b.body!.nonce-a.body!.nonce)[0]?.txid??undefined;
+    const ctx=await this.network.context(this.policy.wallet,lastOut);this.gate();await this.fresh();this.gate();
     integer(ctx.nextNonce,1);integer(ctx.cutoff);need(ctx.parents.length===2 && new Set(ctx.parents).size===2,"ESCROW_PARENTS");
     const state=this.state();need(state.nonce===null||state.nonce===ctx.nextNonce,"ESCROW_NONCE_GAP");
     // All unresolved payments, even reserved on an earlier day, count against today's cap.
@@ -284,6 +290,22 @@ export class Escrow {
     this.gate();this.journal.append("outgoing-unknown",{id:p.id},s=>{s.payments[p.id]!.status="UNKNOWN";});
     try{await this.network.submit(body);}catch{ /* lookup only; never regenerate or resubmit */ }
     this.crash("after-submit");return this.state();
+  }); }
+  /** Explicit admin recovery: re-transmits exact retained signed bytes only if unseen on-chain and nonce is still current. */
+  rebroadcast(): Promise<State> { return this.serial(async()=>{
+    this.gate();const status=await this.fresh();this.gate();
+    const p=Object.values(this.state().payments).find(x=>x.status==="SIGNED"||x.status==="UNKNOWN");
+    if(!p||!p.body||!p.txid)return this.state();
+    let o:Observation|null;
+    try{o=await this.network.lookup(p.txid);}catch{throw new Error("ESCROW_LOOKUP_HELD");}
+    if(o)return this.state();
+    const lastOut=Object.values(this.state().payments).filter(x=>x.status==="FINAL"&&x.txid&&x.body).sort((a,b)=>b.body!.nonce-a.body!.nonce)[0]?.txid??undefined;
+    const ctx=await this.network.context(this.policy.wallet,lastOut);this.gate();await this.fresh();this.gate();
+    need(ctx.nextNonce===p.body.nonce,"ESCROW_NONCE_GAP");
+    await this.reconcileAt(status);await this.fresh();this.gate();
+    if(p.status==="SIGNED")this.journal.append("outgoing-unknown",{id:p.id},s=>{s.payments[p.id]!.status="UNKNOWN";});
+    try{await this.network.submit(p.body);}catch{}
+    return this.state();
   }); }
 }
 

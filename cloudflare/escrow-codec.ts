@@ -25,7 +25,7 @@ export function verifyTransfer(body: Transfer, chain = CHAIN): void {
   exact(body, ["type", "cid", "from", "to", "amount", "memo", "nonce", "parents", "ts", "sig"]);
   need(body.type === "transfer" && body.cid === chain, "ESCROW_CHAIN");
   address(body.from); address(body.to); need(micros(body.amount) > 0n, "ESCROW_AMOUNT");
-  text(body.memo, 160); integer(body.nonce, 1); integer(body.ts);
+  text(body.memo, 160); integer(body.nonce, 1); integer(body.ts, 1);
   need(Array.isArray(body.parents) && body.parents.length <= 2 && new Set(body.parents).size === body.parents.length &&
     body.parents.every(p => /^[0-9a-f]{64}$/.test(p)), "ESCROW_PARENTS");
   const key = createPublicKey({ format: "der", type: "spki", key: Buffer.concat([

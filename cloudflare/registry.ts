@@ -3,7 +3,7 @@ import { DurableObject } from "cloudflare:workers";
 import { createPrivateKey, generateKeyPairSync, KeyObject } from "node:crypto";
 import { Escrow, Policy, SQLiteEscrowJournal, EscrowArchive, exportEscrow, restoreEscrow, replay as replayEscrow } from "./escrow.js";
 import { WorkerSecretSigner, verifyCommand, digest } from "./escrow-codec.js";
-import { PoaHttpNetwork } from "./escrow-network.js";
+import { PoaHttpNetwork, MAINNET_ENGINE_SHA256, MAINNET_PARAMS_SHA256, PILOT_PER_TX, PILOT_DAILY } from "./escrow-network.js";
 import { nativePrincipal } from "../src/auth.js";
 import { mainnetConfig, Config } from "../src/config.js";
 import { Engine } from "../src/engine.js";
@@ -135,7 +135,7 @@ export class PoaRegistry extends DurableObject<Env> {
   private escrowPolicy(): Policy {
     need(String(this.env.POA_ESCROW_ENABLED) === "true", "ESCROW_DISABLED");
     return { wallet: this.env.POA_ESCROW_ADDRESS ?? "", treasury: this.engine.config.treasury,
-      perTx: this.env.POA_ESCROW_PER_TX ?? "0.000000", daily: this.env.POA_ESCROW_DAILY ?? "0.000000",
+      perTx: this.env.POA_ESCROW_PER_TX ?? PILOT_PER_TX, daily: this.env.POA_ESCROW_DAILY ?? PILOT_DAILY,
       feeBps: this.engine.config.feeBps, maxAgeMs: 90000 };
   }
   private escrow(): Escrow {
@@ -145,7 +145,7 @@ export class PoaRegistry extends DurableObject<Env> {
     const signing = () => enabled() && String(this.env.POA_ESCROW_NETWORK_WRITES) === "approved-v1";
     const e = this.engine;
     const titles = registryTitles(e);
-    this.escrowService = new Escrow(new SQLiteEscrowJournal(this.ctx.storage, policy), new PoaHttpNetwork(signing, fetch, { engine: this.env.POA_ESCROW_ENGINE_SHA256 ?? "", params: this.env.POA_ESCROW_PARAMS_SHA256 ?? "" }),
+    this.escrowService = new Escrow(new SQLiteEscrowJournal(this.ctx.storage, policy), new PoaHttpNetwork(signing, fetch, { engine: this.env.POA_ESCROW_ENGINE_SHA256 ?? MAINNET_ENGINE_SHA256, params: this.env.POA_ESCROW_PARAMS_SHA256 ?? MAINNET_PARAMS_SHA256 }),
       new WorkerSecretSigner(policy.wallet, () => this.env.POA_ESCROW_KEY, signing), titles, policy, () => Date.now(), enabled);
     return this.escrowService;
   }
@@ -177,6 +177,7 @@ export class PoaRegistry extends DurableObject<Env> {
         case "pause": escrow.pause(v.paused); break;
         case "reconcile": await escrow.reconcile(); break;
         case "tick": await escrow.tick(); break;
+        case "rebroadcast": await escrow.rebroadcast(); break;
         case "command": await escrow.command(verifyCommand(v.packet, this.engine.registryId, Math.floor(Date.now()/1000))); break;
         default: need(false, "ESCROW_ACTION");
       }
