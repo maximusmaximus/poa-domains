@@ -34,7 +34,7 @@ export async function startBuiltSite({fault='normal',buildDir,pathPrefix='/poa-d
   res.writeHead(status,{'Content-Type':status===200?mime(entry.name):'text/plain; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(status===200?entry.body:Buffer.from('No allowlisted built asset at this exact path.\n'));
  });
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});const origin=`http://127.0.0.1:${server.address().port}`;
- return {origin,url:origin+pathPrefix,pathPrefix,allowedPaths:[...routes.keys()],requests,artifact,close:()=>new Promise((resolve,reject)=>{server.close(e=>e?reject(e):resolve());server.closeIdleConnections?.();})};
+ return {origin,url:origin+pathPrefix,pathPrefix,allowedPaths:[...routes.keys()],requests,artifact,close:()=>new Promise((resolve,reject)=>{server.close(e=>e?reject(e):resolve());server.closeAllConnections();})};
 }
 export function createSyntheticBaselineResponder(){
  // One fixed cutoff PER CONTEXT, reused on refresh to avoid fabricating checkpoint drift.
