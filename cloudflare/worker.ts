@@ -1,4 +1,5 @@
-import { Fault, exact, need, parseJSON } from "../src/core.js";
+import { Fault, need, parseJSON } from "../src/core.js";
+import { parseRestoreInput, RESTORE_INPUT_LIMIT } from "./restore-input.js";
 import { SINGLETON } from "./registry.js";
 import { networkStatusMonitor } from "./network-status.js";
 import { BackupKind, RETENTION_DAYS, backupObjectKey, kindForCron } from "./backup-codec.js";
@@ -99,10 +100,9 @@ async function admin(request: Request, env: Env, u: URL): Promise<Response> {
     const target = u.searchParams.get("target") ?? "";
     need(RESTORE_TARGET.test(target) && target !== SINGLETON, "RESTORE_TARGET");
     need(request.headers.get("content-type") === "application/json", "CONTENT_TYPE");
-    const raw = parseJSON(await readLimited(request, 16 * 1024 * 1024), 16 * 1024 * 1024);
-    const body = exact(raw, ["backup", "keys"], ["escrow"]) as { backup: string; keys: Record<string, string>; escrow?: import("./registry.js").EscrowExport };
-    need(typeof body.backup === "string", "BACKUP_FORMAT");
-    const result = await env.REGISTRY.getByName(target).restoreBackup(body.backup, body.keys, body.escrow);
+    need(!request.headers.has("content-encoding"), "ENCODING");
+    const body = parseRestoreInput(await readLimited(request, RESTORE_INPUT_LIMIT));
+    const result = await env.REGISTRY.getByName(target).restoreBackup(body.backup, body.keys, body.escrow as import("./registry.js").EscrowExport | undefined);
     return json(200, { target, ...result });
   }
   return json(404, { code: "NOT_FOUND" });

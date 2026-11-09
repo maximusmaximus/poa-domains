@@ -49,9 +49,15 @@ export class PoaHttpNetwork implements Network {
     if(cutoff!==undefined)need(cutoff*1000<=observedAt+300000,"ESCROW_FUTURE_CHECKPOINT");
     if(this.lastHeight!==undefined)need(height>=this.lastHeight,"ESCROW_CHECKPOINT_ROLLBACK");
     if(cutoff!==undefined&&this.lastCutoff!==undefined)need(cutoff>=this.lastCutoff&&(height!==this.lastHeight||cutoff===this.lastCutoff),"ESCROW_CHECKPOINT_ROLLBACK");
+    // A fetched checkpoint is not evidence of a fresh source snapshot. Never
+    // manufacture source time from our clock (including when Age is absent).
+    const asOf=typeof s.as_of==="string"?Date.parse(s.as_of):Number.NaN;
+    const age=s.stale_age_s;
+    const stale=s.stale!==false || !Number.isSafeInteger(asOf) ||
+      asOf>observedAt+5000 || observedAt-asOf>120000 ||
+      (age!==undefined&&(!Number.isSafeInteger(age)||age<0||age>120));
+    need(!stale,"ESCROW_STALE");
     this.lastHeight=height;if(cutoff!==undefined)this.lastCutoff=cutoff;
-    const stale=s.stale===true||(typeof s.stale_age_s==="number"&&s.stale_age_s>120)?true:(s.stale===false||cutoff!==undefined?false:true);
-    const asOf=typeof s.as_of==="string"?Date.parse(s.as_of):(!stale&&cutoff!==undefined?observedAt:Number.NaN);
     const root=typeof s.state_root==="string"&&/^[0-9a-f]{64}$/.test(s.state_root)?s.state_root:(cutoff!==undefined?digest(["poa-checkpoint-cut/v1",CHAIN,height,cutoff]):"");
     return {chain:f.chain_id,asOf,stale,height,root, ...(cutoff!==undefined?{cutoff}:{}),
       // Native transfers are documented fee-free; if exposed, a contrary node fee fails closed.

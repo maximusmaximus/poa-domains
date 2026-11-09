@@ -15,7 +15,7 @@ export class MemoryJournal implements Journal {
   constructor(readonly policy:Policy){}
   load():State{return replay(this.rows,this.policy);}
   append(event:string,payload:unknown,change:(s:State)=>void):State {
-    const s=this.load(),e=nextEntry(s,this.rows.at(-1)?.checksum??digest(["escrow-genesis/v1",s.policy]),event,payload,change);
+    const s=this.load(),e=nextEntry(s,this.rows.at(-1)?.checksum??digest(["escrow-genesis/v1",s.policy]),event,payload,change,this.policy);
     this.rows.push(e);return structuredClone(e.state);
   }
 }

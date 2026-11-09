@@ -129,13 +129,16 @@ response schema, missing freshness/chain/cutoff/receipt context, stale status, f
 change, inconsistent cut, nonce gap, unavailable node, or asset mismatch holds writes.
 The native context reader deliberately refuses oversized snapshots (>8 MB) or an
 unestablished enrolled-sender nonce rather than guessing. These guards may prevent
-operation against a node that omits required observations.
+operation against a node that omits required observations. Source `stale: false`
+and a recent valid `as_of` are required; observing a checkpoint locally never
+substitutes for source freshness.
 
 Before any network effect, exact signed bytes, tx id, nonce and cap reservation are
 durable. `SIGNED` is pre-I/O; `UNKNOWN` is committed before the first submit. Recovery
-may send a proven pre-I/O retained payload once. An `UNKNOWN` transaction is lookup-only:
-not-found, delayed indexing, timeout, rejection, or date changes **never** authorize
-another submission, a new nonce, or a replacement payment. Unresolved amounts remain
+may send a proven pre-I/O retained payload once. Automatic `UNKNOWN` recovery is
+lookup-only. The explicit admin `rebroadcast` action may resend only the exact
+retained signed bytes after fresh lookup, nonce and reconciliation checks. Not-found,
+timeout, rejection or date changes never authorize a new nonce, signature or replacement payment. Unresolved amounts remain
 reserved across restart/day change; transaction and daily caps include reservations.
 
 ## Persistence and tests
@@ -143,8 +146,15 @@ reserved across restart/day change; transaction and daily caps include reservati
 Escrow records are append-only, payload-bound, checksummed and replayed; no mutable
 snapshot is independently trusted. Ledger invariants require credited assets to equal
 available balances + bid holds + non-final payout/refund liabilities. Outbox nonces
-cannot be reused. The pilot journal is bounded to 2,000 records and replays stored
-state records; this is not an unrestricted-volume storage design.
+cannot be reused. New work atomically reserves its worst-case recovery records
+within the 2,000-record admission budget, including pending deposits and capped
+withdrawal chunks. A finite drain-only lane may exceed this budget for legacy
+backlogs or emergency entries: each permitted transition must strictly reduce
+remaining recovery work. It cannot admit new money or no-op entries. Emergency
+pause/halt controls remain available beyond that admission cap and repeated
+identical controls do not append another record. Near capacity,
+withdraw the full available balance or the existing per-transaction maximum, not
+arbitrarily small partial amounts. This is not unrestricted-volume storage.
 
 Private financial records are exported only inside the existing RSA-OAEP/AES-GCM
 backup envelope, alongside encrypted registry bootstrap keys. The escrow Worker secret
@@ -152,8 +162,8 @@ is excluded. Isolated restore validates the escrow journal, forces a pause recor
 sets a permanent `RESTORED_ARCHIVE_READ_ONLY` halt so unpausing a restored archive can
 never replay old payouts; live-target restore is refused.
 
-Run `npm run escrow:test`: 24 unit/adversarial/model tests (including 1,200 generated
-model transitions) plus 17 real local workerd/SQLite integration checks. The runtime
+Run `npm run escrow:test`: 38 unit/adversarial/model tests (including 1,200 generated
+model transitions) plus 18 real local workerd/SQLite integration checks. The runtime
 suite uses the real engine/journal/title adapter, a simulated PoA transport, full
 process restarts after deposit and payout, and concurrent recovery. It tests no real
 wallet, network signature submission, deposit or payout. Existing checks remain

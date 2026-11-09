@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { sign, verify, createPublicKey, createPrivateKey } from "node:crypto";
 import { base58 } from "../../src/native-crypto.js";
 import { canonical } from "../../src/core.js";
-import { Escrow, PILOT_ADMISSION_LIMIT, PILOT_JOURNAL_LIMIT, invariant, nextEntry, replay } from "../escrow.js";
-import { CHAIN, WorkerSecretSigner, micros, decimal, txid, verifyCommand, verifyTransfer } from "../escrow-codec.js";
+import { Escrow, PILOT_ADMISSION_LIMIT, PILOT_JOURNAL_LIMIT, invariant, nextEntry, recoveryReserve, replay } from "../escrow.js";
+import { CHAIN, WorkerSecretSigner, digest, micros, decimal, txid, verifyCommand, verifyTransfer } from "../escrow-codec.js";
 import { PoaHttpNetwork, MAINNET_ENGINE_SHA256, MAINNET_PARAMS_SHA256, PILOT_PER_TX, PILOT_DAILY } from "../escrow-network.js";
 import { MockNetwork, MemoryJournal, policy, who, key, seed, signer, command, depositBody, root, parents } from "./escrow-fixture.js";
 function fixture(crash=(point:string)=>{}, p=policy){
@@ -25,6 +25,11 @@ async function auction(f:ReturnType<typeof fixture>,amount="2.000000"){
   await fund(f);
   const r=await f.e.command(command(who(2),"open","open",{name:"test",reserve:"1.000000"})) as any;
   await f.e.command(command(who(3),"bid","bid",{auction:r.auction,amount}));return r.auction as string;
+}
+// Capacity tests pad thousands of checksum-valid rows. Avoid O(n^2) fixture
+// replay while padding; each test independently replays the full history at end.
+function capacityJournal(j:MemoryJournal){
+ j.load=()=>structuredClone(j.rows.at(-1)!.state);
 }
 // Packet validation is exercised against the real engine in the runtime suite.
 // Use a real authenticated reference packet shape for the service boundary (mock title store only).
@@ -131,8 +136,9 @@ test("crash before submit reuses retained signed bytes once; crash after submit 
 });
 test("nonce gap and per-transaction limits hold before signing/submitting",async()=>{
  const f=fixture(),a=await auction(f);await settle(f,a);f.journal.append("test-nonce",{},s=>{s.nonce=4;});await assert.rejects(f.e.tick(),/NONCE_GAP/);assert.equal(f.net.calls,0);
- const g=fixture(()=>{},{...policy,perTx:"1.000000"}),b=await auction(g);await settle(g,b);
- await assert.rejects(g.e.tick(),/LIMIT/);assert.equal(g.net.calls,0);
+ const g=fixture(()=>{},{...policy,perTx:"1.000000"});
+ await assert.rejects(auction(g),/LIMIT/);assert.equal(g.net.calls,0);
+ await assert.rejects(g.e.command(command(who(3),"oversize-withdraw","withdraw",{amount:"2.000000"})),/LIMIT/);
 });
 test("simultaneous bid/cancel/ticks cannot overdraw or double refund/payout",async()=>{
  const f=fixture(),a=await auction(f);await fund(f,4,"10.000000","b");
@@ -186,7 +192,7 @@ test("fixed-origin native adapter validates receipt/body bindings and checkpoint
  if(u.pathname===`/api/receipt/${id}`)b={txid:id,status:"included",from:body.from,type:"transfer",valid_in_open_window:false,checkpoint_covered:true};
  if(u.pathname===`/api/explorer/address/${policy.wallet}`)b={address:policy.wallet,balance:"1.000000",balance_as_of:{checkpoint_height:10}};
  return Response.json(b,{status:b?200:404});})as typeof fetch;
- const n=new PoaHttpNetwork(()=>false,request,{engine:root,params:root}),s=await n.status(),o=await n.lookup(id);assert.equal(o?.checkpoint?.height,10);
+ const n=new PoaHttpNetwork(()=>false,request,{engine:root,params:root},()=>1800000000000),s=await n.status(),o=await n.lookup(id);assert.equal(o?.checkpoint?.height,10);
  const cut=await n.cut(policy.wallet,[id],s);assert.deepEqual(cut.covered,[id]);assert.equal(cut.balance,"1.000000");assert.ok(paths.length>=8);
 });
 
@@ -196,7 +202,7 @@ test("native adapter supports post-8:59-PST /chain/poa-mainnet-1/api/status sche
  const p1="b".repeat(64),p2="c".repeat(64);
  let cpHeight=593855,cutoffTs=1794228787,nowMs=1794250522000;
  const request=(async(input:any)=>{const u=new URL(input);
-  if(u.pathname==="/chain/poa-mainnet-1/api/status")return Response.json({checkpoint:{height:cpHeight,cutoff_ts:cutoffTs},network:"PoA prototype",K:5,open_ballots:0,chain_id:CHAIN,supply:"26020127390.293810",txs:13078,final:13007,invalid:0,agents_joined:9959,epochs_closed:63,holders:4968});
+  if(u.pathname==="/chain/poa-mainnet-1/api/status")return Response.json({checkpoint:{height:cpHeight,cutoff_ts:cutoffTs},stale:false,as_of:new Date(nowMs).toISOString(),network:"PoA prototype",K:5,open_ballots:0,chain_id:CHAIN,supply:"26020127390.293810",txs:13078,final:13007,invalid:0,agents_joined:9959,epochs_closed:63,holders:4968});
   if(u.pathname==="/chain/poa-mainnet-1/api/network-facts")return Response.json({chain_id:CHAIN,open_epoch:63,engine_sha256:MAINNET_ENGINE_SHA256,params_sha256:MAINNET_PARAMS_SHA256,economics:{K:5}});
   if(u.pathname===`/chain/poa-mainnet-1/api/explorer/tx/${id}`)return Response.json({id,body,atts:3,checkpointed:{height:593800},checkpoint_height:cpHeight});
   if(u.pathname===`/chain/poa-mainnet-1/api/receipt/${id}`)return Response.json({txid:id,status:"included",from:body.from,type:"transfer",valid_in_open_window:false,checkpoint_covered:true,next_nonce:2});
@@ -330,7 +336,7 @@ test("pilot journal admission cap reserves headroom for settlement and recovery"
  const f=fixture(),a=await auction(f);
  while(f.journal.rows.length<PILOT_ADMISSION_LIMIT){
   const prev=f.journal.rows.at(-1)!;
-  f.journal.rows.push(nextEntry(prev.state,prev.checksum,"noop",{},()=>{}));
+  f.journal.rows.push(nextEntry(prev.state,prev.checksum,"noop",{},()=>{},policy));
  }
  await assert.rejects(f.e.command(command(who(3),"new-intent","intent",{amount:"1.000000"})),/CAPACITY/);
  await assert.rejects(f.e.command(command(who(2),"new-open","open",{name:"other",reserve:"1.000000"})),/CAPACITY/);
@@ -346,4 +352,80 @@ test("malformed Worker secret never leaks in error message",()=>{
  const b=depositBody(3,policy.wallet,"1.000000","test"),{sig,...raw}=b;
  const s=new WorkerSecretSigner(who(1),()=>"not-valid-base58-secret!!!",()=>true);
  assert.throws(()=>s.transfer({...raw,from:who(1)}),(err:any)=>err instanceof Error&&err.message==="ESCROW_KEY_OR_TRANSFER_INVALID"&&!err.message.includes("not-valid"));
+});
+
+
+test("native freshness fails closed for a 24-hour-old checkpoint without source freshness",async()=>{
+ const now=1800000000000;
+ const base={K:5,chain_id:CHAIN,checkpoint:{height:10,cutoff_ts:now/1000-86400}};
+ const facts={chain_id:CHAIN,engine_sha256:MAINNET_ENGINE_SHA256,params_sha256:MAINNET_PARAMS_SHA256};
+ for(const fields of [{},{stale:false},{as_of:new Date(now).toISOString()},
+   {stale:false,as_of:new Date(now-86400000).toISOString()},
+   {stale:false,as_of:"invalid"},{stale:true,as_of:new Date(now).toISOString()},
+   {stale:false,as_of:new Date(now+6000).toISOString()},
+   {stale:false,as_of:new Date(now).toISOString(),stale_age_s:121}]){
+   const fetcher=(async(input:any)=>Response.json(String(input).endsWith("/status")?{...base,...fields}:facts)) as typeof fetch;
+   await assert.rejects(new PoaHttpNetwork(()=>false,fetcher,undefined,()=>now).status(),/ESCROW_STALE/);
+ }
+ const fetcher=(async(input:any)=>Response.json(String(input).endsWith("/status")?{...base,stale:false,as_of:new Date(now-1000).toISOString()}:facts)) as typeof fetch;
+ assert.equal((await new PoaHttpNetwork(()=>false,fetcher,undefined,()=>now).status()).asOf,now-1000);
+});
+
+test("proportional reservations refuse new work before spending recovery headroom",async()=>{
+ const f=fixture();await fund(f,3,"100.000000");capacityJournal(f.journal);
+ for(let i=0;i<12;i++)await f.e.command(command(who(3),`w${i}`,"withdraw",{amount:"1.000000"}));
+ while(BigInt(f.journal.rows.length)+recoveryReserve(f.e.state(),policy)<BigInt(PILOT_JOURNAL_LIMIT)){
+  f.journal.append("noop",{},()=>{});
+ }
+ assert.throws(()=>f.journal.append("noop",{},()=>{}),/CAPACITY/);
+ await assert.rejects(f.e.command(command(who(3),"more-work","withdraw",{amount:"1.000000"})),/CAPACITY/);
+ for(let i=0;i<14;i++)await f.e.tick();
+ assert.equal(Object.values(f.e.state().payments).filter(p=>p.status==="FINAL").length,12);
+ await f.e.command(command(who(3),"drain","withdraw",{amount:"88.000000"}));
+ await f.e.tick();await f.e.tick();assert.equal(f.e.state().assets,"0");
+ assert.ok(f.e.state().sequence<=PILOT_JOURNAL_LIMIT);
+ assert.deepEqual(replay(f.journal.rows,policy),f.e.state());
+});
+
+test("legacy 12-withdrawals-at-1968 backlog fully drains even across the old cap",async()=>{
+ const f=fixture();await fund(f,3,"100.000000");capacityJournal(f.journal);
+ for(let i=0;i<12;i++)await f.e.command(command(who(3),`w${i}`,"withdraw",{amount:"1.000000"}));
+ // Recreate a checksum-valid pre-fix journal; old admission ignored obligations.
+ while(f.journal.rows.length<1968){
+  const prev=f.journal.rows.at(-1)!,state=structuredClone(prev.state);state.sequence++;
+  const v={sequence:state.sequence,previous:prev.checksum,event:"noop",payload:{},state};
+  f.journal.rows.push({...v,checksum:digest(v)});
+ }
+ assert.throws(()=>f.journal.append("noop",{},()=>{}),/CAPACITY/);
+ for(let i=0;i<14;i++)await f.e.tick();
+ assert.equal(Object.values(f.e.state().payments).filter(p=>p.status==="FINAL").length,12);
+ await f.e.command(command(who(3),"drain","withdraw",{amount:"88.000000"}));
+ await f.e.tick();await f.e.tick();assert.equal(f.e.state().assets,"0");
+ assert.equal(f.net.calls,13);assert.ok(f.e.state().sequence>PILOT_JOURNAL_LIMIT);
+ assert.deepEqual(replay(f.journal.rows,policy),f.e.state());
+ await assert.rejects(f.e.command(command(who(3),"new","intent",{amount:"1.000000"})),/CAPACITY/);
+ for(let i=0;i<34;i++){await f.e.pause(true);await f.e.pause(false);}
+ assert.ok(f.e.state().sequence>2032);await f.e.pause(true);assert.equal(f.e.state().paused,true);
+ invariant(f.e.state());
+});
+
+test("queued pause is shared across instances and persisted after in-flight I/O",async()=>{
+ const f=fixture(),other=f.make();await fund(f);
+ await Promise.all([f.e.pause(true),other.pause(false)]);assert.equal(f.e.state().paused,false);
+ await other.pause(true);await assert.rejects(f.e.tick(),/PAUSED/);assert.equal(f.e.state().paused,true);
+});
+
+
+test("pending intents reserve detection and all capped withdrawal chunks",async()=>{
+ const f=fixture(()=>{},{...policy,perTx:"1.000000"});
+ const r=await f.e.command(command(who(3),"i","intent",{amount:"3.000000"})) as any;capacityJournal(f.journal);
+ while(BigInt(f.e.state().sequence)+recoveryReserve(f.e.state(),f.e.policy)<BigInt(PILOT_JOURNAL_LIMIT))f.journal.append("noop",{},()=>{});
+ const id=f.net.add(depositBody(3,policy.wallet,"3.000000",r.intent));
+ await f.e.command(command(who(3),"d","detect",{intent:r.intent,txid:id}));
+ for(let i=0;i<3;i++){
+  await f.e.command(command(who(3),`w${i}`,"withdraw",{amount:"1.000000"}));await f.e.tick();await f.e.tick();
+ }
+ assert.equal(f.e.state().assets,"0");assert.equal(f.net.calls,3);
+ assert.equal(f.e.state().sequence,PILOT_JOURNAL_LIMIT);
+ assert.deepEqual(replay(f.journal.rows,f.e.policy),f.e.state());
 });

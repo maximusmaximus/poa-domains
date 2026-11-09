@@ -5,6 +5,8 @@ import { CHAIN, Command, Signer, Transfer, address, decimal, digest, micros, txi
 export const PILOT_JOURNAL_LIMIT = 2000;
 export const PILOT_ADMISSION_LIMIT = 1900;
 const journalQueues = new WeakMap<Journal, Promise<unknown>>();
+// Immediate shared kill latch while the durable pause waits behind in-flight I/O.
+const pendingPauses = new WeakMap<Journal, symbol>();
 
 export interface Observation {
   id: string; body: Transfer; chain: string; valid: boolean; attestations: number;
@@ -68,10 +70,35 @@ export function invariant(s: State): void {
   for(const p of Object.values(s.payments)) if(p.body) need(p.txid === txid(p.body) &&
     p.to === p.body.to && decimal(BigInt(p.amount)) === p.body.amount,"ESCROW_OUTBOX_CORRUPT");
 }
-export function nextEntry(s: State, previous: string, event: string, payload: unknown, change: (s: State)=>void): Entry {
+/** Worst-case records to drain existing obligations, without admitting new money.
+ * Includes deposits already invited by an intent, capped withdrawal chunks,
+ * both seller/fee outboxes, and one failed-title + seller-repair transition.
+ */
+export function recoveryReserve(s: State, policy: Policy): bigint {
+  const cap=micros(policy.perTx);
+  const chunks=(n:bigint)=>(n+cap-1n)/cap;
+  let n=Object.values(s.available).reduce((n,v)=>n+4n*chunks(BigInt(v)),0n);
+  for(const d of Object.values(s.deposits))if(!d.tx)n+=1n+4n*chunks(micros(d.amount));
+  for(const a of Object.values(s.auctions))if(a.status==="OPEN")n+=a.high?9n:1n;
+  for(const p of Object.values(s.payments))n+=BigInt({READY:3,SIGNED:2,UNKNOWN:1,FINAL:0}[p.status]);
+  for(const st of Object.values(s.settlements))n+=st.status==="PAYING"?2n:st.status==="TITLE_PENDING"?1n:0n;
+  return n;
+}
+const DRAIN_EVENTS=new Set(["deposit","withdraw","cancel","expire","auto-expire","settle","repair-title",
+  "outgoing-intent","outgoing-unknown","payment-final","title-pending","title-complete"]);
+export function nextEntry(s: State, previous: string, event: string, payload: unknown, change: (s: State)=>void, policy: Policy): Entry {
   const emergency=event==="pause"||event==="halt"||event==="reconciliation-quarantine"||event==="restore-paused";
-  need(s.sequence<(emergency?PILOT_JOURNAL_LIMIT+32:PILOT_JOURNAL_LIMIT),"ESCROW_JOURNAL_CAPACITY");
+  // Emergency controls must remain available after a legacy drain crosses the
+  // old cap; they never admit financial obligations. Repeated controls dedupe.
   const next = structuredClone(s); change(next); next.sequence++; invariant(next);
+  if(!emergency){
+    const remaining=recoveryReserve(next,policy);
+    // New work must reserve its entire drain budget atomically. Legacy journals
+    // (or emergency entries) may already exceed that budget: permit only a
+    // strictly decreasing, finite recovery lane, never new admissions/noops.
+    const drains=DRAIN_EVENTS.has(event)&&remaining<recoveryReserve(s,policy);
+    need(BigInt(next.sequence)+remaining<=BigInt(PILOT_JOURNAL_LIMIT)||drains,"ESCROW_JOURNAL_CAPACITY");
+  }
   const v = { sequence:next.sequence,previous,event,payload,state:next }; return {...v,checksum:digest(v)};
 }
 export function replay(rows: Entry[], policy: Policy): State {
@@ -95,8 +122,8 @@ export class SQLiteEscrowJournal implements Journal {
   append(event:string,payload:unknown,change:(s:State)=>void): State {
     return this.storage.transactionSync(()=>{
       const rows=this.rows(),s=replay(rows,this.policy);
-      // Bounded pilot journal; reserve emergency headroom so pause/halt/restore never fail at the cap.
-      const e=nextEntry(s,rows.at(-1)?.checksum ?? digest(["escrow-genesis/v1",s.policy]),event,payload,change);
+      // Admission budgets include recovery; legacy financial drains may exceed the old cap.
+      const e=nextEntry(s,rows.at(-1)?.checksum ?? digest(["escrow-genesis/v1",s.policy]),event,payload,change,this.policy);
       this.storage.sql.exec("INSERT INTO escrow_journal(sequence,record) VALUES (?,?)",e.sequence,canonical(e)); return e.state;
     });
   }
@@ -113,12 +140,19 @@ export class Escrow {
   }
   state(): State { return this.journal.load(); }
   titleLocked(): boolean { return Object.values(this.state().auctions).some(a=>a.status==="OPEN"||a.status==="SETTLING"); }
-  private gate(): void { need(this.enabled(),"ESCROW_DISABLED"); const s=this.state(); need(!s.paused,"ESCROW_PAUSED"); need(!s.halt,"ESCROW_HALTED"); }
-  pause(paused:boolean): void {
+  private gate(): void { need(this.enabled(),"ESCROW_DISABLED"); const s=this.state(); need(!s.paused&&!pendingPauses.has(this.journal),"ESCROW_PAUSED"); need(!s.halt,"ESCROW_HALTED"); }
+  pause(paused:boolean): Promise<void> {
     need(this.enabled(),"ESCROW_DISABLED"); need(typeof paused==="boolean","ESCROW_PAUSE");
-    this.journal.append("pause",{paused},s=>{s.paused=paused;});
+    const prior=pendingPauses.get(this.journal),token=Symbol();
+    if(paused)pendingPauses.set(this.journal,token);
+    return this.serial(async()=>{
+      need(this.enabled(),"ESCROW_DISABLED");
+      if(this.state().paused!==paused)this.journal.append("pause",{paused},s=>{s.paused=paused;});
+      // Never clear a newer pause request (including across Escrow instances).
+      if(pendingPauses.get(this.journal)===(paused?token:prior))pendingPauses.delete(this.journal);
+    });
   }
-  private halt(code:string): void { this.journal.append("halt",{code},s=>{s.halt=code;}); }
+  private halt(code:string): void { if(this.state().halt!==code)this.journal.append("halt",{code},s=>{s.halt=code;}); }
   private async fresh(): Promise<Status> {
     let status:Status;
     try { status=await this.network.status(); }
@@ -184,7 +218,6 @@ export class Escrow {
     if(c.action==="detect") {
       exact(p,["intent","txid"]); const id=text(p.txid,64); need(/^[0-9a-f]{64}$/.test(id),"ESCROW_TXID");
       const s=this.state(),dep=s.deposits[text(p.intent,80)]; need(dep && dep.payer===c.actor,"ESCROW_DEPOSIT_INTENT");
-      need(s.sequence<PILOT_JOURNAL_LIMIT-32,"ESCROW_JOURNAL_CAPACITY");
       need(!dep.tx && !s.credited[id],"ESCROW_DEPOSIT_DUPLICATE");
       const o=await this.network.lookup(id); need(o,"ESCROW_UNKNOWN_DEPOSIT"); this.final(o,id);
       need(o.body.to===this.policy.wallet && o.body.from===dep.payer && o.body.amount===dep.amount && o.body.memo===`poadomains:${p.intent}`,"ESCROW_DEPOSIT_BINDING");
@@ -193,7 +226,6 @@ export class Escrow {
       this.journal.append("deposit",{rk,fingerprint,id},s=>{
         need(this.enabled(),"ESCROW_DISABLED"); need(!s.paused,"ESCROW_PAUSED"); need(!s.halt,"ESCROW_HALTED");
         need(!s.requests[rk],"ESCROW_IDEMPOTENCY_CONFLICT");
-        need(s.sequence<PILOT_JOURNAL_LIMIT-32,"ESCROW_JOURNAL_CAPACITY");
         need(!s.credited[id] && !s.deposits[String(p.intent)]!.tx,"ESCROW_DEPOSIT_DUPLICATE");
         need(!Object.values(s.credited).some(b=>(b.from===o.body.from&&b.nonce===o.body.nonce)||b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
         const d=s.deposits[String(p.intent)]!; d.tx=id;s.credited[id]=o.body;s.assets=String(BigInt(s.assets)+micros(d.amount));
@@ -223,7 +255,7 @@ export class Escrow {
         case "bid": {
           need(s.sequence<PILOT_JOURNAL_LIMIT-32,"ESCROW_JOURNAL_CAPACITY");
           exact(p,["auction","amount"]);const a=s.auctions[text(p.auction,64)]; need(a&&a.status==="OPEN"&&this.now()<a.closes,"ESCROW_AUCTION_CLOSED");
-          const n=micros(p.amount);need(c.actor!==a.seller,"ESCROW_SELF_SALE");need(a.high?.payer!==c.actor,"ESCROW_SELF_RAISE");
+          const n=micros(p.amount);need(n<=micros(this.policy.perTx),"ESCROW_PAYOUT_LIMIT");need(c.actor!==a.seller,"ESCROW_SELF_SALE");need(a.high?.payer!==c.actor,"ESCROW_SELF_RAISE");
           // Existing strict >10% rule, in integer micros (not rounded decimal floats).
           need(n>=BigInt(a.reserve)&&(!a.high||n*10n>BigInt(a.high.amount)*11n),"ESCROW_BID_INCREMENT");
           need(BigInt(s.available[c.actor]??"0")>=n,"ESCROW_INSUFFICIENT_FUNDS");
@@ -238,8 +270,7 @@ export class Escrow {
           if(a.high)this.refund(s,`cancel-${a.id}`,a.high.payer,a.high.amount);a.status="CANCELLED";break;
         }
         case "withdraw": {
-          need(s.sequence<PILOT_JOURNAL_LIMIT-32,"ESCROW_JOURNAL_CAPACITY");
-          exact(p,["amount"]);const n=micros(p.amount);need(n>0n&&BigInt(s.available[c.actor]??"0")>=n,"ESCROW_INSUFFICIENT_FUNDS");
+          exact(p,["amount"]);const n=micros(p.amount);need(n<=micros(this.policy.perTx),"ESCROW_PAYOUT_LIMIT");need(n>0n&&BigInt(s.available[c.actor]??"0")>=n,"ESCROW_INSUFFICIENT_FUNDS");
           s.available[c.actor]=String(BigInt(s.available[c.actor]??"0")-n);this.refund(s,`withdraw-${rk}`,c.actor,String(n));break;
         }
         case "settle": {
@@ -273,7 +304,7 @@ export class Escrow {
   private refund(s:State,id:string,to:string,n:string): void {
     need(!s.payments[id],"ESCROW_REFUND_DUPLICATE"); s.payments[id]={id,kind:"refund",to,amount:n,status:"READY",day:null,body:null,txid:null};
   }
-  /** One sender lane. UNKNOWN is lookup-only forever: absence/rejection never means safe to repay. */
+  /** One sender lane. Automatic UNKNOWN recovery is lookup-only; explicit rebroadcast retains exact bytes. */
   tick(): Promise<State> { return this.serial(async()=>{
     this.gate();const status=await this.fresh();this.gate();
     for(const a of Object.values(this.state().auctions)){

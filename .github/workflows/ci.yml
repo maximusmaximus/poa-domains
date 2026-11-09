@@ -47,3 +47,21 @@ jobs:
       - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm ci --ignore-scripts
       - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm run cf:typecheck
       - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm run escrow:test
+
+  local-recovery-and-ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm ci --ignore-scripts
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npx playwright install --with-deps chromium firefox webkit
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 WRANGLER_SEND_METRICS=false npm run cf:typecheck
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 WRANGLER_SEND_METRICS=false CF_EXPECT_FRESH=1 npm run cf:test
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 WRANGLER_SEND_METRICS=false npm run cf:test:backup
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm run ui:e2e
