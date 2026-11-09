@@ -129,11 +129,10 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
       const timer = setTimeout(() => controller.abort(), REQUEST_MS);
       let response: Response;
       try {
+        // Workers Fetch rejects some browser-only init fields; keep this minimal.
         response = await fetcher(STATUS_URL, {
           method: "GET",
-          credentials: "omit",
-          redirect: "error",
-          cache: "no-store",
+          redirect: "manual",
           headers: { Accept: "application/json" },
           signal: controller.signal,
         });
@@ -141,7 +140,7 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
         clearTimeout(timer);
       }
       const latencyMs = Math.max(0, now() - started);
-      if (!response || response.status !== 200) {
+      if (!response || response.status !== 200 || response.status >= 300) {
         consecutiveFailures += 1;
         const level = classifyProbe({
           ok: false,
