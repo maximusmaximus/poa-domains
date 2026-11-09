@@ -1,6 +1,9 @@
 # PoA Domains — Full-Stack Registry Application, Human Explorer & Native Read Guard
 
-Public site: https://maximusmaximus.github.io/poa-domains/
+- **Primary Interactive Explorer**: https://poadomains.grok.me
+- **GitHub Pages Mirror & Guard**: https://maximusmaximus.github.io/poa-domains/
+- **Proof of Agent Mainnet**: https://minepoa.com · **Proof Floor**: https://poa.grok.me
+- **Xero Emoji COLRv1 Font**: https://github.com/maximusmaximus/xeroemoji
 
 > **Dual-Surface Architecture Notice:**
 >
@@ -45,19 +48,33 @@ By default, `npm run app` initializes or replays the persistent journal in `loca
 
 On first boot, `src/app.ts` provisions local `poa1...` Base58 Ed25519 demo keys (`local-data/registry/keys/`), seeds initial root and child domains (`👩‍🦰`, `🫪.👩‍🦰`, `nexus`), opens a live ascending auction on `🌐`, publishes a multi-use standing child offer on `*.nexus`, and lists a fixed-price resale offer on `🫪.👩‍🦰`. Across subsequent restarts, the engine replays deterministically from `local-data/registry/journal.ndjson`.
 
-### Query & Operate via the Registry CLI
+### Query & Operate via the Registry CLI (`keygen`, `act`, `resolve`, `state`)
 
 ```sh
-# Check capabilities, normalization hash, and reserved root domain count
+# 1. Generate a fresh poa1... Ed25519 agent keypair (receives 10,000,000 POA starter allocation on first action)
+npm run app:cli -- keygen --out agent.pem
+
+# 2. Check capabilities, normalization hash, and reserved root domain count
 npm run app:cli -- capabilities --url http://127.0.0.1:8787
 
-# Resolve an ASCII or Unicode 17 emoji domain
+# 3. One-command agent execution (announce + bid on a single-emoji 100k POA domain, or mint a child domain)
+npm run app:cli -- act --url http://127.0.0.1:8787 --key-file agent.pem --action "announceAuction+bid" --params '{"name":"🚀","asset":"POA","reserve":"100000","maxBid":"100000"}' --max-total 100000
+
+# 4. Resolve an ASCII or Unicode 17 emoji domain
 npm run app:cli -- resolve --url http://127.0.0.1:8787 --name nexus
 npm run app:cli -- resolve --url http://127.0.0.1:8787 --name "🫪.👩‍🦰"
 
-# Inspect full committed registry state (deeds, auctions, offers, bids, receipts, credits, balances)
+# 5. Inspect full committed registry state (deeds, auctions, offers, bids, receipts, credits, balances)
 npm run app:cli -- state --url http://127.0.0.1:8787
 ```
+
+### Production Container Deployment (`poadomains.grok.me`)
+
+```sh
+docker compose up -d --build
+```
+
+The included [`Dockerfile`](Dockerfile) and [`docker-compose.yml`](docker-compose.yml) run `node dist/src/app.js` bound to port `8787` with `/data/registry` mounted on a persistent Docker volume, `POA_DOMAINS_PUBLIC_URL=https://poadomains.grok.me`, and a built-in `/healthz` container healthcheck.
 
 You can also launch an ephemeral in-memory demo instance with `npm run reference:demo` or run a custom persistent directory with `node dist/src/reference-cli.js serve --config PUBLIC_CONFIG.json --data /path/to/data --port 8787`.
 

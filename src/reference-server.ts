@@ -13,10 +13,30 @@ const files: Record<string, [string, string]> = {
   "/style.css": ["style.css", "text/css; charset=utf-8"],
   "/XeroEmoji-COLRv1.woff2": ["XeroEmoji-COLRv1.woff2", "font/woff2"],
 };
+export interface ReferenceServerOptions {
+  host?: string;
+  publicUrl?: string;
+  allowedHosts?: string[];
+}
 export async function startReferenceServer(
   engine: Engine,
   port = 0,
+  options: ReferenceServerOptions = {},
 ): Promise<{ server: Server; url: string; close: () => Promise<void> }> {
+  const bindHost = options.host ?? "127.0.0.1";
+  const allowedHostnames = new Set<string>([
+    "127.0.0.1",
+    "localhost",
+    "poadomains.grok.me",
+    ...(options.allowedHosts ?? []),
+  ]);
+  if (options.publicUrl) {
+    try {
+      allowedHostnames.add(new URL(options.publicUrl).hostname.toLowerCase());
+    } catch {
+      /* ignore invalid publicUrl override */
+    }
+  }
   const server = createServer(async (req, res) => {
     const send = (status: number, data: any) => {
       res.statusCode = status;
@@ -28,14 +48,25 @@ export async function startReferenceServer(
     res.setHeader("referrer-policy", "no-referrer");
     res.setHeader(
       "content-security-policy",
-      "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self' https: http://127.0.0.1:*; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self' https: http://127.0.0.1:* http://localhost:*; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     );
     try {
       need((req.url?.length ?? 0) <= 4096, "URL_SIZE");
-      need(/^127\.0\.0\.1(?::[0-9]+)?$/.test(req.headers.host ?? ""), "HOST");
+      const rawHost = (req.headers.host ?? "").toLowerCase();
+      const hostMatch = /^([a-z0-9.-]+)(?::[0-9]+)?$/.exec(rawHost);
+      need(Boolean(hostMatch && allowedHostnames.has(hostMatch[1]!)), "HOST");
       const u = new URL(req.url ?? "/", "http://127.0.0.1");
       if (req.method === "GET") {
         res.setHeader("access-control-allow-origin", "*");
+        if (u.pathname === "/healthz")
+          return send(200, {
+            status: "ok",
+            processAlive: true,
+            chainId: engine.config.chainId,
+            revision: engine.config.revision,
+            sequence: engine.snapshot().sequence,
+            durability: engine.durability(),
+          });
         if (files[u.pathname]) {
           const [path, type] = files[u.pathname]!;
           res.setHeader("content-type", type);
@@ -142,14 +173,16 @@ export async function startReferenceServer(
   server.maxConnections = 32;
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
-    server.listen(port, "127.0.0.1", () => {
+    server.listen(port, bindHost, () => {
       server.off("error", reject);
       resolve();
     });
   });
   const address = server.address();
   need(address && typeof address === "object");
-  const url = "http://127.0.0.1:" + address.port;
+  const urlHost =
+    bindHost === "0.0.0.0" || bindHost === "::" ? "127.0.0.1" : bindHost;
+  const url = "http://" + urlHost + ":" + address.port;
   let closing: Promise<void> | undefined;
   return {
     server,

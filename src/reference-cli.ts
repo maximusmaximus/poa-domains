@@ -1,16 +1,66 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync, statSync } from "node:fs";
-import { createPrivateKey } from "node:crypto";
+import { createPrivateKey, generateKeyPairSync, KeyObject } from "node:crypto";
 import { parseArgs } from "node:util";
 import { Fault, need, parseJSON } from "./core.js";
 import { request, endpoint } from "./client.js";
-import { prepare, handoff } from "./interface.js";
-import { validateBody, signBody } from "./auth.js";
+import { buildMetadataWitness, prepare, handoff } from "./interface.js";
+import {
+  nativePrincipal,
+  publicPrincipal,
+  validateBody,
+  signBody,
+} from "./auth.js";
 import { Engine } from "./engine.js";
 import { SystemClock } from "./clock.js";
 import { attachJournal } from "./store.js";
 import { startReferenceServer } from "./reference-server.js";
 import { runReferenceMcp } from "./reference-mcp.js";
+
+function loadKeyFiles(paths: string[] | undefined): KeyObject[] {
+  need(paths?.length && paths.length <= 4, "KEY_FILE_REQUIRED");
+  return paths.map((path) => {
+    const st = statSync(path);
+    need(
+      st.isFile() &&
+        st.size <= 8192 &&
+        (process.platform === "win32" || (st.mode & 0o077) === 0),
+      "KEY_FILE_PERMISSIONS",
+    );
+    const key = createPrivateKey(readFileSync(path));
+    need(key.asymmetricKeyType === "ed25519", "KEY_SCHEME");
+    return key;
+  });
+}
+
+async function resolveInputMetadata(raw: any, baseUrl: string): Promise<any> {
+  const cloned = structuredClone(raw);
+  if (
+    cloned?.action === "fillChildOffer" &&
+    cloned?.params?.metadata &&
+    (cloned.params.metadata.cid === "<COMPUTED_CIDV1_SHA256>" ||
+      cloned.params.metadata.document?.rightsHash ===
+        "<PARENT_OFFER_RIGHTS_HASH>")
+  ) {
+    const stateResp = await request(baseUrl, "/v1/state");
+    const offer = stateResp?.state?.offers?.[cloned.params.offerId];
+    const parentDeed = offer
+      ? stateResp?.state?.deeds?.[offer.parentId]
+      : undefined;
+    if (offer && parentDeed) {
+      const fullName = `${cloned.params.label}.${parentDeed.name}`;
+      cloned.params.metadata = buildMetadataWitness(
+        fullName,
+        offer.rights ?? { kind: "permanent" },
+        offer.parentId,
+        cloned.params.metadata.document?.description ??
+          `Child domain ${fullName}`,
+      );
+    }
+  }
+  return cloned;
+}
+
 try {
   const { positionals, values: v } = parseArgs({
     allowPositionals: true,
@@ -22,9 +72,17 @@ try {
       config: { type: "string" },
       data: { type: "string" },
       port: { type: "string" },
+      host: { type: "string" },
+      "public-url": { type: "string" },
       name: { type: "string" },
       id: { type: "string" },
       signer: { type: "string" },
+      action: { type: "string" },
+      params: { type: "string" },
+      "max-total": { type: "string" },
+      "request-id": { type: "string" },
+      "parent-id": { type: "string" },
+      description: { type: "string" },
     },
   });
   const cmd = positionals[0];
@@ -42,29 +100,163 @@ try {
     if (v.out) writeFileSync(v.out, text, { flag: "wx", mode: 0o600 });
     else process.stdout.write(text);
   };
-  if (cmd === "prepare")
-    output(prepare(input(), await request(url(), "/v1/capabilities")));
-  else if (cmd === "handoff") output(handoff(validateBody(input())));
-  else if (cmd === "sign") {
-    need(
-      v["key-file"]?.length && v["key-file"].length <= 4,
-      "KEY_FILE_REQUIRED",
+  if (cmd === "keygen") {
+    let key: KeyObject;
+    let keyFile: string | null = null;
+    if (v["key-file"]?.length) {
+      key = loadKeyFiles(v["key-file"])[0]!;
+      keyFile = v["key-file"][0]!;
+    } else {
+      key = generateKeyPairSync("ed25519").privateKey;
+      if (v.out) {
+        writeFileSync(v.out, key.export({ format: "pem", type: "pkcs8" }), {
+          flag: "wx",
+          mode: 0o600,
+        });
+        keyFile = v.out;
+      }
+    }
+    const info = {
+      principal: nativePrincipal(key),
+      legacyPrincipal: publicPrincipal(key),
+      keyFile,
+    };
+    process.stdout.write(JSON.stringify(info, null, 2) + "\n");
+  } else if (cmd === "witness") {
+    need(v.name, "NAME_REQUIRED");
+    output(
+      buildMetadataWitness(
+        v.name,
+        { kind: "permanent" },
+        v["parent-id"] ?? null,
+        v.description ?? `PoA Domains metadata for ${v.name}`,
+      ),
     );
+  } else if (cmd === "prepare") {
+    const baseUrl = url();
+    const resolvedInput = await resolveInputMetadata(input(), baseUrl);
+    output(prepare(resolvedInput, await request(baseUrl, "/v1/capabilities")));
+  } else if (cmd === "handoff") output(handoff(validateBody(input())));
+  else if (cmd === "sign") {
     const body = validateBody(input());
     // Files are read only by the operator's local process. Key bytes never leave it.
-    const keys = v["key-file"].map((path) => {
-      const st = statSync(path);
-      need(
-        st.isFile() &&
-          st.size <= 8192 &&
-          (process.platform === "win32" || (st.mode & 0o077) === 0),
-        "KEY_FILE_PERMISSIONS",
-      );
-      const key = createPrivateKey(readFileSync(path));
-      need(key.asymmetricKeyType === "ed25519", "KEY_SCHEME");
-      return key;
-    });
+    const keys = loadKeyFiles(v["key-file"]);
     output(signBody(body, keys));
+  } else if (cmd === "act") {
+    const baseUrl = url();
+    const keys = loadKeyFiles(v["key-file"]);
+    const primaryKey = keys[0]!;
+    need(v.action && v.params, "ACTION_AND_PARAMS_REQUIRED");
+    const cap = await request(baseUrl, "/v1/capabilities");
+    const signer =
+      v.signer ??
+      (cap.revision === "poa-mainnet-v1"
+        ? nativePrincipal(primaryKey)
+        : publicPrincipal(primaryKey));
+    const parsedParams = parseJSON(v.params);
+    const stateResp = await request(baseUrl, "/v1/state");
+    const now = stateResp.observedServerTime ?? Math.floor(Date.now() / 1000);
+    let nonce = (
+      await request(baseUrl, "/v1/nonce?signer=" + encodeURIComponent(signer))
+    ).nonce as number;
+    const baseReqId = v["request-id"] ?? `act-${now}-${nonce}`;
+
+    if (v.action === "announceAuction+bid") {
+      const domainName = parsedParams.name;
+      const reserve = parsedParams.reserve ?? "1000";
+      const bidAmount = parsedParams.maxBid ?? reserve;
+      const announceInput = {
+        signer,
+        coSigners: [],
+        requestId: `${baseReqId}-announce`,
+        nonce: nonce++,
+        notBefore: 0,
+        deadline: now + 3600,
+        maxTotal: "0",
+        maxNetworkFee: "0",
+        action: "announceAuction",
+        params: {
+          name: domainName,
+          asset: parsedParams.asset ?? "POA",
+          reserve,
+          openAt: cap.revision === "poa-mainnet-v1" ? now : now + 86400,
+          expectedDeedId: null,
+          expectedVersion: 0,
+          metadata: buildMetadataWitness(
+            domainName,
+            { kind: "permanent" },
+            null,
+            `Root domain ${domainName}`,
+          ),
+        },
+      };
+      const announceBody = prepare(announceInput, cap);
+      const announceReceipt = await request(
+        baseUrl,
+        "/v1/intents",
+        signBody(announceBody, keys),
+      );
+      if (
+        announceReceipt.status !== "succeeded" ||
+        cap.revision !== "poa-mainnet-v1"
+      ) {
+        output({ announceReceipt });
+      } else {
+        const bidInput = {
+          signer,
+          coSigners: [],
+          requestId: `${baseReqId}-bid`,
+          nonce,
+          notBefore: 0,
+          deadline: now + 3600,
+          maxTotal: v["max-total"] ?? bidAmount,
+          maxNetworkFee: "0",
+          action: "bid",
+          params: {
+            auctionId: announceReceipt.result.auctionId,
+            expectedVersion: 1,
+            asset: parsedParams.asset ?? "POA",
+            amount: bidAmount,
+            beneficiary: signer,
+          },
+        };
+        const bidBody = prepare(bidInput, cap);
+        const bidReceipt = await request(
+          baseUrl,
+          "/v1/intents",
+          signBody(bidBody, keys),
+        );
+        output({
+          status: bidReceipt.status,
+          auctionId: announceReceipt.result.auctionId,
+          announceReceipt,
+          bidReceipt,
+        });
+      }
+    } else {
+      const rawIntent = await resolveInputMetadata(
+        {
+          signer,
+          coSigners: [],
+          requestId: baseReqId,
+          nonce,
+          notBefore: 0,
+          deadline: now + 3600,
+          maxTotal:
+            v["max-total"] ??
+            parsedParams.amount ??
+            parsedParams.price ??
+            parsedParams.reserve ??
+            "0",
+          maxNetworkFee: "0",
+          action: v.action,
+          params: parsedParams,
+        },
+        baseUrl,
+      );
+      const body = prepare(rawIntent, cap);
+      output(await request(baseUrl, "/v1/intents", signBody(body, keys)));
+    }
   } else if (cmd === "submit")
     output(await request(url(), "/v1/intents", input()));
   else if (cmd === "capabilities")
@@ -95,8 +287,15 @@ try {
     try {
       const port = Number(v.port ?? "8787");
       need(Number.isInteger(port) && port >= 0 && port <= 65535, "PORT");
-      const s = await startReferenceServer(e, port);
-      output({ mode: "local-reference-only", url: s.url });
+      const s = await startReferenceServer(e, port, {
+        host: v.host,
+        publicUrl: v["public-url"],
+      });
+      output({
+        mode: "local-reference-only",
+        url: s.url,
+        publicUrl: v["public-url"] ?? null,
+      });
       let stopping = false;
       const stop = async () => {
         if (stopping) return;
@@ -112,7 +311,7 @@ try {
     }
   } else
     throw new Fault(
-      "COMMAND: prepare|sign|handoff|submit|capabilities|state|export|resolve|receipt|nonce|mcp|serve",
+      "COMMAND: keygen|witness|act|prepare|sign|handoff|submit|capabilities|state|export|resolve|receipt|nonce|mcp|serve",
     );
 } catch (e) {
   process.stderr.write(

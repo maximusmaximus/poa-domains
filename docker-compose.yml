@@ -1,0 +1,17 @@
+services:
+  poa-domains:
+    build: .
+    container_name: poa-domains-explorer
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      POA_DOMAINS_HOST: "0.0.0.0"
+      POA_DOMAINS_PORT: "8787"
+      POA_DOMAINS_DATA: "/data/registry"
+      POA_DOMAINS_PUBLIC_URL: "https://poadomains.grok.me"
+    volumes:
+      - poa_domains_data:/data/registry
+
+volumes:
+  poa_domains_data:
