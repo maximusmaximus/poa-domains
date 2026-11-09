@@ -10,7 +10,14 @@ import {
 } from "../src/core.js";
 import { normalizeName, manifest, NORMALIZATION_HASH } from "../src/names.js";
 import { cidFor, metadata, validCid } from "../src/metadata.js";
-import { minimumNext } from "../src/config.js";
+import {
+  minimumNext,
+  validateConfig,
+  SINGLE_LETTER_RESERVED,
+  PROTOCOL_AND_SYSTEM_RESERVED,
+  TOP_BRAND_AND_PRODUCT_RESERVED,
+  DEFAULT_RESERVED_NAMES,
+} from "../src/config.js";
 import { setup, witness } from "./helpers.js";
 import { rightsHash } from "../src/model.js";
 import { prepare, handoff, capabilities } from "../src/interface.js";
@@ -140,6 +147,60 @@ test("missing mandatory fixture policies and unsupported live assets fail closed
   }
   const c = setup().config;
   assert.equal(c.assets.POA!.kind, "local-fixture");
+  assert.throws(() =>
+    validateConfig({ ...c, reserved: ["system", "system"] }),
+  );
+});
+test("reserved list covers letters a-z, protocol/system/anti-phishing names, and 500 brand/product names", () => {
+  assert.equal(SINGLE_LETTER_RESERVED.length, 26);
+  assert.deepEqual(
+    SINGLE_LETTER_RESERVED,
+    Array.from({ length: 26 }, (_, i) => String.fromCharCode(97 + i)),
+  );
+  assert.equal(PROTOCOL_AND_SYSTEM_RESERVED.length, 129);
+  assert.equal(TOP_BRAND_AND_PRODUCT_RESERVED.length, 500);
+  assert.equal(DEFAULT_RESERVED_NAMES.length, 655);
+  assert.equal(
+    new Set(DEFAULT_RESERVED_NAMES).size,
+    DEFAULT_RESERVED_NAMES.length,
+  );
+  const c = setup();
+  for (const sample of [
+    "a",
+    "z",
+    "poa",
+    "minepoa",
+    "system",
+    "admin",
+    "wallet",
+    "openai",
+    "apple",
+    "google",
+    "microsoft",
+    "nvidia",
+    "bitcoin",
+    "visa",
+    "netflix",
+    "tesla",
+  ]) {
+    assert.ok(DEFAULT_RESERVED_NAMES.includes(sample), sample);
+    const n = normalizeName(sample);
+    const r = c.send(
+      "announceAuction",
+      {
+        name: n.canonical,
+        asset: "POA",
+        reserve: n.tier === "premium" ? "1000" : "100",
+        openAt: c.clock.now() + 86400,
+        expectedDeedId: null,
+        expectedVersion: 0,
+        metadata: witness(n.canonical),
+      },
+      c.issuer,
+    );
+    assert.equal(r.status, "rejected");
+    assert.equal(r.code, "RESERVED_NAME");
+  }
 });
 test("real Ed25519 signature rejects forgery before consuming nonce", () => {
   const c = setup();

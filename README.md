@@ -63,7 +63,7 @@ The complete check includes production guard/API/CLI/MCP regressions, production
 
 `npm run reference:demo` explicitly opens the local reference UI. `node dist/src/reference-cli.js ...` is the reference-only CLI. Its `serve --config PUBLIC_CONFIG.json --data /private/runtime/local-data --port 8787` accepts only the local reference profile and opens a synthetic journal. Do not use it with real assets or a real treasury key. The reference signer consumes only ephemeral/private local test files; no key belongs in a frontend, URL, request parameter, log or repository.
 
-The fixture reserved names are exactly `system` and `admin` (`src/config.ts`); these are not an approved production reservation policy. Fixture fees, reserves, assets and bid increment likewise are not approved production economics or custody choices.
+The default reserved list (`src/reserved.ts`, loaded by `src/config.ts`) reserves **655 root names**: all 26 single-character ASCII letters (`a`–`z`), 129 protocol/system/network/anti-phishing names, and 500 top global brand and product names. Fixture fees, reserves, assets and bid increment remain synthetic test settings, not approved production economics or custody choices.
 
 ### Reference engine capabilities (not native operations)
 
