@@ -62,6 +62,7 @@ export class Engine {
   readonly config: Config;
   readonly policyHash: string;
   readonly registryId: string;
+  private readonly reservedSet: Set<string>;
   private state: State;
   private storage?: Persistence;
   private stopped = false;
@@ -71,6 +72,7 @@ export class Engine {
   ) {
     this.config = validateConfig(config);
     freeze(this.config);
+    this.reservedSet = new Set(this.config.reserved);
     this.policyHash = policyHash(this.config);
     this.registryId = registryId(this.config);
     this.state = {
@@ -238,7 +240,7 @@ export class Engine {
   }
   private entry(s: State, name: unknown) {
     const n = canonicalName(name);
-    need(!this.config.reserved.includes(n.canonical), "RESERVED_NAME");
+    need(!this.reservedSet.has(n.canonical), "RESERVED_NAME");
     return { n, e: s.names[n.canonical] };
   }
   private deed(s: State, p: Obj): Deed {

@@ -11,6 +11,13 @@ import {
 } from "./core.js";
 import { principal } from "./auth.js";
 import { canonicalName, NORMALIZATION_HASH } from "./names.js";
+import { DEFAULT_RESERVED_NAMES } from "./reserved.js";
+export {
+  SINGLE_LETTER_RESERVED,
+  PROTOCOL_AND_SYSTEM_RESERVED,
+  TOP_BRAND_AND_PRODUCT_RESERVED,
+  DEFAULT_RESERVED_NAMES,
+} from "./reserved.js";
 export interface Config {
   revision: "local-reference-v1";
   chainId: string;
@@ -105,7 +112,12 @@ export function validateConfig(value: unknown): Config {
       amount(sums[asset]!.toString());
     }
   }
-  need(Array.isArray(c.reserved) && c.reserved.length <= 256, "CONFIG");
+  need(
+    Array.isArray(c.reserved) &&
+      c.reserved.length <= 4096 &&
+      new Set(c.reserved).size === c.reserved.length,
+    "CONFIG",
+  );
   for (const name of c.reserved) canonicalName(name);
   return structuredClone(c) as Config;
 }
@@ -159,6 +171,6 @@ export function fixtureConfig(
       },
     },
     balances,
-    reserved: ["system", "admin"],
+    reserved: [...DEFAULT_RESERVED_NAMES],
   });
 }
