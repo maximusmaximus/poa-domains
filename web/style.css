@@ -6,13 +6,14 @@
 }
 body {
   margin: 0;
-  overflow-x: hidden;
 }
 main {
   max-width: 850px;
   padding: 3rem 1.5rem;
   margin: auto;
   box-sizing: border-box;
+  /* Long explorer URLs must wrap even with wider system-font metrics. */
+  overflow-wrap: anywhere;
 }
 pre {
   white-space: pre-wrap;
@@ -84,6 +85,7 @@ section {
   margin-top: 1rem;
 }
 .resource-card {
+  min-width: 0;
   background: #161f2c;
   border: 1px solid #38465e;
   border-radius: 10px;

@@ -774,6 +774,7 @@ async function runPublicProductionPagesMultiBrowserSmoke(prodUrl: string) {
           page,
           vp,
           [
+            "explorer-mirror-title",
             "availability",
             "operations",
             "status",
@@ -785,6 +786,16 @@ async function runPublicProductionPagesMultiBrowserSmoke(prodUrl: string) {
           `${name}:public-pages`,
         );
       }
+
+      // Ubuntu's system-ui resolves to wider metrics than this box's default.
+      // Reproduce the original 356px overflow from the unbreakable explorer URL.
+      await page.evaluate(()=>{document.documentElement.style.fontFamily='"DejaVu Sans", monospace';});
+      await assertResponsiveGeometry(page,{name:"mobile-xs-wide-font",width:320,height:568},
+        ["explorer-mirror-title","availability","operations","status","emoji-format-checker","network-details"],
+        `${name}:public-pages-wide-font`);
+      assert.ok(await page.locator(".resource-panel").evaluate(el=>el.scrollWidth<=el.clientWidth+1),
+        `${name}: long explorer URLs stay within their panel, without clipping`);
+      await page.evaluate(()=>{document.documentElement.style.removeProperty("font-family");});
 
       // Test the Shadow-DOM Unicode 17 emoji format checker across Chromium, Firefox, and WebKit
       const emojiCheckResult = await page.evaluate(async () => {
