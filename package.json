@@ -26,6 +26,7 @@
     "app:cli": "node dist/src/reference-cli.js",
     "reference:demo": "npm run build && node dist/src/reference-demo.js",
     "reference:pages:smoke": "npm run build && node dist/test/reference-pages-smoke.js",
+    "ui:e2e": "npm run pages:build && node dist/test/ui-ux-e2e-smoke.js",
     "start": "node dist/src/cli.js serve",
     "production:smoke": "npm run build && node dist/test/production-smoke.js",
     "native:smoke": "npm run build && node dist/test/native-live-smoke.js",

@@ -6,11 +6,17 @@
 }
 body {
   margin: 0;
+  overflow-x: hidden;
 }
 main {
   max-width: 850px;
   padding: 3rem 1.5rem;
   margin: auto;
+  box-sizing: border-box;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 h1 {
   font-size: 2.8rem;
