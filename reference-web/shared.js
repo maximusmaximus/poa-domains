@@ -56,24 +56,62 @@ export function safeObject(value, depth = 0) {
     throw Error("Invalid value");
   }
 }
+const trieCache = new WeakMap();
+function getAliasTrie(manifest) {
+  let root = trieCache.get(manifest);
+  if (root) return root;
+  root = { next: new Map(), canonical: null };
+  const list = manifest.sequences
+    ? Object.entries(manifest.sequences).map(([input, canonical]) => ({
+        input,
+        canonical,
+      }))
+    : manifest.aliases;
+  for (const a of list) {
+    let node = root;
+    for (const ch of a.input) {
+      let child = node.next.get(ch);
+      if (!child) {
+        child = { next: new Map(), canonical: null };
+        node.next.set(ch, child);
+      }
+      node = child;
+    }
+    node.canonical = a.canonical;
+  }
+  trieCache.set(manifest, root);
+  return root;
+}
 export function normalize(value, manifest) {
   if (typeof value !== "string") throw Error("Name");
   const s = value.startsWith("poa:") ? value.slice(4) : value;
   const labels = s.split(".");
   if (labels.length > 2) throw Error("Only roots and direct children");
-  const aliases = [...manifest.aliases].sort(
-    (a, b) => b.input.length - a.input.length || (a.input < b.input ? -1 : 1),
-  );
+  const trie = getAliasTrie(manifest);
   return labels
     .map((label) => {
       let i = 0,
         out = "",
         count = 0;
       while (i < label.length) {
-        const a = aliases.find((x) => label.startsWith(x.input, i));
-        if (a) {
-          out += a.canonical;
-          i += a.input.length;
+        let node = trie,
+          j = i,
+          matchedCanonical = null,
+          matchedEnd = i;
+        while (j < label.length && node) {
+          const cp = label.codePointAt(j);
+          const ch = String.fromCodePoint(cp);
+          node = node.next.get(ch);
+          if (!node) break;
+          j += ch.length;
+          if (node.canonical !== null) {
+            matchedCanonical = node.canonical;
+            matchedEnd = j;
+          }
+        }
+        if (matchedCanonical !== null) {
+          out += matchedCanonical;
+          i = matchedEnd;
         } else {
           const c = label[i++];
           if (!/^[a-zA-Z0-9]$/.test(c)) throw Error("Unsupported name");
