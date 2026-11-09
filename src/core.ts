@@ -85,14 +85,14 @@ export const hash = (domain: string, value: any) =>
   createHash("sha256")
     .update(canonical([domain, value]))
     .digest("hex");
-export function noSecrets(v: any, depth = 0): void {
+export function noSecrets(v: any, depth = 0, maxArray = 256): void {
   need(depth <= 24, "DEPTH");
   if (typeof v === "string") {
     text(v, 16384);
     need(!/-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/.test(v), "SECRET_FIELD");
   } else if (Array.isArray(v)) {
-    need(v.length <= 256, "SIZE");
-    for (const x of v) noSecrets(x, depth + 1);
+    need(v.length <= maxArray, "SIZE");
+    for (const x of v) noSecrets(x, depth + 1, maxArray);
   } else if (v && typeof v === "object")
     for (const [k, x] of Object.entries(v)) {
       text(k, 1024);
@@ -106,13 +106,13 @@ export function noSecrets(v: any, depth = 0): void {
         ),
         "SECRET_FIELD",
       );
-      noSecrets(x, depth + 1);
+      noSecrets(x, depth + 1, maxArray);
     }
   else if (typeof v === "number") integer(v);
   else need(v === null || typeof v === "boolean");
 }
 // Bounded JSON parser with duplicate-key rejection. No eval and no coercion.
-export function parseJSON(source: string, limit = 65536): any {
+export function parseJSON(source: string, limit = 65536, maxArray = 256): any {
   need(Buffer.byteLength(source) <= limit, "BODY_TOO_LARGE");
   let i = 0;
   const ws = () => {
@@ -149,7 +149,7 @@ export function parseJSON(source: string, limit = 65536): any {
       }
       while (i < source.length) {
         if (array) {
-          need(out.length < 256, "SIZE");
+          need(out.length < maxArray, "SIZE");
           out.push(value(depth + 1));
         } else {
           need(source[i] === '"', "JSON");
@@ -190,7 +190,7 @@ export function parseJSON(source: string, limit = 65536): any {
     const out = value(0);
     ws();
     need(i === source.length, "JSON");
-    noSecrets(out);
+    noSecrets(out, 0, maxArray);
     return out;
   } catch (e) {
     if (e instanceof Fault) throw e;

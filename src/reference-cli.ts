@@ -88,7 +88,7 @@ try {
   else if (cmd === "serve") {
     need(v.config && v.data, "CONFIG_AND_DATA_REQUIRED");
     const e = new Engine(
-      parseJSON(readFileSync(v.config, "utf8")),
+      parseJSON(readFileSync(v.config, "utf8"), 262144, 4096),
       new SystemClock(),
     );
     attachJournal(e, v.data);

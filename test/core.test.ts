@@ -1,5 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { startRegistryApp } from "../src/app.js";
 import {
   canonical,
   parseJSON,
@@ -610,4 +614,50 @@ test("browser shared module maintains exact canonical, normalization, parser, an
     web.instructions(webBody, intentId(engineBody)),
     /submit_intent/,
   );
+});
+test("launchable full-stack registry app initializes mainnet profile, serves Unicode 17 emoji domains, and replays from journal across restarts", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "poa-app-test-"));
+  try {
+    const app1 = await startRegistryApp({ dataDir: dir, port: 0 });
+    let stateHash1 = "";
+    let sequence1 = 0;
+    try {
+      assert.equal(app1.config.revision, "poa-mainnet-v1");
+      assert.equal(app1.config.chainId, "poa-mainnet-1");
+      assert.ok(app1.principals.alice!.startsWith("poa1"));
+      const capRes = await fetch(app1.url + "/v1/capabilities");
+      assert.equal(capRes.status, 200);
+      const cap: any = await capRes.json();
+      assert.equal(cap.emojiAliases, 5216);
+      assert.equal(cap.chainId, "poa-mainnet-1");
+      const resolveEmoji = await fetch(
+        app1.url + "/v1/resolve?name=" + encodeURIComponent("🫪.👩‍🦰"),
+      );
+      assert.equal(resolveEmoji.status, 200);
+      const resolvedChild: any = await resolveEmoji.json();
+      assert.equal(resolvedChild.deed.owner, app1.principals.bob);
+      const resolveAscii = await fetch(
+        app1.url + "/v1/resolve?name=" + encodeURIComponent("nexus"),
+      );
+      assert.equal(resolveAscii.status, 200);
+      const resolvedNexus: any = await resolveAscii.json();
+      assert.equal(resolvedNexus.deed.owner, app1.principals.alice);
+      assert.equal(resolvedNexus.deed.records.length, 2);
+      stateHash1 = app1.engine.stateHash();
+      sequence1 = app1.engine.snapshot().sequence;
+      assert.ok(sequence1 > 0);
+    } finally {
+      await app1.close();
+    }
+    const app2 = await startRegistryApp({ dataDir: dir, port: 0 });
+    try {
+      assert.equal(app2.engine.stateHash(), stateHash1);
+      assert.equal(app2.engine.snapshot().sequence, sequence1);
+      assert.deepEqual(app2.principals, app1.principals);
+    } finally {
+      await app2.close();
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

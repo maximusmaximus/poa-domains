@@ -57,13 +57,22 @@ npm run native:smoke # explicit GET-only public-network smoke; requires node ava
 
 The complete check includes production guard/API/CLI/MCP regressions, production smoke, the retained isolated reference test suite, both browser test surfaces, Unicode subset audit and npm advisory checks. Tests use ephemeral unfunded keys and synthetic fixtures only where explicitly testing the reference engine; no real PoA state is changed. [Test details](docs/TESTING.md).
 
-## Explicitly isolated reference implementation
+## Explicitly isolated reference implementation & launchable registry app
 
-`src/reference-cli.ts`, `src/reference-server.ts`, `src/reference-mcp.ts`, `src/reference-demo.ts` and `reference-web/` are local test/reference tools, not production services. They are never loaded by production entry points or the public bundle. The fixture snapshot generator and its static test builder live under `test/`; their output is temporary and not published.
+`src/app.ts`, `src/reference-cli.ts`, `src/reference-server.ts`, `src/reference-mcp.ts`, `src/reference-demo.ts` and `reference-web/` are local registry/reference tools, not public Pages services. They are never loaded by the read-only production guard entry points (`src/cli.ts`, `src/server.ts`, `src/mcp.ts`) or the public Pages bundle. The fixture snapshot generator and its static test builder live under `test/`; their output is temporary and not published.
 
-`npm run reference:demo` explicitly opens the local reference UI. `node dist/src/reference-cli.js ...` is the reference-only CLI. Its `serve --config PUBLIC_CONFIG.json --data /private/runtime/local-data --port 8787` accepts only the local reference profile and opens a synthetic journal. Do not use it with real assets or a real treasury key. The reference signer consumes only ephemeral/private local test files; no key belongs in a frontend, URL, request parameter, log or repository.
+To launch the persistent full-stack PoA Domains registry application (`poa-mainnet-v1` config profile, `poa1...` Base58 Ed25519 principals, all 5,216 official Unicode 17 emoji sequences, 655 reserved root names, and fsynced journal persistence in `local-data/registry`):
 
-The default reserved list (`src/reserved.ts`, loaded by `src/config.ts`) reserves **655 root names**: all 26 single-character ASCII letters (`a`–`z`), 129 protocol/system/network/anti-phishing names, and 500 top global brand and product names. Fixture fees, reserves, assets and bid increment remain synthetic test settings, not approved production economics or custody choices.
+```sh
+npm run app                      # launches persistent registry app & Web UI on http://127.0.0.1:8787
+npm run app:cli -- resolve --url http://127.0.0.1:8787 --name nexus
+npm run app:cli -- state --url http://127.0.0.1:8787
+npm run app:cli -- capabilities --url http://127.0.0.1:8787
+```
+
+`npm run reference:demo` explicitly opens the in-memory local reference UI. `node dist/src/reference-cli.js ...` is the reference CLI. Its `serve --config PUBLIC_CONFIG.json --data /private/runtime/local-data --port 8787` opens a durable journal for either `local-reference-v1` or `poa-mainnet-v1`. The local signer consumes only ephemeral/private local files; no key belongs in a frontend, URL, request parameter, log or repository.
+
+The default reserved list (`src/reserved.ts`, loaded by `src/config.ts`) reserves **655 root names**: all 26 single-character ASCII letters (`a`–`z`), 129 protocol/system/network/anti-phishing names, and 500 top global brand and product names.
 
 ### Reference engine capabilities (not native operations)
 
