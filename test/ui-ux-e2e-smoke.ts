@@ -47,6 +47,7 @@ const MIME_TYPES: Record<string, string> = {
   ".json": "application/json",
   ".css": "text/css",
   ".svg": "image/svg+xml",
+  ".woff2": "font/woff2",
 };
 
 async function startStaticDirServer(
@@ -215,6 +216,15 @@ async function runFullUiUxFlowsOnRegistryApp(
   // Restore desktop viewport for interactive UX sequence
   await page.setViewportSize({ width: 1440, height: 900 });
 
+  // Verify Xero Emoji web font is registered and active in the browser
+  const xeroFontReady = await page.evaluate(async () => {
+    await document.fonts.ready;
+    return Array.from(document.fonts).some((f) =>
+      f.family.replace(/['"]/g, "").includes("Xero"),
+    );
+  });
+  assert.equal(xeroFontReady, true, `${browserName}: Xero Emoji font loaded`);
+
   // 2. Quick-try pills UX: click every quick pill and verify input + result update
   const pillQueries = await page
     .locator(".quick-pills .pill")
@@ -223,8 +233,8 @@ async function runFullUiUxFlowsOnRegistryApp(
     );
   assert.equal(
     pillQueries.length,
-    5,
-    `${browserName}: 5 quick-try pills rendered`,
+    6,
+    `${browserName}: 6 quick-try pills rendered`,
   );
   for (const q of pillQueries) {
     await page.locator(`.quick-pills .pill[data-query="${q}"]`).click();
@@ -236,7 +246,7 @@ async function runFullUiUxFlowsOnRegistryApp(
     );
   }
 
-  // 3. Verify all 7 availability classification states via search bar & Enter key
+  // 3. Verify all availability classification & pricing states via search bar & Enter key
   // (a) Invalid domain syntax via Enter key
   await page.locator("#searchInput").fill("bad--domain");
   await page.locator("#searchInput").press("Enter");
@@ -255,7 +265,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   assert.match(await page.locator("#searchResult").innerText(), /655-name/);
   assert.equal(await page.locator("#addToCartBtn").count(), 0);
 
-  // (c) Available premium Unicode 17 emoji root via poa: prefix
+  // (c) Available single-emoji root via poa: prefix (100k POA minimum bid)
   await page.locator("#searchInput").fill("poa:🚀");
   await page.locator("#searchInput").press("Enter");
   assert.match(
@@ -265,6 +275,34 @@ async function runFullUiUxFlowsOnRegistryApp(
   assert.match(
     await page.locator("#searchResult").innerText(),
     /Tier: PREMIUM/,
+  );
+  assert.match(
+    await page.locator("#searchResult").innerText(),
+    /100k POA single-emoji minimum bid/,
+  );
+  assert.match(
+    await page.locator("#searchResult").innerText(),
+    /Opening auction reserve: 100000 POA/,
+  );
+
+  // (c2) Available multi-emoji root (more than 1 emoji -> 1k POA minimum bid)
+  await page.locator("#searchInput").fill("🔥🔥");
+  await page.locator("#searchInput").press("Enter");
+  assert.match(
+    await page.locator("#searchResult").innerText(),
+    /AVAILABLE ROOT DOMAIN/,
+  );
+  assert.match(
+    await page.locator("#searchResult").innerText(),
+    /Tier: STANDARD/,
+  );
+  assert.match(
+    await page.locator("#searchResult").innerText(),
+    /1k POA multi-emoji minimum bid/,
+  );
+  assert.match(
+    await page.locator("#searchResult").innerText(),
+    /Opening auction reserve: 1000 POA/,
   );
 
   // (d) Available standard ASCII root -> add to cart from search result
@@ -290,7 +328,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   );
   assert.match(
     await page.locator("#searchResult").innerText(),
-    /Minimum next valid bid: 110000001 POA/,
+    /Minimum next valid bid: 110001 POA/,
   );
 
   // (f) Available child domain via standing parent offer
@@ -310,7 +348,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   );
   assert.match(
     await page.locator("#searchResult").innerText(),
-    /Active fixed-price resale listing: 25000000 POA/,
+    /Active fixed-price resale listing: 2500 POA/,
   );
 
   // 4. Add items to cart directly from #auctions and #offers cards
@@ -325,9 +363,9 @@ async function runFullUiUxFlowsOnRegistryApp(
 
   // 5. Edit bid amount inside cart item and verify prompt updates live
   const firstCartInput = page.locator("#cartList .card input").first();
-  await firstCartInput.fill("25000000");
+  await firstCartInput.fill("25000");
   await firstCartInput.dispatchEvent("input");
-  assert.match(await page.locator("#cartPrompt").innerText(), /25000000/);
+  assert.match(await page.locator("#cartPrompt").innerText(), /25000/);
 
   // 6. Enter signer principal in #cartSigner and verify prompt updates live
   await page.locator("#cartSigner").fill(carolPrincipal);
@@ -425,17 +463,17 @@ async function runAgentRoundtripVerification(
   );
   await page.locator("#addToCartBtn").click();
 
-  // Human also searches for live auction "🌐" and queues a 125000000 POA bid
+  // Human also searches for live auction "🌐" and queues a 125000 POA bid
   await page.locator("#searchInput").fill("🌐");
   await page.locator("#searchBtn").click();
-  await page.locator("#searchResult input").fill("125000000");
+  await page.locator("#searchResult input").fill("125000");
   await page.locator("#addToCartBtn").click();
   assert.equal(await page.locator("#cartCount").innerText(), "2");
 
   const promptText = await page.locator("#cartPrompt").innerText();
   assert.match(promptText, /builder\.nexus/);
   assert.match(promptText, /fillChildOffer/);
-  assert.match(promptText, /125000000/);
+  assert.match(promptText, /125000/);
 
   // Now the simulated AI Agent executes both intents against POST /v1/intents
   const cap = capabilities(app.engine);
@@ -491,7 +529,7 @@ async function runAgentRoundtripVerification(
   const fillReceipt: any = await fillRes.json();
   assert.equal(fillReceipt.status, "succeeded");
 
-  // Agent Intent 2: bob places a 125000000 POA bid on "🌐", displacing carol's 100000000 bid
+  // Agent Intent 2: bob places a 125000 POA bid on "🌐", displacing carol's 100000 bid
   const bidBody = prepare(
     {
       signer: app.principals.bob!,
@@ -500,14 +538,14 @@ async function runAgentRoundtripVerification(
       nonce: app.engine.nextNonce(app.principals.bob!),
       notBefore: 0,
       deadline: now + 60000,
-      maxTotal: "125000000",
+      maxTotal: "125000",
       maxNetworkFee: "0",
       action: "bid",
       params: {
         auctionId: liveAuction.id,
         expectedVersion: liveAuction.version,
         asset: liveAuction.asset,
-        amount: "125000000",
+        amount: "125000",
         beneficiary: app.principals.bob!,
       },
     },
@@ -539,10 +577,10 @@ async function runAgentRoundtripVerification(
     /OWNED \(PERMANENT DEED\)/,
   );
 
-  // Verify #auctions reflects bob's 125000000 high bid and new 137500001 minimum next bid
+  // Verify #auctions reflects bob's 125000 high bid and new 137501 minimum next bid
   const auctionsText = await page.locator("#auctions").innerText();
-  assert.match(auctionsText, /High bid 125000000 by/);
-  assert.match(auctionsText, /137500001 POA/);
+  assert.match(auctionsText, /High bid 125000 by/);
+  assert.match(auctionsText, /137501 POA/);
 
   // Verify #history shows the new child purchase and carol's displaced bid as OUTBID
   const historyText = await page.locator("#history").innerText();
@@ -550,9 +588,9 @@ async function runAgentRoundtripVerification(
   assert.match(historyText, /agent-e2e-fill-builder-nexus/);
   assert.match(historyText, /OUTBID/);
 
-  // Verify #balances now shows carol's 100000000 POA withdrawable outbid escrow refund
+  // Verify #balances now shows carol's 100000 POA withdrawable outbid escrow refund
   const balancesText = await page.locator("#balances").innerText();
-  assert.match(balancesText, /Refund credit: 100000000 POA/);
+  assert.match(balancesText, /Refund credit: 100000 POA/);
   assert.match(balancesText, /Withdrawable by/);
 }
 

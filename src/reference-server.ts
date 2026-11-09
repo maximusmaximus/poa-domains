@@ -11,6 +11,7 @@ const files: Record<string, [string, string]> = {
   "/shared.js": ["shared.js", "text/javascript; charset=utf-8"],
   "/config.json": ["config.json", "application/json; charset=utf-8"],
   "/style.css": ["style.css", "text/css; charset=utf-8"],
+  "/XeroEmoji-COLRv1.woff2": ["XeroEmoji-COLRv1.woff2", "font/woff2"],
 };
 export async function startReferenceServer(
   engine: Engine,
@@ -27,7 +28,7 @@ export async function startReferenceServer(
     res.setHeader("referrer-policy", "no-referrer");
     res.setHeader(
       "content-security-policy",
-      "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self' https: http://127.0.0.1:*; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self' https: http://127.0.0.1:*; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     );
     try {
       need((req.url?.length ?? 0) <= 4096, "URL_SIZE");

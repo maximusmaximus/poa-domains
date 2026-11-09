@@ -20,14 +20,17 @@
         <h2>Search domain availability &amp; build agent bid cart</h2>
         <p class="muted">
           Search any ASCII or Unicode 17 emoji domain (roots or
-          <code>child.root</code>) to check live availability, reserve tier,
-          minimum next bid, or standing offers. Add domains to your cart to
-          generate a copy-and-paste prompt for your AI agent.
+          <code>child.root</code>, rendered with <strong>Xero Emoji</strong>) to
+          check live availability, reserve tier (single emoji minimum bid:
+          <strong>100,000 POA / 100k POA</strong>; more than one emoji:
+          <strong>1,000 POA / 1k POA</strong>), minimum next bid, or standing
+          offers. Add domains to your cart to generate a copy-and-paste prompt
+          for your AI agent.
         </p>
         <div class="search-bar">
           <input
             id="searchInput"
-            placeholder="Search domain (e.g. quantum, orbit, 🌐, 👩‍🦰, agent.alpha, openai)..."
+            placeholder="Search domain (e.g. quantum, orbit, 🌐, 🚀, 🚀🚀, 👩‍🦰, agent.alpha, openai)..."
             autocomplete="off"
           />
           <button id="searchBtn" type="button">Check availability</button>
@@ -38,7 +41,10 @@
             quantum (available)
           </button>
           <button type="button" class="pill" data-query="🚀">
-            🚀 (premium emoji)
+            🚀 (100k POA single emoji)
+          </button>
+          <button type="button" class="pill" data-query="🚀🚀">
+            🚀🚀 (1k POA multi-emoji)
           </button>
           <button type="button" class="pill" data-query="orbit">
             orbit (live auction)

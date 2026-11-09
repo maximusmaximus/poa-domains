@@ -38,11 +38,18 @@ export function buildReferenceBundle(directory: string) {
       entry.key === nameKey(fixture.capabilities.registryId, entry.name),
       "PUBLIC_NAME_ID",
     );
-  const files = ["index.html", "style.css", "app.js", "shared.js", "icon.svg"];
+  const files = [
+    "index.html",
+    "style.css",
+    "app.js",
+    "shared.js",
+    "icon.svg",
+    "XeroEmoji-COLRv1.woff2",
+  ];
   for (const file of files)
     copyFileSync(join("reference-web", file), join(output, file));
   const policy =
-    "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'";
+    "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'";
   const html = readFileSync(join(output, "index.html"), "utf8").replace(
     "<head>",
     '<head>\n<meta http-equiv="Content-Security-Policy" content="' +
@@ -103,7 +110,10 @@ export function buildReferenceBundle(directory: string) {
       "ARTIFACT_LINK",
     );
     const bytes = readFileSync(path);
-    need(bytes.length < 1000000, "ARTIFACT_SIZE");
+    need(
+      bytes.length < (file.endsWith(".woff2") ? 2500000 : 1000000),
+      "ARTIFACT_SIZE",
+    );
     need(
       !/-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----\s+[A-Za-z0-9+/=]{20}/.test(
         bytes.toString(),
@@ -116,7 +126,7 @@ export function buildReferenceBundle(directory: string) {
       {
         status: "built",
         mode: "static-synthetic-demo",
-        files: 11,
+        files: 12,
         names: Object.keys(fixture.state.state.names).length,
         actions: Object.keys(fixture.capabilities.actions).length,
         apiEndpoint: null,

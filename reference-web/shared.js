@@ -91,10 +91,12 @@ export function inspectName(value, manifest) {
   const trie = getAliasTrie(manifest);
   const labels = [];
   const tokenCounts = [];
+  const emojiCounts = [];
   for (const label of rawLabels) {
     let i = 0,
       out = "",
-      count = 0;
+      count = 0,
+      emojis = 0;
     while (i < label.length) {
       let node = trie,
         j = i,
@@ -114,6 +116,7 @@ export function inspectName(value, manifest) {
       if (matchedCanonical !== null) {
         out += matchedCanonical;
         i = matchedEnd;
+        emojis++;
       } else {
         const c = label[i++];
         if (!/^[a-zA-Z0-9]$/.test(c)) throw Error("Unsupported name");
@@ -124,16 +127,32 @@ export function inspectName(value, manifest) {
     if (!count) throw Error("Empty label");
     labels.push(out);
     tokenCounts.push(count);
+    emojiCounts.push(emojis);
   }
   const canonicalName = labels.join(".");
   const lastTokens = tokenCounts[tokenCounts.length - 1];
+  const lastEmojis = emojiCounts[emojiCounts.length - 1];
+  const isSingleEmoji = lastTokens === 1 && lastEmojis === 1;
+  const isMultiEmoji = lastTokens > 1 && lastEmojis > 0;
+  const isFullEmoji17 = Boolean(manifest && manifest.sequences);
   return {
     canonical: canonicalName,
     name: canonicalName,
     labels,
     tokenCounts,
+    emojiCounts,
     tokenCount: lastTokens,
-    tier: lastTokens <= 3 ? "premium" : "standard",
+    emojiCount: lastEmojis,
+    isSingleEmoji,
+    isMultiEmoji,
+    minimumBidPoa: isSingleEmoji ? "100000" : "1000",
+    tier: isFullEmoji17
+      ? isSingleEmoji
+        ? "premium"
+        : "standard"
+      : lastTokens <= 3
+        ? "premium"
+        : "standard",
     isRoot: labels.length === 1,
     kind: labels.length === 1 ? "root" : "child",
     parent: labels.length === 2 ? labels[1] : null,
