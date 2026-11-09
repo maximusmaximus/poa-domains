@@ -15,9 +15,30 @@ case "$os:$arch" in
   MINGW*:x86_64|MSYS*:x86_64|CYGWIN*:x86_64) archive="gitleaks_${version}_windows_x64.zip"; bin="gitleaks.exe" ;;
   *) echo "Unsupported platform: $os:$arch" >&2; exit 1 ;;
 esac
-# Bounded retries: GitHub release CDN intermittently returns 504.
-curl --fail --silent --show-error --location --retry 5 --retry-all-errors --retry-delay 5 --connect-timeout 20 --max-time 120 "$base/$archive" --output "$work/$archive"
-curl --fail --silent --show-error --location --retry 5 --retry-all-errors --retry-delay 5 --connect-timeout 20 --max-time 120 "$base/gitleaks_${version}_checksums.txt" --output "$work/checksums.txt"
+# GitHub release CDN intermittently returns 504 for minutes. Keep Max's curl retry
+# flags, and wrap with an outer backoff so a short outage cannot fail the job.
+download() {
+  local url="$1" out="$2"
+  local attempt=1
+  local max_attempts=12
+  while true; do
+    if curl --fail --silent --show-error --location \
+      --retry 5 --retry-all-errors --retry-delay 5 \
+      --connect-timeout 20 --max-time 120 \
+      "$url" --output "$out"; then
+      return 0
+    fi
+    if [ "$attempt" -ge "$max_attempts" ]; then
+      echo "Failed to download $url after $attempt outer attempts" >&2
+      return 1
+    fi
+    echo "download attempt $attempt failed for $url; backing off" >&2
+    sleep $((5 * attempt))
+    attempt=$((attempt + 1))
+  done
+}
+download "$base/$archive" "$work/$archive"
+download "$base/gitleaks_${version}_checksums.txt" "$work/checksums.txt"
 node --input-type=module - "$work" "$archive" "$bin" <<'JS'
 import fs from "node:fs";
 import path from "node:path";
