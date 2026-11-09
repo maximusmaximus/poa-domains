@@ -360,12 +360,18 @@ if (isMain) {
         ? Number(v.port)
         : process.env.POA_DOMAINS_PORT
           ? Number(process.env.POA_DOMAINS_PORT)
-          : 8787;
+          : process.env.PORT
+            ? Number(process.env.PORT)
+            : 8787;
     need(Number.isInteger(port) && port >= 0 && port <= 65535, "PORT");
     const app = await startRegistryApp({
       dataDir: v.data ?? process.env.POA_DOMAINS_DATA,
       port,
-      host: v.host ?? process.env.POA_DOMAINS_HOST,
+      host:
+        v.host ??
+        process.env.POA_DOMAINS_HOST ??
+        process.env.HOST ??
+        (process.env.PORT ? "0.0.0.0" : undefined),
       publicUrl: v["public-url"] ?? process.env.POA_DOMAINS_PUBLIC_URL,
       seed: !v["no-seed"],
     });

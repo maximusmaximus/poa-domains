@@ -54,7 +54,16 @@ export async function startReferenceServer(
       need((req.url?.length ?? 0) <= 4096, "URL_SIZE");
       const rawHost = (req.headers.host ?? "").toLowerCase();
       const hostMatch = /^([a-z0-9.-]+)(?::[0-9]+)?$/.exec(rawHost);
-      need(Boolean(hostMatch && allowedHostnames.has(hostMatch[1]!)), "HOST");
+      const hostname = hostMatch?.[1] ?? "";
+      need(
+        Boolean(
+          hostname &&
+          (allowedHostnames.has(hostname) ||
+            hostname === "grok.me" ||
+            hostname.endsWith(".grok.me")),
+        ),
+        "HOST",
+      );
       const u = new URL(req.url ?? "/", "http://127.0.0.1");
       if (req.method === "GET") {
         res.setHeader("access-control-allow-origin", "*");
