@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { manifestData, emoji17DataSource } from "#poa-unicode-data";
 import { hash, need, text } from "./core.js";
 export interface Alias {
   input: string;
@@ -27,18 +27,9 @@ export interface Emoji17DataInfo {
   rgiNameRepresentatives: number;
   sourceSha256: Record<string, string>;
 }
-export const manifest = JSON.parse(
-  readFileSync(
-    new URL("../../vendor/unicode/manifest.json", import.meta.url),
-    "utf8",
-  ),
-) as { version: string; aliases: Alias[]; sourceSha256: string };
+export const manifest = manifestData as { version: string; aliases: Alias[]; sourceSha256: string };
 export const NORMALIZATION_HASH = hash("normalization-manifest/v1", manifest);
 
-const emoji17DataSource = readFileSync(
-  new URL("../../web/emoji17-data.mjs", import.meta.url),
-  "utf8",
-);
 function extractFrozenJson<T>(source: string, exportName: string): T {
   const prefix = `export const ${exportName} = freeze(`;
   const start = source.indexOf(prefix);

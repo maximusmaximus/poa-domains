@@ -1,0 +1,32 @@
+import assert from "node:assert/strict";
+import { chromium } from "@playwright/test";
+import { resolve } from "node:path";
+export async function browserSmoke(base, evidence) {
+  const browser=await chromium.launch({headless:true});
+  try {
+    const page=await browser.newPage({viewport:{width:1440,height:1000}}), errors=[], writes=[];
+    page.on("pageerror", error=>errors.push(error.message));
+    page.on("request", request=>{if(request.method()==="POST")writes.push(request.url());});
+    await page.goto(base,{waitUntil:"networkidle"});
+    await page.waitForFunction(()=>document.querySelectorAll("#action option").length===17);
+    for(const id of ["searchInput","searchBtn","cartList","cartPrompt","copyCartPrompt","stats","names","auctions","offers","history","balances","handoff"]) assert.equal(await page.locator(`#${id}`).count(),1,id);
+    assert.equal(await page.locator(".quick-pills .pill").count(),6);
+    assert.match(await page.locator("#names").innerText(),/nexus/);
+    assert.equal(await page.locator("#action option").count(),17);
+    assert.ok((await page.locator("#stats").innerText()).length>10);
+    await page.locator('.pill[data-query="quantum"]').click();
+    await page.locator("#addToCartBtn").waitFor();
+    await page.locator("#addToCartBtn").click();
+    assert.equal(await page.locator("#cartCount").innerText(),"1");
+    const prompt=await page.locator("#cartPrompt").innerText();
+    for(const needle of ["keygen"," act ","submit_intent","quantum"]) assert.ok(prompt.includes(needle),needle);
+    assert.equal(await page.locator("#copyCartPrompt").isEnabled(),true);
+    await page.locator('.pill[data-query="openai"]').click();
+    assert.match(await page.locator("#searchResult").innerText(),/RESERVED/i);
+    await page.evaluate(()=>document.fonts.ready);
+    assert.equal(await page.locator("#error").innerText(),"");
+    assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);
+    await page.screenshot({path:resolve(evidence,"browser.png"),fullPage:true});
+    return {actionOptions:17,quickPills:6,cartPrompt:true,pageErrors:errors,browserWrites:writes};
+  } finally {await browser.close();}
+}

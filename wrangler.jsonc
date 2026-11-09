@@ -1,0 +1,65 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "poadomains-registry",
+  "account_id": "b1c96174cb665cac086ca06434ded1f2",
+  "main": "cloudflare/worker.ts",
+  "compatibility_date": "2026-11-08",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "assets": {
+    "directory": "./reference-web",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/healthz",
+      "/v1/*"
+    ]
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "REGISTRY",
+        "class_name": "PoaRegistry"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-sqlite",
+      "new_sqlite_classes": [
+        "PoaRegistry"
+      ]
+    }
+  ],
+  "alias": {
+    "#poa-unicode-data": "./cloudflare/unicode-data.ts"
+  },
+  "rules": [
+    {
+      "type": "Text",
+      "globs": [
+        "**/*.txt"
+      ],
+      "fallthrough": true
+    }
+  ],
+  "vars": {
+    "PUBLIC_EXPLORER_URL": "https://poadomains.grok.me",
+    "BACKEND_HOST": "poadomains-registry.maxinfeld-artshow.workers.dev"
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 0.1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01
+    }
+  },
+  "build": {
+    "command": "npm run cf:prepare"
+  }
+}
