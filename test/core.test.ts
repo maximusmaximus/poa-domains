@@ -8,7 +8,19 @@ import {
   bounded,
   hash,
 } from "../src/core.js";
-import { normalizeName, manifest, NORMALIZATION_HASH } from "../src/names.js";
+import {
+  normalizeName,
+  canonicalName,
+  nameKey,
+  manifest,
+  emoji17Manifest,
+  EMOJI17_ALIASES,
+  EMOJI17_RECORD_COUNT,
+  EMOJI17_NORMALIZATION_HASH,
+  NORMALIZATION_HASH,
+  normalizationHashFor,
+  normalizationModeForHash,
+} from "../src/names.js";
 import { cidFor, metadata, validCid } from "../src/metadata.js";
 import {
   minimumNext,
@@ -109,6 +121,60 @@ test("unsupported Unicode, components, dangling VS/ZWJ/tags, hyphens and depth f
     "🚀\u200d",
   ])
     assert.throws(() => normalizeName(s), s);
+});
+test("full Unicode 17 emoji canonicalization supports all 5,216 non-component sequences and rejects standalone components", async () => {
+  assert.equal(EMOJI17_RECORD_COUNT, 5216);
+  assert.equal(EMOJI17_ALIASES.length, 5216);
+  assert.match(EMOJI17_NORMALIZATION_HASH, /^[0-9a-f]{64}$/);
+  assert.notEqual(EMOJI17_NORMALIZATION_HASH, NORMALIZATION_HASH);
+  assert.equal(normalizationHashFor("reference-subset"), NORMALIZATION_HASH);
+  assert.equal(normalizationHashFor("emoji17-full"), EMOJI17_NORMALIZATION_HASH);
+  assert.equal(normalizationModeForHash(NORMALIZATION_HASH), "reference-subset");
+  assert.equal(
+    normalizationModeForHash(EMOJI17_NORMALIZATION_HASH),
+    "emoji17-full",
+  );
+  assert.throws(() => normalizationModeForHash("0".repeat(64)));
+  const web: any = await import(
+    new URL("../../reference-web/shared.js", import.meta.url).href
+  );
+  for (const a of EMOJI17_ALIASES) {
+    const n = normalizeName(a.input, "emoji17-full");
+    assert.equal(n.canonical, a.canonical);
+    assert.equal(n.labels[0]!.tokens.length, 1);
+    assert.equal(n.tier, "premium");
+    assert.equal(
+      canonicalName(n.canonical, "emoji17-full").canonical,
+      n.canonical,
+    );
+    assert.equal(web.normalize(a.input, emoji17Manifest), a.canonical);
+  }
+  assert.equal(normalizeName("poa:👩‍🦰.🫪🫯", "emoji17-full").canonical, "👩‍🦰.🫪🫯");
+  assert.equal(
+    normalizeName("❤.#⃣", "emoji17-full").canonical,
+    "❤️.#️⃣",
+  );
+  assert.match(nameKey("reg-1", "👩‍🦰", "emoji17-full"), /^[0-9a-f]{64}$/);
+  for (const bad of [
+    "🏻",
+    "🏼",
+    "🏽",
+    "🏾",
+    "🏿",
+    "🦰",
+    "🦱",
+    "🦳",
+    "🦲",
+    "🇺",
+    "🏴\u{e0067}",
+    "👍\ufe0f",
+    "1\ufe0f",
+    "🚀\u200d",
+    "a\u200db",
+  ]) {
+    assert.throws(() => normalizeName(bad, "emoji17-full"), bad);
+    assert.throws(() => web.normalize(bad, emoji17Manifest), bad);
+  }
 });
 test("metadata accepts only verified raw CIDv1 sha256 witness bound to name and immutable rights", () => {
   const w = witness("alpha");
