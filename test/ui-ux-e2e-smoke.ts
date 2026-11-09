@@ -228,9 +228,9 @@ async function runFullUiUxFlowsOnRegistryApp(
   // Verify ecosystem navigation & poadomains.grok.me links are rendered
   assert.ok(
     (await page
-      .locator('.resource-nav a[href="https://poadomains.grok.me"]')
+      .locator('#siteFooter a[href="https://github.com/maximusmaximus/poa-domains"]')
       .count()) >= 1,
-    `${browserName}: poadomains.grok.me link present in explorer header`,
+    `${browserName}: GitHub repo link present in footer`,
   );
   assert.ok(
     (await page
@@ -241,26 +241,20 @@ async function runFullUiUxFlowsOnRegistryApp(
     `${browserName}: GitHub Pages mirror link present in resources section`,
   );
 
-  // 2. Quick-try pills UX: click every quick pill and verify input + result update
-  const pillQueries = await page
-    .locator(".quick-pills .pill")
-    .evaluateAll((nodes) =>
-      nodes.map((n) => (n as HTMLElement).dataset.query ?? ""),
-    );
-  assert.equal(
-    pillQueries.length,
-    6,
-    `${browserName}: 6 quick-try pills rendered`,
+  // 2. Idea strip UX: 3-row masonry, tap fills search + adds to cart
+  await page.waitForFunction(
+    () => document.querySelectorAll("#ideasStrip .ideas-row").length === 3,
   );
-  for (const q of pillQueries) {
-    await page.locator(`.quick-pills .pill[data-query="${q}"]`).click();
-    assert.equal(await page.locator("#searchInput").inputValue(), q);
-    const resultText = await page.locator("#searchResult").innerText();
-    assert.ok(
-      resultText.length > 10,
-      `${browserName}: pill ${q} rendered non-empty search result`,
-    );
-  }
+  const firstIdea = page.locator("#ideasStrip .idea").first();
+  const ideaQuery = (await firstIdea.getAttribute("data-query")) ?? "";
+  await firstIdea.click();
+  assert.equal(await page.locator("#searchInput").inputValue(), ideaQuery);
+  assert.ok(
+    (await page.locator("#searchResult").innerText()).length > 10,
+    `${browserName}: idea ${ideaQuery} rendered non-empty search result`,
+  );
+  if (await page.locator("#clearCart").isEnabled())
+    await page.locator("#clearCart").click();
 
   // 3. Verify all availability classification & pricing states via search bar & Enter key
   // (a) Invalid domain syntax via Enter key

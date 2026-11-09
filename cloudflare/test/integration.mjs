@@ -66,17 +66,19 @@ try {
   const font = await fetch(base + "/XeroEmoji-COLRv1.woff2"), fontBytes = new Uint8Array(await font.arrayBuffer());
   check("font MIME and exact font bytes", () => { assert.equal(font.status, 200); assert.equal(font.headers.get("content-type"), "font/woff2"); assert.equal(createHash("sha256").update(fontBytes).digest("hex"), createHash("sha256").update(readFileSync(resolve(root,"reference-web/XeroEmoji-COLRv1.woff2"))).digest("hex")); });
   const home = await fetch(base + "/"), html = await home.text();
-  check("home UI ids, six pills, ecosystem links and reference disclosure", () => {
+  check("home UI ids, ideas strip, footer links and reference disclosure", () => {
     assert.equal(home.status, 200);
     for (const id of ["searchInput","searchBtn","cartList","cartPrompt","copyCartPrompt","stats","names","auctions","offers","history","balances","handoff"]) assert.ok(html.includes(`id="${id}"`), id);
-    for (const link of ["https://poadomains.grok.me","https://maximusmaximus.github.io/poa-domains/","minepoa.com","https://poa.grok.me","github.com/maximusmaximus/poa-domains","https://maxi.grok.me"]) assert.ok(html.includes(link), link);
+    for (const link of ["https://maximusmaximus.github.io/poa-domains/","github.com/maximusmaximus/poa-domains","https://maxi.grok.me"]) assert.ok(html.slice(html.indexOf('id="siteFooter"')).includes(link), link);
+    assert.ok(!html.includes("resource-nav"), "top link chips removed");
+    assert.match(html, /href="\/style\.css\?v=[0-9a-f]{12}"/); assert.match(html, /src="\/app\.js\?v=[0-9a-f]{12}"/);
+    assert.match(home.headers.get("cache-control") ?? "", /no-cache/);
     assert.equal(/xero[\s-]?emoji/i.test(html.replace(/<style[\s\S]*?<\/style>/gi,"")), false, "no visible xero emoji phrasing");
     assert.ok(!html.includes("view-tabs"), "duplicate view-tabs removed");
     assert.ok(html.includes('id="networkStatusBar"'));
     assert.ok(html.includes('id="siteFooter"'));
     assert.match(html, /Tesselate Army/);
-    const pills = html.match(/class="quick-pills"([\s\S]*?)<\/div>/)?.[0] ?? "";
-    assert.equal((pills.match(/<button/g) ?? []).length,6); assert.ok(pills.includes("100k POA single emoji")); assert.ok(pills.includes("1k POA multi-emoji"));
+    assert.ok(html.includes('id="ideasStrip"')); assert.ok(!html.includes("quick-pills"));
     assert.match(html, /local reference\. Not live PoA/i);
     for (const id of ["siteTitle","liveTicker","floatingCartBtn","floatingCartPanel","copyCheckoutBtn","auctionsSection","marketSection","sectionTabs","domainMain","networkStatusBar","siteFooter"]) assert.ok(html.includes(`id="${id}"`), id);
     assert.ok(home.headers.get("content-security-policy")); assert.equal(home.headers.get("x-content-type-options"),"nosniff");
@@ -103,7 +105,7 @@ try {
     assert.ok(s.deeds[s.names.nexus.activeId].records.length>=2); assert.ok(s.sequence>=15); assert.equal(initial.durability,"durable-object-sqlite");
   });
   const browserResult=await browserSmoke(base,ev); save("browser-result.json",browserResult);
-  check("rendered browser: search/cart, 17-action handoff, six pills, no errors/writes",()=>assert.equal(browserResult.actionOptions,17));
+  check("rendered browser: search/cart, 17-action handoff, idea strip, no errors/writes",()=>assert.equal(browserResult.actionOptions,17));
   const { privateKey } = generateKeyPairSync("ed25519"), signer = nativePrincipal(privateKey);
   const suffix = randomBytes(6).toString("hex"), now = Math.floor(Date.now()/1000);
   const unsigned = (name, requestId, nonce) => prepare({signer,coSigners:[],requestId,nonce,notBefore:0,deadline:now+3600,maxTotal:"1000",maxNetworkFee:"0",action:"announceAuction",params:{name,asset:"POA",reserve:"1000",openAt:now+60,expectedDeedId:null,expectedVersion:0,metadata:buildMetadataWitness(name)}},cap);

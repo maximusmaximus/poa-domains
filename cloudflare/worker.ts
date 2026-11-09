@@ -59,7 +59,7 @@ export default {
             if (loc) shell = await env.ASSETS.fetch(new Request(new URL(loc, u.origin), { method: "GET" }));
           }
           const headers = new Headers(shell.headers);
-          headers.set("cache-control", "no-store");
+          headers.set("cache-control", "no-cache, no-store, must-revalidate");
           return new Response(shell.body, { status: 200, headers });
         }
         return env.ASSETS.fetch(request);

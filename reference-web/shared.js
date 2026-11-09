@@ -402,37 +402,56 @@ export function parsePublicJSON(source) {
   return result;
 }
 
-/** Decorative emoji + ASCII letters only — no regional indicators / obscure letterforms. */
+/**
+ * Site title: "poadomains" spelled with emoji letters. Only vetted code points that
+ * Noto Color Emoji (Android Chrome) renders; never regional indicators.
+ * Letters with no emoji form (d, n) render as small CSS letter tiles.
+ */
+export const TITLE_LETTER_OPTIONS = {
+  p: ["\u{1F17F}\uFE0F"], // 🅿️
+  o: ["\u{1F17E}\uFE0F", "\u2B55", "\u{1F535}", "\u{1F7E0}", "\u26AA", "\u{1F369}", "\u{1F315}"], // 🅾️ ⭕ 🔵 🟠 ⚪ 🍩 🌕
+  a: ["\u{1F170}\uFE0F"], // 🅰️
+  d: [null], // tile
+  m: ["\u24C2\uFE0F"], // Ⓜ️
+  i: ["\u2139\uFE0F", "\u2757"], // ℹ️ ❗
+  n: [null], // tile
+  s: ["\u{1F4B2}"], // 💲
+};
 export const TITLE_SAFE_CODEPOINTS = new Set([
-  ..."poadomainsPOADOMAINS ·.-".split("").map((c) => c.codePointAt(0)),
-  0x20, // space
-  0x1f310, // 🌐
-  0x2728, // ✨
-  0x1f511, // 🔑
-  0x1f48e, // 💎
-  0x1f680, // 🚀
-  0x1f528, // 🔨
-  0x2733, 0xfe0f, // ✳️
-  0x1f3f7, 0xfe0f, // 🏷️
-  0x1f4b0, // 💰
-  0x1f50d, // 🔍
+  0x44, 0x4e, // tile letters D N
+  0xfe0f,
+  0x1f17f, 0x1f17e, 0x2b55, 0x1f535, 0x1f7e0, 0x26aa, 0x1f369, 0x1f315,
+  0x1f170, 0x24c2, 0x2139, 0x2757, 0x1f4b2,
 ]);
+export const TITLE_THEMES = ["tilt", "wave", "glow", "pop", "flat"];
+export const TITLE_TILE_COLORS = ["blue", "green", "gold", "violet", "coral"];
 
-/** Several emoji stylizations of the site name; pick one per page load. */
-export const TITLE_STYLES = [
-  () => "🌐 poadomains 🌐",
-  () => "✨ poa · domains ✨",
-  () => "🔑 poadomains 🔑",
-  () => "💎 poadomains 💎",
-  () => "🚀 poa domains 🚀",
-  () => "🔨 poa · domains 🔨",
-  () => "✳️ P · O · A · D · O · M · A · I · N · S ✳️",
-  () => "🏷️ poadomains 🏷️",
-];
+function pick(list, random) {
+  return list[Math.floor(random() * list.length) % list.length];
+}
+
+/** One randomized emoji spelling of "poadomains" (new look on each load). */
+export function buildSiteTitle(random = Math.random) {
+  const glyphs = [];
+  for (const letter of "poadomains") {
+    const choice = pick(TITLE_LETTER_OPTIONS[letter], random);
+    glyphs.push(
+      choice === null
+        ? { kind: "tile", letter, text: letter.toUpperCase() }
+        : { kind: "emoji", letter, text: choice },
+    );
+  }
+  return {
+    theme: pick(TITLE_THEMES, random),
+    tile: pick(TITLE_TILE_COLORS, random),
+    glyphs,
+    text: glyphs.map((g) => g.text).join(""),
+    spelled: glyphs.map((g) => g.letter).join(""),
+  };
+}
 
 export function pickSiteTitle(random = Math.random) {
-  const i = Math.floor(random() * TITLE_STYLES.length) % TITLE_STYLES.length;
-  return TITLE_STYLES[i]();
+  return buildSiteTitle(random).text;
 }
 
 export function titleCodePointsOk(title) {
@@ -441,6 +460,69 @@ export function titleCodePointsOk(title) {
     if (!TITLE_SAFE_CODEPOINTS.has(cp)) return false;
   }
   return true;
+}
+
+/* ---------- Name ideas under the Check button ---------- */
+export const IDEA_WORDS = [
+  "moon", "rocket", "pixel", "sunny", "cosmic", "lucky", "mango", "ninja", "river",
+  "spark", "cloud", "nova", "maple", "echo", "comet", "tiger", "lemon", "bolt",
+  "jazz", "zen", "koala", "waffle", "disco", "astro", "coral", "frost", "honey",
+  "jelly", "kite", "llama", "meadow", "olive", "panda", "robot", "salsa", "tidal",
+  "velvet", "wizard", "yeti", "bloom", "cactus", "dragon", "ember", "falcon",
+  "harbor", "island", "jungle", "lotus", "magic", "noodle", "otter", "peach",
+  "quest", "rainbow", "sushi", "taco", "unicorn", "vibe", "whale", "zebra",
+  "happy", "golden", "tiny", "mega", "super", "chill", "brave", "swift", "wild",
+];
+export const IDEA_EMOJI = [
+  "\u{1F680}", "\u{1F319}", "\u{1F355}", "\u{1F525}", "\u{1F30A}", "\u{1F419}",
+  "\u{1F98A}", "\u{1F340}", "\u{1F48E}", "\u26A1", "\u{1F388}", "\u{1F335}",
+  "\u{1F369}", "\u{1F3A7}", "\u{1F41D}", "\u{1F308}", "\u{1F349}", "\u{1F9E0}",
+  "\u{1FA90}", "\u{1F433}", "\u{1F33B}", "\u{1F3A8}", "\u{1F984}", "\u{1F344}",
+]; // 🚀🌙🍕🔥🌊🐙🦊🍀💎⚡🎈🌵🍩🎧🐝🌈🍉🧠🪐🐳🌻🎨🦄🍄
+
+/** A single random idea: plain words, or words mixed with one emoji. */
+export function randomIdea(random = Math.random) {
+  const w1 = pick(IDEA_WORDS, random);
+  const w2 = pick(IDEA_WORDS, random);
+  const e = pick(IDEA_EMOJI, random);
+  switch (Math.floor(random() * 5) % 5) {
+    case 0: return w1 + w2;
+    case 1: return e + w1;
+    case 2: return w1 + e;
+    case 3: return w1 + Math.floor(random() * 99 + 1);
+    default: return w1 + e + w2;
+  }
+}
+
+/**
+ * Fresh list of unique idea names. `accept(name)` must apply the registry's name
+ * rules (and availability); only accepted names are returned.
+ */
+export function buildIdeas({ count = 24, random = Math.random, accept = () => true } = {}) {
+  const out = [];
+  const seen = new Set();
+  for (let tries = 0; out.length < count && tries < count * 40; tries++) {
+    const q = randomIdea(random);
+    if (seen.has(q)) continue;
+    seen.add(q);
+    let ok = false;
+    try { ok = Boolean(accept(q)); } catch { ok = false; }
+    if (ok) out.push(q);
+  }
+  return out;
+}
+
+/** Split ideas into `rows` rows with balanced total length (masonry bricks). */
+export function masonryRows(ideas, rows = 3) {
+  const out = Array.from({ length: rows }, () => []);
+  const size = new Array(rows).fill(0);
+  for (const idea of ideas) {
+    let r = 0;
+    for (let k = 1; k < rows; k++) if (size[k] < size[r]) r = k;
+    out[r].push(idea);
+    size[r] += [...idea].length + 3;
+  }
+  return out;
 }
 
 export function domainPath(name) {

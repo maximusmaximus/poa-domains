@@ -9,7 +9,9 @@ import {
   minimumNextBid,
   buildAgentCartPrompt,
   buildAgentCheckoutHandoff,
-  pickSiteTitle,
+  buildSiteTitle,
+  buildIdeas,
+  masonryRows,
   partitionAuctions,
   shapeLiveActions,
   historyForTarget,
@@ -31,7 +33,7 @@ import {
   networkBannerColor,
   isNetworkBannerDismissed,
   dismissNetworkBanner,
-} from "./shared.js";
+} from "./shared.js?v=80cc5c363743";
 
 const el = (id) => document.getElementById(id);
 let cap,
@@ -296,6 +298,9 @@ function updateTabDots(state) {
     if (!dot) continue;
     const show = tabHasNew(id, marks, tabSeen);
     dot.hidden = !show;
+    const sr = btn.querySelector(".tab-new-text");
+    if (sr) sr.hidden = !show;
+    btn.classList.toggle("has-new", show);
   }
 }
 
@@ -387,6 +392,7 @@ function renderFloatingCart() {
 }
 
 function renderCart() {
+  syncIdeaMarks();
   el("cartCount").textContent = String(cart.length);
   el("clearCart").disabled = cart.length === 0;
   {
@@ -459,9 +465,86 @@ function setFloatingCartOpen(open) {
 }
 
 function applySiteTitle() {
-  const title = pickSiteTitle();
-  el("siteTitle").textContent = title;
+  const title = buildSiteTitle();
+  const h1 = el("siteTitle");
+  h1.replaceChildren();
+  h1.dataset.theme = title.theme;
+  h1.dataset.tile = title.tile;
+  h1.setAttribute("aria-label", "poadomains");
+  title.glyphs.forEach((g, i) => {
+    const span = document.createElement("span");
+    span.className = g.kind === "tile" ? "title-glyph title-tile" : "title-glyph";
+    span.style.setProperty("--i", String(i));
+    span.setAttribute("aria-hidden", "true");
+    span.textContent = g.text;
+    h1.append(span);
+  });
   document.title = "PoA domains";
+}
+
+/* ---------- 💡 Name ideas (3-row masonry strip) ---------- */
+function ideaAccepted(q) {
+  if (!cap || !latestState) return false;
+  const info = inspectName(q, cap.emojiManifest);
+  if (!info.isRoot || info.isSingleEmoji) return false;
+  const name = info.canonical;
+  if (reservedSet.has(name)) return false;
+  const entry = latestState.names?.[name];
+  if (entry?.activeId || entry?.auctionId) return false;
+  if (Object.values(latestState.auctions ?? {}).some((a) => a.name === name && a.status === "live")) return false;
+  return true;
+}
+
+function renderIdeas() {
+  const strip = el("ideasStrip");
+  if (!strip) return;
+  strip.replaceChildren();
+  const ideas = buildIdeas({ count: 24, accept: ideaAccepted });
+  const inCart = new Set(cart.map((x) => x.name));
+  for (const row of masonryRows(ideas, 3)) {
+    const line = add(strip, "div", "", "ideas-row");
+    for (const q of row) {
+      const btn = add(line, "button", "", "idea");
+      btn.type = "button";
+      btn.dataset.query = q;
+      // varied brick widths for the masonry look
+      btn.dataset.size = String(Math.floor(Math.random() * 3));
+      add(btn, "span", q, "idea-text");
+      const mark = add(btn, "span", "", "idea-mark");
+      mark.setAttribute("aria-hidden", "true");
+      if (inCart.has(q)) btn.classList.add("is-added");
+      btn.addEventListener("click", () => pickIdea(btn, q));
+    }
+  }
+}
+
+function syncIdeaMarks() {
+  const inCart = new Set(cart.map((x) => x.name));
+  for (const b of document.querySelectorAll("#ideasStrip .idea"))
+    b.classList.toggle("is-added", inCart.has(b.dataset.query));
+}
+
+function pickIdea(btn, q) {
+  el("searchInput").value = q;
+  runSearch(q);
+  const status = el("ideasStatus");
+  const addBtn = el("searchResult").querySelector("#addToCartBtn");
+  if (!addBtn) {
+    status.textContent = "👀 " + q + " is not open right now. Try another idea.";
+    status.dataset.tone = "warn";
+    return;
+  }
+  const already = cart.some((x) => x.name === q);
+  addBtn.click();
+  btn.classList.add("is-added");
+  status.textContent = already
+    ? "✅ " + q + " is already in your cart."
+    : "🛒 Added " + q + " to your cart. Tap the 🛒 button to check out.";
+  status.dataset.tone = "ok";
+  const badge = el("floatingCartBtn");
+  badge?.classList.remove("bump");
+  void badge?.offsetWidth;
+  badge?.classList.add("bump");
 }
 
 function renderTicker(state) {
@@ -1526,7 +1609,13 @@ try {
 
   for (const btn of document.querySelectorAll(".section-tab")) {
     btn.addEventListener("click", () => {
-      setSectionTab(btn.getAttribute("data-tab") || "find", true);
+      const id = btn.getAttribute("data-tab") || "find";
+      setSectionTab(id, true);
+      btn.scrollIntoView({ block: "nearest", inline: "nearest" });
+      // Wide screens show every section, so jump to it.
+      if (globalThis.matchMedia?.("(min-width: 721px)").matches) {
+        document.querySelector(`main#homeMain > section[data-section="${id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     });
   }
   el("domainHomeLink")?.addEventListener("click", (event) => {
@@ -1568,13 +1657,13 @@ try {
       runSearch(el("searchInput").value);
     }
   });
-  for (const pill of document.querySelectorAll(".pill")) {
-    pill.addEventListener("click", () => {
-      const q = pill.getAttribute("data-query") ?? "";
-      el("searchInput").value = q;
-      runSearch(q);
-    });
-  }
+  renderIdeas();
+  el("ideasShuffle")?.addEventListener("click", () => {
+    renderIdeas();
+    el("ideasStatus").textContent = "🔀 Fresh ideas";
+    el("ideasStatus").dataset.tone = "";
+    el("ideasStrip").scrollLeft = 0;
+  });
   el("cartSigner").addEventListener("input", () => {
     updatePromptText();
   });

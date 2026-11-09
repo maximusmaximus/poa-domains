@@ -5,19 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="/style.css?v=403275b7b05e" />
   </head>
   <body>
+    <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
     <header>
-      <h1 id="siteTitle" aria-label="poadomains">poadomains</h1>
-      <p id="mode">Local reference. Not live PoA.</p>
-      <nav class="resource-nav" aria-label="Links">
-        <a href="https://poadomains.grok.me" rel="noreferrer">🌐 poadomains.grok.me</a>
-        <a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer">🛡️ GitHub Pages</a>
-        <a href="https://minepoa.com" rel="noreferrer">⛏️ minepoa.com</a>
-        <a href="https://poa.grok.me" rel="noreferrer">📡 poa.grok.me</a>
-        <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer">📦 poa-domains</a>
-      </nav>
+      <h1 id="siteTitle" class="site-title" aria-label="poadomains"><span class="title-fallback">poadomains</span></h1>
+      <p id="mode"><span aria-hidden="true">🧪</span> Local reference. Not live PoA.</p>
     </header>
 
     <div id="networkStatusBar" class="network-status-bar" data-level="checking" role="status" aria-live="polite" hidden>
@@ -34,23 +28,21 @@
 
     <nav id="sectionTabs" class="section-tabs" role="tablist" aria-label="Site sections">
       <button type="button" class="section-tab is-active" role="tab" aria-selected="true" data-tab="find" id="tabFind">
-        <span class="tab-label">🔍 Find</span><span class="tab-dot" hidden aria-label="New"></span>
+        <span class="tab-icon" aria-hidden="true">🔍</span><span class="tab-label">Find</span><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="auctions" id="tabAuctions">
-        <span class="tab-label">🏷️ Auctions</span><span class="tab-dot" hidden aria-label="New"></span>
+        <span class="tab-icon" aria-hidden="true">🏷️</span><span class="tab-label">Auctions</span><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="market" id="tabMarket">
-        <span class="tab-label">💰 For sale</span><span class="tab-dot" hidden aria-label="New"></span>
+        <span class="tab-icon" aria-hidden="true">💰</span><span class="tab-label">For sale</span><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="explore" id="tabExplore">
-        <span class="tab-label">🧭 Explore</span><span class="tab-dot" hidden aria-label="New"></span>
+        <span class="tab-icon" aria-hidden="true">🧭</span><span class="tab-label">Explore</span><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="handoff" id="tabHandoff">
-        <span class="tab-label">🧾 Handoff</span><span class="tab-dot" hidden aria-label="New"></span>
+        <span class="tab-icon" aria-hidden="true">🧾</span><span class="tab-label">Handoff</span><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
     </nav>
-
-    <a class="skip-link" href="#homeMain">Skip to content</a>
 
     <aside id="detailView" class="detail-view" hidden>
       <div class="detail-header">
@@ -75,13 +67,14 @@
           />
           <button id="searchBtn" type="button">Check</button>
         </div>
-        <div class="quick-pills">
-          <button type="button" class="pill" data-query="quantum">quantum</button>
-          <button type="button" class="pill" data-query="🚀">🚀 (100k POA single emoji)</button>
-          <button type="button" class="pill" data-query="🚀🚀">🚀🚀 (1k POA multi-emoji)</button>
-          <button type="button" class="pill" data-query="orbit">orbit</button>
-          <button type="button" class="pill" data-query="alpha">alpha</button>
-          <button type="button" class="pill" data-query="openai">openai</button>
+        <div class="ideas" aria-labelledby="ideasHeading">
+          <div class="ideas-head">
+            <h3 id="ideasHeading">💡 Ideas</h3>
+            <button type="button" id="ideasShuffle" class="ideas-shuffle secondary small" aria-label="Show new ideas">🔀 New ideas</button>
+          </div>
+          <p class="ideas-hint">Tap one to check it and add it to your 🛒 cart.</p>
+          <div id="ideasStrip" class="ideas-strip" role="group" aria-label="Name ideas"></div>
+          <p id="ideasStatus" class="ideas-status" role="status" aria-live="polite"></p>
         </div>
         <div id="searchResult" class="search-result"></div>
 
@@ -246,7 +239,11 @@
     </main>
 
     <footer id="siteFooter" class="site-footer">
-      made with ❤️ in SF by Tesselate Army | <a href="https://maxi.grok.me" rel="noreferrer">maxi.grok.me</a>
+      <nav class="footer-links" aria-label="Project links">
+        <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer">📦 poa-domains on GitHub</a>
+        <a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer">🛡️ GitHub Pages</a>
+      </nav>
+      <p class="footer-credit">made with ❤️ in SF by Tesselate Army | <a href="https://maxi.grok.me" rel="noreferrer">maxi.grok.me</a></p>
     </footer>
 
     <button
@@ -282,6 +279,6 @@
       <p id="floatingCartStatus" class="muted" role="status"></p>
     </div>
 
-    <script type="module" src="/app.js"></script>
+    <script type="module" src="/app.js?v=a8450f07dfb5"></script>
   </body>
 </html>

@@ -2,7 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   pickSiteTitle,
-  TITLE_STYLES,
+  buildSiteTitle,
+  TITLE_LETTER_OPTIONS,
+  buildIdeas,
+  randomIdea,
+  IDEA_EMOJI,
+  masonryRows,
+  inspectName,
   classifyAuction,
   partitionAuctions,
   shapeLiveActions,
@@ -26,16 +32,21 @@ import {
   TAB_SEEN_KEY,
 } from "../reference-web/shared.js";
 
-test("emoji site title stylizations cover poadomains letters", () => {
-  assert.ok(TITLE_STYLES.length >= 5);
+function seq(values) {
+  let i = 0;
+  return () => values[i++ % values.length];
+}
+
+test("emoji site title spells poadomains and varies per load", () => {
   const seen = new Set();
-  for (let i = 0; i < TITLE_STYLES.length; i++) {
-    const title = pickSiteTitle(() => i / TITLE_STYLES.length);
-    assert.equal(typeof title, "string");
-    assert.ok(title.length > 0);
-    seen.add(title);
+  for (let k = 0; k < 40; k++) {
+    const t = buildSiteTitle();
+    assert.equal(t.spelled, "poadomains");
+    assert.equal(t.glyphs.length, 10);
+    seen.add(t.text + t.theme + t.tile);
   }
-  assert.equal(seen.size, TITLE_STYLES.length);
+  assert.ok(seen.size > 5, "randomized styles");
+  assert.ok(Object.values(TITLE_LETTER_OPTIONS).flat().filter(Boolean).length >= 10);
 });
 
 test("partitionAuctions splits past current upcoming from real shapes", () => {
@@ -172,19 +183,90 @@ test("cart localStorage helpers round-trip and reject junk", () => {
 });
 
 
-test("every title stylization uses only vetted safe code points", () => {
-  for (let i = 0; i < TITLE_STYLES.length; i++) {
-    const title = pickSiteTitle(() => i / TITLE_STYLES.length);
-    assert.equal(titleCodePointsOk(title), true, title);
-    assert.match(title, /poa|POA|domains|DOMAINS|P · O · A/i);
-    // No regional-indicator A–Z range
-    for (const ch of title) {
-      const cp = ch.codePointAt(0);
-      assert.ok(cp < 0x1f1e6 || cp > 0x1f1ff, `regional ${cp.toString(16)}`);
+test("every title option uses only vetted code points, never regional indicators", () => {
+  for (const [letter, opts] of Object.entries(TITLE_LETTER_OPTIONS)) {
+    for (const o of opts) {
+      if (o === null) continue;
+      assert.equal(titleCodePointsOk(o), true, letter + " " + o);
+      for (const ch of o) {
+        const cp = ch.codePointAt(0);
+        assert.ok(cp < 0x1f1e6 || cp > 0x1f1ff, `regional ${cp.toString(16)}`);
+      }
     }
   }
-  assert.ok(TITLE_SAFE_CODEPOINTS.has("p".codePointAt(0)));
-  assert.ok(TITLE_SAFE_CODEPOINTS.has(0x1f680));
+  for (let k = 0; k < 50; k++) assert.equal(titleCodePointsOk(pickSiteTitle()), true);
+  for (let k = 0; k < 6; k++) {
+    const t = pickSiteTitle(seq([k / 7, 0.99, 0.1, 0.5]));
+    assert.equal(titleCodePointsOk(t), true, t);
+  }
+  assert.ok(TITLE_SAFE_CODEPOINTS.has(0x1f17f));
+  assert.equal(TITLE_SAFE_CODEPOINTS.has(0x1f1f5), false);
+});
+
+test("ideas only include names that pass the name rules and accept()", () => {
+  const ideas = buildIdeas({
+    count: 30,
+    accept: (q) => {
+      const info = inspectName(q, { sequences: {} });
+      return info.isRoot && !info.isSingleEmoji;
+    },
+  });
+  // With an empty emoji manifest only ASCII names pass the rules.
+  assert.ok(ideas.length > 5);
+  for (const q of ideas) assert.match(q, /^[a-z0-9]{1,32}$/);
+  assert.equal(new Set(ideas).size, ideas.length);
+  const blocked = buildIdeas({ count: 10, accept: () => false });
+  assert.deepEqual(blocked, []);
+  const throwing = buildIdeas({ count: 10, accept: () => { throw Error("bad"); } });
+  assert.deepEqual(throwing, []);
+  const manifest = { sequences: Object.fromEntries(IDEA_EMOJI.map((e) => [e, e])) };
+  const mixed = buildIdeas({ count: 40, accept: (q) => { const i = inspectName(q, manifest); return i.isRoot && !i.isSingleEmoji; } });
+  assert.equal(mixed.length, 40);
+  assert.ok(mixed.some((q) => /[^\x00-\x7f]/.test(q)));
+  let withEmoji = 0;
+  for (let k = 0; k < 200; k++) if (/[^\x00-\x7f]/.test(randomIdea())) withEmoji++;
+  assert.ok(withEmoji > 20, "some ideas carry emoji");
+});
+
+test("masonryRows makes exactly 3 balanced rows", () => {
+  const ideas = ["a", "bbbbbbbb", "cc", "ddddd", "e", "ffffffffff", "gg", "hhh", "iiii"];
+  const rows = masonryRows(ideas, 3);
+  assert.equal(rows.length, 3);
+  assert.deepEqual(rows.flat().sort(), [...ideas].sort());
+  const widths = rows.map((r) => r.reduce((n, q) => n + q.length + 3, 0));
+  assert.ok(Math.max(...widths) - Math.min(...widths) <= 10, widths.join(","));
+});
+
+test("asset URLs carry current content stamps (no stale cached JS/CSS)", async () => {
+  const { stampAssets } = await import("../scripts/stamp-assets.mjs");
+  assert.equal(stampAssets().changed, false, "run node scripts/stamp-assets.mjs");
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../reference-web/index.html", import.meta.url), "utf8");
+  assert.match(html, /href="\/style\.css\?v=[0-9a-f]{12}"/);
+  assert.match(html, /src="\/app\.js\?v=[0-9a-f]{12}"/);
+  const headers = readFileSync(new URL("../reference-web/_headers", import.meta.url), "utf8");
+  assert.match(headers, /Cache-Control: no-cache, must-revalidate/);
+});
+
+test("home HTML: skip link first, one-row tabs, ideas strip, footer links, no top chips", async () => {
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../reference-web/index.html", import.meta.url), "utf8");
+  const body = html.slice(html.indexOf("<body>"));
+  assert.ok(body.indexOf('class="skip-link"') < body.indexOf("<header>"));
+  assert.ok(!html.includes("resource-nav"));
+  assert.ok(!html.includes("quick-pills"));
+  assert.ok(html.includes('id="ideasStrip"'));
+  assert.equal((html.match(/class="section-tab[ "]/g) ?? []).length, 5);
+  const footer = html.slice(html.indexOf('id="siteFooter"'));
+  assert.ok(footer.includes("https://github.com/maximusmaximus/poa-domains"));
+  assert.ok(footer.includes("https://maximusmaximus.github.io/poa-domains/"));
+  assert.ok(footer.includes("Tesselate Army"));
+  const header = html.slice(html.indexOf("<header>"), html.indexOf("</header>"));
+  assert.ok(!header.includes("<a "), "no links in header");
+  assert.equal(/xero[\s-]?emoji/i.test(html), false);
+  const css = readFileSync(new URL("../reference-web/style.css", import.meta.url), "utf8");
+  assert.ok(!/text-align:\s*justify/.test(css));
+  assert.match(css, /\.skip-link:focus/);
 });
 
 test("domain and owner path helpers round-trip", () => {
