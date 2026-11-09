@@ -82,47 +82,124 @@ function getAliasTrie(manifest) {
   trieCache.set(manifest, root);
   return root;
 }
-export function normalize(value, manifest) {
+export function inspectName(value, manifest) {
   if (typeof value !== "string") throw Error("Name");
   const s = value.startsWith("poa:") ? value.slice(4) : value;
-  const labels = s.split(".");
-  if (labels.length > 2) throw Error("Only roots and direct children");
+  const rawLabels = s.split(".");
+  if (rawLabels.length < 1 || rawLabels.length > 2)
+    throw Error("Only roots and direct children");
   const trie = getAliasTrie(manifest);
-  return labels
-    .map((label) => {
-      let i = 0,
-        out = "",
-        count = 0;
-      while (i < label.length) {
-        let node = trie,
-          j = i,
-          matchedCanonical = null,
-          matchedEnd = i;
-        while (j < label.length && node) {
-          const cp = label.codePointAt(j);
-          const ch = String.fromCodePoint(cp);
-          node = node.next.get(ch);
-          if (!node) break;
-          j += ch.length;
-          if (node.canonical !== null) {
-            matchedCanonical = node.canonical;
-            matchedEnd = j;
-          }
+  const labels = [];
+  const tokenCounts = [];
+  for (const label of rawLabels) {
+    let i = 0,
+      out = "",
+      count = 0;
+    while (i < label.length) {
+      let node = trie,
+        j = i,
+        matchedCanonical = null,
+        matchedEnd = i;
+      while (j < label.length && node) {
+        const cp = label.codePointAt(j);
+        const ch = String.fromCodePoint(cp);
+        node = node.next.get(ch);
+        if (!node) break;
+        j += ch.length;
+        if (node.canonical !== null) {
+          matchedCanonical = node.canonical;
+          matchedEnd = j;
         }
-        if (matchedCanonical !== null) {
-          out += matchedCanonical;
-          i = matchedEnd;
-        } else {
-          const c = label[i++];
-          if (!/^[a-zA-Z0-9]$/.test(c)) throw Error("Unsupported name");
-          out += c.toLowerCase();
-        }
-        if (++count > 32) throw Error("Too long");
       }
-      if (!count) throw Error("Empty label");
-      return out;
-    })
-    .join(".");
+      if (matchedCanonical !== null) {
+        out += matchedCanonical;
+        i = matchedEnd;
+      } else {
+        const c = label[i++];
+        if (!/^[a-zA-Z0-9]$/.test(c)) throw Error("Unsupported name");
+        out += c.toLowerCase();
+      }
+      if (++count > 32) throw Error("Too long");
+    }
+    if (!count) throw Error("Empty label");
+    labels.push(out);
+    tokenCounts.push(count);
+  }
+  const canonicalName = labels.join(".");
+  const lastTokens = tokenCounts[tokenCounts.length - 1];
+  return {
+    canonical: canonicalName,
+    name: canonicalName,
+    labels,
+    tokenCounts,
+    tokenCount: lastTokens,
+    tier: lastTokens <= 3 ? "premium" : "standard",
+    isRoot: labels.length === 1,
+    kind: labels.length === 1 ? "root" : "child",
+    parent: labels.length === 2 ? labels[1] : null,
+    childLabel: labels.length === 2 ? labels[0] : null,
+  };
+}
+export function normalize(value, manifest) {
+  return inspectName(value, manifest).canonical;
+}
+export function minimumNextBid(high, rule) {
+  const h = BigInt(high);
+  if (rule.kind === "eosStrict10" || rule.kind === "eos10Percent")
+    return (h + h / 10n + 1n).toString();
+  const bpsRaise = (h * BigInt(rule.bps)) / 10000n + 1n;
+  const minUnits = BigInt(rule.minUnits ?? rule.minUnit ?? "1");
+  return (h + (bpsRaise > minUnits ? bpsRaise : minUnits)).toString();
+}
+export function buildAgentCartPrompt(
+  items,
+  cap,
+  signerPrincipal,
+  endpointUrl,
+  context = "local-reference-only",
+) {
+  if (!Array.isArray(items) || items.length === 0) return "";
+  const signer =
+    signerPrincipal && validPrincipal(signerPrincipal)
+      ? signerPrincipal
+      : "<YOUR_POA1_OR_ED25519_PRINCIPAL>";
+  const endpoint = endpointUrl || "http://127.0.0.1:8787";
+  const header =
+    context === "static-synthetic-demo"
+      ? `STATIC SYNTHETIC DEMO CART — NO LIVE API. Copy this structured prompt to inspect how an agent prepares and submits multi-domain bids and purchases against a local PoA Domains registry.`
+      : `AGENT TASK PROMPT — POA DOMAINS REGISTRY CART (${items.length} ${items.length === 1 ? "ITEM" : "ITEMS"})`;
+  const lines = [
+    header,
+    `Target Registry Endpoint: ${endpoint}`,
+    `Network / Chain ID: ${cap.chainId} (revision: ${cap.revision})`,
+    `Registry ID: ${cap.registryId}`,
+    `Policy Hash: ${cap.policyHash}`,
+    `Normalization Hash: ${cap.normalizationHash}`,
+    `Authorized Signer Principal: ${signer}`,
+    ``,
+    `Instructions for Agent:`,
+    `1. VerifyGET ${endpoint}/v1/capabilities matches chainId="${cap.chainId}", registryId="${cap.registryId}", and policyHash="${cap.policyHash}".`,
+    `2. Query GET ${endpoint}/v1/nonce?signer=${signer} to obtain the current starting integer nonce N.`,
+    `3. For each cart item below, prepare the exact unsigned intent body, sign it locally with the operator's Ed25519 signer file, and submit via POST ${endpoint}/v1/intents (or MCP tool submit_intent). Never exceed the user-approved maxTotal cap.`,
+    ``,
+    `Cart Items:`,
+  ];
+  items.forEach((item, idx) => {
+    lines.push(
+      `--- Item ${idx + 1}: ${item.name} (${item.tier} ${item.isRoot ? "root" : "child"}) ---`,
+      `Action: ${item.action}`,
+      `Summary: ${item.summary}`,
+      `Asset: ${item.asset} | Amount / Max Bid: ${item.amount} base units (maxTotal=${item.amount})`,
+      `Action Parameters JSON: ${JSON.stringify(item.params)}`,
+      `CLI Prepare & Submit Example:`,
+      `  # Save intent input to item-${idx + 1}.json with nonce = N+${idx}, notBefore = NOW, deadline = NOW+3600, maxTotal = "${item.amount}", maxNetworkFee = "0"`,
+      `  node dist/src/reference-cli.js prepare --url ${endpoint} --file item-${idx + 1}.json --out unsigned-${idx + 1}.json`,
+      `  node dist/src/reference-cli.js sign --file unsigned-${idx + 1}.json --key-file /private/runtime/signer.pem --out signed-${idx + 1}.json`,
+      `  node dist/src/reference-cli.js submit --url ${endpoint} --file signed-${idx + 1}.json`,
+      ``,
+    );
+  });
+  return lines.join("\n");
 }
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
