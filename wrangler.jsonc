@@ -13,7 +13,9 @@
     "binding": "ASSETS",
     "run_worker_first": [
       "/healthz",
-      "/v1/*"
+      "/v1/*",
+      "/d/*",
+      "/p/*"
     ]
   },
   "durable_objects": {

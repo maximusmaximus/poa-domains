@@ -401,3 +401,786 @@ export function parsePublicJSON(source) {
   safeObject(result);
   return result;
 }
+
+/**
+ * Site title: "poadomains" spelled with emoji letters. Only vetted code points that
+ * Noto Color Emoji (Android Chrome) renders; never regional indicators.
+ * Letters with no emoji form (d, n) render as small CSS letter tiles.
+ */
+export const TITLE_LETTER_OPTIONS = {
+  p: ["\u{1F17F}\uFE0F"], // 🅿️
+  o: ["\u{1F17E}\uFE0F", "\u2B55", "\u{1F535}", "\u{1F7E0}", "\u26AA", "\u{1F369}", "\u{1F315}"], // 🅾️ ⭕ 🔵 🟠 ⚪ 🍩 🌕
+  a: ["\u{1F170}\uFE0F"], // 🅰️
+  d: [null], // tile
+  m: ["\u24C2\uFE0F"], // Ⓜ️
+  i: ["\u2139\uFE0F", "\u2757"], // ℹ️ ❗
+  n: [null], // tile
+  s: ["\u{1F4B2}"], // 💲
+};
+export const TITLE_SAFE_CODEPOINTS = new Set([
+  0x44, 0x4e, // tile letters D N
+  0xfe0f,
+  0x1f17f, 0x1f17e, 0x2b55, 0x1f535, 0x1f7e0, 0x26aa, 0x1f369, 0x1f315,
+  0x1f170, 0x24c2, 0x2139, 0x2757, 0x1f4b2,
+]);
+export const TITLE_THEMES = ["tilt", "wave", "glow", "pop", "flat"];
+export const TITLE_TILE_COLORS = ["blue", "green", "gold", "violet", "coral"];
+
+function pick(list, random) {
+  return list[Math.floor(random() * list.length) % list.length];
+}
+
+/** One randomized emoji spelling of "poadomains" (new look on each load). */
+export function buildSiteTitle(random = Math.random) {
+  const glyphs = [];
+  for (const letter of "poadomains") {
+    const choice = pick(TITLE_LETTER_OPTIONS[letter], random);
+    glyphs.push(
+      choice === null
+        ? { kind: "tile", letter, text: letter.toUpperCase() }
+        : { kind: "emoji", letter, text: choice },
+    );
+  }
+  return {
+    theme: pick(TITLE_THEMES, random),
+    tile: pick(TITLE_TILE_COLORS, random),
+    glyphs,
+    text: glyphs.map((g) => g.text).join(""),
+    spelled: glyphs.map((g) => g.letter).join(""),
+  };
+}
+
+export function pickSiteTitle(random = Math.random) {
+  return buildSiteTitle(random).text;
+}
+
+export function titleCodePointsOk(title) {
+  for (const ch of String(title)) {
+    const cp = ch.codePointAt(0);
+    if (!TITLE_SAFE_CODEPOINTS.has(cp)) return false;
+  }
+  return true;
+}
+
+/* ---------- Name ideas under the Check button ---------- */
+export const IDEA_WORDS = [
+  "moon", "rocket", "pixel", "sunny", "cosmic", "lucky", "mango", "ninja", "river",
+  "spark", "cloud", "nova", "maple", "echo", "comet", "tiger", "lemon", "bolt",
+  "jazz", "zen", "koala", "waffle", "disco", "astro", "coral", "frost", "honey",
+  "jelly", "kite", "llama", "meadow", "olive", "panda", "robot", "salsa", "tidal",
+  "velvet", "wizard", "yeti", "bloom", "cactus", "dragon", "ember", "falcon",
+  "harbor", "island", "jungle", "lotus", "magic", "noodle", "otter", "peach",
+  "quest", "rainbow", "sushi", "taco", "unicorn", "vibe", "whale", "zebra",
+  "happy", "golden", "tiny", "mega", "super", "chill", "brave", "swift", "wild",
+];
+export const IDEA_EMOJI = [
+  "\u{1F680}", "\u{1F319}", "\u{1F355}", "\u{1F525}", "\u{1F30A}", "\u{1F419}",
+  "\u{1F98A}", "\u{1F340}", "\u{1F48E}", "\u26A1", "\u{1F388}", "\u{1F335}",
+  "\u{1F369}", "\u{1F3A7}", "\u{1F41D}", "\u{1F308}", "\u{1F349}", "\u{1F9E0}",
+  "\u{1FA90}", "\u{1F433}", "\u{1F33B}", "\u{1F3A8}", "\u{1F984}", "\u{1F344}",
+]; // 🚀🌙🍕🔥🌊🐙🦊🍀💎⚡🎈🌵🍩🎧🐝🌈🍉🧠🪐🐳🌻🎨🦄🍄
+
+/** A single random idea: plain words, or words mixed with one emoji. */
+export function randomIdea(random = Math.random) {
+  const w1 = pick(IDEA_WORDS, random);
+  const w2 = pick(IDEA_WORDS, random);
+  const e = pick(IDEA_EMOJI, random);
+  switch (Math.floor(random() * 5) % 5) {
+    case 0: return w1 + w2;
+    case 1: return e + w1;
+    case 2: return w1 + e;
+    case 3: return w1 + Math.floor(random() * 99 + 1);
+    default: return w1 + e + w2;
+  }
+}
+
+/**
+ * Fresh list of unique idea names. `accept(name)` must apply the registry's name
+ * rules (and availability); only accepted names are returned.
+ */
+export function buildIdeas({ count = 24, random = Math.random, accept = () => true } = {}) {
+  const out = [];
+  const seen = new Set();
+  for (let tries = 0; out.length < count && tries < count * 40; tries++) {
+    const q = randomIdea(random);
+    if (seen.has(q)) continue;
+    seen.add(q);
+    let ok = false;
+    try { ok = Boolean(accept(q)); } catch { ok = false; }
+    if (ok) out.push(q);
+  }
+  return out;
+}
+
+/** Split ideas into `rows` rows with balanced total length (masonry bricks). */
+export function masonryRows(ideas, rows = 3) {
+  const out = Array.from({ length: rows }, () => []);
+  const size = new Array(rows).fill(0);
+  for (const idea of ideas) {
+    let r = 0;
+    for (let k = 1; k < rows; k++) if (size[k] < size[r]) r = k;
+    out[r].push(idea);
+    size[r] += [...idea].length + 3;
+  }
+  return out;
+}
+
+export function domainPath(name) {
+  return "/d/" + encodeURIComponent(String(name ?? ""));
+}
+
+export function parseDomainPath(pathname) {
+  if (typeof pathname !== "string") return null;
+  const m = pathname.match(/^\/d\/([^/]+)\/?$/);
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return null;
+  }
+}
+
+export function parseOwnerPath(pathname) {
+  if (typeof pathname !== "string") return null;
+  const m = pathname.match(/^\/p\/([^/]+)\/?$/);
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return null;
+  }
+}
+
+export function offerIsActive(o, time) {
+  return Boolean(
+    o && !o.cancelled && o.uses < o.maxUses && typeof time === "number" && time < o.validUntil,
+  );
+}
+
+export function activeResaleOffers(state) {
+  if (!state) return [];
+  const time = state.time;
+  const out = [];
+  for (const o of Object.values(state.offers ?? {})) {
+    if (o.kind !== "resale" || !offerIsActive(o, time)) continue;
+    const deed = state.deeds?.[o.parentId];
+    out.push({
+      offer: o,
+      name: deed?.name ?? null,
+      deed,
+      price: o.price,
+      asset: o.asset,
+    });
+  }
+  out.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  return out;
+}
+
+export function resolveDomainView(state, name, reservedSet = new Set()) {
+  const result = {
+    name,
+    status: "unknown",
+    deed: null,
+    owner: null,
+    auction: null,
+    auctionBucket: null,
+    listing: null,
+    childOffer: null,
+    reserved: false,
+    history: [],
+  };
+  if (!state || typeof name !== "string" || !name) return result;
+  result.history = historyForTarget(state, { name });
+  if (reservedSet.has(name)) {
+    result.status = "reserved";
+    result.reserved = true;
+    return result;
+  }
+  const entry = state.names?.[name];
+  const liveAuction =
+    (entry?.auctionId && state.auctions?.[entry.auctionId]) ||
+    Object.values(state.auctions ?? {}).find((a) => a.name === name) ||
+    null;
+  if (liveAuction) {
+    result.auction = liveAuction;
+    result.auctionBucket = classifyAuction(liveAuction, state.time);
+  }
+  if (entry?.activeId && state.deeds?.[entry.activeId]) {
+    const d = state.deeds[entry.activeId];
+    result.deed = d;
+    result.owner = d.owner;
+    const listing = Object.values(state.offers ?? {}).find(
+      (o) =>
+        o.kind === "resale" &&
+        o.parentId === d.id &&
+        offerIsActive(o, state.time),
+    );
+    result.listing = listing || null;
+    result.status = listing ? "listed" : "owned";
+    if (d.rights?.kind === "lease") {
+      if (typeof d.expiry === "number" && state.time >= d.expiry) {
+        const grace = d.rights.graceSeconds ?? 0;
+        result.status =
+          state.time < d.expiry + grace ? "lease-grace" : "lease-expired";
+      } else {
+        result.status = listing ? "listed-lease" : "leased";
+      }
+    }
+    return result;
+  }
+  if (liveAuction) {
+    result.status =
+      result.auctionBucket === "upcoming"
+        ? "auction-upcoming"
+        : result.auctionBucket === "past"
+          ? "auction-past"
+          : "auction-current";
+    return result;
+  }
+  if (name.includes(".")) {
+    const parent = name.split(".").slice(1).join(".");
+    const parentEntry = state.names?.[parent];
+    const parentDeed = parentEntry?.activeId
+      ? state.deeds?.[parentEntry.activeId]
+      : null;
+    const childLabel = name.split(".")[0];
+    const childOffer = parentDeed
+      ? Object.values(state.offers ?? {}).find(
+          (o) =>
+            o.kind === "child" &&
+            o.parentId === parentDeed.id &&
+            offerIsActive(o, state.time) &&
+            (o.labels === null || o.labels.includes(childLabel)),
+        )
+      : null;
+    result.childOffer = childOffer || null;
+    result.status = childOffer ? "child-offer" : "unminted-child";
+    return result;
+  }
+  result.status = "available";
+  return result;
+}
+
+export function buildListingPrompt({
+  kind,
+  name,
+  deed,
+  offer,
+  price,
+  validUntil,
+  endpointUrl,
+  signerPlaceholder = "<YOUR_OWNER_PRINCIPAL>",
+}) {
+  const endpoint = endpointUrl || "http://127.0.0.1:8787";
+  const lines = [
+    "POA DOMAINS LISTING PROMPT (UNSIGNED — NO KEYS, NO AUTO-SUBMIT)",
+    `Domain page: ${endpoint}${domainPath(name)}`,
+    `Endpoint: ${endpoint}`,
+    `Asset: POA only (resale rejects other assets)`,
+    "",
+  ];
+  if (kind === "list") {
+    lines.push(
+      `Action: sellFixed`,
+      `List "${name}" for ${price} POA until ${validUntil}.`,
+      `Params JSON: ${JSON.stringify({
+        name,
+        expectedDeedId: deed?.id,
+        expectedVersion: deed?.version,
+        asset: "POA",
+        price: String(price),
+        validUntil,
+      })}`,
+      `CLI: node dist/src/reference-cli.js act --url ${endpoint} --key-file agent.pem --action sellFixed --params '${JSON.stringify({
+        name,
+        expectedDeedId: deed?.id,
+        expectedVersion: deed?.version,
+        asset: "POA",
+        price: String(price),
+        validUntil,
+      })}' --max-total 0`,
+      `Signer must be current owner (${signerPlaceholder}).`,
+    );
+  } else if (kind === "unlist") {
+    lines.push(
+      `Action: cancelOffer`,
+      `Unlist "${name}" offer ${offer?.id}.`,
+      `Params JSON: ${JSON.stringify({
+        offerId: offer?.id,
+        expectedVersion: offer?.version,
+      })}`,
+      `CLI: node dist/src/reference-cli.js act --url ${endpoint} --key-file agent.pem --action cancelOffer --params '${JSON.stringify({
+        offerId: offer?.id,
+        expectedVersion: offer?.version,
+      })}' --max-total 0`,
+    );
+  } else if (kind === "change") {
+    lines.push(
+      `Change listing price for "${name}" to ${price} POA (two-step: cancelOffer then sellFixed).`,
+      `Step 1 cancelOffer params: ${JSON.stringify({
+        offerId: offer?.id,
+        expectedVersion: offer?.version,
+      })}`,
+      `Step 2 sellFixed params: ${JSON.stringify({
+        name,
+        expectedDeedId: deed?.id,
+        expectedVersion: deed?.version,
+        asset: "POA",
+        price: String(price),
+        validUntil,
+      })}`,
+      `Note: after cancelOffer the deed version may stay the same; re-read GET /v1/state before step 2 if versions moved.`,
+      `CLI step 1: node dist/src/reference-cli.js act --url ${endpoint} --key-file agent.pem --action cancelOffer --params '${JSON.stringify({
+        offerId: offer?.id,
+        expectedVersion: offer?.version,
+      })}' --max-total 0`,
+      `CLI step 2: node dist/src/reference-cli.js act --url ${endpoint} --key-file agent.pem --action sellFixed --params '<REFRESHED_SELL_PARAMS>' --max-total 0`,
+    );
+  }
+  lines.push("", "Never paste private keys into the browser.");
+  return lines.join("\n");
+}
+
+export const TAB_SEEN_KEY = "poadomains.tabSeen.v1";
+
+export function loadTabSeen(storage) {
+  try {
+    const raw = storage?.getItem?.(TAB_SEEN_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveTabSeen(storage, map) {
+  try {
+    storage?.setItem?.(TAB_SEEN_KEY, JSON.stringify(map ?? {}));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Per-tab content watermark from committed state (for green new-dots). */
+export function tabWatermarks(state) {
+  if (!state) return { find: 0, auctions: 0, market: 0, explore: 0, handoff: 0 };
+  const seq = state.sequence ?? 0;
+  let auctions = 0;
+  for (const a of Object.values(state.auctions ?? {}))
+    auctions = Math.max(auctions, a.sequence ?? 0);
+  for (const b of Object.values(state.bids ?? {}))
+    auctions = Math.max(auctions, b.sequence ?? 0);
+  let market = 0;
+  for (const o of Object.values(state.offers ?? {})) {
+    if (o.kind === "resale") market = Math.max(market, o.sequence ?? o.version ?? 0);
+  }
+  return {
+    find: seq,
+    auctions: Math.max(auctions, seq),
+    market: Math.max(market, seq),
+    explore: seq,
+    handoff: 0,
+  };
+}
+
+export function tabHasNew(tabId, watermarks, seenMap) {
+  const w = watermarks?.[tabId] ?? 0;
+  const seen = seenMap?.[tabId] ?? 0;
+  return w > seen;
+}
+
+function auctionCloseAt(a) {
+  return a.high
+    ? Math.max(a.openAt + a.window, a.high.at + a.quiet)
+    : a.openAt + a.window;
+}
+
+/** Classify one auction relative to registry time. */
+export function classifyAuction(auction, time) {
+  if (!auction || typeof auction !== "object") return "past";
+  if (auction.status !== "live") return "past";
+  if (typeof time === "number" && time < auction.openAt) return "upcoming";
+  const close = auctionCloseAt(auction);
+  if (typeof time === "number" && time >= close) return "current";
+  return "current";
+}
+
+/** Split auctions into past / current / upcoming (stable name sort within). */
+export function partitionAuctions(auctions, time) {
+  const groups = { past: [], current: [], upcoming: [] };
+  const list = Array.isArray(auctions)
+    ? auctions
+    : Object.values(auctions ?? {});
+  for (const a of list) groups[classifyAuction(a, time)].push(a);
+  for (const key of Object.keys(groups))
+    groups[key].sort((x, y) => String(x.name).localeCompare(String(y.name)));
+  return groups;
+}
+
+/**
+ * Shape a polite live-actions ticker from committed registry state.
+ * No fabricated events — empty array when nothing actionable is present.
+ */
+export function shapeLiveActions(state, limit = 40) {
+  if (!state || typeof state !== "object") return [];
+  const items = [];
+  const auctions = Object.values(state.auctions ?? {});
+  const bids = Object.values(state.bids ?? {});
+  const receipts = Object.values(state.receipts ?? {});
+  const offers = Object.values(state.offers ?? {});
+  const time = state.time;
+
+  for (const a of auctions) {
+    const bucket = classifyAuction(a, time);
+    if (bucket === "past" && a.status !== "live") {
+      items.push({
+        id: `auction:${a.id}:final`,
+        kind: "auction-final",
+        label: `${a.name} · ${a.status}`,
+        name: a.name,
+        auctionId: a.id,
+        sequence: a.sequence ?? 0,
+        at: a.openAt ?? 0,
+      });
+    } else if (bucket === "upcoming") {
+      items.push({
+        id: `auction:${a.id}:upcoming`,
+        kind: "auction-upcoming",
+        label: `${a.name} · opens ${a.openAt}`,
+        name: a.name,
+        auctionId: a.id,
+        sequence: a.sequence ?? 0,
+        at: a.openAt ?? 0,
+      });
+    } else if (bucket === "current") {
+      const high = a.high
+        ? `high ${a.high.amount}`
+        : `reserve ${a.reserve}`;
+      items.push({
+        id: `auction:${a.id}:live`,
+        kind: "auction-live",
+        label: `${a.name} · live · ${high}`,
+        name: a.name,
+        auctionId: a.id,
+        sequence: a.sequence ?? 0,
+        at: a.high?.at ?? a.openAt ?? 0,
+      });
+    }
+  }
+
+  for (const b of bids) {
+    const a = state.auctions?.[b.auctionId];
+    const name = a?.name ?? b.auctionId?.slice?.(0, 12) ?? "bid";
+    items.push({
+      id: `bid:${b.id ?? b.sequence}`,
+      kind: "bid",
+      label: `${name} · bid ${b.amount} · ${b.status}`,
+      name,
+      auctionId: b.auctionId,
+      sequence: b.sequence ?? 0,
+      at: b.at ?? 0,
+    });
+  }
+
+  for (const r of receipts) {
+    if (r.status !== "succeeded") continue;
+    const name =
+      r.result?.name ??
+      (r.result?.deedId && state.deeds?.[r.result.deedId]?.name) ??
+      null;
+    if (!name && !r.result?.offerId) continue;
+    items.push({
+      id: `receipt:${r.intentId ?? r.sequence}`,
+      kind: "receipt",
+      label: name
+        ? `${name} · settled #${r.sequence}`
+        : `offer · settled #${r.sequence}`,
+      name: name ?? "",
+      auctionId: null,
+      sequence: r.sequence ?? 0,
+      at: r.time ?? 0,
+    });
+  }
+
+  for (const o of offers) {
+    const deed = state.deeds?.[o.parentId];
+    const target = deed?.name ?? o.parentId?.slice?.(0, 12) ?? "offer";
+    const active =
+      !o.cancelled && o.uses < o.maxUses && time < o.validUntil;
+    items.push({
+      id: `offer:${o.id}`,
+      kind: active ? "offer-active" : "offer",
+      label: `${o.kind} · ${target} · ${o.price} ${o.asset}`,
+      name: o.kind === "child" ? target : target,
+      auctionId: null,
+      offerId: o.id,
+      sequence: o.sequence ?? 0,
+      at: o.validUntil ?? 0,
+    });
+  }
+
+  items.sort((a, b) => b.sequence - a.sequence || b.at - a.at);
+  const seen = new Set();
+  const out = [];
+  for (const item of items) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    out.push(item);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/** History rows for a name or auction from committed state. */
+export function historyForTarget(state, { name, auctionId } = {}) {
+  if (!state) return [];
+  const rows = [];
+  const auctions = Object.values(state.auctions ?? {});
+  const matchAuction = (a) =>
+    (auctionId && a.id === auctionId) || (name && a.name === name);
+  for (const a of auctions.filter(matchAuction)) {
+    rows.push({
+      kind: "auction",
+      sequence: a.sequence ?? 0,
+      at: a.openAt ?? 0,
+      text: `${a.name} · ${a.status} · reserve ${a.reserve} ${a.asset}`,
+    });
+  }
+  for (const b of Object.values(state.bids ?? {})) {
+    const a = state.auctions?.[b.auctionId];
+    if (auctionId && b.auctionId !== auctionId) continue;
+    if (name && a?.name !== name) continue;
+    if (!auctionId && !name) continue;
+    rows.push({
+      kind: "bid",
+      sequence: b.sequence ?? 0,
+      at: b.at ?? 0,
+      text: `bid ${b.amount} · ${b.status} · #${b.sequence}`,
+    });
+  }
+  for (const r of Object.values(state.receipts ?? {})) {
+    const deedName = r.result?.deedId
+      ? state.deeds?.[r.result.deedId]?.name
+      : null;
+    const rName = r.result?.name ?? deedName;
+    if (name && rName !== name) continue;
+    if (!name && auctionId) continue;
+    if (!name && !auctionId) continue;
+    if (r.status !== "succeeded") continue;
+    rows.push({
+      kind: "receipt",
+      sequence: r.sequence ?? 0,
+      at: r.time ?? 0,
+      text: `receipt #${r.sequence} · ${rName ?? "ok"}`,
+    });
+  }
+  rows.sort((a, b) => b.sequence - a.sequence);
+  return rows;
+}
+
+export const CART_STORAGE_KEY = "poadomains.cart.v1";
+
+export function loadCart(storage) {
+  try {
+    const raw = storage?.getItem?.(CART_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (x) => x && typeof x === "object" && typeof x.name === "string",
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function saveCart(storage, cart) {
+  try {
+    storage?.setItem?.(CART_STORAGE_KEY, JSON.stringify(cart ?? []));
+  } catch {
+    /* quota / private mode — cart stays in-memory only */
+  }
+}
+
+/**
+ * Machine-readable agent checkout handoff (no keys, secrets, or signatures).
+ * Does not submit; documents GET/POST endpoints and CLI/MCP actions only.
+ */
+export function buildAgentCheckoutHandoff(
+  items,
+  cap,
+  signerPrincipal,
+  endpointUrl,
+  context = "local-reference-only",
+) {
+  if (!Array.isArray(items) || items.length === 0) return "";
+  const endpoint = endpointUrl || "http://127.0.0.1:8787";
+  const signer =
+    signerPrincipal && validPrincipal(signerPrincipal)
+      ? signerPrincipal
+      : null;
+  const payload = {
+    schema: "poa-domains.agent-checkout.v1",
+    livePoA: false,
+    context,
+    endpoint,
+    reads: {
+      healthz: `${endpoint}/healthz`,
+      capabilities: `${endpoint}/v1/capabilities`,
+      state: `${endpoint}/v1/state`,
+      nonce: `${endpoint}/v1/nonce?signer=<PRINCIPAL>`,
+      receipt: `${endpoint}/v1/receipts/<intentId>`,
+    },
+    writes: {
+      intents: {
+        method: "POST",
+        path: `${endpoint}/v1/intents`,
+        contentType: "application/json",
+        note: "Signed packet only; browser writes are rejected. Never auto-submit from this page.",
+      },
+    },
+    cli: {
+      keygen: "node dist/src/reference-cli.js keygen --out agent.pem",
+      act: "node dist/src/reference-cli.js act --url <ENDPOINT> --key-file agent.pem --action <ACTION> --params '<JSON>' --max-total <AMOUNT>",
+      prepare: "node dist/src/reference-cli.js prepare --url <ENDPOINT> --file item.json --out unsigned.json",
+      sign: "node dist/src/reference-cli.js sign --file unsigned.json --key-file agent.pem --out signed.json",
+      submit: "node dist/src/reference-cli.js submit --url <ENDPOINT> --file signed.json",
+    },
+    mcp: {
+      tool: "submit_intent",
+      note: "Same signed packet shape as POST /v1/intents. No keys in this handoff.",
+    },
+    chainId: cap?.chainId ?? null,
+    registryId: cap?.registryId ?? null,
+    policyHash: cap?.policyHash ?? null,
+    revision: cap?.revision ?? null,
+    signerPrincipal: signer,
+    itemCount: items.length,
+    items: items.map((item, index) => ({
+      index: index + 1,
+      name: item.name,
+      action: item.action,
+      tier: item.tier,
+      isRoot: item.isRoot,
+      asset: item.asset,
+      amount: item.amount,
+      summary: item.summary,
+      auctionId: item.params?.auctionId ?? null,
+      offerId: item.params?.offerId ?? null,
+      params: item.params,
+    })),
+  };
+  const lines = [
+    "POA DOMAINS AGENT CHECKOUT (UNSIGNED — NO KEYS, NO SIGNATURES, NO AUTO-SUBMIT)",
+    `Endpoint: ${endpoint}`,
+    `Items: ${items.length}`,
+    `Verify: GET ${endpoint}/v1/capabilities then GET ${endpoint}/v1/state`,
+    `Submit only via local CLI/MCP after independent review: POST ${endpoint}/v1/intents`,
+    `CLI act example uses --key-file on the agent host; never paste private keys here.`,
+    "",
+    JSON.stringify(payload, null, 2),
+  ];
+  return lines.join("\n");
+}
+
+/** Network banner / hold helpers (UI). Levels match Worker /v1/network-status. */
+export const NETWORK_BANNER_DISMISS_KEY = "poadomains.networkBanner.dismissedLevel";
+
+export function shouldHoldTransactions(level) {
+  return level === "down";
+}
+
+export function networkBannerCopy(level) {
+  switch (level) {
+    case "online":
+      return "🟢 PoA network Online";
+    case "degraded":
+      return "🟡 PoA network Slow — actions still work, expect delays";
+    case "down":
+      return "🔴 PoA network Down — actions held ⏸️ until the network is back";
+    default:
+      return "⚪ Checking PoA network…";
+  }
+}
+
+export function networkBannerColor(level) {
+  switch (level) {
+    case "online":
+      return "green";
+    case "degraded":
+      return "amber";
+    case "down":
+      return "red";
+    default:
+      return "grey";
+  }
+}
+
+/** Dismiss stays until the level changes. */
+export function isNetworkBannerDismissed(storage, level) {
+  try {
+    return storage?.getItem?.(NETWORK_BANNER_DISMISS_KEY) === level;
+  } catch {
+    return false;
+  }
+}
+
+export function dismissNetworkBanner(storage, level) {
+  try {
+    storage?.setItem?.(NETWORK_BANNER_DISMISS_KEY, level);
+  } catch {
+    /* private mode */
+  }
+}
+
+export function clearNetworkBannerDismiss(storage) {
+  try {
+    storage?.removeItem?.(NETWORK_BANNER_DISMISS_KEY);
+  } catch {
+    /* private mode */
+  }
+}
+
+/**
+ * Classify a probe result into online/degraded/down/checking.
+ * Requires 2 consecutive failures before Down.
+ */
+export function classifyNetworkProbe({
+  ok,
+  latencyMs = null,
+  stale = null,
+  staleAgeS = null,
+  consecutiveFailures = 0,
+  everSucceeded = false,
+  slowMs = 4000,
+  failThreshold = 2,
+}) {
+  if (!ok) {
+    if (consecutiveFailures >= failThreshold) return "down";
+    return everSucceeded ? "degraded" : "checking";
+  }
+  const slow = (latencyMs ?? 0) >= slowMs;
+  const isStale =
+    stale === true || (typeof staleAgeS === "number" && staleAgeS > 120);
+  if (slow || isStale) return "degraded";
+  return "online";
+}
+
+/** Strip user-visible "xero emoji" phrasing from a string (case-insensitive). */
+export function stripXeroEmojiPhrasing(text) {
+  if (typeof text !== "string") return text;
+  return text.replace(/xero[\s-]?emoji/gi, "").replace(/ {2,}/g, " ").trim();
+}
+
+/** True when HTML/UI source still contains a user-visible xero-emoji mention. */
+export function htmlHasVisibleXeroEmoji(html) {
+  if (typeof html !== "string") return false;
+  // Ignore CSS @font-face / font-family and font file paths.
+  const withoutCss = html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/url\([^)]*XeroEmoji[^)]*\)/gi, "")
+    .replace(/font-family:\s*["']?Xero\s*Emoji["']?/gi, "")
+    .replace(/font-family:\s*["']?XeroEmoji["']?/gi, "");
+  return /xero[\s-]?emoji/i.test(withoutCss);
+}

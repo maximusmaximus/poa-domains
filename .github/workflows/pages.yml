@@ -30,7 +30,7 @@ jobs:
       - name: Check production guards, reference test suite and public read-only bundle
         run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm run check
       - name: Redacted source, history and public artifact scan
-        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 bash scripts/gitleaks.sh
+        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 GITHUB_TOKEN="$GITHUB_TOKEN" bash scripts/gitleaks.sh
       - name: Upload only the tested public static files
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
         with:
