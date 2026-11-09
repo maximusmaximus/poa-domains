@@ -1,6 +1,7 @@
 import { createInterface } from "node:readline";
-import { need, parseJSON, Fault, exact } from "./core.js";
+import { need, parseJSON, Fault, exact, text } from "./core.js";
 import { request } from "./client.js";
+import { buildMetadataWitness } from "./interface.js";
 export async function runReferenceMcp(url: string): Promise<void> {
   let initialized = false,
     ready = false;
@@ -88,6 +89,26 @@ export async function runReferenceMcp(url: string): Promise<void> {
             } else if (p.name === "read_capabilities") {
               exact(p.arguments, []);
               data = await request(url, "/v1/capabilities");
+            } else if (p.name === "resolve_domain") {
+              const args = exact(p.arguments, ["name"]);
+              data = await request(
+                url,
+                "/v1/resolve?name=" + encodeURIComponent(text(args.name, 256)),
+              );
+            } else if (p.name === "build_metadata_witness") {
+              const args = exact(
+                p.arguments,
+                ["name"],
+                ["parentId", "description"],
+              );
+              data = buildMetadataWitness(
+                text(args.name, 256),
+                { kind: "permanent" },
+                args.parentId ? text(args.parentId, 128) : null,
+                args.description
+                  ? text(args.description, 512)
+                  : `PoA Domains metadata for ${args.name}`,
+              );
             } else {
               need(p.name === "submit_intent", "TOOL");
               data = await request(url, "/v1/intents", p.arguments);

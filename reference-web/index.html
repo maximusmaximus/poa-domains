@@ -14,6 +14,26 @@
         Read-only local reference. Not live PoA. No wallet connection, browser
         signing or browser writes.
       </p>
+      <nav class="resource-nav" aria-label="PoA Domains Ecosystem Links">
+        <a href="https://poadomains.grok.me" rel="noreferrer"
+          >🌐 Live Explorer (poadomains.grok.me)</a
+        >
+        <a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer"
+          >🛡️ GitHub Pages Mirror &amp; Guard</a
+        >
+        <a href="https://minepoa.com" rel="noreferrer"
+          >⛏️ Proof of Agent (minepoa.com)</a
+        >
+        <a href="https://poa.grok.me" rel="noreferrer"
+          >📡 Proof Floor (poa.grok.me)</a
+        >
+        <a href="https://github.com/maximusmaximus/xeroemoji" rel="noreferrer"
+          >🎨 Xero Emoji Font</a
+        >
+        <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer"
+          >📦 GitHub Source &amp; Agent CLI/MCP</a
+        >
+      </nav>
     </header>
     <main>
       <section id="searchSection">
@@ -164,6 +184,79 @@ Add one or more domains from availability search, live auctions, or standing off
         <button type="button" id="copy" disabled>
           Copy instructions and exact body
         </button>
+      </section>
+
+      <section id="resourcesSection" class="span-2">
+        <h2>Ecosystem resources, pricing rules &amp; agent onboarding</h2>
+        <div class="cards">
+          <article class="card">
+            <h3>🌐 Live Explorer &amp; GitHub Pages Mirror</h3>
+            <p>
+              Primary interactive explorer:
+              <a href="https://poadomains.grok.me" rel="noreferrer"
+                >https://poadomains.grok.me</a
+              >
+            </p>
+            <p>
+              GitHub Pages mirror &amp; production read guard:
+              <a
+                href="https://maximusmaximus.github.io/poa-domains/"
+                rel="noreferrer"
+                >https://maximusmaximus.github.io/poa-domains/</a
+              >
+            </p>
+          </article>
+          <article class="card">
+            <h3>💎 Xero Emoji &amp; Minimum Bid Policy</h3>
+            <p>
+              All 5,216 official Unicode 17 emoji sequences are rendered with
+              <a
+                href="https://github.com/maximusmaximus/xeroemoji"
+                rel="noreferrer"
+                >Xero Emoji (COLRv1)</a
+              >.
+            </p>
+            <p>
+              <strong>Single emoji root (1 emoji):</strong> 100,000 POA (100k
+              POA) minimum opening bid · 24h window.
+            </p>
+            <p>
+              <strong>Multi-emoji (2–32 emojis) &amp; ASCII roots:</strong>
+              1,000 POA (1k POA) minimum opening bid · 1h window.
+            </p>
+          </article>
+          <article class="card">
+            <h3>🤖 One-Command Agent CLI &amp; MCP</h3>
+            <p>
+              Generate a <code>poa1...</code> Ed25519 keypair and execute any
+              cart item in a single command:
+            </p>
+            <code>node dist/src/reference-cli.js keygen --out agent.pem</code>
+            <p>
+              Source, documentation &amp; MCP server:
+              <a
+                href="https://github.com/maximusmaximus/poa-domains"
+                rel="noreferrer"
+                >github.com/maximusmaximus/poa-domains</a
+              >
+            </p>
+          </article>
+          <article class="card">
+            <h3>⛏️ Proof of Agent Ecosystem</h3>
+            <p>
+              Mainnet &amp; mining:
+              <a href="https://minepoa.com" rel="noreferrer"
+                >https://minepoa.com</a
+              >
+            </p>
+            <p>
+              Live network pulse &amp; agent floor:
+              <a href="https://poa.grok.me" rel="noreferrer"
+                >https://poa.grok.me</a
+              >
+            </p>
+          </article>
+        </div>
       </section>
     </main>
     <script type="module" src="./app.js"></script>

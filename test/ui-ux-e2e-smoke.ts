@@ -225,6 +225,22 @@ async function runFullUiUxFlowsOnRegistryApp(
   });
   assert.equal(xeroFontReady, true, `${browserName}: Xero Emoji font loaded`);
 
+  // Verify ecosystem navigation & poadomains.grok.me links are rendered
+  assert.ok(
+    (await page
+      .locator('.resource-nav a[href="https://poadomains.grok.me"]')
+      .count()) >= 1,
+    `${browserName}: poadomains.grok.me link present in explorer header`,
+  );
+  assert.ok(
+    (await page
+      .locator(
+        '#resourcesSection a[href="https://maximusmaximus.github.io/poa-domains/"]',
+      )
+      .count()) >= 1,
+    `${browserName}: GitHub Pages mirror link present in resources section`,
+  );
+
   // 2. Quick-try pills UX: click every quick pill and verify input + result update
   const pillQueries = await page
     .locator(".quick-pills .pill")
@@ -787,6 +803,12 @@ async function runPublicProductionPagesMultiBrowserSmoke(prodUrl: string) {
         emojiCheckResult.text ?? "",
         /3/,
         `${name}: shadow DOM emoji checker counted 3 Unicode 17 emoji sequences`,
+      );
+      assert.ok(
+        (await page
+          .locator('.mirror-nav a[href="https://poadomains.grok.me"]')
+          .count()) >= 1,
+        `${name}: public GitHub Pages mirror links to poadomains.grok.me`,
       );
       assert.deepEqual(errors, [], `${name}: public pages zero errors`);
     } finally {

@@ -2,6 +2,8 @@ import { ACTIONS, Action } from "./actions.js";
 import { Body, DOMAIN, validateBody, intentId } from "./auth.js";
 import { canonical, exact, need } from "./core.js";
 import { Engine } from "./engine.js";
+import { cidFor, Metadata } from "./metadata.js";
+import { Rights, rightsHash } from "./model.js";
 import {
   EMOJI17_RECORD_COUNT,
   emoji17Manifest,
@@ -9,6 +11,20 @@ import {
   normalizationModeForHash,
   normalizeName,
 } from "./names.js";
+export function buildMetadataWitness(
+  name: string,
+  r: Rights = { kind: "permanent" },
+  parentId: string | null = null,
+  description = "PoA Domains Registry title metadata",
+): Metadata {
+  const document = {
+    schema: "poa-domains.metadata.v1",
+    name,
+    rightsHash: rightsHash(r, parentId),
+    description,
+  };
+  return { cid: cidFor(document), document };
+}
 export function capabilities(e: Engine): any {
   const mode = e.normalizationMode;
   const activeManifest = mode === "emoji17-full" ? emoji17Manifest : manifest;
@@ -28,6 +44,10 @@ export function capabilities(e: Engine): any {
     emojiManifest: activeManifest,
     reservedCount: e.config.reserved.length,
     reservedCatalog: e.config.reserved.join(","),
+    publicExplorerUrl: "https://poadomains.grok.me",
+    githubMirrorUrl: "https://maximusmaximus.github.io/poa-domains/",
+    onboardingGrantPoa:
+      e.config.revision === "poa-mainnet-v1" ? "10000000" : "0",
     assets: e.config.assets,
     increment: e.config.increment,
     feeBps: e.config.feeBps,
@@ -72,6 +92,23 @@ export function prepare(input: unknown, cap: any): Body {
     const n = normalizeName(params.label, mode);
     need(n.labels.length === 1, "NAME_DEPTH");
     params.label = n.canonical;
+  }
+  if (
+    i.action === "announceAuction" &&
+    params.expectedDeedId === null &&
+    params.metadata &&
+    typeof params.metadata === "object" &&
+    (params.metadata.cid === "<COMPUTED_CIDV1_SHA256>" ||
+      params.metadata.document?.rightsHash === "<PERMANENT_ROOT_RIGHTS_HASH>")
+  ) {
+    params.metadata = buildMetadataWitness(
+      params.name,
+      { kind: "permanent" },
+      null,
+      typeof params.metadata.document?.description === "string"
+        ? params.metadata.document.description
+        : `Root domain ${params.name}`,
+    );
   }
   const body: Body = {
     domain: cap.domain,

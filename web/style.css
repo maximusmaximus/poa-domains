@@ -32,6 +32,43 @@ section {
   border: 1px solid #455269;
   border-radius: 12px;
   padding: 1.5rem;
+  margin: 1.5rem 0;
+}
+.mirror-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1rem 0 1.5rem;
+}
+.mirror-nav a {
+  background: #182232;
+  border: 1px solid #455269;
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.mirror-nav a.primary-link {
+  background: #1f3b2e;
+  border-color: #65cfa8;
+  color: #9cffe0;
+  font-weight: 600;
+}
+.resource-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.resource-card {
+  background: #161f2c;
+  border: 1px solid #38465e;
+  border-radius: 10px;
+  padding: 1rem;
+}
+.resource-card h3 {
+  margin-top: 0;
+  color: #9cffe0;
 }
 p {
   line-height: 1.65;

@@ -1,8 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { promisify } from "node:util";
+const execFileAsync = promisify(execFile);
 import { startRegistryApp } from "../src/app.js";
 import {
   canonical,
@@ -681,12 +684,21 @@ test("launchable full-stack registry app initializes mainnet profile, serves Uni
       assert.equal(app1.config.revision, "poa-mainnet-v1");
       assert.equal(app1.config.chainId, "poa-mainnet-1");
       assert.ok(app1.principals.alice!.startsWith("poa1"));
+      const healthRes = await fetch(app1.url + "/healthz", {
+        headers: { host: "poadomains.grok.me" },
+      });
+      assert.equal(healthRes.status, 200);
+      const health: any = await healthRes.json();
+      assert.equal(health.status, "ok");
+      assert.equal(health.chainId, "poa-mainnet-1");
       const capRes = await fetch(app1.url + "/v1/capabilities");
       assert.equal(capRes.status, 200);
       const cap: any = await capRes.json();
       assert.equal(cap.emojiAliases, 5216);
       assert.equal(cap.chainId, "poa-mainnet-1");
       assert.equal(cap.reservedCount, 655);
+      assert.equal(cap.publicExplorerUrl, "https://poadomains.grok.me");
+      assert.equal(cap.onboardingGrantPoa, "10000000");
       assert.ok(
         typeof cap.reservedCatalog === "string" &&
           cap.reservedCatalog.split(",").includes("google"),
@@ -715,8 +727,51 @@ test("launchable full-stack registry app initializes mainnet profile, serves Uni
       );
       assert.ok(Object.keys(snap1.offers).length >= 2);
       assert.ok(Object.keys(snap1.bids).length >= 3);
+      const cliPath = resolve("dist/src/reference-cli.js");
+      const newKeyPath = join(dir, "new-agent.pem");
+      const keygenOut = JSON.parse(
+        (
+          await execFileAsync(process.execPath, [
+            cliPath,
+            "keygen",
+            "--out",
+            newKeyPath,
+          ])
+        ).stdout,
+      );
+      assert.ok(keygenOut.principal.startsWith("poa1"));
+      const actOut = JSON.parse(
+        (
+          await execFileAsync(process.execPath, [
+            cliPath,
+            "act",
+            "--url",
+            app1.url,
+            "--key-file",
+            newKeyPath,
+            "--action",
+            "announceAuction+bid",
+            "--params",
+            JSON.stringify({
+              name: "🔥",
+              asset: "POA",
+              reserve: "100000",
+              maxBid: "100000",
+            }),
+            "--max-total",
+            "100000",
+          ])
+        ).stdout,
+      );
+      assert.equal(actOut.status, "succeeded");
+      const snapAfterAct = app1.engine.snapshot();
+      assert.equal(
+        snapAfterAct.auctions[actOut.auctionId]?.high?.amount,
+        "100000",
+      );
+      assert.equal(snapAfterAct.balances[keygenOut.principal]?.POA, "9900000");
       stateHash1 = app1.engine.stateHash();
-      sequence1 = snap1.sequence;
+      sequence1 = snapAfterAct.sequence;
       assert.ok(sequence1 > 0);
     } finally {
       await app1.close();

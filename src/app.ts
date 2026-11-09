@@ -26,11 +26,14 @@ class BootableSystemClock implements Clock {
 export interface RegistryAppOptions {
   dataDir?: string;
   port?: number;
+  host?: string;
+  publicUrl?: string;
   seed?: boolean;
 }
 
 export interface RegistryAppInstance {
   url: string;
+  publicUrl: string;
   port: number;
   dataDir: string;
   config: Config;
@@ -307,11 +310,16 @@ export async function startRegistryApp(
   try {
     const port = options.port ?? 8787;
     need(Number.isInteger(port) && port >= 0 && port <= 65535, "PORT");
-    const server = await startReferenceServer(engine, port);
+    const server = await startReferenceServer(engine, port, {
+      host: options.host,
+      publicUrl: options.publicUrl,
+    });
     const parsedUrl = new URL(server.url);
+    const publicUrl = options.publicUrl ?? "https://poadomains.grok.me";
     let closed = false;
     return {
       url: server.url,
+      publicUrl,
       port: Number(parsedUrl.port),
       dataDir,
       config,
@@ -342,14 +350,23 @@ if (isMain) {
       options: {
         data: { type: "string" },
         port: { type: "string" },
+        host: { type: "string" },
+        "public-url": { type: "string" },
         "no-seed": { type: "boolean" },
       },
     });
-    const port = v.port !== undefined ? Number(v.port) : 8787;
+    const port =
+      v.port !== undefined
+        ? Number(v.port)
+        : process.env.POA_DOMAINS_PORT
+          ? Number(process.env.POA_DOMAINS_PORT)
+          : 8787;
     need(Number.isInteger(port) && port >= 0 && port <= 65535, "PORT");
     const app = await startRegistryApp({
-      dataDir: v.data,
+      dataDir: v.data ?? process.env.POA_DOMAINS_DATA,
       port,
+      host: v.host ?? process.env.POA_DOMAINS_HOST,
+      publicUrl: v["public-url"] ?? process.env.POA_DOMAINS_PUBLIC_URL,
       seed: !v["no-seed"],
     });
     const snap = app.engine.snapshot();
@@ -358,6 +375,7 @@ if (isMain) {
         {
           status: "running",
           url: app.url,
+          publicUrl: app.publicUrl,
           chainId: app.config.chainId,
           revision: app.config.revision,
           signingMode: app.config.signingMode,
@@ -375,6 +393,7 @@ if (isMain) {
           dataDir: app.dataDir,
           keysDir: app.keysDir,
           cliUsage: {
+            keygen: `node dist/src/reference-cli.js keygen --out agent.pem`,
             resolve: `node dist/src/reference-cli.js resolve --url ${app.url} --name nexus`,
             state: `node dist/src/reference-cli.js state --url ${app.url}`,
             capabilities: `node dist/src/reference-cli.js capabilities --url ${app.url}`,

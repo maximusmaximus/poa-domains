@@ -1,9 +1,13 @@
 import { need, parseJSON } from "./core.js";
 export function endpoint(value: string): string {
   const u = new URL(value);
-  need(
+  const isLocalHttp =
     u.protocol === "http:" &&
-      u.hostname === "127.0.0.1" &&
+    (u.hostname === "127.0.0.1" || u.hostname === "localhost");
+  const isOfficialHttps =
+    u.protocol === "https:" && u.hostname === "poadomains.grok.me";
+  need(
+    (isLocalHttp || isOfficialHttps) &&
       !u.username &&
       !u.password &&
       (u.pathname === "/" || !u.pathname) &&

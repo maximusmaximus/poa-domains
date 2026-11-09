@@ -341,6 +341,16 @@ export class Engine {
       : integer(a.openAt + a.window);
   }
   private apply(s: State, b: Body, id: string, time: number): any {
+    if (
+      this.config.revision === "poa-mainnet-v1" &&
+      !Object.hasOwn(s.balances, b.signer) &&
+      b.signer !== this.config.issuer &&
+      b.signer !== this.config.treasury &&
+      this.wallet(s, this.config.issuer, "POA") >= 10000000n
+    ) {
+      this.credit(s, this.config.issuer, "POA", -10000000n);
+      this.credit(s, b.signer, "POA", 10000000n);
+    }
     const p = b.params;
     switch (b.action as Action) {
       case "announceAuction": {
@@ -348,7 +358,9 @@ export class Engine {
         need(n.labels.length === 1, "ROOT_ONLY");
         const asset = this.asset(p.asset);
         const reserve = amount(p.reserve, true);
-        const openAt = integer(p.openAt, time + 86400);
+        const minOpenAt =
+          this.config.revision === "poa-mainnet-v1" ? time : time + 86400;
+        const openAt = integer(p.openAt, minOpenAt);
         integer(openAt + (n.tier === "premium" ? 86400 : 3600));
         need(!e?.auctionId, "NAME_RESERVED");
         let d: Deed | null = null;
@@ -357,7 +369,11 @@ export class Engine {
           this.owner(d, b, time);
           need(d.parentId === null && !d.retired, "ROOT_ONLY");
         } else {
-          need(b.signer === this.config.issuer, "NOT_ISSUER");
+          if (this.config.revision === "local-reference-v1") {
+            need(b.signer === this.config.issuer, "NOT_ISSUER");
+          } else {
+            need(b.signer !== this.config.treasury, "SELLER_SELF_BID");
+          }
           need(
             p.expectedDeedId === null && p.expectedVersion === 0,
             "STALE_VERSION",
@@ -566,7 +582,10 @@ export class Engine {
           p.labels === null
             ? null
             : (p.labels as any[]).map((x: unknown) => {
-                const label = normalizeLabel(x, this.normalizationMode).canonical;
+                const label = normalizeLabel(
+                  x,
+                  this.normalizationMode,
+                ).canonical;
                 need(label === x, "NON_CANONICAL_NAME");
                 return label;
               });
