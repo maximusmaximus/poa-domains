@@ -80,25 +80,27 @@ maxTotal maxNetworkFee action params
 | `transfer`         | `name,expectedDeedId,expectedVersion,recipient`; holder, unchanged terms; no fresh parent approval for child                                                       |
 | `setRecords`       | `name,expectedDeedId,expectedVersion,records`; holder; HTTPS service, wallet chain/address, raw-CID IPFS only                                                      |
 | `setMetadata`      | `name,expectedDeedId,expectedVersion,metadata`; holder; verified new witness appends history, cannot rewrite rights                                                |
-| `renewLease`       | `name,expectedDeedId,expectedVersion,asset,amount,termSeconds`; holder exercises frozen guarantee, or current parent co-signs negotiated extension                 |
-| `expireLease`      | `name,expectedDeedId,expectedVersion`; permissionless objective expiry/grace/options check; never permanent expiry                                                 |
+| `renewLease`       | Off. New submissions are refused with `PERMANENT_OWNERSHIP_ONLY` (names are owned forever)                                                                      |
+| `expireLease`      | Off. New submissions are refused with `PERMANENT_OWNERSHIP_ONLY` (names never expire)                                                                           |
 | `revokeChild`      | `name,expectedDeedId,expectedVersion,parentOwnerVersion`; current child holder primary + current parent co-signature; permanent path remains reserved              |
 
-### Rights and metadata
+### Ownership, rights and metadata
 
-Permanent rights: `{kind:"permanent"}`. Leased rights:
+Ownership is permanent: names are owned forever, with no renewals or expiry. A name changes
+hands only by resale (`sellFixed`/`buyFixed`, or an auction announced by its owner) or by
+`transfer`. Child offers must use `{kind:"permanent"}` rights; lease rights, `renewLease` and
+`expireLease` are refused at submission with `PERMANENT_OWNERSHIP_ONLY`, without consuming a
+nonce. Lease rules remain in the engine only so that previously recorded history replays
+exactly.
 
-```
-{
- kind:"lease", settlementAsset:"POA", expiresAt:INTEGER,
- graceSeconds:INTEGER, resolveDuringGrace:BOOLEAN, manageDuringGrace:BOOLEAN,
- renewal:{kind:"negotiated"}
- // OR renewal:{kind:"guaranteed",price:"UNITS",termSeconds:INTEGER,
- //             windowSeconds:INTEGER,maxRenewals:INTEGER,optionUntil:INTEGER}
-}
-```
-
-All values are parent-chosen explicit terms in the signed offer. `expiresAt` is the absolute initial expiry; it is not reset by sale/transfer. The original rights policy remains immutable; derived expiry and renewal count are separate deed state. Guaranteed exercise occurs from current expiry minus window through exclusive `optionUntil`, within remaining renewals, at the original asset/price/term. New expiry is `max(currentExpiry,executionTime)+termSeconds`; renewals pay the current parent holder (fee included in price). Reallocation waits for expiry+grace **and** any surviving option deadline. Negotiated extensions require child and parent signatures, before grace ends. In this profile the explicit `manageDuringGrace` flag controls both record/metadata changes and transfers during grace.
+Emoji ownership classes: each emoji spelling belongs to one ownership class (mapping
+`poa-emoji-ownership-selected-20261108-v1`, manifest SHA-256
+`ac09d59266426b0b50b854e7eee304f9503ea9487929902c3c50822131f30a89`: 5216 spellings,
+3944 fully-qualified forms, 1704 classes; 1-32 tokens per label). A new auction or child
+label whose ownership key (each emoji replaced by its class representative) matches another
+owned or auctioned name is refused with `OWNERSHIP_CLASS_TAKEN`. `/v1/resolve` reports
+`ownershipConflict` and `/v1/capabilities` publishes `ownership` and `emojiOwnership`
+(the multi-member classes).
 
 Metadata is `{cid,document:{schema:"poa-domains.metadata.v1",name,rightsHash,description}}`. Use `rightsHash(rights,parentDeedIdOrNull)` and `cidFor(document)` from the SDK. CIDv1 raw SHA-256 addresses exact canonical JSON bytes. Both witnesses and hashes are verified without fetching/pinning. Descriptions are inert untrusted public data. Current ownership/derived expiry/records cannot be overridden by a CID.
 

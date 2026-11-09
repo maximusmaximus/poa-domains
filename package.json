@@ -14,7 +14,7 @@
     "clean": "node -e \"import('node:fs').then(fs => fs.rmSync('dist', { recursive: true, force: true }))\"",
     "build": "npm run clean && tsc",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test dist/test/*.test.js test/ui-live-shaping.test.mjs && node --experimental-strip-types --test test/network-status-worker.test.mjs test/backup-codec.test.mjs",
+    "test": "npm run build && node --test dist/test/*.test.js test/ui-live-shaping.test.mjs test/ui-ownership.test.mjs && node --experimental-strip-types --test test/network-status-worker.test.mjs test/backup-codec.test.mjs",
     "test:coverage": "npm run build && node --test --experimental-test-coverage dist/test/*.test.js",
     "smoke": "npm run build && node dist/test/smoke.js",
     "unicode:audit": "node scripts/unicode-audit.mjs",

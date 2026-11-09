@@ -9,7 +9,7 @@ export const BACKUP_BUCKET = "poadomains-registry-backups";
 export const HOURLY_CRON = "17 * * * *";
 export const DAILY_CRON = "47 8 * * *"; // 00:47 America/Los_Angeles during PST
 export type BackupKind = "hourly" | "daily" | "manual";
-export const RETENTION_DAYS: Record<BackupKind, number> = { hourly: 2, daily: 30, manual: 90 };
+export const RETENTION_DAYS: Record<BackupKind, number> = { hourly: 2, daily: 14, manual: 90 };
 
 export interface JournalRow { sequence: number; record: string; }
 export interface BackupHead { sequence: number; stateHash: string; journalHead: string | null; }
@@ -119,4 +119,7 @@ export function backupObjectKey(kind: BackupKind, createdAt: string, sequence: n
   return `v1/${kind}/${y}/${m}/${day}/${iso}-seq${String(sequence).padStart(9, "0")}-${sha256.slice(0, 16)}.json`;
 }
 
-export function kindForCron(cron: string): BackupKind { return cron === DAILY_CRON ? "daily" : "hourly"; }
+export function kindForCron(cron: string): BackupKind {
+  if (cron !== DAILY_CRON) fail("BACKUP_CRON_DISABLED");
+  return "daily";
+}

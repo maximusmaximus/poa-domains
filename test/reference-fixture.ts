@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from "node:crypto";
-import { Engine } from "../src/engine.js";
+import { Engine, LEGACY_LEASE_POLICY } from "../src/engine.js";
 import { ManualClock } from "../src/clock.js";
 import { Body, DOMAIN, publicPrincipal, signBody } from "../src/auth.js";
 import { fixtureConfig } from "../src/config.js";
@@ -27,7 +27,7 @@ export function publicDemoFixture() {
     roles.carol!,
   ]);
   const clock = new ManualClock(1000000),
-    e = new Engine(config, clock);
+    e = new Engine(config, clock, LEGACY_LEASE_POLICY);
   let counter = 0;
   const witness = (
     name: string,

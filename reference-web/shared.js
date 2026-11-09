@@ -82,6 +82,56 @@ function getAliasTrie(manifest) {
   trieCache.set(manifest, root);
   return root;
 }
+// Emoji ownership classes (from /v1/capabilities emojiOwnership): spellings in one class
+// count as one name. Mirrors the registry's check so the UI can say "taken" up front.
+const ownershipCache = new WeakMap();
+const fromHexSeq = (hex) => String.fromCodePoint(...hex.split(" ").map((x) => parseInt(x, 16)));
+export function buildOwnershipIndex(emojiOwnership) {
+  if (!emojiOwnership || !Array.isArray(emojiOwnership.multiMemberClasses)) return null;
+  let index = ownershipCache.get(emojiOwnership);
+  if (index) return index;
+  index = new Map();
+  for (const [rep, members] of emojiOwnership.multiMemberClasses)
+    for (const m of members) index.set(fromHexSeq(m), fromHexSeq(rep));
+  ownershipCache.set(emojiOwnership, index);
+  return index;
+}
+/** Ownership key of a name: tokens with each emoji replaced by its class representative. */
+export function ownershipKeyOf(name, manifest, index) {
+  if (typeof name !== "string" || !manifest) return null;
+  const trie = getAliasTrie(manifest);
+  const labels = [];
+  for (const label of name.split(".")) {
+    const tokens = [];
+    let i = 0;
+    while (i < label.length) {
+      let node = trie, j = i, matched = null, end = i;
+      while (j < label.length && node) {
+        const ch = String.fromCodePoint(label.codePointAt(j));
+        node = node.next.get(ch);
+        if (!node) break;
+        j += ch.length;
+        if (node.canonical !== null) { matched = node.canonical; end = j; }
+      }
+      if (matched !== null) { tokens.push(index?.get(matched) ?? matched); i = end; }
+      else tokens.push(label[i++].toLowerCase());
+    }
+    labels.push(tokens.join("\u0001"));
+  }
+  return labels.join(".");
+}
+/** Another owned or auctioned name in the same emoji ownership class, or null. */
+export function ownershipConflict(state, name, manifest, index) {
+  if (!state || !index) return null;
+  let key;
+  try { key = ownershipKeyOf(name, manifest, index); } catch { return null; }
+  if (key === null) return null;
+  for (const [other, e] of Object.entries(state.names ?? {})) {
+    if (other === name || (!e?.activeId && !e?.auctionId)) continue;
+    try { if (ownershipKeyOf(other, manifest, index) === key) return other; } catch {}
+  }
+  return null;
+}
 export function inspectName(value, manifest) {
   if (typeof value !== "string") throw Error("Name");
   const s = value.startsWith("poa:") ? value.slice(4) : value;
@@ -576,7 +626,7 @@ export function activeResaleOffers(state) {
   return out;
 }
 
-export function resolveDomainView(state, name, reservedSet = new Set()) {
+export function resolveDomainView(state, name, reservedSet = new Set(), ownership = null) {
   const result = {
     name,
     status: "unknown",
@@ -587,6 +637,7 @@ export function resolveDomainView(state, name, reservedSet = new Set()) {
     listing: null,
     childOffer: null,
     reserved: false,
+    variantOf: null,
     history: [],
   };
   if (!state || typeof name !== "string" || !name) return result;
@@ -655,6 +706,12 @@ export function resolveDomainView(state, name, reservedSet = new Set()) {
       : null;
     result.childOffer = childOffer || null;
     result.status = childOffer ? "child-offer" : "unminted-child";
+    return result;
+  }
+  const variantOf = ownership ? ownershipConflict(state, name, ownership.manifest, ownership.index) : null;
+  if (variantOf) {
+    result.status = "variant-taken";
+    result.variantOf = variantOf;
     return result;
   }
   result.status = "available";

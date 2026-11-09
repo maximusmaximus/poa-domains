@@ -63,6 +63,6 @@ test("object keys are sortable, immutable and kind-scoped; cron mapping", () => 
   assert.equal(k, "v1/daily/2026/11/09/2026-11-09T08-47-00-123Z-seq000000015-abababababababab.json");
   assert.throws(() => c.backupObjectKey("hourly", "bad", 1, "ab".repeat(32)));
   assert.equal(c.kindForCron(c.DAILY_CRON), "daily");
-  assert.equal(c.kindForCron(c.HOURLY_CRON), "hourly");
-  assert.deepEqual(c.RETENTION_DAYS, { hourly: 2, daily: 30, manual: 90 });
+  assert.throws(() => c.kindForCron(c.HOURLY_CRON), /CRON_DISABLED/);
+  assert.deepEqual(c.RETENTION_DAYS, { hourly: 2, daily: 14, manual: 90 });
 });

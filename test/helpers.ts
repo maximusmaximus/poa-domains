@@ -1,5 +1,5 @@
 import { generateKeyPairSync, KeyObject } from "node:crypto";
-import { Engine } from "../src/engine.js";
+import { AdmissionPolicy, Engine, LEGACY_LEASE_POLICY } from "../src/engine.js";
 import {
   Body,
   Packet,
@@ -30,7 +30,7 @@ export function witness(
   };
   return { cid: cidFor(document), document };
 }
-export function setup(change?: (c: Config) => void) {
+export function setup(change?: (c: Config) => void, policy: AdmissionPolicy = LEGACY_LEASE_POLICY) {
   const issuer = actor(),
     treasury = actor(),
     alice = actor(),
@@ -43,7 +43,7 @@ export function setup(change?: (c: Config) => void) {
   ]);
   change?.(config);
   const clock = new ManualClock(1000000);
-  const e = new Engine(config, clock);
+  const e = new Engine(config, clock, policy);
   let counter = 0;
   const packet = (
     action: string,
@@ -59,7 +59,7 @@ export function setup(change?: (c: Config) => void) {
       genesisHash: config.genesisHash,
       registryId: e.registryId,
       policyHash: e.policyHash,
-      normalizationHash: NORMALIZATION_HASH,
+      normalizationHash: config.normalizationHash,
       signer: who.id,
       coSigners: co.map((x) => x.id).sort(),
       requestId: "test-" + ++counter,
@@ -85,7 +85,7 @@ export function setup(change?: (c: Config) => void) {
     return { name, expectedDeedId: d.id, expectedVersion: d.version };
   };
   const announce = (name = "alpha") => {
-    const n = normalizeName(name);
+    const n = normalizeName(name, e.normalizationMode);
     const result = send(
       "announceAuction",
       {

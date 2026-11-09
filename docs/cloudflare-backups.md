@@ -38,8 +38,8 @@ v1/latest-<kind>.json   # metadata pointer only (key, size, sha256, sequence)
 
 | Kind | Trigger | Retention (R2 lifecycle rule on the prefix) |
 |---|---|---|
-| hourly | Cron `17 * * * *` | 2 days |
-| daily | Cron `47 8 * * *` (00:47 Pacific standard time) | 30 days |
+| hourly (legacy objects only; no new exports) | None | 2 days |
+| daily | Cron `47 8 * * *` (00:47 Pacific standard time) | 14 days |
 | manual | `POST /v1/admin/backup` | 90 days |
 
 `POST /v1/admin/backup` requires `Authorization: Bearer <BACKUP_ADMIN_TOKEN>` (Worker secret)
@@ -63,5 +63,5 @@ temporary storage is deleted afterwards. The restore route does not exist on the
 Worker, and the Durable Object refuses to restore into the live singleton.
 
 Tests: `npm test` (codec, tamper and plaintext-key checks) and `npm run cf:test:backup`
-(local workerd + local R2: admin guard, manual and scheduled backups, isolated restore,
+(local workerd + local R2: admin guard, manual and daily scheduled backups, isolated restore,
 tamper rejection).

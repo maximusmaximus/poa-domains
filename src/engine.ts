@@ -27,6 +27,7 @@ import {
   text,
 } from "./core.js";
 import { Clock } from "./clock.js";
+import { ownershipKey } from "./emoji-ownership.js";
 import {
   canonicalName,
   nameKey,
@@ -59,6 +60,16 @@ export interface Persistence {
   append(commit: Commit): void;
   close(): void;
 }
+export interface AdmissionPolicy {
+  /** Reject new lease rights, renewLease and expireLease submissions. */
+  permanentOnly: boolean;
+  /** Reject a new name whose emoji ownership class is already owned or in auction. */
+  emojiOwnership: boolean;
+}
+/** Live practice registry policy. */
+export const PRACTICE_POLICY: Readonly<AdmissionPolicy> = Object.freeze({ permanentOnly: true, emojiOwnership: true });
+/** Legacy semantics, kept so lease-era engine behaviour stays tested for replay. */
+export const LEGACY_LEASE_POLICY: Readonly<AdmissionPolicy> = Object.freeze({ permanentOnly: false, emojiOwnership: true });
 export class Engine {
   readonly config: Config;
   readonly policyHash: string;
@@ -71,6 +82,7 @@ export class Engine {
   constructor(
     config: unknown,
     private clock: Clock,
+    readonly admission: Readonly<AdmissionPolicy> = PRACTICE_POLICY,
   ) {
     this.config = validateConfig(config);
     freeze(this.config);
@@ -140,7 +152,57 @@ export class Engine {
     );
   }
   submit(packet: unknown): Receipt {
+    this.admit(packet);
     return this.execute(packet, integer(this.clock.now()));
+  }
+  // Admission policy for NEW submissions only. Replay of recorded commits never runs it,
+  // so history recorded under earlier rules replays byte-for-byte.
+  //  - Ownership is permanent: no leases, renewals or lease expiry. Names change hands
+  //    only by resale or transfer.
+  //  - Emoji ownership classes: a new name may not be registered while another spelling
+  //    in the same ownership class is owned or in auction.
+  private admit(value: unknown): void {
+    const body = (value as { body?: { action?: unknown; params?: any } } | null)?.body;
+    if (!body || typeof body !== "object") return;
+    const { action, params: p } = body;
+    if (this.admission.permanentOnly && (action === "renewLease" || action === "expireLease"))
+      throw new Fault("PERMANENT_OWNERSHIP_ONLY");
+    if (this.admission.permanentOnly && action === "createChildOffer" && p && typeof p === "object" &&
+        (p.rights === null || typeof p.rights !== "object" || p.rights.kind !== "permanent"))
+      throw new Fault("PERMANENT_OWNERSHIP_ONLY");
+    let name: string | null = null;
+    if (action === "announceAuction" && typeof p?.name === "string") name = p.name;
+    if (action === "fillChildOffer" && typeof p?.label === "string" && typeof p?.offerId === "string") {
+      const o = this.state.offers[p.offerId];
+      if (this.admission.permanentOnly && o?.rights?.kind === "lease")
+        throw new Fault("PERMANENT_OWNERSHIP_ONLY");
+      const root = o ? this.state.deeds[o.parentId] : undefined;
+      if (root) name = p.label + "." + root.name;
+    }
+    if (name !== null && this.admission.emojiOwnership) {
+      const holder = this.ownershipConflict(name);
+      if (holder !== null) throw new Fault("OWNERSHIP_CLASS_TAKEN");
+    }
+  }
+  private ownershipKeys = new Map<string, string>();
+  private keyOf(name: string): string | null {
+    let k = this.ownershipKeys.get(name);
+    if (k === undefined) {
+      try { k = ownershipKey(name, this.normalizationMode); }
+      catch { return null; } // invalid names are rejected by normal execution
+      this.ownershipKeys.set(name, k);
+    }
+    return k;
+  }
+  /** Another owned or auctioned name in the same ownership class, or null. */
+  ownershipConflict(name: string): string | null {
+    const key = this.keyOf(name);
+    if (key === null) return null;
+    for (const [other, e] of Object.entries(this.state.names)) {
+      if (other === name || (!e.activeId && !e.auctionId)) continue;
+      if (this.keyOf(other) === key) return other;
+    }
+    return null;
   }
   private execute(value: unknown, time: number): Receipt {
     need(!this.stopped, "ENGINE_STOPPED");
@@ -823,6 +885,8 @@ export class Engine {
       stateHash: this.stateHash(),
       name,
       deed: active ? structuredClone(d) : null,
+      ownership: "permanent",
+      ownershipConflict: this.ownershipConflict(name),
     };
   }
   assertInvariants(s: State = this.state): void {
