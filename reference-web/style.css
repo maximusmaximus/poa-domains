@@ -1,5 +1,29 @@
+@font-face {
+  font-family: "Xero Emoji";
+  src: url("./XeroEmoji-COLRv1.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+00A9, U+00AE, U+200D, U+203C-3299, U+20E3, U+FE0F, U+1F000-1FAFF,
+    U+E0020-E007F;
+}
+@font-face {
+  font-family: "XeroEmoji";
+  src: url("./XeroEmoji-COLRv1.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+00A9, U+00AE, U+200D, U+203C-3299, U+20E3, U+FE0F, U+1F000-1FAFF,
+    U+E0020-E007F;
+}
 :root {
-  font: 16px/1.5 system-ui;
+  font:
+    16px/1.5 "Xero Emoji",
+    "XeroEmoji",
+    system-ui,
+    sans-serif;
   color: #dfecf5;
   background: #101b26;
 }
@@ -219,7 +243,7 @@ code {
   font-weight: 600;
 }
 .record {
-  font-family: monospace;
+  font-family: "Xero Emoji", "XeroEmoji", monospace;
 }
 details {
   margin: 1.5rem 0;

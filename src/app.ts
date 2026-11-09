@@ -158,7 +158,7 @@ export async function startRegistryApp(
       const emojiAuction = submitAs("issuer", "announceAuction", {
         name: emojiRoot,
         asset: "POA",
-        reserve: "100000000",
+        reserve: "100000",
         openAt: baseNow + 86400,
         expectedDeedId: null,
         expectedVersion: 0,
@@ -169,7 +169,7 @@ export async function startRegistryApp(
       const asciiAuction = submitAs("issuer", "announceAuction", {
         name: asciiRoot,
         asset: "POA",
-        reserve: "10000000",
+        reserve: "1000",
         openAt: baseNow + 86400,
         expectedDeedId: null,
         expectedVersion: 0,
@@ -179,11 +179,21 @@ export async function startRegistryApp(
       const liveAuction = submitAs("issuer", "announceAuction", {
         name: "🌐",
         asset: "POA",
-        reserve: "100000000",
+        reserve: "100000",
         openAt: baseNow + 172800,
         expectedDeedId: null,
         expectedVersion: 0,
         metadata: makeWitness("🌐"),
+      }).auctionId as string;
+
+      const multiEmojiAuction = submitAs("issuer", "announceAuction", {
+        name: "🚀🚀",
+        asset: "POA",
+        reserve: "1000",
+        openAt: baseNow + 172800,
+        expectedDeedId: null,
+        expectedVersion: 0,
+        metadata: makeWitness("🚀🚀"),
       }).auctionId as string;
 
       clock.overrideTime = baseNow + 86400;
@@ -191,14 +201,14 @@ export async function startRegistryApp(
         auctionId: emojiAuction,
         expectedVersion: 1,
         asset: "POA",
-        amount: "100000000",
+        amount: "100000",
         beneficiary: principals.alice!,
       });
       submitAs("alice", "bid", {
         auctionId: asciiAuction,
         expectedVersion: 1,
         asset: "POA",
-        amount: "10000000",
+        amount: "1000",
         beneficiary: principals.alice!,
       });
 
@@ -217,8 +227,15 @@ export async function startRegistryApp(
         auctionId: liveAuction,
         expectedVersion: 1,
         asset: "POA",
-        amount: "100000000",
+        amount: "100000",
         beneficiary: principals.carol!,
+      });
+      submitAs("bob", "bid", {
+        auctionId: multiEmojiAuction,
+        expectedVersion: 1,
+        asset: "POA",
+        amount: "1000",
+        beneficiary: principals.bob!,
       });
 
       clock.overrideTime = baseNow + 172900;
@@ -241,7 +258,7 @@ export async function startRegistryApp(
         parentDeedId: asciiDeedId,
         expectedOwnerVersion: 1,
         asset: "POA",
-        price: "2500000",
+        price: "250",
         validUntil: baseNow + 800000,
         rights: { kind: "permanent" },
         labels: null,
@@ -253,7 +270,7 @@ export async function startRegistryApp(
         parentDeedId: emojiDeedId,
         expectedOwnerVersion: 1,
         asset: "POA",
-        price: "5000000",
+        price: "500",
         validUntil: baseNow + 500000,
         rights: { kind: "permanent" },
         labels: ["🫪"],
@@ -267,7 +284,7 @@ export async function startRegistryApp(
         expectedGeneration: 1,
         label: "🫪",
         asset: "POA",
-        amount: "5000000",
+        amount: "500",
         metadata: makeWitness(childName, { kind: "permanent" }, emojiDeedId),
       }).deedId as string;
 
@@ -276,7 +293,7 @@ export async function startRegistryApp(
         expectedDeedId: childDeedId,
         expectedVersion: 1,
         asset: "POA",
-        price: "25000000",
+        price: "2500",
         validUntil: baseNow + 800000,
       });
     }

@@ -330,7 +330,7 @@ test("poa-mainnet-v1 config profile executes full Unicode 17 emoji domain lifecy
   const reservedTry = submitPoa(issuerPoa, c.issuer.key, "announceAuction", {
     name: "openai",
     asset: "POA",
-    reserve: "10000000",
+    reserve: "1000",
     openAt: clock.now() + 86400,
     expectedDeedId: null,
     expectedVersion: 0,
@@ -342,7 +342,7 @@ test("poa-mainnet-v1 config profile executes full Unicode 17 emoji domain lifecy
   const announced = submitPoa(issuerPoa, c.issuer.key, "announceAuction", {
     name: rootName,
     asset: "POA",
-    reserve: "100000000",
+    reserve: "100000",
     openAt: clock.now() + 86400,
     expectedDeedId: null,
     expectedVersion: 0,
@@ -355,7 +355,7 @@ test("poa-mainnet-v1 config profile executes full Unicode 17 emoji domain lifecy
     auctionId,
     expectedVersion: 1,
     asset: "POA",
-    amount: "100000000",
+    amount: "100000",
     beneficiary: alicePoa,
   });
   assert.equal(bidRes.status, "succeeded", bidRes.code);
@@ -628,6 +628,14 @@ test("browser shared module maintains exact canonical, normalization, parser, an
   assert.equal(inspectedPremium.kind, "root");
   assert.equal(inspectedPremium.tier, "premium");
   assert.equal(inspectedPremium.tokenCount, 1);
+  assert.equal(inspectedPremium.isSingleEmoji, true);
+  assert.equal(inspectedPremium.minimumBidPoa, "100000");
+  const inspectedMultiEmoji = web.inspectName("🚀🚀", emoji17Manifest);
+  assert.equal(inspectedMultiEmoji.name, "🚀🚀");
+  assert.equal(inspectedMultiEmoji.tier, "standard");
+  assert.equal(inspectedMultiEmoji.tokenCount, 2);
+  assert.equal(inspectedMultiEmoji.isMultiEmoji, true);
+  assert.equal(inspectedMultiEmoji.minimumBidPoa, "1000");
   assert.equal(
     web.minimumNextBid("1000", {
       kind: "eos10Percent",
@@ -699,7 +707,11 @@ test("launchable full-stack registry app initializes mainnet profile, serves Uni
       const snap1 = app1.engine.snapshot();
       assert.equal(
         snap1.auctions[snap1.names["🌐"]!.auctionId!]?.high?.amount,
-        "100000000",
+        "100000",
+      );
+      assert.equal(
+        snap1.auctions[snap1.names["🚀🚀"]!.auctionId!]?.high?.amount,
+        "1000",
       );
       assert.ok(Object.keys(snap1.offers).length >= 2);
       assert.ok(Object.keys(snap1.bids).length >= 3);

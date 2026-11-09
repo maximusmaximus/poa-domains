@@ -184,9 +184,16 @@ export async function verifyReferenceStaticPage(
           0,
         ),
     );
-    assert.ok(bytes < 1500000);
+    assert.ok(bytes < 2500000);
+    const hasXeroEmoji = await page.evaluate(async () => {
+      await document.fonts.ready;
+      return Array.from(document.fonts).some(
+        (f) => f.family.replace(/['"]/g, "") === "Xero Emoji",
+      );
+    });
+    assert.equal(hasXeroEmoji, true);
     checks.push(
-      "static resources under 1.5 MB; no frameworks, remote assets or telemetry",
+      "static resources under 2.5 MB including bundled Xero Emoji font; no frameworks, remote assets or telemetry",
     );
     if (screenshot) await page.screenshot({ path: screenshot, fullPage: true });
     return {

@@ -5,7 +5,7 @@ Public site: https://maximusmaximus.github.io/poa-domains/
 > **Dual-Surface Architecture Notice:**
 >
 > - **Public GitHub Pages & Default Production Guard (`src/cli.ts`, `src/server.ts`, `src/mcp.ts`, `web/`)**: Strictly read-only status monitor and local Unicode 17 emoji spelling checker. **The upstream native naming registry is not yet enabled on the public chain; default production entry points never simulate ownership or accept writes.**
-> - **Full-Stack Persistent Registry Application (`src/app.ts`, `src/reference-server.ts`, `src/reference-cli.ts`, `src/reference-mcp.ts`, `reference-web/`)**: Complete, deterministic, single-writer PoA Domains registry engine (`poa-mainnet-v1` profile) with fsynced journal persistence, `poa1...` Base58 Ed25519 principals, all **5,216 official Unicode 17 emoji sequences**, **655 reserved root domains**, human domain availability search, multi-domain **Agent Bid & Purchase Cart** with copy-paste agent prompts, purchase/bid/settlement history, standing child & fixed-price resale offers, and an interactive 17-action handoff explorer.
+> - **Full-Stack Persistent Registry Application (`src/app.ts`, `src/reference-server.ts`, `src/reference-cli.ts`, `src/reference-mcp.ts`, `reference-web/`)**: Complete, deterministic, single-writer PoA Domains registry engine (`poa-mainnet-v1` profile) with fsynced journal persistence, `poa1...` Base58 Ed25519 principals, all **5,216 official Unicode 17 emoji sequences** rendered with the bundled **Xero Emoji** OpenType COLRv1 web font (`XeroEmoji-COLRv1.woff2`), **655 reserved root domains**, **`100,000 POA` (`100k POA`) single-emoji / `1,000 POA` (`1k POA`) multi-emoji minimum bid policy**, human domain availability search, multi-domain **Agent Bid & Purchase Cart** with copy-paste agent prompts, purchase/bid/settlement history, standing child & fixed-price resale offers, and an interactive 17-action handoff explorer.
 
 ---
 
@@ -112,9 +112,10 @@ The Web Explorer (`reference-web/`) provides a complete, zero-framework, XSS-har
 - **Token Composition**:
   - **ASCII Labels**: Lowercase `a–z` and `0–9` only (`1..32` characters). Uppercase ASCII is case-folded to lowercase; hyphens (`-`), underscores, spaces, and punycode prefixes (`xn--`) are rejected.
   - **Emoji Labels**: `1..32` canonical Unicode 17 emoji tokens per label with no mixing of ASCII and emoji within the same label.
-- **Pricing & Duration Tiers**:
-  - **Premium Tier (`1..3` tokens)**: Root reserve price `1000 POA` (`local-reference-v1` & `poa-mainnet-v1`); 24-hour minimum bidding window + 24-hour quiet-period extension window.
-  - **Standard Tier (`4..32` tokens)**: Root reserve price `100 POA`; 1-hour minimum bidding window + 1-hour quiet-period extension window.
+- **Pricing, Minimum Bids & Duration Tiers (`poa-mainnet-v1` / `"emoji17-full"`)**:
+  - **Single-Emoji Root (`1` emoji token — `premium` tier)**: Minimum opening bid / reserve price of **`100,000 POA` (`100k POA`)**; 24-hour minimum bidding window + 24-hour quiet-period extension window.
+  - **Multi-Emoji Root (`2..32` emoji tokens) & ASCII Root (`1..32` characters) — `standard` tier**: Minimum opening bid / reserve price of **`1,000 POA` (`1k POA`)**; 1-hour minimum bidding window + 1-hour quiet-period extension window.
+  - **Xero Emoji Typography**: All emoji sequences across the Web Explorer (`reference-web/XeroEmoji-COLRv1.woff2`) and stylesheet stack are rendered using **Xero Emoji** (`Xero Emoji` / `XeroEmoji` OpenType COLRv1 color vector font by Max Infeld, covering all 3,963 locked Xero Emoji glyphs with FE0F-aware OpenType GSUB ligatures).
 
 ### Unicode 17 Emoji Modes
 

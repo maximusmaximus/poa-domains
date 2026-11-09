@@ -371,19 +371,27 @@ function runSearch(rawQuery) {
   }
 
   const poaPolicy = cap.assets?.POA ?? {
-    premiumReserve: "1000",
-    standardReserve: "100",
+    premiumReserve: "100000",
+    standardReserve: "1000",
   };
-  const reserve =
-    info.tier === "premium"
-      ? poaPolicy.premiumReserve
-      : poaPolicy.standardReserve;
+  const reserve = info.isSingleEmoji
+    ? "100000"
+    : info.isMultiEmoji
+      ? "1000"
+      : info.tier === "premium"
+        ? poaPolicy.premiumReserve
+        : poaPolicy.standardReserve;
+  const tierNote = info.isSingleEmoji
+    ? "100k POA single-emoji minimum bid"
+    : info.isMultiEmoji
+      ? "1k POA multi-emoji minimum bid"
+      : `${reserve} POA minimum bid`;
   const windowSec = info.tier === "premium" ? 86400 : 3600;
   add(card, "p", "AVAILABLE ROOT DOMAIN", "badge-ok");
   add(
     card,
     "p",
-    `Unclaimed ${info.tier} root domain. Opening auction reserve: ${reserve} POA base units (${windowSec}s minimum window + ${windowSec}s quiet period).`,
+    `Unclaimed ${info.tier} root domain (${tierNote}). Opening auction reserve: ${reserve} POA (${windowSec}s minimum window + ${windowSec}s quiet period).`,
   );
   const controls = add(card, "div", "", "inline-controls");
   const maxBidInput = document.createElement("input");

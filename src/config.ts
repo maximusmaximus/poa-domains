@@ -94,10 +94,7 @@ export function validateConfig(value: unknown): Config {
   const issuer = principal(c.issuer);
   const treasury = principal(c.treasury);
   if (isMainnet) {
-    need(
-      issuer.startsWith("poa1") && treasury.startsWith("poa1"),
-      "PRINCIPAL",
-    );
+    need(issuer.startsWith("poa1") && treasury.startsWith("poa1"), "PRINCIPAL");
   }
   integer(c.feeBps, 0, 10000);
   need(c.highestSelfRaise === "reject", "POLICY_UNSET");
@@ -118,10 +115,7 @@ export function validateConfig(value: unknown): Config {
     need(/^[A-Z][A-Z0-9_]{0,15}$/.test(id), "ASSET");
     exact(a, ["decimals", "kind", "premiumReserve", "standardReserve"]);
     integer(a.decimals, 0, 18);
-    need(
-      a.kind === (isMainnet ? "poa-native" : "local-fixture"),
-      "ASSET",
-    );
+    need(a.kind === (isMainnet ? "poa-native" : "local-fixture"), "ASSET");
     amount(a.premiumReserve, true);
     amount(a.standardReserve, true);
   }
@@ -235,8 +229,8 @@ export function mainnetConfig(
       POA: {
         decimals: 6,
         kind: "poa-native",
-        premiumReserve: options.premiumReserveMicros ?? "100000000",
-        standardReserve: options.standardReserveMicros ?? "10000000",
+        premiumReserve: options.premiumReserveMicros ?? "100000",
+        standardReserve: options.standardReserveMicros ?? "1000",
       },
     },
     balances,

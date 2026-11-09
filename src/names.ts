@@ -199,11 +199,20 @@ export function normalizeName(
   const parts = s.split(".");
   need(parts.length >= 1 && parts.length <= 2, "NAME_DEPTH");
   const labels = parts.map((part) => normalizeLabel(part, mode));
+  const lastLabel = labels[labels.length - 1]!;
+  const isSingleEmoji =
+    lastLabel.tokens.length === 1 && lastLabel.tokens[0]!.startsWith("u");
   return {
     canonical: labels.map((l) => l.canonical).join("."),
     labels,
     tier:
-      labels[labels.length - 1]!.tokens.length <= 3 ? "premium" : "standard",
+      mode === "emoji17-full"
+        ? isSingleEmoji
+          ? "premium"
+          : "standard"
+        : lastLabel.tokens.length <= 3
+          ? "premium"
+          : "standard",
   };
 }
 export function canonicalName(

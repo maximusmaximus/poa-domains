@@ -16,6 +16,7 @@ const types: Record<string, string> = {
   ".json": "application/json",
   ".css": "text/css",
   ".svg": "image/svg+xml",
+  ".woff2": "font/woff2",
 };
 const server = createServer((req, res) => {
   if (req.method !== "GET" || !req.url?.startsWith(prefix)) {
