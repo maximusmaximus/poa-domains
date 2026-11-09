@@ -121,6 +121,12 @@ export class Engine {
   snapshot(): State {
     return structuredClone(this.state);
   }
+  /** Side-effect-free admission/economic check used before reserving a signed escrow transfer. */
+  preview(packet: unknown): Receipt {
+    const candidate = new Engine(this.config, { now: () => this.clock.now() }, this.admission);
+    candidate.state = structuredClone(this.state);
+    return candidate.submit(packet);
+  }
   stateHash(): string {
     return hash("local-state/v1", this.state);
   }

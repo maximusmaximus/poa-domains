@@ -43,11 +43,14 @@
     "cf:test": "npm run build && node cloudflare/test/integration.mjs",
     "cf:test:backup": "node --experimental-strip-types cloudflare/test/backup-restore.mjs",
     "backup:now": "node scripts/registry-backup.mjs",
-    "backup:restore": "node --experimental-strip-types scripts/registry-restore.mjs"
+    "backup:restore": "node --experimental-strip-types scripts/registry-restore.mjs",
+    "escrow:test": "node scripts/test-escrow.mjs",
+    "escrow:test:unit": "node scripts/test-escrow.mjs --unit"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
     "@types/node": "26.6.6",
+    "esbuild": "0.28.2",
     "typescript": "7.0.2",
     "wrangler": "4.158.0"
   },
