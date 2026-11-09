@@ -49,10 +49,15 @@ try{
  await stop();const final=await start("complete-restart");check("completed name title, refunds and idempotency survive full restart",()=>assert.deepEqual(final,refunded));
  const archived=await call({op:"archive"});instance="?instance=isolated-archive-restore";
  const restored=await call({op:"restore-archive",archive:archived.archive});
- check("actual SQLite escrow archive restore preserves money journal and forces pause",()=>{assert.equal(restored.state.assets,"0");assert.equal(restored.state.paused,true);assert.equal(restored.state.sequence,archived.state.sequence+1);assert.deepEqual(restored.state.payments,archived.state.payments);});
+ check("actual SQLite escrow archive restore preserves money journal, forces pause, and sets read-only halt",()=>{assert.equal(restored.state.assets,"0");assert.equal(restored.state.paused,true);assert.equal(restored.state.halt,"RESTORED_ARCHIVE_READ_ONLY");assert.equal(restored.state.sequence,archived.state.sequence+1);assert.deepEqual(restored.state.payments,archived.state.payments);});
+ await call({op:"unpause"});
+ const noReplay=await call({op:"tick"},409);
+ check("restored archive cannot replay payouts even if unpaused",()=>assert.equal(noReplay.code,"ESCROW_HALTED"));
+ await call({op:"pause"});
+ const afterUnpauseAttempt=await call({op:"status"});
  const tampered=structuredClone(archived.archive);tampered.rows[0].state.assets="1";
  await call({op:"restore-archive",archive:tampered},409);count++;
  const afterBad=await call({op:"status"});
- check("failed archive validation leaves isolated restored ledger unchanged",()=>assert.deepEqual(afterBad.state,restored.state));
+ check("failed archive validation leaves isolated restored ledger unchanged",()=>assert.deepEqual(afterBad.state,afterUnpauseAttempt.state));
  console.log(`SUMMARY ${count} PASS, 0 FAIL; real local workerd/SQLite + mock chain (no mainnet writes)`);
 }finally{await stop();console.log("Local test evidence: "+work);}

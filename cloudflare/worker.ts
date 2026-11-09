@@ -1,4 +1,4 @@
-import { Fault, need, parseJSON } from "../src/core.js";
+import { Fault, exact, need, parseJSON } from "../src/core.js";
 import { SINGLETON } from "./registry.js";
 import { networkStatusMonitor } from "./network-status.js";
 import { BackupKind, RETENTION_DAYS, backupObjectKey, kindForCron } from "./backup-codec.js";
@@ -81,6 +81,7 @@ async function admin(request: Request, env: Env, u: URL): Promise<Response> {
     const expected = env.ESCROW_ADMIN_TOKEN ?? "", auth = request.headers.get("authorization") ?? "";
     if (String(env.POA_ESCROW_ENABLED) !== "true" || expected.length < 32 || !auth.startsWith("Bearer ") || !(await tokenMatches(auth.slice(7), expected)))
       return json(404, { code: "NOT_FOUND" });
+    need(u.search === "", "QUERY_NOT_ALLOWED");
     const reply = await env.REGISTRY.getByName(SINGLETON).escrowAdmin(await readPacket(request));
     return new Response(reply.jsonText, { status: reply.status, headers: { ...SECURITY, "content-type": "application/json" } });
   }
@@ -89,6 +90,7 @@ async function admin(request: Request, env: Env, u: URL): Promise<Response> {
     const auth = request.headers.get("authorization") ?? "";
     if (expected.length < 32 || !auth.startsWith("Bearer ") || !(await tokenMatches(auth.slice(7), expected)))
       return json(404, { code: "NOT_FOUND" });
+    need(u.search === "", "QUERY_NOT_ALLOWED");
     return json(200, await runBackup(env, "manual"));
   }
   if (u.pathname === "/v1/admin/restore") {
@@ -97,7 +99,9 @@ async function admin(request: Request, env: Env, u: URL): Promise<Response> {
     const target = u.searchParams.get("target") ?? "";
     need(RESTORE_TARGET.test(target) && target !== SINGLETON, "RESTORE_TARGET");
     need(request.headers.get("content-type") === "application/json", "CONTENT_TYPE");
-    const body = JSON.parse(await readLimited(request, 16 * 1024 * 1024)) as { backup: string; keys: Record<string, string>; escrow?: import("./registry.js").EscrowExport };
+    const raw = parseJSON(await readLimited(request, 16 * 1024 * 1024), 16 * 1024 * 1024);
+    const body = exact(raw, ["backup", "keys"], ["escrow"]) as { backup: string; keys: Record<string, string>; escrow?: import("./registry.js").EscrowExport };
+    need(typeof body.backup === "string", "BACKUP_FORMAT");
     const result = await env.REGISTRY.getByName(target).restoreBackup(body.backup, body.keys, body.escrow);
     return json(200, { target, ...result });
   }
@@ -106,7 +110,8 @@ async function admin(request: Request, env: Env, u: URL): Promise<Response> {
 export default {
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(runBackup(env, kindForCron(controller.cron)).then(() => undefined, (error: unknown) => {
-      console.error(JSON.stringify({ event: "registry-backup-failed", cron: controller.cron, code: error instanceof Error ? error.message.slice(0, 80) : "UNKNOWN" }));
+      const code = error instanceof Error && /^[A-Z0-9_]{1,64}$/.test(error.message) ? error.message : "BACKUP_FAILED";
+      console.error(JSON.stringify({ event: "registry-backup-failed", cron: controller.cron, code }));
       throw error;
     }));
   },
@@ -147,6 +152,7 @@ export default {
 
       // Hold state-changing writes while the public PoA network is Down (2 consecutive failures).
       if (request.method === "POST" && u.pathname === "/v1/intents") {
+        need(u.search === "", "QUERY_NOT_ALLOWED");
         const net = networkStatusMonitor.peekStatus();
         if (net.hold) {
           return json(503, {

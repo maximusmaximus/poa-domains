@@ -173,12 +173,12 @@ export class PoaRegistry extends DurableObject<Env> {
       const v = exact(value, ["action"], ["packet", "paused"]), escrow = this.escrow();
       if (String(this.env.POA_ESCROW_NETWORK_WRITES) === "approved-v1") await this.ctx.storage.setAlarm(Date.now() + 60000);
       switch (v.action) {
-        case "status": return { status: 200, jsonText: JSON.stringify(escrow.state()) };
-        case "pause": escrow.pause(v.paused); break;
-        case "reconcile": await escrow.reconcile(); break;
-        case "tick": await escrow.tick(); break;
-        case "rebroadcast": await escrow.rebroadcast(); break;
-        case "command": await escrow.command(verifyCommand(v.packet, this.engine.registryId, Math.floor(Date.now()/1000))); break;
+        case "status": exact(value, ["action"]); return { status: 200, jsonText: JSON.stringify(escrow.state()) };
+        case "pause": exact(value, ["action", "paused"]); escrow.pause(v.paused); break;
+        case "reconcile": exact(value, ["action"]); await escrow.reconcile(); break;
+        case "tick": exact(value, ["action"]); await escrow.tick(); break;
+        case "rebroadcast": exact(value, ["action"]); await escrow.rebroadcast(); break;
+        case "command": exact(value, ["action", "packet"]); await escrow.command(verifyCommand(v.packet, this.engine.registryId, Math.floor(Date.now()/1000))); break;
         default: need(false, "ESCROW_ACTION");
       }
       return { status: 200, jsonText: JSON.stringify(escrow.state()) };

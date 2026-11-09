@@ -1,6 +1,10 @@
-import { canonical, exact, integer, need, text } from "../src/core.js";
+import { canonical, exact, integer, need, obj, text } from "../src/core.js";
 import { Packet, authenticate } from "../src/auth.js";
 import { CHAIN, Command, Signer, Transfer, address, decimal, digest, micros, txid, verifyTransfer } from "./escrow-codec.js";
+
+export const PILOT_JOURNAL_LIMIT = 2000;
+export const PILOT_ADMISSION_LIMIT = 1900;
+const journalQueues = new WeakMap<Journal, Promise<unknown>>();
 
 export interface Observation {
   id: string; body: Transfer; chain: string; valid: boolean; attestations: number;
@@ -65,6 +69,8 @@ export function invariant(s: State): void {
     p.to === p.body.to && decimal(BigInt(p.amount)) === p.body.amount,"ESCROW_OUTBOX_CORRUPT");
 }
 export function nextEntry(s: State, previous: string, event: string, payload: unknown, change: (s: State)=>void): Entry {
+  const emergency=event==="pause"||event==="halt"||event==="reconciliation-quarantine"||event==="restore-paused";
+  need(s.sequence<(emergency?PILOT_JOURNAL_LIMIT+32:PILOT_JOURNAL_LIMIT),"ESCROW_JOURNAL_CAPACITY");
   const next = structuredClone(s); change(next); next.sequence++; invariant(next);
   const v = { sequence:next.sequence,previous,event,payload,state:next }; return {...v,checksum:digest(v)};
 }
@@ -89,22 +95,21 @@ export class SQLiteEscrowJournal implements Journal {
   append(event:string,payload:unknown,change:(s:State)=>void): State {
     return this.storage.transactionSync(()=>{
       const rows=this.rows(),s=replay(rows,this.policy);
-      // Bounded pilot journal; stop rather than exceed the Worker memory/SQLite row limits.
-      need(s.sequence<2000,"ESCROW_JOURNAL_CAPACITY");
+      // Bounded pilot journal; reserve emergency headroom so pause/halt/restore never fail at the cap.
       const e=nextEntry(s,rows.at(-1)?.checksum ?? digest(["escrow-genesis/v1",s.policy]),event,payload,change);
       this.storage.sql.exec("INSERT INTO escrow_journal(sequence,record) VALUES (?,?)",e.sequence,canonical(e)); return e.state;
     });
   }
 }
 export class Escrow {
-  private tail: Promise<unknown> = Promise.resolve();
   constructor(readonly journal: Journal, private network: Network, private signer: Signer,
     private titles: TitleStore, readonly policy: Policy, private now=()=>Date.now(), private enabled=()=>false,
     private crash: (point:string)=>void=()=>{}) {
     need(journal.load().policy===digest(policy) && signer.address===policy.wallet,"ESCROW_POLICY_CHANGED");
   }
   private serial<T>(fn:()=>Promise<T>): Promise<T> {
-    const result=this.tail.then(fn); this.tail=result.catch(()=>{}); return result;
+    const prev=journalQueues.get(this.journal) ?? Promise.resolve();
+    const result=prev.then(fn); journalQueues.set(this.journal,result.catch(()=>{})); return result;
   }
   state(): State { return this.journal.load(); }
   titleLocked(): boolean { return Object.values(this.state().auctions).some(a=>a.status==="OPEN"||a.status==="SETTLING"); }
@@ -149,11 +154,29 @@ export class Escrow {
     }
     invariant(s);
   }
+  private validateCommand(c:Command): void {
+    const p=obj(c.params);
+    switch(c.action){
+      case "intent": case "withdraw": exact(p,["amount"]); need(micros(p.amount)>0n,"ESCROW_AMOUNT"); break;
+      case "detect": exact(p,["intent","txid"]); text(p.intent,80); need(/^[0-9a-f]{64}$/.test(text(p.txid,64)),"ESCROW_TXID"); break;
+      case "open": exact(p,["name","reserve"]); text(p.name,256); need(micros(p.reserve)>0n,"ESCROW_RESERVE"); break;
+      case "bid": exact(p,["auction","amount"]); text(p.auction,64); need(micros(p.amount)>0n,"ESCROW_AMOUNT"); break;
+      case "cancel": case "expire": exact(p,["auction"]); text(p.auction,64); break;
+      case "settle": case "repair-title": {
+        exact(p,["auction","transfer"]); text(p.auction,64);
+        const packet=authenticate(p.transfer), nowSec=Math.floor(this.now()/1000);
+        need(integer(packet.body.notBefore)<=nowSec && integer(packet.body.deadline)>=nowSec+600,"ESCROW_CONSENT_EXPIRING");
+        break;
+      }
+      default: need(false,"ESCROW_ACTION");
+    }
+  }
   command(c:Command): Promise<unknown> { return this.serial(async()=>{
     need(this.enabled(),"ESCROW_DISABLED");
     need(address(c.actor)!==this.policy.wallet,"ESCROW_SELF_DEPOSIT");
     const rk=c.actor+":"+c.key, fingerprint=digest(c), old=this.state().requests[rk];
     if(old) {need(old.fingerprint===fingerprint,"ESCROW_IDEMPOTENCY_CONFLICT"); return structuredClone(old.result);}
+    this.validateCommand(c);
     // Cancel/expiry only reclassify obligations; no money leaves during pause/holds.
     const local=c.action==="cancel"||c.action==="expire";
     if(!local) { this.gate(); await this.fresh(); this.gate(); }
@@ -161,12 +184,16 @@ export class Escrow {
     if(c.action==="detect") {
       exact(p,["intent","txid"]); const id=text(p.txid,64); need(/^[0-9a-f]{64}$/.test(id),"ESCROW_TXID");
       const s=this.state(),dep=s.deposits[text(p.intent,80)]; need(dep && dep.payer===c.actor,"ESCROW_DEPOSIT_INTENT");
+      need(s.sequence<PILOT_JOURNAL_LIMIT-32,"ESCROW_JOURNAL_CAPACITY");
       need(!dep.tx && !s.credited[id],"ESCROW_DEPOSIT_DUPLICATE");
       const o=await this.network.lookup(id); need(o,"ESCROW_UNKNOWN_DEPOSIT"); this.final(o,id);
       need(o.body.to===this.policy.wallet && o.body.from===dep.payer && o.body.amount===dep.amount && o.body.memo===`poadomains:${p.intent}`,"ESCROW_DEPOSIT_BINDING");
       need(!Object.values(s.credited).some(b=>(b.from===o.body.from&&b.nonce===o.body.nonce)||b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
       this.gate(); await this.fresh(); this.gate();
       this.journal.append("deposit",{rk,fingerprint,id},s=>{
+        need(this.enabled(),"ESCROW_DISABLED"); need(!s.paused,"ESCROW_PAUSED"); need(!s.halt,"ESCROW_HALTED");
+        need(!s.requests[rk],"ESCROW_IDEMPOTENCY_CONFLICT");
+        need(s.sequence<PILOT_JOURNAL_LIMIT-32,"ESCROW_JOURNAL_CAPACITY");
         need(!s.credited[id] && !s.deposits[String(p.intent)]!.tx,"ESCROW_DEPOSIT_DUPLICATE");
         need(!Object.values(s.credited).some(b=>(b.from===o.body.from&&b.nonce===o.body.nonce)||b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
         const d=s.deposits[String(p.intent)]!; d.tx=id;s.credited[id]=o.body;s.assets=String(BigInt(s.assets)+micros(d.amount));
@@ -176,12 +203,17 @@ export class Escrow {
     }
     if(!local) { await this.reconcileAt(await this.fresh()); this.gate(); }
     this.journal.append(c.action,{rk,fingerprint,params:p},s=>{
+      need(this.enabled(),"ESCROW_DISABLED");
+      if(!local) { need(!s.paused,"ESCROW_PAUSED"); need(!s.halt,"ESCROW_HALTED"); }
+      need(!s.requests[rk],"ESCROW_IDEMPOTENCY_CONFLICT");
       switch(c.action) {
         case "intent": {
+          need(s.sequence<PILOT_ADMISSION_LIMIT,"ESCROW_JOURNAL_CAPACITY");
           exact(p,["amount"]); need(micros(p.amount)>0n,"ESCROW_AMOUNT");
           const id=digest([rk,c]); s.deposits[id]={payer:c.actor,amount:String(p.amount),tx:null}; result={intent:id,memo:`poadomains:${id}`,to:this.policy.wallet}; break;
         }
         case "open": {
+          need(s.sequence<PILOT_ADMISSION_LIMIT,"ESCROW_JOURNAL_CAPACITY");
           exact(p,["name","reserve"]); const name=text(p.name,256), terms=this.titles.terms(name,c.actor);
           need(micros(p.reserve)>=micros(terms.reserve),"ESCROW_RESERVE");
           need(!Object.values(s.auctions).some(a=>a.name===name&&(a.status==="OPEN"||a.status==="SETTLING")),"ESCROW_TITLE_RESERVED");
@@ -189,6 +221,7 @@ export class Escrow {
             closes:this.now()+terms.window,quiet:terms.quiet,high:null,status:"OPEN"};result={auction:id};break;
         }
         case "bid": {
+          need(s.sequence<PILOT_JOURNAL_LIMIT-32,"ESCROW_JOURNAL_CAPACITY");
           exact(p,["auction","amount"]);const a=s.auctions[text(p.auction,64)]; need(a&&a.status==="OPEN"&&this.now()<a.closes,"ESCROW_AUCTION_CLOSED");
           const n=micros(p.amount);need(c.actor!==a.seller,"ESCROW_SELF_SALE");need(a.high?.payer!==c.actor,"ESCROW_SELF_RAISE");
           // Existing strict >10% rule, in integer micros (not rounded decimal floats).
@@ -205,6 +238,7 @@ export class Escrow {
           if(a.high)this.refund(s,`cancel-${a.id}`,a.high.payer,a.high.amount);a.status="CANCELLED";break;
         }
         case "withdraw": {
+          need(s.sequence<PILOT_JOURNAL_LIMIT-32,"ESCROW_JOURNAL_CAPACITY");
           exact(p,["amount"]);const n=micros(p.amount);need(n>0n&&BigInt(s.available[c.actor]??"0")>=n,"ESCROW_INSUFFICIENT_FUNDS");
           s.available[c.actor]=String(BigInt(s.available[c.actor]??"0")-n);this.refund(s,`withdraw-${rk}`,c.actor,String(n));break;
         }
@@ -222,7 +256,14 @@ export class Escrow {
         case "repair-title": {
           exact(p,["auction","transfer"]);const a=s.auctions[text(p.auction,64)], st=s.settlements[String(p.auction)];
           need(a&&st&&a.status==="SETTLING"&&c.actor===a.seller,"ESCROW_TITLE_NOT_PENDING");
-          const packet=authenticate(p.transfer);this.titles.validate(packet,a.name,a.seller,a.high!.payer);st.packet=packet;break;
+          const packet=authenticate(p.transfer);this.titles.validate(packet,a.name,a.seller,a.high!.payer);
+          st.packet=packet;
+          if(st.payments.every(id=>s.payments[id]!.status==="FINAL")){
+            this.titles.commit(packet);st.status="COMPLETE";a.status="COMPLETE";
+          } else {
+            st.status="PAYING";
+          }
+          break;
         }
         default: need(false,"ESCROW_ACTION");
       }
@@ -235,6 +276,16 @@ export class Escrow {
   /** One sender lane. UNKNOWN is lookup-only forever: absence/rejection never means safe to repay. */
   tick(): Promise<State> { return this.serial(async()=>{
     this.gate();const status=await this.fresh();this.gate();
+    for(const a of Object.values(this.state().auctions)){
+      if(a.status==="OPEN"&&((a.high===null&&this.now()>=a.closes)||(a.high!==null&&this.now()>=a.closes+a.quiet))){
+        this.journal.append("auto-expire",{auction:a.id},s=>{
+          need(this.enabled(),"ESCROW_DISABLED");need(!s.paused,"ESCROW_PAUSED");need(!s.halt,"ESCROW_HALTED");
+          const cur=s.auctions[a.id];if(!cur||cur.status!=="OPEN")return;
+          if(cur.high)this.refund(s,`cancel-${cur.id}`,cur.high.payer,cur.high.amount);
+          cur.status="CANCELLED";
+        });
+      }
+    }
     for(const p of Object.values(this.state().payments).filter(p=>p.status==="SIGNED"||p.status==="UNKNOWN")){
       let o:Observation|null;
       try{o=await this.network.lookup(p.txid!);}catch{throw new Error("ESCROW_LOOKUP_HELD");}
@@ -243,7 +294,10 @@ export class Escrow {
           // SIGNED is provably pre-I/O: UNKNOWN is durably committed before the first submit.
           // Recovery sends the retained bytes once, never a new tx/nonce.
           await this.reconcileAt(status);await this.fresh();this.gate();
-          this.journal.append("outgoing-unknown",{id:p.id},s=>{s.payments[p.id]!.status="UNKNOWN";});
+          this.journal.append("outgoing-unknown",{id:p.id},s=>{
+            need(this.enabled(),"ESCROW_DISABLED");need(!s.paused,"ESCROW_PAUSED");need(!s.halt,"ESCROW_HALTED");
+            s.payments[p.id]!.status="UNKNOWN";
+          });
           try{await this.network.submit(p.body!);}catch{}
         }
         return this.state();
@@ -254,40 +308,59 @@ export class Escrow {
       }
       need(canonical(o.body)===canonical(p.body),"ESCROW_OUTBOX_PROOF");this.gate();
       this.journal.append("payment-final",{id:p.id,txid:p.txid},s=>{
+        need(this.enabled(),"ESCROW_DISABLED");need(!s.paused,"ESCROW_PAUSED");need(!s.halt,"ESCROW_HALTED");
         const current=s.payments[p.id]!;need(current.status!=="FINAL","ESCROW_DUPLICATE_PAYMENT");current.status="FINAL";
         s.assets=String(BigInt(s.assets)-BigInt(p.amount));
       });this.crash("after-payout");
     }
     await this.reconcileAt(status);await this.fresh();this.gate();
     // Local title commit + settlement journal are one SQLite transaction in the production adapter.
-    for(const st of Object.values(this.state().settlements)) if(st.status!=="COMPLETE"&&st.payments.every(id=>this.state().payments[id]!.status==="FINAL")){
+    // Only transition PAYING -> TITLE_PENDING once; never spam journal records or block READY payments.
+    for(const st of Object.values(this.state().settlements)) if(st.status==="PAYING"&&st.payments.every(id=>this.state().payments[id]!.status==="FINAL")){
       const a=this.state().auctions[st.auction]!;this.crash("before-title");
-      try { this.titles.validate(st.packet,a.name,a.seller,a.high!.payer); }
-      catch {this.journal.append("title-pending",{auction:a.id},s=>{s.settlements[a.id]!.status="TITLE_PENDING";});return this.state();}
-      this.journal.append("title-complete",{auction:a.id},s=>{
-        this.titles.commit(st.packet);s.settlements[a.id]!.status="COMPLETE";s.auctions[a.id]!.status="COMPLETE";
-      });
+      let valid=false;
+      try { this.titles.validate(st.packet,a.name,a.seller,a.high!.payer); valid=true; }
+      catch {
+        this.journal.append("title-pending",{auction:a.id},s=>{
+          need(this.enabled(),"ESCROW_DISABLED");need(!s.paused,"ESCROW_PAUSED");need(!s.halt,"ESCROW_HALTED");
+          s.settlements[a.id]!.status="TITLE_PENDING";
+        });
+      }
+      if(valid){
+        this.journal.append("title-complete",{auction:a.id},s=>{
+          need(this.enabled(),"ESCROW_DISABLED");need(!s.paused,"ESCROW_PAUSED");need(!s.halt,"ESCROW_HALTED");
+          this.titles.commit(st.packet);s.settlements[a.id]!.status="COMPLETE";s.auctions[a.id]!.status="COMPLETE";
+        });
+      }
     }
     if(Object.values(this.state().payments).some(p=>p.status==="SIGNED"||p.status==="UNKNOWN"))return this.state();
     const rank={seller:0,fee:1,refund:2};
-    const p=Object.values(this.state().payments).filter(p=>p.status==="READY").sort((a,b)=>rank[a.kind]-rank[b.kind]||a.id.localeCompare(b.id))[0];if(!p)return this.state();
+    const p=Object.values(this.state().payments).filter(p=>p.status==="READY").sort((a,b)=>rank[a.kind]-rank[b.kind]||a.id.localeCompare(b.id))[0];
+    if(!p)return this.state();
+    const day=new Date(this.now()).toISOString().slice(0,10);
     const lastOut=Object.values(this.state().payments).filter(x=>x.status==="FINAL"&&x.txid&&x.body).sort((a,b)=>b.body!.nonce-a.body!.nonce)[0]?.txid??undefined;
     const ctx=await this.network.context(this.policy.wallet,lastOut);this.gate();await this.fresh();this.gate();
     integer(ctx.nextNonce,1);integer(ctx.cutoff);need(ctx.parents.length===2 && new Set(ctx.parents).size===2,"ESCROW_PARENTS");
     const state=this.state();need(state.nonce===null||state.nonce===ctx.nextNonce,"ESCROW_NONCE_GAP");
     // All unresolved payments, even reserved on an earlier day, count against today's cap.
-    const day=new Date(this.now()).toISOString().slice(0,10);
     const used=Object.values(state.payments).filter(x=>x.day!==null&&(x.day===day||x.status!=="FINAL")).reduce((n,x)=>n+BigInt(x.amount),0n);
     need(BigInt(p.amount)<=micros(this.policy.perTx)&&used+BigInt(p.amount)<=micros(this.policy.daily),"ESCROW_PAYOUT_LIMIT");
     const unsigned:Transfer={type:"transfer",cid:CHAIN,from:this.policy.wallet,to:p.to,amount:decimal(BigInt(p.amount)),memo:`poadomains:${digest(p.id)}`,
       nonce:ctx.nextNonce,parents:ctx.parents,ts:Math.max(Math.floor(this.now()/1000),ctx.cutoff+1)};
     const body=this.signer.transfer(unsigned);verifyTransfer(body);const id=txid(body);
     this.gate();this.journal.append("outgoing-intent",{id:p.id,txid:id},s=>{
+      need(this.enabled(),"ESCROW_DISABLED");need(!s.paused,"ESCROW_PAUSED");need(!s.halt,"ESCROW_HALTED");
+      need(s.nonce===null||s.nonce===ctx.nextNonce,"ESCROW_NONCE_GAP");
+      const currentUsed=Object.values(s.payments).filter(x=>x.day!==null&&(x.day===day||x.status!=="FINAL")).reduce((n,x)=>n+BigInt(x.amount),0n);
       const target=s.payments[p.id]!;need(target.status==="READY","ESCROW_OUTBOX_STATE");
+      need(BigInt(target.amount)<=micros(this.policy.perTx)&&currentUsed+BigInt(target.amount)<=micros(this.policy.daily),"ESCROW_PAYOUT_LIMIT");
       Object.assign(target,{status:"SIGNED",body,txid:id,day});s.nonce=ctx.nextNonce+1;
     });this.crash("before-submit");
     // Persist UNKNOWN BEFORE external I/O, including known queued/202 responses.
-    this.gate();this.journal.append("outgoing-unknown",{id:p.id},s=>{s.payments[p.id]!.status="UNKNOWN";});
+    this.gate();this.journal.append("outgoing-unknown",{id:p.id},s=>{
+      need(this.enabled(),"ESCROW_DISABLED");need(!s.paused,"ESCROW_PAUSED");need(!s.halt,"ESCROW_HALTED");
+      s.payments[p.id]!.status="UNKNOWN";
+    });
     try{await this.network.submit(body);}catch{ /* lookup only; never regenerate or resubmit */ }
     this.crash("after-submit");return this.state();
   }); }
@@ -303,7 +376,10 @@ export class Escrow {
     const ctx=await this.network.context(this.policy.wallet,lastOut);this.gate();await this.fresh();this.gate();
     need(ctx.nextNonce===p.body.nonce,"ESCROW_NONCE_GAP");
     await this.reconcileAt(status);await this.fresh();this.gate();
-    if(p.status==="SIGNED")this.journal.append("outgoing-unknown",{id:p.id},s=>{s.payments[p.id]!.status="UNKNOWN";});
+    if(p.status==="SIGNED")this.journal.append("outgoing-unknown",{id:p.id},s=>{
+      need(this.enabled(),"ESCROW_DISABLED");need(!s.paused,"ESCROW_PAUSED");need(!s.halt,"ESCROW_HALTED");
+      s.payments[p.id]!.status="UNKNOWN";
+    });
     try{await this.network.submit(p.body);}catch{}
     return this.state();
   }); }
@@ -315,16 +391,23 @@ export function exportEscrow(storage: DurableObjectStorage): EscrowArchive | und
   const sql=storage.sql;
   if(!sql.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='escrow_policy'").toArray().length)return undefined;
   const saved=sql.exec<{value:string}>("SELECT value FROM escrow_policy WHERE id=1").toArray()[0];if(!saved)return undefined;
-  const policy=JSON.parse(saved.value) as Policy,rows=new SQLiteEscrowJournal(storage,policy).rows();replay(rows,policy);return {policy,rows};
+  const policy=JSON.parse(saved.value) as Policy,rows=new SQLiteEscrowJournal(storage,policy).rows();replay(rows,policy);
+  const archive:EscrowArchive={policy,rows};
+  need(!/PRIVATE KEY|POA_ESCROW_KEY/.test(canonical(archive)),"ESCROW_SECRET_LEAK");
+  return archive;
 }
 /** Caller must restrict this to an isolated local restore target. No key is present in this archive. */
 export function restoreEscrow(storage: DurableObjectStorage, archive?: EscrowArchive): void {
-  if(archive)replay(archive.rows,archive.policy);
+  if(archive){
+    const a=exact(archive,["policy","rows"]);
+    need(Array.isArray(a.rows),"ESCROW_JOURNAL_CORRUPT");
+    replay(a.rows as Entry[],a.policy as Policy);
+  }
   storage.transactionSync(()=>{
     storage.sql.exec("DROP TABLE IF EXISTS escrow_journal; DROP TABLE IF EXISTS escrow_policy");
     if(archive){const j=new SQLiteEscrowJournal(storage,archive.policy);
       for(const row of archive.rows)storage.sql.exec("INSERT INTO escrow_journal(sequence,record) VALUES(?,?)",row.sequence,canonical(row));
-      j.append("restore-paused",{},s=>{s.paused=true;});
+      j.append("restore-paused",{},s=>{s.paused=true;s.halt="RESTORED_ARCHIVE_READ_ONLY";});
     }
   });
 }
