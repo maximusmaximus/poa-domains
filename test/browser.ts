@@ -29,12 +29,12 @@ export async function browserSmoke(
     await page.waitForFunction(
       () => document.querySelectorAll("#action option").length === 17,
     );
-    assert.match(await page.locator("#mode").innerText(), /Not live PoA/);
+    assert.match(await page.locator("#mode").innerText(), /Live PoA Domains registry/);
     await page.waitForFunction(
       () =>
         document
           .querySelector("#state")
-          ?.textContent?.includes("local-committed-only") ||
+          ?.textContent?.includes("registry-committed") ||
         document.querySelector("#error")?.textContent,
     );
     assert.equal(
@@ -44,10 +44,10 @@ export async function browserSmoke(
     );
     assert.match(
       (await page.locator("#state").textContent()) ?? "",
-      /local-committed-only/,
+      /registry-committed/,
     );
     checks.push(
-      "read-only UI loads all 17 implemented actions and clearly labels local state",
+      "read-only UI loads all 17 implemented actions and clearly labels live registry state",
     );
     const state = e.snapshot();
     const d = state.deeds[state.names.alpha!.activeId!]!;

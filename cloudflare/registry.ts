@@ -132,7 +132,7 @@ export class PoaRegistry extends DurableObject<Env> {
           livePoA: false, principals: this.principals });
         if (call.path === "/v1/capabilities") return ok({ ...capabilities(e), publicExplorerUrl: this.env.PUBLIC_EXPLORER_URL });
         if (call.path === "/v1/state") return ok({ state: e.snapshot(), stateHash: e.stateHash(),
-          observedServerTime: e.observedTime(), durability: DURABILITY, finality: "local-committed-only" });
+          observedServerTime: e.observedTime(), durability: DURABILITY, finality: "registry-committed" });
         if (call.path === "/v1/resolve") return ok(e.resolve(normalizeName(call.query.name, e.normalizationMode).canonical));
         if (call.path === "/v1/nonce") return ok({ nonce: e.nextNonce(call.query.signer ?? "") });
         if (call.path.startsWith("/v1/receipts/")) {
@@ -144,7 +144,7 @@ export class PoaRegistry extends DurableObject<Env> {
         return { status: 404, jsonText: JSON.stringify({ code: "NOT_FOUND" }) };
       }
       if (call.method === "POST" && call.path === "/v1/intents") return ok({ ...e.submit(parseJSON(call.packet ?? "")), accepted: true,
-        durability: DURABILITY, finality: "local-committed-not-chain-finality" });
+        durability: DURABILITY, finality: "registry-committed" });
       return { status: 405, jsonText: JSON.stringify({ code: "METHOD_NOT_ALLOWED" }) };
     } catch (error) {
       if (error instanceof Fault) {

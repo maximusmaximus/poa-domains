@@ -61,7 +61,7 @@ try {
     assert.equal(cap.githubMirrorUrl, "https://maximusmaximus.github.io/poa-domains/"); assert.equal(cap.chainId, "poa-mainnet-1");
     assert.equal(cap.revision, "poa-mainnet-v1"); assert.equal(cap.normalizationHash, EMOJI17_NORMALIZATION_HASH);
     assert.equal(Object.keys(cap.actions).length, 17); assert.equal(cap.durability, "durable-object-sqlite");
-    assert.equal(cap.mode, "local-reference-only"); assert.equal(cap.livePoA, false);
+    assert.equal(cap.mode, "poa-domains-registry"); assert.equal(cap.livePoA, false);
   });
   const font = await fetch(base + "/XeroEmoji-COLRv1.woff2"), fontBytes = new Uint8Array(await font.arrayBuffer());
   check("font MIME and exact font bytes", () => { assert.equal(font.status, 200); assert.equal(font.headers.get("content-type"), "font/woff2"); assert.equal(createHash("sha256").update(fontBytes).digest("hex"), createHash("sha256").update(readFileSync(resolve(root,"reference-web/XeroEmoji-COLRv1.woff2"))).digest("hex")); });
@@ -79,7 +79,9 @@ try {
     assert.ok(html.includes('id="siteFooter"'));
     assert.match(html, /Tesselate Army/);
     assert.ok(html.includes('id="ideasStrip"')); assert.ok(!html.includes("quick-pills"));
-    assert.match(html, /local reference\. Not live PoA/i);
+    assert.match(html, /Live PoA Domains registry/i);
+    assert.ok(!html.includes("cartSigner"), "cart signer field removed");
+    assert.ok(!/local-committed-only/i.test(html), "no local-committed-only in HTML");
     for (const id of ["siteTitle","liveTicker","floatingCartBtn","floatingCartPanel","copyCheckoutBtn","auctionsSection","marketSection","sectionTabs","domainMain","networkStatusBar","siteFooter"]) assert.ok(html.includes(`id="${id}"`), id);
     assert.ok(home.headers.get("content-security-policy")); assert.equal(home.headers.get("x-content-type-options"),"nosniff");
   });
