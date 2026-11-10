@@ -1193,3 +1193,6 @@ button.box-close { margin:0; }
  .site-title .title-glyph:not(.title-tile) { font-size:.8em; }
 }
 .manage-domains > h2 { font-size:1.17em; }
+
+/* Include existing dialog padding/borders in their viewport width, including new corner controls. */
+.detail-view,.floating-cart-panel { box-sizing:border-box; }
