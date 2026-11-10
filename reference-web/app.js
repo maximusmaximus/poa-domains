@@ -38,7 +38,12 @@ import {
   dismissNetworkBanner,
   formatDuration,
   formatClock,
-} from "./shared.js?v=91878e6641ed";
+  rootAuctionPolicy,
+  compactAmount,
+  cartMinimum,
+  cartSummary,
+  editCartAmount,
+} from "./shared.js?v=afc97f7cddd8";
 
 const el = (id) => document.getElementById(id);
 let cap,
@@ -327,6 +332,7 @@ function persistCart() {
 }
 
 function addToCart(item) {
+  item.minimumAmount = cartMinimum(item, cap, latestState);
   const existingIdx = cart.findIndex(
     (x) => x.name === item.name && x.action === item.action,
   );
@@ -356,6 +362,10 @@ function updatePromptText() {
     }
     return;
   }
+  if (cart.some(item => item.validationError)) {
+    el("cartPrompt").textContent = "⚠️ Fix the cart amount before copying.";
+    return;
+  }
   el("cartPrompt").textContent = buildAgentCartPrompt(
     cart,
     cap,
@@ -378,7 +388,7 @@ function renderFloatingCart() {
   );
   clearBtn.disabled = cart.length === 0;
   const held = shouldHoldTransactions(networkStatus.level) || !!networkStatus.hold;
-  copyBtn.disabled = cart.length === 0 || held;
+  copyBtn.disabled = cart.length === 0 || held || cart.some(item => item.validationError);
   if (held) copyBtn.classList.add("action-held");
   else copyBtn.classList.remove("action-held");
   list.replaceChildren();
@@ -404,7 +414,7 @@ function renderCart() {
   el("clearCart").disabled = cart.length === 0;
   {
     const held = shouldHoldTransactions(networkStatus.level) || !!networkStatus.hold;
-    el("copyCartPrompt").disabled = cart.length === 0 || held;
+    el("copyCartPrompt").disabled = cart.length === 0 || held || cart.some(item => item.validationError);
     if (held) el("copyCartPrompt").classList.add("action-held");
     else el("copyCartPrompt").classList.remove("action-held");
   }
@@ -426,7 +436,9 @@ function renderCart() {
       `${item.action} · ${item.tier} ${item.isRoot ? "root" : "child"}`,
       "badge",
     );
-    add(card, "p", item.summary);
+    const summaryNode = add(card, "p", item.summary);
+    const errorNode = add(card, "p", item.validationError || "", "badge-warn");
+    errorNode.setAttribute("role", "alert");
     const controls = add(card, "div", "", "inline-controls");
     const amountInput = document.createElement("input");
     amountInput.value = item.amount;
@@ -435,17 +447,21 @@ function renderCart() {
       "aria-label",
       "Amount or max bid for " + item.name,
     );
+    amountInput.readOnly = !["bid", "announceAuction+bid"].includes(item.action);
     amountInput.addEventListener("input", () => {
-      if (/^(0|[1-9][0-9]{0,38})$/.test(amountInput.value.trim())) {
-        item.amount = amountInput.value.trim();
-        if (Object.hasOwn(item.params, "amount"))
-          item.params.amount = item.amount;
-        if (Object.hasOwn(item.params, "reserve"))
-          item.params.reserve = item.amount;
+      try {
+        Object.assign(item, editCartAmount(item, amountInput.value, cap, latestState));
+        delete item.validationError;
+        summaryNode.textContent = item.summary;
         persistCart();
-        updatePromptText();
-        renderFloatingCart();
+      } catch (error) {
+        item.validationError = error.message;
       }
+      errorNode.textContent = item.validationError || "";
+      amountInput.setAttribute("aria-invalid", item.validationError ? "true" : "false");
+      el("copyCartPrompt").disabled = !!item.validationError || cart.some(x => x.validationError) || shouldHoldTransactions(networkStatus.level) || !!networkStatus.hold;
+      updatePromptText();
+      renderFloatingCart();
     });
     const removeBtn = add(controls, "button", "Remove", "secondary small");
     removeBtn.type = "button";
@@ -704,24 +720,14 @@ function addDetailToCart(item) {
         expectedVersion: liveAuction.version,
         asset: liveAuction.asset,
         amount: minBid,
-        beneficiary:
-          "<YOUR_BENEFICIARY_PRINCIPAL>",
       },
     });
     return;
   }
   if (info.isRoot && !s.names[name]?.activeId && !reservedSet.has(name)) {
-    const poaPolicy = cap.assets?.POA ?? {
-      premiumReserve: "100000",
-      standardReserve: "1000",
-    };
-    const reserve = info.isSingleEmoji
-      ? "100000"
-      : info.isMultiEmoji
-        ? "1000"
-        : info.tier === "premium"
-          ? poaPolicy.premiumReserve
-          : poaPolicy.standardReserve;
+    let reserve;
+    try { ({ reserve } = rootAuctionPolicy(cap, info)); }
+    catch (error) { el("ideasStatus").textContent = error.message; return; }
     addToCart({
       name,
       tier: info.tier,
@@ -818,10 +824,15 @@ function runSearch(rawQuery) {
     const btn = add(controls, "button", "Add to cart", "small");
     btn.id = "addToCartBtn";
     btn.type = "button";
+    const inputError = add(card, "p", "", "badge-warn");
+    inputError.setAttribute("role", "alert");
     btn.addEventListener("click", () => {
-      const chosen = /^(0|[1-9][0-9]{0,38})$/.test(bidInput.value.trim())
-        ? bidInput.value.trim()
-        : minBid;
+      const chosen = bidInput.value.trim();
+      if (!/^[1-9][0-9]{0,38}$/.test(chosen) || BigInt(chosen) < BigInt(minBid)) {
+        inputError.textContent = `⚠️ Enter a whole-number bid of at least ${minBid} ${liveAuction.asset}.`;
+        bidInput.setAttribute("aria-invalid", "true"); return;
+      }
+      inputError.textContent = ""; bidInput.removeAttribute("aria-invalid");
       addToCart({
         name,
         tier: info.tier,
@@ -835,8 +846,6 @@ function runSearch(rawQuery) {
           expectedVersion: liveAuction.version,
           asset: liveAuction.asset,
           amount: chosen,
-          beneficiary:
-            "<YOUR_BENEFICIARY_PRINCIPAL>",
         },
       });
     });
@@ -951,28 +960,16 @@ function runSearch(rawQuery) {
     return;
   }
 
-  const poaPolicy = cap.assets?.POA ?? {
-    premiumReserve: "100000",
-    standardReserve: "1000",
-  };
-  const reserve = info.isSingleEmoji
-    ? "100000"
-    : info.isMultiEmoji
-      ? "1000"
-      : info.tier === "premium"
-        ? poaPolicy.premiumReserve
-        : poaPolicy.standardReserve;
-  const tierNote = info.isSingleEmoji
-    ? "100k POA single-emoji minimum bid"
-    : info.isMultiEmoji
-      ? "1k POA multi-emoji minimum bid"
-      : `${reserve} POA minimum bid`;
-  const windowSec = info.tier === "premium" ? 86400 : 3600;
+  let pricing;
+  try { pricing = rootAuctionPolicy(cap, info); }
+  catch (error) { add(card, "p", error.message, "badge-warn"); return; }
+  const { reserve } = pricing;
+  const tierNote = `${compactAmount(reserve)} POA ${info.isSingleEmoji ? "single-emoji" : info.isMultiEmoji ? "multi-emoji" : "root"} minimum bid`;
   add(card, "p", "🟢 Available", "badge-ok");
   add(
     card,
     "p",
-    `Unclaimed ${info.tier} root domain (${tierNote}). Opening auction reserve: ${reserve} POA (${formatDuration(windowSec)} minimum window + ${formatDuration(windowSec)} quiet period).`,
+    `Unclaimed ${info.tier} root domain (${tierNote}). Opening auction reserve: ${reserve} POA (${formatDuration(pricing.window)} minimum window + ${formatDuration(pricing.quiet)} quiet period).`,
   );
   const controls = add(card, "div", "", "inline-controls");
   const maxBidInput = document.createElement("input");
@@ -983,10 +980,15 @@ function runSearch(rawQuery) {
   const btn = add(controls, "button", "Add to cart", "small");
   btn.id = "addToCartBtn";
   btn.type = "button";
+  const inputError = add(card, "p", "", "badge-warn");
+  inputError.setAttribute("role", "alert");
   btn.addEventListener("click", () => {
-    const chosen = /^(0|[1-9][0-9]{0,38})$/.test(maxBidInput.value.trim())
-      ? maxBidInput.value.trim()
-      : reserve;
+    const chosen = maxBidInput.value.trim();
+    if (!/^[1-9][0-9]{0,38}$/.test(chosen) || BigInt(chosen) < BigInt(reserve)) {
+      inputError.textContent = `⚠️ Enter a whole-number bid of at least ${reserve} POA.`;
+      maxBidInput.setAttribute("aria-invalid", "true"); return;
+    }
+    inputError.textContent = ""; maxBidInput.removeAttribute("aria-invalid");
     addToCart({
       name,
       tier: info.tier,
@@ -1054,7 +1056,7 @@ function renderAuctions(s) {
       btn.addEventListener("click", () => {
         addToCart({
           name: a.name,
-          tier: a.window === 86400 ? "premium" : "standard",
+          tier: inspectName(a.name, cap.emojiManifest).tier,
           isRoot: true,
           action: "bid",
           asset: a.asset,
@@ -1065,8 +1067,6 @@ function renderAuctions(s) {
             expectedVersion: a.version,
             asset: a.asset,
             amount: nextMin,
-            beneficiary:
-              "<YOUR_BENEFICIARY_PRINCIPAL>",
           },
         });
       });
@@ -1186,7 +1186,7 @@ function renderDomainPage(name) {
     bidBtn.addEventListener("click", () => {
       addToCart({
         name,
-        tier: view.auction.window === 86400 ? "premium" : "standard",
+        tier: inspectName(name, cap.emojiManifest).tier,
         isRoot: true,
         action: "bid",
         asset: view.auction.asset,
@@ -1197,7 +1197,6 @@ function renderDomainPage(name) {
           expectedVersion: view.auction.version,
           asset: view.auction.asset,
           amount: minBid,
-          beneficiary: "<YOUR_BENEFICIARY_PRINCIPAL>",
         },
       });
       setFloatingCartOpen(true);
@@ -1656,6 +1655,22 @@ try {
     cap = await json(base + "/v1/capabilities");
     read = () => json(base + "/v1/state");
   }
+  for (const [id, tier, label] of [["premiumPolicy", "premium", "Single emoji"], ["standardPolicy", "standard", "Standard roots"]]) {
+    try {
+      const policy = rootAuctionPolicy(cap, { tier });
+      el(id).textContent = `${label}: ${policy.reserve} POA · ${formatDuration(policy.window)} + ${formatDuration(policy.quiet)} quiet`;
+    } catch { el(id).textContent = "⚠️ Prices unavailable. Refresh to check."; }
+  }
+  for (const item of cart) {
+    // Repair old saved carts affected by the amount/maxBid mismatch, without raising any cap.
+    if (item.action === "announceAuction+bid") item.params.maxBid = item.amount;
+    try {
+      item.minimumAmount = cartMinimum(item, cap, null);
+      if (BigInt(item.amount) < BigInt(item.minimumAmount) ||
+          (item.params.reserve && BigInt(item.params.reserve) > BigInt(item.amount))) throw Error("⚠️ Review this cart amount before copying.");
+      item.summary = cartSummary(item);
+    } catch (error) { item.validationError = error.message; }
+  }
   if (cap.livePoA !== false)
     throw Error("Only local reference profile is supported");
   if (typeof cap.reservedCatalog === "string" && cap.reservedCatalog.length) {
@@ -1752,7 +1767,7 @@ try {
       return;
     }
     const text = el("cartPrompt").textContent;
-    if (!text || !cart.length) return;
+    if (!text || !cart.length || cart.some(item => item.validationError)) return;
     try {
       await navigator.clipboard.writeText(text);
       el("cartStatus").textContent = "Copied";
@@ -1789,7 +1804,7 @@ try {
       el("floatingCartStatus").textContent = "Held ⏸️ until the PoA network is back";
       return;
     }
-    if (!cart.length || !cap) return;
+    if (!cart.length || !cap || cart.some(item => item.validationError)) return;
     const text = buildAgentCheckoutHandoff(
       cart,
       cap,

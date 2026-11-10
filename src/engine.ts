@@ -36,6 +36,7 @@ import {
   normalizationModeForHash,
 } from "./names.js";
 import { Metadata, metadata, validCid } from "./metadata.js";
+
 import {
   State,
   Deed,
@@ -49,6 +50,11 @@ import {
   leaseEnd,
   records,
 } from "./model.js";
+
+export const AUCTION_WINDOWS = Object.freeze({
+  premium: Object.freeze({ window: 86400, quiet: 86400 }),
+  standard: Object.freeze({ window: 3600, quiet: 3600 }),
+});
 
 export interface Commit {
   packet: Packet;
@@ -429,7 +435,7 @@ export class Engine {
         const minOpenAt =
           this.config.revision === "poa-mainnet-v1" ? time : time + 86400;
         const openAt = integer(p.openAt, minOpenAt);
-        integer(openAt + (n.tier === "premium" ? 86400 : 3600));
+        integer(openAt + AUCTION_WINDOWS[n.tier].window);
         need(!e?.auctionId, "NAME_RESERVED");
         let d: Deed | null = null;
         if (e?.activeId) {
@@ -476,8 +482,8 @@ export class Engine {
           reserve: reserve.toString(),
           openAt,
           announcedAt: time,
-          window: n.tier === "premium" ? 86400 : 3600,
-          quiet: n.tier === "premium" ? 86400 : 3600,
+          window: AUCTION_WINDOWS[n.tier].window,
+          quiet: AUCTION_WINDOWS[n.tier].quiet,
           version: 1,
           metadata: m,
           encumbranceVersion: d?.encumbranceVersion ?? 0,
