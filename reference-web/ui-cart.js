@@ -1,9 +1,9 @@
-import { actionLabel } from "./ui-copy.js?v=f94114d2def0";
-import { trapDialog } from "./ui-a11y.js?v=f94114d2def0";
-import { ui } from "./ui-state.js?v=f94114d2def0";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=f94114d2def0";
-import { add, el, endpointBase } from "./ui-core.js?v=f94114d2def0";
-import { nameLink } from "./ui-router.js?v=f94114d2def0";
+import { actionLabel } from "./ui-copy.js?v=2c61fff70fb8";
+import { trapDialog } from "./ui-a11y.js?v=2c61fff70fb8";
+import { ui } from "./ui-state.js?v=2c61fff70fb8";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=2c61fff70fb8";
+import { add, el, endpointBase } from "./ui-core.js?v=2c61fff70fb8";
+import { nameLink } from "./ui-router.js?v=2c61fff70fb8";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || shouldHoldTransactions(ui.networkStatus.level) || !!ui.networkStatus.hold;

@@ -1,15 +1,15 @@
-import { installHelp } from "./ui-help.js?v=f94114d2def0";
-import { renderManagement } from "./ui-manage.js?v=f94114d2def0";
-import { actionLabel } from "./ui-copy.js?v=f94114d2def0";
-import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=f94114d2def0";
-import { ui } from "./ui-state.js?v=f94114d2def0";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=f94114d2def0";
-import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=f94114d2def0";
-import { render } from "./ui-render.js?v=f94114d2def0";
-import { runSearch } from "./ui-search.js?v=f94114d2def0";
-import { renderIdeas } from "./ui-ideas.js?v=f94114d2def0";
-import { mountEscrow } from "./escrow.js?v=f94114d2def0";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=f94114d2def0";
+import { installHelp } from "./ui-help.js?v=2c61fff70fb8";
+import { renderManagement } from "./ui-manage.js?v=2c61fff70fb8";
+import { actionLabel } from "./ui-copy.js?v=2c61fff70fb8";
+import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=2c61fff70fb8";
+import { ui } from "./ui-state.js?v=2c61fff70fb8";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=2c61fff70fb8";
+import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=2c61fff70fb8";
+import { render } from "./ui-render.js?v=2c61fff70fb8";
+import { runSearch } from "./ui-search.js?v=2c61fff70fb8";
+import { renderIdeas } from "./ui-ideas.js?v=2c61fff70fb8";
+import { mountEscrow } from "./escrow.js?v=2c61fff70fb8";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=2c61fff70fb8";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -134,11 +134,9 @@ export function renderNetworkStatus() {
         icon.textContent = "";
     if (label)
         label.textContent = text;
-    let dismissed=!!ui.statusPanelDismissed;try{dismissed=globalThis.sessionStorage.getItem("poa-status-dismissed-v1")==="1";}catch{}
-    bar.hidden = dismissed;
+    bar.hidden = !!ui.statusPanelDismissed;
     const serviceError=document.body.dataset.registryStatus==="error",slow=level==="degraded"||document.body.dataset.registryStatus==="loading";
     bar.dataset.color=serviceError?"red":slow?"yellow":bar.dataset.color;
-    const indicator=el("statusReopen");if(indicator){indicator.textContent=(serviceError||level==="down"?"🔴":slow?"🟡":level==="online"?"🟢":"⚪")+" Status";indicator.setAttribute("aria-expanded",String(!dismissed));indicator.setAttribute("aria-label",(dismissed?"Open":"Close")+" network and site status");}
 }
 
 export function applyNetworkHold() {
@@ -163,7 +161,8 @@ export function applyNetworkHold() {
         }
         else {
             node.classList.remove("action-held");
-            node.removeAttribute("title");
+            if(node.classList.contains("emoji-control"))node.title=node.getAttribute("aria-label");
+            else node.removeAttribute("title");
             // Re-enable based on existing cart/copy rules on next renderCart / route.
         }
     }

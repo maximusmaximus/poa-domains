@@ -1,19 +1,20 @@
-import { installHelp } from "./ui-help.js?v=f94114d2def0";
-import { wireManagement } from "./ui-manage.js?v=f94114d2def0";
-import { logSubmittedSearch } from "./ui-search-log.js?v=f94114d2def0";
-import { bindTabKeys } from "./ui-a11y.js?v=f94114d2def0";
-import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=f94114d2def0";
-import { ui } from "./ui-state.js?v=f94114d2def0";
-import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=f94114d2def0";
-import { navigateHome, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=f94114d2def0";
-import { el, endpointBase } from "./ui-core.js?v=f94114d2def0";
-import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=f94114d2def0";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=f94114d2def0";
-import { runSearch } from "./ui-search.js?v=f94114d2def0";
-import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=f94114d2def0";
-import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=f94114d2def0";
+import { installHelp } from "./ui-help.js?v=2c61fff70fb8";
+import { wireManagement } from "./ui-manage.js?v=2c61fff70fb8";
+import { logSubmittedSearch } from "./ui-search-log.js?v=2c61fff70fb8";
+import { bindTabKeys } from "./ui-a11y.js?v=2c61fff70fb8";
+import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=2c61fff70fb8";
+import { ui } from "./ui-state.js?v=2c61fff70fb8";
+import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=2c61fff70fb8";
+import { navigateHome, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=2c61fff70fb8";
+import { el, endpointBase } from "./ui-core.js?v=2c61fff70fb8";
+import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=2c61fff70fb8";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=2c61fff70fb8";
+import { runSearch } from "./ui-search.js?v=2c61fff70fb8";
+import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=2c61fff70fb8";
+import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=2c61fff70fb8";
 
 try {
+    ui.statusPanelDismissed = false; // New page visits show status; closing lasts for this page only.
     applySiteTitle();
     installHelp();
     wireManagement();
@@ -116,6 +117,7 @@ try {
     document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape")
             return;
+        if (document.querySelector(".info-popover:popover-open")) return;
         if (!el("floatingCartPanel").hidden)
             setFloatingCartOpen(false);
         else if (!el("detailView").hidden)
@@ -124,12 +126,10 @@ try {
     const dismissBtn = el("networkStatusDismiss");
     if (dismissBtn) {
         dismissBtn.addEventListener("click", () => {
-            const level = ui.networkStatus.level || "checking";
-            ui.statusPanelDismissed=true;try{globalThis.sessionStorage.setItem("poa-status-dismissed-v1","1");}catch{}
+            ui.statusPanelDismissed = true;
             renderNetworkStatus();
         });
     }
-    el("statusReopen")?.addEventListener("click",()=>{const hidden=el("networkStatusBar").hidden;ui.statusPanelDismissed=!hidden;try{if(hidden)globalThis.sessionStorage.removeItem("poa-status-dismissed-v1");else globalThis.sessionStorage.setItem("poa-status-dismissed-v1","1");}catch{}renderNetworkStatus();});
     el("example").addEventListener("click", () => {
         const x = ui.examples[el("action").value];
         if (!x)

@@ -25,9 +25,9 @@ focus outlines. Hidden elements stay hidden even when a component sets display.
 Links in footer text have underlines; tab color changes are immediate to avoid
 brief low-contrast animation frames. Time wording remains hours/minutes.
 
-The floating left ℹ️ is an aria-pressed info-mode toggle. Feature ℹ️ controls are hidden from visual and keyboard navigation until enabled. They open native nonmodal keyboard/touch popovers; Escape closes a popover without switching off info mode. Toggling off closes popovers and returns focus to the floating control. Required field labels, POA units, privacy warnings and actual errors/statuses remain visible.
+Always-visible ℹ️ buttons sit at each module’s top-right, immediately left of close controls. The Check Availability label has inline help. Native keyboard/touch popovers stay inside their owning module for modal focus containment and removed-card cleanup. Escape dismisses help before its parent dialog; its close button restores focus. Required field labels, POA units, privacy warnings and actual errors/statuses remain visible. Simple emoji buttons preserve a descriptive aria-label and title; technical financial/signing controls retain words.
 
-Network and service status share a session-dismissible panel with a small color/emoji reopen button. Dismissing it never bypasses the network hold.
+Network and service status use flat rows in one closable panel, with no top reopen button. A new page visit shows status again. Dismissing it never bypasses the network hold. Mobile title glyphs fit a ten-column viewport-wide grid; the header divider is removed.
 
 ## Read-only Pages
 

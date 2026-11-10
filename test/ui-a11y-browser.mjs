@@ -188,6 +188,8 @@ try {
     await expect(page.locator("#floatingCartClose")).toBeFocused();
     await expect(page.locator("#copyCheckoutBtn")).toBeDisabled();
     await page.keyboard.press("Shift+Tab");
+    await expect(page.locator("#help-floatingCartPanel")).toBeFocused();
+    await page.keyboard.press("Tab");
     await expect(page.locator("#floatingCartClose")).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(page.locator("#floatingCartBtn")).toBeFocused();

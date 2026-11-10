@@ -5,30 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=eead5361be50" />
+    <link rel="stylesheet" href="/style.css?v=c45278b84630" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
     <header>
       <h1 id="siteTitle" class="site-title" aria-label="poadomains"><span class="title-fallback">poadomains</span></h1>
-      <button id="statusReopen" class="secondary small status-indicator" type="button" aria-controls="networkStatusBar" aria-expanded="true">⚪ Status</button>
     </header>
 
     <div id="networkStatusBar" class="network-status-bar combined-status" data-level="checking" role="region" aria-label="Network and site status">
       <button type="button" id="networkStatusDismiss" class="network-status-dismiss" aria-label="Close network and site status">✕</button>
       <div class="status-network"><span id="networkStatusIcon" class="network-status-icon" aria-hidden="true">⚪</span><span id="networkStatusText" class="network-status-text" role="status" aria-live="polite">Checking PoA network…</span></div>
-      <div class="registry-read-status">
-        <p id="mode">⏳ Loading registry data…</p>
+              <p id="mode">⏳ Loading registry data…</p>
         <p id="registryLoading" role="status">⏳ Loading registry data… You can use the tabs and type a search now.</p>
         <p id="registryAge" title="Registry data only. POA payments refresh separately.">Registry data not loaded yet · POA payments refresh separately.</p>
         <div id="registryError" role="alert" hidden><span id="registryErrorText"></span> <button id="registryRetry" type="button" class="secondary small">🔄 Refresh</button></div>
-      </div>
     </div>
 
+    <div id="recentActions" class="ticker-shell">
     <div id="liveTicker" class="live-ticker" role="region" aria-label="Recent registry actions" tabindex="0">
       <div id="liveTickerTrack" class="live-ticker-track">
         <span class="ticker-empty muted">No recent registry actions</span>
       </div>
+    </div>
+
     </div>
 
     <div class="section-navigation" role="navigation" aria-label="Explorer navigation">
@@ -64,8 +64,6 @@
 
     <main id="homeMain" tabindex="-1">
       <section id="searchSection" data-section="find" role="tabpanel" aria-labelledby="tabFind" tabindex="0" class="is-active-section">
-        <h2>🔍 Find a name</h2>
-        <p class="howto">Type a name → Check → Add to cart or open its page.</p>
         <div class="ideas" aria-labelledby="ideasHeading">
           <div class="ideas-head">
             <div id="ideasHeading" role="group" aria-label="Name ideas"></div>
@@ -75,16 +73,17 @@
           <div id="ideasStrip" class="ideas-strip" role="group" aria-label="Name ideas"></div>
           <p id="ideasStatus" class="ideas-status" role="status" aria-live="polite"></p>
         </div>
-        <label for="searchInput">Name or emoji to check</label>
+        <div class="search-label"><label id="searchLabel" for="searchInput">Check Availability</label><span id="searchHelp"></span></div>
         <div class="search-bar">
           <input
             id="searchInput"
             placeholder="name or emoji"
             autocomplete="off"
-            aria-label="Search domain"
+            aria-describedby="searchHelpText searchPrivacy"
           />
           <button id="searchBtn" type="button">Check</button>
         </div>
+        <p id="searchHelpText" class="muted">Enter a name or emoji, then select 🔍 to check its registry availability. Add a result to your planning cart or open its page. No payment is sent.</p>
         <p id="searchPrivacy" class="muted">Submitted name searches are saved without IP or account details to improve suggestions. Query text is saved: do not enter personal information, wallet addresses or keys.</p>
         <p id="searchLogStatus" class="muted" role="status" aria-live="polite"></p>
         <p id="searchResultStatus" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
@@ -302,8 +301,6 @@
       <p id="floatingCartStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
 
-    <button id="floatingInfo" class="floating-info" type="button" aria-controls="infoHint" aria-expanded="false" aria-pressed="false" aria-label="Toggle feature information">ℹ️</button>
-    <div id="infoHint" class="info-popover info-hint" popover="auto" role="dialog" aria-labelledby="infoHintTitle"><h2 id="infoHintTitle">ℹ️ Need a hand?</h2><p>Info mode is on. Tap the small ℹ️ next to a feature to learn what it does and what it does not do. Tap the floating ℹ️ again to hide these buttons. You can also reach each one with Tab and open it with Enter. Tap outside or press Escape to close.</p><button type="button" popovertarget="infoHint" popovertargetaction="hide">Close</button></div>
-    <script type="module" src="/app.js?v=f94114d2def0"></script>
+    <script type="module" src="/app.js?v=2c61fff70fb8"></script>
   </body>
 </html>
