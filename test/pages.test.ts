@@ -61,7 +61,9 @@ test("production Pages allowlist publishes external Worker discovery but no fixt
     assert.match(html, /Native on-chain registration, ownership and settlement are not verified/);
     assert.match(html, /Safety checks can hold payments/);
     assert.doesNotMatch(html, /xero\s*emoji|roadmap|coming\s+soon|future\s+plans/i);
-    const footer = /<footer>([\s\S]*?)<\/footer>/.exec(html)![1]!.replace(/<[^>]+>/g, "").trim();
+    const footer = /<p class="footer-credit">([\s\S]*?)<\/p>/.exec(html)![1]!.replace(/<[^>]+>/g, "").trim();
+    assert.match(html, /href="\.\/terms.html" target="_blank" rel="noopener noreferrer"/);
+    for(const file of ["terms.html","terms.css"])assert.equal(readFileSync(join(dir,file),"utf8"),readFileSync(join("reference-web",file),"utf8"));
     assert.equal(footer, "made with ❤️ in SF by Tesselate Army | maxi.grok.me");
     assert.equal(readFileSync(join(dir, "robots.txt"), "utf8"), "User-agent: *\nAllow: /poa-domains/\nSitemap: https://maximusmaximus.github.io/poa-domains/sitemap.xml\n");
     assert.match(readFileSync(join(dir, "sitemap.xml"), "utf8"), /<loc>https:\/\/maximusmaximus.github.io\/poa-domains\/<\/loc>/);

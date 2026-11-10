@@ -27,7 +27,7 @@ export async function verifyStaticPage(url: string, screenshot?: string) {
   assert.ok(entry.pathname.endsWith('/') || entry.pathname.endsWith('/index.html'), 'Use the explicit page directory or index.html');
   const base = new URL('./', entry);
   const asset = (name: string) => new URL(name, base).href;
-  const permitted = new Set([base.href, asset('index.html'), ...['app.js', 'live-network.js', 'network-schema.js', 'emoji-format-checker.mjs', 'emoji-format-checker.css', 'emoji17.mjs', 'emoji17-data.mjs', 'style.css', 'icon.svg', 'config.json', 'status.json'].map(asset)]);
+  const permitted = new Set([base.href, asset('index.html'), ...['app.js', 'live-network.js', 'network-schema.js', 'emoji-format-checker.mjs', 'emoji-format-checker.css', 'emoji17.mjs', 'emoji17-data.mjs', 'style.css', 'icon.svg', 'config.json', 'status.json', 'terms.html'].map(asset)]);
   const counts = { requests: 0, backend: 0, mutationAttempts: 0 };
   const violations: string[] = [], routeErrors: string[] = [], pageErrors: string[] = [];
   const consoleErrors: string[] = [];
@@ -76,7 +76,7 @@ export async function verifyStaticPage(url: string, screenshot?: string) {
       const request = route.request(); counts.requests++;
       const target = new URL(request.url());
       if (request.method() !== 'GET') { counts.mutationAttempts++; await abort(route, 'Non-GET request'); return; }
-      if (target.search || target.hash || target.username || target.password) { await abort(route, 'Query/fragment/credential request'); return; }
+      if ((target.search && !permitted.has(target.href)) || target.hash || target.username || target.password) { await abort(route, 'Query/fragment/credential request'); return; }
       const headers = await request.allHeaders();
       if (Object.keys(headers).some(k => /^(cookie|authorization|proxy-authorization|x-api-key|x-wallet.*)$/i.test(k))) {
         await abort(route, 'Credential-bearing request'); return;
@@ -205,10 +205,23 @@ export async function verifyStaticPage(url: string, screenshot?: string) {
     assert.equal(await page.locator('#network-status').innerText(), 'Checking…');
     assert.equal(await page.locator('#observationSection').getAttribute('aria-busy'), 'true');
     assert.equal(await page.locator('header .hero-cta').getAttribute('href'), 'https://poadomains.grok.me');
-    assert.equal((await page.locator('footer').innerText()).replace(/\s+/g,' ').trim(), 'made with ❤️ in SF by Tesselate Army | maxi.grok.me');
+    assert.equal((await page.locator('.footer-credit').innerText()).replace(/\s+/g,' ').trim(), 'made with ❤️ in SF by Tesselate Army | maxi.grok.me');
     assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), 'https://maximusmaximus.github.io/poa-domains/');
     assert.ok(await page.locator('meta[name="description"]').getAttribute('content'));
     assert.equal(await page.locator('meta[property="og:type"]').getAttribute('content'), 'website');
+    const termsLink=page.getByRole('link',{name:'📜 Terms',exact:true});
+    assert.equal(await termsLink.getAttribute('target'),'_blank');
+    assert.equal(await termsLink.getAttribute('rel'),'noopener noreferrer');
+    const termsHtml=await (await context.request.get(asset('terms.html'))).text();
+    const termsCss=/href="(\.\/terms\.css\?v=[a-f0-9]+)"/.exec(termsHtml)![1]!;
+    permitted.add(new URL(termsCss,base).href);
+    const popupPromise=context.waitForEvent('page');await termsLink.click();const termsPage=await popupPromise;
+    await termsPage.waitForLoadState('load');
+    assert.equal(await termsPage.locator('h2').count(),8);
+    assert.match(await termsPage.locator('body').innerText(),/original payer/);
+    assert.equal(await termsPage.locator('script,form').count(),0);
+    assert.equal(await termsPage.locator('nav a').getAttribute('href'),'./');
+    await termsPage.close();
     releaseHeldRequests(); await ready();
     assert.equal(await page.locator('#observationSection').getAttribute('aria-busy'), 'false');
     checks.push('Static Explorer-first live-only landing, exact footer/SEO and visible checking/disabled refresh before replies');

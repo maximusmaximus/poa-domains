@@ -1,6 +1,6 @@
-import { ui } from "./ui-state.js?v=5c1f8083f451";
-import { el, endpointBase, ownershipView } from "./ui-core.js?v=5c1f8083f451";
-import { buildListingPrompt, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=5c1f8083f451";
+import { ui } from "./ui-state.js?v=4ebb3841970c";
+import { el, endpointBase, ownershipView } from "./ui-core.js?v=4ebb3841970c";
+import { buildListingPrompt, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=4ebb3841970c";
 
 export function clearHandoff() {
     ui.generation++;

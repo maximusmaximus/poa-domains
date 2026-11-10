@@ -1,0 +1,13 @@
+/* Scriptless and relative-path safe on the Worker and the static Mirror Site. */
+:root { color-scheme:dark; --space:12px; }
+* { box-sizing:border-box; }
+body { margin:0 auto; max-width:48rem; padding:24px; background:#0b1118; color:#d8e9f0; font:1rem/1.6 system-ui,sans-serif; overflow-wrap:anywhere; }
+a { color:#9cffe0; text-underline-offset:.2em; }
+a:focus-visible { outline:3px solid #9cffe0; outline-offset:4px; border-radius:4px; }
+nav { margin:0 0 24px; }
+nav a { display:inline-flex; min-height:44px; align-items:center; }
+h1 { font-size:clamp(1.5rem,5vw,2rem); line-height:1.3; margin:0 0 24px; }
+h2 { font-size:1.15rem; line-height:1.4; margin:24px 0 var(--space); }
+p { margin:0; }
+footer { margin-top:24px; padding-top:var(--space); color:#b4cad6; font-size:.875rem; }
+@media(max-width:600px) { body { padding:var(--space); } }

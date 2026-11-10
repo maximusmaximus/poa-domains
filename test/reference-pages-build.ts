@@ -42,6 +42,8 @@ export function buildReferenceBundle(directory: string) {
   const files = [
     "index.html",
     "style.css",
+    "terms.html",
+    "terms.css",
     "app.js",
     "ideas-generator.js",
     "ui-copy.js",
@@ -82,6 +84,7 @@ export function buildReferenceBundle(directory: string) {
   // Subpath static hosting (/poa-domains/): root-absolute Worker assets become relative.
   html = html
     .replaceAll('href="/icon.svg"', 'href="./icon.svg"')
+    .replaceAll('href="/terms"', 'href="./terms.html"')
     .replace(/href="\/style\.css(\?v=[0-9a-f]+)?"/, 'href="./style.css$1"')
     .replace(/src="\/app\.js(\?v=[0-9a-f]+)?"/, 'src="./app.js$1"');
   writeFileSync(join(output, "index.html"), html);

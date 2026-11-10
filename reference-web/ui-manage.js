@@ -1,7 +1,7 @@
-import { ui } from "./ui-state.js?v=5c1f8083f451";
-import { add, el, endpointBase } from "./ui-core.js?v=5c1f8083f451";
-import { nameLink } from "./ui-router.js?v=5c1f8083f451";
-import { actionLabel } from "./ui-copy.js?v=5c1f8083f451";
+import { ui } from "./ui-state.js?v=4ebb3841970c";
+import { add, el, endpointBase } from "./ui-core.js?v=4ebb3841970c";
+import { nameLink } from "./ui-router.js?v=4ebb3841970c";
+import { actionLabel } from "./ui-copy.js?v=4ebb3841970c";
 export function managedNames(state,owner){return Object.values(state?.names??{}).map(n=>state.deeds?.[n.activeId]).filter(d=>d&&!d.retired&&d.owner===owner);}
 export function managementPlan(action,deed,state,owner,price="100",hours="168"){
  if(deed.owner!==owner||deed.retired)throw Error("This address is not the active registry holder.");
@@ -13,7 +13,7 @@ export function managementPlan(action,deed,state,owner,price="100",hours="168"){
  else throw Error("Unsupported management action.");
  return {action,signer:owner,coSigners,params};
 }
-export function renderManagement(){const box=el("manageNames"),owner=el("manageOwner")?.value.trim();if(!box)return;box.replaceChildren();if(!owner){add(box,"p","Enter a public owner address to view its registry domains and subdomains.","muted");return;}
+export function renderManagement(){const box=el("manageNames"),owner=el("manageOwner")?.value.trim();if(!box)return;box.replaceChildren();el("managePrompt").textContent="";if(!owner)return;
  if(!/^(poa1[1-9A-HJ-NP-Za-km-z]{30,60}|ed25519:[0-9a-f]{64})$/.test(owner)){add(box,"p","Use a public owner address only — never a private key.","badge-warn");return;}
  const names=managedNames(ui.latestState,owner);if(!names.length){add(box,"p","No active names for this address in the current registry snapshot.","muted");return;}
  for(const d of names){const card=add(box,"article","","card"),h=add(card,"h4","");nameLink(h,d.name);add(card,"p",d.parentId?"Subdomain · application-registry record":"Root domain · application-registry record","badge");if(d.parentId){const p=add(card,"p","Child of ");nameLink(p,ui.latestState.deeds[d.parentId]?.name??"");}

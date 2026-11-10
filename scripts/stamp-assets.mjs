@@ -12,7 +12,9 @@ export function stampAssets(){
  const files=Object.fromEntries(names.map(n=>[n,bare(originals[n]).replace(/(from\s+["']\.\/[a-z0-9-]+\.js)(["'])/g,`$1?v=${revision}$2`)]));
  const htmlIn=read('index.html');
  files['index.html']=htmlIn.replace(/href="\/style\.css(?:\?v=[0-9a-f]+)?"/,`href="/style.css?v=${hash(read('style.css'))}"`).replace(/src="\/app\.js(?:\?v=[0-9a-f]+)?"/,`src="/app.js?v=${revision}"`);
- return {files,changed:names.some(n=>files[n]!==originals[n])||files['index.html']!==htmlIn};
+ const termsIn=read('terms.html');
+ files['terms.html']=termsIn.replace(/href="\.\/terms\.css(?:\?v=[0-9a-f]+)?"/,`href="./terms.css?v=${hash(read('terms.css'))}"`);
+ return {files,changed:files['terms.html']!==termsIn||names.some(n=>files[n]!==originals[n])||files['index.html']!==htmlIn};
 }
 if(import.meta.url===`file://${process.argv[1]}`){
  const {files,changed}=stampAssets();
