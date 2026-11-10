@@ -9,7 +9,7 @@ export const suites = {
   unit: [
     ["node", "--test", ...readdirSync("dist/test").filter(n => n.endsWith(".test.js")).map(n => `dist/test/${n}`),
       "test/ui-live-shaping.test.mjs", "test/ui-ownership.test.mjs", "test/live-network.test.mjs",
-      "test/emoji-format-checker.test.mjs", "test/ci-contract.test.mjs", "test/worker-deploy.test.mjs", "test/ui-cart-correctness.test.mjs", "test/ui-freshness.test.mjs", "test/ui-modules.test.mjs", "test/network-schema.test.mjs", "test/errors.test.mjs", "test/mcp-core.test.mjs", "test/mcp-deploy.test.mjs", "test/agent-cart-v2.test.mjs", "test/discovery.test.mjs", "test/ui-a11y.test.mjs", "test/ui-policy.test.mjs", "test/ui-ideas-feature.test.mjs", "test/search-log.test.mjs"],
+      "test/emoji-format-checker.test.mjs", "test/ci-contract.test.mjs", "test/worker-deploy.test.mjs", "test/ui-cart-correctness.test.mjs", "test/ui-freshness.test.mjs", "test/ui-modules.test.mjs", "test/network-schema.test.mjs", "test/errors.test.mjs", "test/mcp-core.test.mjs", "test/mcp-deploy.test.mjs", "test/agent-cart-v2.test.mjs", "test/discovery.test.mjs", "test/ui-a11y.test.mjs", "test/ui-policy.test.mjs", "test/ui-ideas-feature.test.mjs", "test/search-log.test.mjs", "test/backup-tamper.test.mjs"],
     ["node", "--experimental-strip-types", "--test", "test/network-status-worker.test.mjs", "test/backup-codec.test.mjs"],
   ],
   "browser-smoke": [["node", "dist/test/production-smoke.js"], ["node", "dist/test/smoke.js"],
