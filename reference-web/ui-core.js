@@ -1,5 +1,6 @@
-import { buildOwnershipIndex, ownershipConflict, safeObject } from "./shared.js?v=f94114d2def0";
-import { ui } from "./ui-state.js?v=f94114d2def0";
+import { decorateEmojiButton } from "./ui-copy.js?v=94d33d638672";
+import { buildOwnershipIndex, ownershipConflict, safeObject } from "./shared.js?v=94d33d638672";
+import { ui } from "./ui-state.js?v=94d33d638672";
 
 export const el = (id) => document.getElementById(id);
 
@@ -35,6 +36,7 @@ export function add(parent, tag, text, css) {
     if (css)
         node.className = css;
     parent.append(node);
+    if (tag === "button") decorateEmojiButton(node);
     return node;
 }
 

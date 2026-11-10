@@ -31,8 +31,9 @@ test("every main and auction tab has a unique explicit panel, labelled panel and
   assert.ok(html.includes('id="searchResultStatus"'));
   assert.ok(!html.includes('id="ideasPause"'));
   assert.ok(!html.includes('id="ideasShuffle"'));
-  assert.ok(html.includes('id="floatingInfo"'));
-  assert.ok(html.includes('id="infoHint"'));
+  assert.ok(!html.includes('id="floatingInfo"'));
+  assert.ok(html.includes('id="searchHelp"'));
+  assert.ok(html.includes('id="searchLabel"'));
   assert.ok(html.includes('id="siteFooter"'));
   assert.ok(html.includes('class="tab-dot"'));
 });

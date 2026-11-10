@@ -36,6 +36,7 @@ async function scan(page, label) {
     incomplete: results.incomplete.map((x) => x.id),
   });
   save();
+  if(label.startsWith("explorer"))assert.equal(results.violations.some(v=>v.id==="heading-order"),false,label+" heading hierarchy");
   assert.deepEqual(
     serious.map((x) => ({
       id: x.id,
@@ -188,6 +189,8 @@ try {
     await expect(page.locator("#floatingCartClose")).toBeFocused();
     await expect(page.locator("#copyCheckoutBtn")).toBeDisabled();
     await page.keyboard.press("Shift+Tab");
+    await expect(page.locator("#help-floatingCartPanel")).toBeFocused();
+    await page.keyboard.press("Tab");
     await expect(page.locator("#floatingCartClose")).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(page.locator("#floatingCartBtn")).toBeFocused();

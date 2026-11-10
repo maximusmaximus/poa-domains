@@ -1,10 +1,10 @@
-import { ui } from "./ui-state.js?v=f94114d2def0";
-import { inspectName } from "./shared.js?v=f94114d2def0";
-import { createIdeaGenerator } from "./ideas-generator.js?v=f94114d2def0";
-import { autoScroll } from "./ui-motion.js?v=f94114d2def0";
-import { add, el, variantOwner } from "./ui-core.js?v=f94114d2def0";
-import { runSearch } from "./ui-search.js?v=f94114d2def0";
-import { logSubmittedSearch } from "./ui-search-log.js?v=f94114d2def0";
+import { ui } from "./ui-state.js?v=94d33d638672";
+import { inspectName } from "./shared.js?v=94d33d638672";
+import { createIdeaGenerator } from "./ideas-generator.js?v=94d33d638672";
+import { autoScroll } from "./ui-motion.js?v=94d33d638672";
+import { add, el, variantOwner } from "./ui-core.js?v=94d33d638672";
+import { runSearch } from "./ui-search.js?v=94d33d638672";
+import { logSubmittedSearch } from "./ui-search-log.js?v=94d33d638672";
 export function ideaAccepted(q) {
  if(!ui.cap||!ui.latestState)return false;
  try{const n=inspectName(q,ui.cap.emojiManifest),entry=ui.latestState.names?.[n.canonical];return n.isRoot&&!ui.reservedSet.has(n.canonical)&&!variantOwner(n.canonical)&&!entry?.activeId&&!entry?.auctionId&&!ui.cart.some(x=>x.name===n.canonical)&&!Object.values(ui.latestState.auctions??{}).some(a=>a.name===n.canonical&&a.status==="live");}catch{return false;}

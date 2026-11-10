@@ -80,7 +80,7 @@ try{
       const violations=await app.evaluate(()=>window.__policyViolations.map(({directive,blocked,target,id})=>({directive,blocked,target,id})));
       assert.deepEqual(violations,nativeSelect,'only the no-script native SELECT baseline is permitted');
     }
-    await app.locator('#tabEscrow').click();await expect(app.locator('#escrowSection h2')).toHaveText('🪙 My POA');
+    await app.locator('#tabEscrow').click();await expect(app.locator('#manageDomains > h2')).toHaveText('🌱 Manage domains and subdomains');await expect(app.locator('#escrowPayments h2')).toHaveText('🪙 My POA');
     assert.deepEqual(appErrors,[]);assert.ok(appRequests.every(r=>new URL(r.url).origin===base&&r.method==='GET'));
     report.push({browser:name,shellBytes,handoffBytes,findBytes,fontBytes:1856988,fontRequests:fonts.length,cache:cached,proxy:'same-origin origin-rewrite fixture',nativeSelectCspBaseline:nativeSelect,clipboard:name==='chromium'?'real copy verified':'covered by existing keyboard tests'});
     console.log('PASS',name,'font bytes/cache/budgets and real app through strict-header proxy',JSON.stringify(report.at(-1)));

@@ -161,7 +161,7 @@ try {
   });
   await blocked();
   await page.locator("#tabEscrow").click();
-  await expect(page.locator("#escrowSection h2")).toHaveText("🪙 My POA");
+  await expect(page.locator("#escrowPayments h2")).toHaveText("🪙 My POA");
   assert.equal(await page.locator("#siteFooter").count(), 1);
   assert.equal(await page.locator(".tab-dot").count(), 6);
   assert.deepEqual(errors, []);
