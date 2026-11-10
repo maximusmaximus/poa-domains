@@ -49,16 +49,18 @@ const packet = (args: any) => {
   }
   return args;
 };
-export function registryMcpProfile(backend: McpRegistryBackend): McpProfile {
+export function registryMcpProfile(backend: McpRegistryBackend, beforeWitness?: (args: any) => Promise<void>): McpProfile {
   const read = (path: string, query: Record<string, string> = {}) =>
     backend("GET", path, query);
-  const witness = async (args: any) =>
-    buildMetadataWitness(
+  const witness = async (args: any) => {
+    await beforeWitness?.(args);
+    return buildMetadataWitness(
       args.name,
       { kind: "permanent" },
       args.parentId ?? null,
       args.description ?? `PoA Domains metadata for ${args.name}`,
     );
+  };
   const tools = [
     {
       name: "read_state",
@@ -266,6 +268,7 @@ export function registryMcpProfile(backend: McpRegistryBackend): McpProfile {
         )
       )
         throw new McpProtocolError(-32602, "MCP_BAD_PARAMS");
+      if(name === "buy_a_domain") await beforeWitness?.({name: args.name});
       return {
         description: prompt.description,
         messages: [

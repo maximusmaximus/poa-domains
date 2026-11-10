@@ -96,7 +96,7 @@ try {
       "generated " + label + " ago",
     );
   }
-  const input = page.getByLabel("Bid or price amount in POA for alpha", { exact: true });
+  const input = page.getByLabel("Bid or price amount in registry units for alpha", { exact: true });
   await page.evaluate(() => (window.__holdDigests = true));
   await input.fill("300");
   await blocked();
@@ -129,13 +129,13 @@ try {
   await ready();
   await page.evaluate(() => (window.__failDigests = true));
   await page
-    .getByLabel("Bid or price amount in POA for alpha", { exact: true })
+    .getByLabel("Bid or price amount in registry units for alpha", { exact: true })
     .fill("600");
   await expect(page.locator("#cartPrompt")).toContainText("Could not build");
   await blocked();
   await page.evaluate(() => (window.__failDigests = false));
   await page
-    .getByLabel("Bid or price amount in POA for alpha", { exact: true })
+    .getByLabel("Bid or price amount in registry units for alpha", { exact: true })
     .fill("700");
   await ready();
   h.stateStatus = 500;

@@ -1,9 +1,11 @@
-import { actionLabel } from "./ui-copy.js?v=1065cb322a67";
-import { trapDialog } from "./ui-a11y.js?v=1065cb322a67";
-import { ui } from "./ui-state.js?v=1065cb322a67";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=1065cb322a67";
-import { add, el, endpointBase } from "./ui-core.js?v=1065cb322a67";
-import { nameLink } from "./ui-router.js?v=1065cb322a67";
+import { publicNameUnavailable } from "./shared.js?v=79aef9675247";
+import { registryUnit } from "./shared.js?v=79aef9675247";
+import { actionLabel } from "./ui-copy.js?v=79aef9675247";
+import { trapDialog } from "./ui-a11y.js?v=79aef9675247";
+import { ui } from "./ui-state.js?v=79aef9675247";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=79aef9675247";
+import { add, el, endpointBase } from "./ui-core.js?v=79aef9675247";
+import { nameLink } from "./ui-router.js?v=79aef9675247";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || shouldHoldTransactions(ui.networkStatus.level) || !!ui.networkStatus.hold;
@@ -103,7 +105,7 @@ export function renderFloatingCart() {
         const card = add(list, "div", "", "card cart-item");
         const h = add(card, "h3", "");
         nameLink(h, item.name);
-        add(card, "p", `${actionLabel(item.action)} · ${item.amount} ${item.asset}`, "badge");
+        add(card, "p", `${actionLabel(item.action)} · ${item.amount} ${registryUnit(item.asset)}`, "badge");
         add(card, "p", item.summary);
         if (item.needsReview)
             add(card, "p", "⚠️ " + item.reviewMessage + " Open Find to review your cart.", "badge-warn");
@@ -115,6 +117,7 @@ export function renderFloatingCart() {
 }
 
 export function renderCart() {
+    if(!ui.cap)return;
     syncIdeaMarks();
     el("cartCount").textContent = String(ui.cart.length);
     el("clearCart").disabled = ui.cart.length === 0;
@@ -166,7 +169,7 @@ export function renderCart() {
         amountInput.value = item.amount;
         amountInput.dataset.fieldKey = item.action + ":" + item.name;
         amountInput.setAttribute("inputmode", "numeric");
-        amountInput.setAttribute("aria-label", "Bid or price amount in POA for " + item.name);
+        amountInput.setAttribute("aria-label", "Bid or price amount in registry units for " + item.name);
         amountInput.readOnly = !["bid", "announceAuction+bid"].includes(item.action);
         amountInput.addEventListener("input", () => {
             try {
@@ -191,9 +194,9 @@ export function renderCart() {
         removeBtn.setAttribute("aria-label", "Remove " + item.name + " from cart");
         removeBtn.type = "button";
         removeBtn.addEventListener("click", () => removeCartAt(index));
-        const amountLabel = add(controls, "label", amountInput.readOnly ? "Listed price (POA)" : "Bid amount (POA)", "amount-label");
-        const unitBox=add(amountLabel,"span","","amount-unit");unitBox.append(amountInput);add(unitBox,"span","POA","input-unit");
-        amountInput.placeholder="Whole-number POA amount";
+        const amountLabel = add(controls, "label", amountInput.readOnly ? "Listed price (registry units)" : "Bid amount (registry units)", "amount-label");
+        const unitBox=add(amountLabel,"span","","amount-unit");unitBox.append(amountInput);add(unitBox,"span","units","input-unit");
+        amountInput.placeholder="Whole-number registry units";
         add(amountLabel,"small",amountInput.readOnly?"The current listing price; not an editable bid.":"Maximum bid for this name. Editing it does not change the auction reserve.","muted");
     });
     updatePromptText();

@@ -1,15 +1,16 @@
-import { installHelp } from "./ui-help.js?v=1065cb322a67";
-import { renderManagement } from "./ui-manage.js?v=1065cb322a67";
-import { actionLabel } from "./ui-copy.js?v=1065cb322a67";
-import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=1065cb322a67";
-import { ui } from "./ui-state.js?v=1065cb322a67";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=1065cb322a67";
-import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=1065cb322a67";
-import { render } from "./ui-render.js?v=1065cb322a67";
-import { runSearch } from "./ui-search.js?v=1065cb322a67";
-import { renderIdeas } from "./ui-ideas.js?v=1065cb322a67";
-import { mountEscrow } from "./escrow.js?v=1065cb322a67";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=1065cb322a67";
+import { publicNameUnavailable } from "./shared.js?v=79aef9675247";
+import { installHelp } from "./ui-help.js?v=79aef9675247";
+import { renderManagement } from "./ui-manage.js?v=79aef9675247";
+import { actionLabel } from "./ui-copy.js?v=79aef9675247";
+import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=79aef9675247";
+import { ui } from "./ui-state.js?v=79aef9675247";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=79aef9675247";
+import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=79aef9675247";
+import { render } from "./ui-render.js?v=79aef9675247";
+import { runSearch } from "./ui-search.js?v=79aef9675247";
+import { renderIdeas } from "./ui-ideas.js?v=79aef9675247";
+import { mountEscrow } from "./escrow.js?v=79aef9675247";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=79aef9675247";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -244,12 +245,14 @@ export async function loadRegistry() {
         for (const [id, tier, label] of [["premiumPolicy", "premium", "Single emoji"], ["standardPolicy", "standard", "Standard roots"]]) {
             try {
                 const policy = rootAuctionPolicy(ui.cap, { tier });
-                el(id).textContent = `${label}: ${policy.reserve} POA · ${formatDuration(policy.window)} + ${formatDuration(policy.quiet)} quiet`;
+                el(id).textContent = `${label}: ${policy.reserve} registry units · ${formatDuration(policy.window)} + ${formatDuration(policy.quiet)} quiet`;
             }
             catch {
                 el(id).textContent = "⚠️ Prices unavailable. Refresh to check.";
             }
         }
+        // Keep stored cart data; omit withheld entries from this public session.
+        ui.cart=ui.cart.filter(item=>!publicNameUnavailable(item.name,ui.cap));
         for (const item of ui.cart) {
             // Repair old saved carts affected by the amount/maxBid mismatch, without raising any cap.
             try {

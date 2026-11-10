@@ -1,13 +1,19 @@
-import { actionLabel } from "./ui-copy.js?v=1065cb322a67";
-import { ui } from "./ui-state.js?v=1065cb322a67";
-import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=1065cb322a67";
-import { add, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=1065cb322a67";
-import { nameLink, ownerLink } from "./ui-router.js?v=1065cb322a67";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=1065cb322a67";
+import { publicNameUnavailable, unavailableKey } from "./shared.js?v=79aef9675247";
+import { registryUnit } from "./shared.js?v=79aef9675247";
+import { actionLabel } from "./ui-copy.js?v=79aef9675247";
+import { ui } from "./ui-state.js?v=79aef9675247";
+import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=79aef9675247";
+import { add, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=79aef9675247";
+import { nameLink, ownerLink } from "./ui-router.js?v=79aef9675247";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=79aef9675247";
 
 export function renderDomainPage(name) {
     if (!ui.latestState || !name)
         return;
+    if(publicNameUnavailable(name,ui.cap)) {
+      el("domainTitle").textContent="Name unavailable";el("domainStatus").textContent="🔒 Stored record withheld — not free to register";el("domainOwner").textContent="No public ownership record.";
+      el("domainListing").hidden=true;el("domainListing").replaceChildren();el("domainActions").replaceChildren();el("domainHistory").replaceChildren();add(el("domainHistory"),"p","No public history.");el("domainOwnerTools").hidden=true;return;
+    }
     const view = resolveDomainView(ui.latestState, name, ui.reservedSet, ownershipView());
     el("domainTitle").textContent = "";
     nameLink(el("domainTitle"), name);
@@ -31,7 +37,7 @@ export function renderDomainPage(name) {
     listingBox.hidden = !view.listing;
     listingBox.replaceChildren();
     if (view.listing) {
-        add(listingBox, "p", `💰 Listed for ${view.listing.price} ${view.listing.asset}`, "badge-ok");
+        add(listingBox, "p", `💰 Listed for ${view.listing.price} ${registryUnit(view.listing.asset)}`, "badge-ok");
         add(listingBox, "p", `Until ${formatClock(view.listing.validUntil)} · offer ${view.listing.id.slice(0, 18)}…`);
     }
     const actions = el("domainActions");
@@ -53,7 +59,7 @@ export function renderDomainPage(name) {
         });
     }
     if (view.listing && view.listing.asset === "POA") {
-        const buyBtn = add(actions, "button", `🛒 Buy ${view.listing.price} POA`);
+        const buyBtn = add(actions, "button", `🛒 Buy ${view.listing.price} registry units`);
         buyBtn.type = "button";
         buyBtn.addEventListener("click", () => {
             addToCart({
@@ -92,6 +98,9 @@ export function renderDomainPage(name) {
 export function renderOwnerPage(ownerId) {
     if (!ui.latestState || !ownerId)
         return;
+    if(ui.cap?.publicView?.unavailableAccountKeys?.includes(unavailableKey(ownerId))){
+      el("ownerTitle").textContent="No public owner profile";el("ownerPrincipal").textContent="";el("ownerNames").replaceChildren();el("ownerListings").replaceChildren();add(el("ownerNames"),"p","No public registry names or subdomains.");add(el("ownerListings"),"p","No public listings.");return;
+    }
     el("ownerTitle").textContent = "👤 Owner profile";
     el("ownerPrincipal").textContent = ownerId;
     const namesBox = el("ownerNames");
@@ -115,6 +124,6 @@ export function renderOwnerPage(ownerId) {
         const card = add(listBox, "article", "", "card");
         const h = add(card, "h4", "");
         nameLink(h, row.name);
-        add(card, "p", `💰 ${row.price} POA`, "badge-ok");
+        add(card, "p", `💰 ${row.price} registry units`, "badge-ok");
     }
 }

@@ -1,3 +1,4 @@
+import { publicRegistryRoute } from "./public-registry-view.js";
 import { registryRoute, type RegistryCall, type RegistryReply } from "../src/registry-routes.js";
 import { marketView, publicCommand } from "./escrow-public.js";
 import { registryTitles } from "./escrow-titles.js";
@@ -217,7 +218,7 @@ export class PoaRegistry extends DurableObject<Env> {
   handle(call: RegistryCall): RegistryReply {
     const e = this.engine;
     try {
-      return registryRoute(e, call, {
+      return publicRegistryRoute(e, call, {
         health: { livePoA: false, principals: this.principals },
         capabilities: { publicExplorerUrl: this.env.PUBLIC_EXPLORER_URL, escrow: {enabled:String(this.env.POA_ESCROW_ENABLED)==="true",capabilities:"/v1/escrow/capabilities"} },
         // Keep the title/nonce reservation hook in its original durable-object boundary.

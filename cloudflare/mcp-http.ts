@@ -1,3 +1,4 @@
+import { HIDDEN } from "./public-registry-view.js";
 import { intentId } from "../src/auth.js";
 /** Stateless Streamable HTTP. No sessions, keys, direct PoA I/O or server-side signing. */
 import { McpCore, MCP_VERSION, rpcError } from "../src/mcp-core.js";
@@ -164,7 +165,10 @@ export async function mcpHttp(request: Request, env: Env): Promise<Response> {
       return data;
     };
     const response = await new McpCore(
-      registryMcpProfile(backend),
+      registryMcpProfile(backend, async args => {
+        await backend("GET", "/v1/resolve", {name: args.name});
+        if(args.parentId && (HIDDEN.deeds as readonly string[]).includes(args.parentId)) throw new Fault("PUBLIC_RECORD_WITHHELD");
+      }),
       true,
     ).handle(raw);
     return response === null

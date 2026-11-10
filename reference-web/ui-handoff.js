@@ -1,6 +1,6 @@
-import { ui } from "./ui-state.js?v=1065cb322a67";
-import { el, endpointBase, ownershipView } from "./ui-core.js?v=1065cb322a67";
-import { buildListingPrompt, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=1065cb322a67";
+import { ui } from "./ui-state.js?v=79aef9675247";
+import { el, endpointBase, ownershipView } from "./ui-core.js?v=79aef9675247";
+import { buildListingPrompt, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=79aef9675247";
 
 export function clearHandoff() {
     ui.generation++;
@@ -30,7 +30,7 @@ export function copyDomainListingPrompt(kind) {
     const hoursRaw = el("listValidHours").value.trim() || "168";
     if (kind !== "unlist") {
         if (!/^(0|[1-9][0-9]{0,38})$/.test(priceRaw) || priceRaw === "0") {
-            el("listingPromptStatus").textContent = "Enter a POA price greater than 0";
+            el("listingPromptStatus").textContent = "Enter a registry-unit price greater than 0";
             return;
         }
     }

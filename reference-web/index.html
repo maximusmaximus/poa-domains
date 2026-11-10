@@ -17,6 +17,7 @@
       <button type="button" id="networkStatusDismiss" class="network-status-dismiss" aria-label="Close network and site status">✕</button>
       <div class="status-network"><span id="networkStatusIcon" class="network-status-icon" aria-hidden="true">⚪</span><span id="networkStatusText" class="network-status-text" role="status" aria-live="polite">Checking PoA network…</span></div>
               <p id="mode">⏳ Loading registry data…</p>
+    <p id="registryUnitsNotice" class="muted">💡 Registry prices and balances use internal registry units, not POA or wallet money. Native naming and real-payment new-name purchases are unavailable. Test records are hidden, not deleted.</p>
         <p id="registryLoading" role="status">⏳ Loading registry data… You can use the tabs and type a search now.</p>
         <p id="registryAge" title="Registry data only. POA payments refresh separately.">Registry data not loaded yet · POA payments refresh separately.</p>
         <div id="registryError" role="alert" hidden><span id="registryErrorText"></span> <button id="registryRetry" type="button" class="secondary small">🔄 Refresh</button></div>
@@ -121,7 +122,7 @@
 
       <section id="marketSection" data-section="market" role="tabpanel" aria-labelledby="tabMarket" tabindex="0" hidden>
         <h2>💰 For sale</h2>
-        <p data-info-description class="howto">Fixed-price listings in POA. Open a name to buy or manage.</p>
+        <p data-info-description class="howto">Fixed-price listings in internal registry units. Open a name to buy or manage.</p>
         <div id="marketplace" class="cards"></div>
       </section>
 
@@ -172,7 +173,7 @@
       <section id="handoffSection" data-section="handoff" role="tabpanel" aria-labelledby="tabHandoff" tabindex="0" hidden>
         <h2>🧾 Handoff</h2>
         <p data-info-description class="howto">Give your agent a clear request — this page does not sign, pay or register a name.</p>
-        <ol class="handoff-steps"><li>🔍 Find a name and add it to your planning cart.</li><li>🛒 Check each POA amount, then copy the cart request or download its JSON.</li><li>🤖 Give it to your agent. Ask it to check prices and ownership again, preview the action, and ask for your approval before sending anything.</li></ol>
+        <ol class="handoff-steps"><li>🔍 Find a name and add it to your planning cart.</li><li>🛒 Check each internal registry-unit amount, then copy the cart request or download its JSON.</li><li>🤖 Give it to your agent. Ask it to check prices and ownership again, preview the action, and ask for your approval before sending anything.</li></ol>
         <p data-info-description>Why? Your agent needs the exact name, amount limit and current registry version. A copied request is not a payment or proof of ownership.</p>
         <details id="advancedHandoff"><summary>Advanced: build one unsigned action by hand</summary><p data-info-description>For agents and experienced users. Public addresses and data only. Never paste a private key. Machine field names below match the API; times are Unix timestamps, not a countdown.</p>
         <button type="button" id="example" hidden>Load example</button>
@@ -186,8 +187,8 @@
           <label>Nonce <input id="nonce" required inputmode="numeric" /></label>
           <label>Not before <input id="notBefore" required inputmode="numeric" /></label>
           <label>Deadline <input id="deadline" required inputmode="numeric" /></label>
-          <label>Maximum amount (POA registry units) <input id="maxTotal" required inputmode="numeric" /></label>
-          <label>Maximum network fee (POA) <input id="maxNetworkFee" required inputmode="numeric" /></label>
+          <label>Maximum amount (internal registry units) <input id="maxTotal" required inputmode="numeric" /></label>
+          <label>Maximum registry fee (internal units; not a native network fee) <input id="maxNetworkFee" required inputmode="numeric" /></label>
           <label>Action details (public JSON) <textarea id="params" rows="12" required>{}</textarea></label>
           <button type="submit">Generate</button>
         </form>
@@ -223,11 +224,11 @@
         <div id="domainListing" class="card" hidden></div>
         <div id="domainActions" class="button-row"></div>
         <div id="domainOwnerTools" class="owner-tools" hidden>
-          <h3>💰 Sell (POA only)</h3>
+          <h3>💰 Sell (registry units)</h3>
           <p data-info-description class="howto">Owners list, change price, or unlist. Copy a prompt for your agent — nothing submits here.</p>
           <label>
-            Price (POA)
-            <input id="listPriceInput" inputmode="numeric" placeholder="2500" aria-label="List price in POA" />
+            Price (registry units)
+            <input id="listPriceInput" inputmode="numeric" placeholder="2500" aria-label="List price in registry units" />
           </label>
           <label>
             Valid for (hours)
@@ -238,7 +239,7 @@
             <button type="button" id="copyChangePromptBtn" class="secondary">Copy change-price prompt</button>
             <button type="button" id="copyUnlistPromptBtn" class="secondary">Copy unlist prompt</button>
           </div>
-          <pre id="listingPromptBox" class="prompt-box">Set a POA price, then copy a prompt.</pre>
+          <pre id="listingPromptBox" class="prompt-box">Set an internal registry-unit price, then copy a prompt.</pre>
           <p id="listingPromptStatus" class="muted" role="status"></p>
         </div>
         <h3>History</h3>
@@ -303,6 +304,6 @@
       <p id="floatingCartStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
 
-    <script type="module" src="/app.js?v=1065cb322a67"></script>
+    <script type="module" src="/app.js?v=79aef9675247"></script>
   </body>
 </html>

@@ -1,8 +1,10 @@
-import { ui } from "./ui-state.js?v=1065cb322a67";
-import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=1065cb322a67";
-import { add, el, person, variantOwner } from "./ui-core.js?v=1065cb322a67";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=1065cb322a67";
-import { addToCart } from "./ui-cart.js?v=1065cb322a67";
+import { publicNameUnavailable } from "./shared.js?v=79aef9675247";
+import { registryUnit } from "./shared.js?v=79aef9675247";
+import { ui } from "./ui-state.js?v=79aef9675247";
+import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=79aef9675247";
+import { add, el, person, variantOwner } from "./ui-core.js?v=79aef9675247";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=79aef9675247";
+import { addToCart } from "./ui-cart.js?v=79aef9675247";
 
 export function runSearch(rawQuery, remember = true) {
     if (remember) {
@@ -28,6 +30,7 @@ export function runSearch(rawQuery, remember = true) {
         add(card, "p", nameErrorReason(error), "badge-warn");
         return;
     }
+    if(publicNameUnavailable(info.canonical,ui.cap)){add(container,"p","🔒 Name unavailable. Stored records are withheld from public view; this name is not free to register.","badge-warn");return;}
     const s = ui.latestState;
     const name = info.canonical;
     const card = add(container, "div", "", "card");
@@ -59,14 +62,14 @@ export function runSearch(rawQuery, remember = true) {
             ? minimumNextBid(liveAuction.high.amount, ui.cap.increment)
             : liveAuction.reserve;
         add(card, "p", "🏷️ In auction now", "badge");
-        add(card, "p", `Auction ID: ${liveAuction.id.slice(0, 18)}… · Version ${liveAuction.version} · Reserve: ${liveAuction.reserve} ${liveAuction.asset} · ${liveAuction.high ? "Current high bid: " + liveAuction.high.amount + " by " + person(liveAuction.high.payer) : "No bids yet"}`);
-        add(card, "p", `Minimum next valid bid: ${minBid} ${liveAuction.asset} base units.`, "badge-ok");
+        add(card, "p", `Auction ID: ${liveAuction.id.slice(0, 18)}… · Version ${liveAuction.version} · Reserve: ${liveAuction.reserve} ${registryUnit(liveAuction.asset)} · ${liveAuction.high ? "Current high bid: " + liveAuction.high.amount + " by " + person(liveAuction.high.payer) : "No bids yet"}`);
+        add(card, "p", `Minimum next valid bid: ${minBid} ${registryUnit(liveAuction.asset)} base units.`, "badge-ok");
         const controls = add(card, "div", "", "inline-controls");
         const bidInput = document.createElement("input");
         bidInput.value = minBid;
         bidInput.setAttribute("inputmode", "numeric");
-        bidInput.setAttribute("aria-label", "Bid amount in POA for " + name);
-        const amountLabel=add(controls,"label","Bid amount (POA)","amount-label"),unitBox=add(amountLabel,"span","","amount-unit");unitBox.append(bidInput);add(unitBox,"span","POA","input-unit");bidInput.placeholder="Whole-number POA amount";add(amountLabel,"small","Your bid for this name, at least the current minimum. Nothing is paid here.","muted");
+        bidInput.setAttribute("aria-label", "Bid amount in registry units for " + name);
+        const amountLabel=add(controls,"label","Bid amount (registry units)","amount-label"),unitBox=add(amountLabel,"span","","amount-unit");unitBox.append(bidInput);add(unitBox,"span","units","input-unit");bidInput.placeholder="Whole-number registry units";add(amountLabel,"small","Your bid for this name, at least the current minimum. Nothing is paid here.","muted");
         const btn = add(controls, "button", "Add to cart", "small");
         btn.id = "addToCartBtn";
         btn.type = "button";
@@ -75,7 +78,7 @@ export function runSearch(rawQuery, remember = true) {
         btn.addEventListener("click", () => {
             const chosen = bidInput.value.trim();
             if (!/^[1-9][0-9]{0,38}$/.test(chosen) || BigInt(chosen) < BigInt(minBid)) {
-                inputError.textContent = `⚠️ Enter a whole-number bid of at least ${minBid} ${liveAuction.asset}.`;
+                inputError.textContent = `⚠️ Enter a whole-number bid of at least ${minBid} ${registryUnit(liveAuction.asset)}.`;
                 bidInput.setAttribute("aria-invalid", "true");
                 return;
             }
@@ -100,7 +103,7 @@ export function runSearch(rawQuery, remember = true) {
             o.uses < o.maxUses &&
             s.time < o.validUntil);
         if (resaleOffer) {
-            add(card, "p", `💰 For sale: ${resaleOffer.price} ${resaleOffer.asset} (until ${formatClock(resaleOffer.validUntil)}) — Active fixed-price resale listing: ${resaleOffer.price} ${resaleOffer.asset}`, "badge-ok");
+            add(card, "p", `💰 For sale: ${resaleOffer.price} ${registryUnit(resaleOffer.asset)} (until ${formatClock(resaleOffer.validUntil)}) — Active fixed-price resale listing: ${resaleOffer.price} ${registryUnit(resaleOffer.asset)}`, "badge-ok");
             const btn = add(card, "button", "Add to cart", "small");
             btn.id = "addToCartBtn";
             btn.type = "button";
@@ -130,7 +133,7 @@ export function runSearch(rawQuery, remember = true) {
             : null;
         if (childOffer) {
             const nextGen = (entry?.generation ?? 0) + 1;
-            add(card, "p", `🟢 Child offer open (${childOffer.price} ${childOffer.asset})`, "badge-ok");
+            add(card, "p", `🟢 Child offer open (${childOffer.price} ${registryUnit(childOffer.asset)})`, "badge-ok");
             const btn = add(card, "button", "Add to cart", "small");
             btn.id = "addToCartBtn";
             btn.type = "button";
@@ -157,15 +160,15 @@ export function runSearch(rawQuery, remember = true) {
         return;
     }
     const { reserve } = pricing;
-    const tierNote = `${compactAmount(reserve)} POA ${info.isSingleEmoji ? "single-emoji" : info.isMultiEmoji ? "multi-emoji" : "root"} minimum bid`;
+    const tierNote = `${compactAmount(reserve)} registry units ${info.isSingleEmoji ? "single-emoji" : info.isMultiEmoji ? "multi-emoji" : "root"} minimum bid`;
     add(card, "p", "🟢 Available in the registry snapshot", "badge-ok");
-    add(card, "p", `Unclaimed ${info.tier} root domain (${tierNote}). Opening auction reserve: ${reserve} POA (${formatDuration(pricing.window)} minimum window + ${formatDuration(pricing.quiet)} quiet period).`).setAttribute("data-info-description", "");
+    add(card, "p", `Unclaimed ${info.tier} root domain (${tierNote}). Opening auction reserve: ${reserve} registry units (${formatDuration(pricing.window)} minimum window + ${formatDuration(pricing.quiet)} quiet period).`).setAttribute("data-info-description", "");
     const controls = add(card, "div", "", "inline-controls");
     const maxBidInput = document.createElement("input");
     maxBidInput.value = reserve;
     maxBidInput.setAttribute("inputmode", "numeric");
-    maxBidInput.setAttribute("aria-label", "Maximum bid in POA for " + name);
-    const amountLabel=add(controls,"label","Maximum opening bid (POA)","amount-label"),unitBox=add(amountLabel,"span","","amount-unit");unitBox.append(maxBidInput);add(unitBox,"span","POA","input-unit");maxBidInput.placeholder="Whole-number POA amount";add(amountLabel,"small","Bid cap for this name. The capability reserve stays fixed. Adding to cart sends no POA.","muted");
+    maxBidInput.setAttribute("aria-label", "Maximum bid in registry units for " + name);
+    const amountLabel=add(controls,"label","Maximum opening bid (registry units)","amount-label"),unitBox=add(amountLabel,"span","","amount-unit");unitBox.append(maxBidInput);add(unitBox,"span","units","input-unit");maxBidInput.placeholder="Whole-number registry units";add(amountLabel,"small","Bid cap for this name. The capability reserve stays fixed. Adding to cart sends no POA.","muted");
     const btn = add(controls, "button", "Add to cart", "small");
     btn.id = "addToCartBtn";
     btn.type = "button";
@@ -174,7 +177,7 @@ export function runSearch(rawQuery, remember = true) {
     btn.addEventListener("click", () => {
         const chosen = maxBidInput.value.trim();
         if (!/^[1-9][0-9]{0,38}$/.test(chosen) || BigInt(chosen) < BigInt(reserve)) {
-            inputError.textContent = `⚠️ Enter a whole-number bid of at least ${reserve} POA.`;
+            inputError.textContent = `⚠️ Enter a whole-number bid of at least ${reserve} registry units.`;
             maxBidInput.setAttribute("aria-invalid", "true");
             return;
         }

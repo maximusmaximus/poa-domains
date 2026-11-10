@@ -1,12 +1,13 @@
-import { drawTicker } from "./ui-ticker.js?v=1065cb322a67";
-import { actionLabel } from "./ui-copy.js?v=1065cb322a67";
-import { returnFocus } from "./ui-a11y.js?v=1065cb322a67";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=1065cb322a67";
-import { ui } from "./ui-state.js?v=1065cb322a67";
-import { add, el, person, namedText } from "./ui-core.js?v=1065cb322a67";
-import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=1065cb322a67";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=1065cb322a67";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=1065cb322a67";
+import { registryUnit } from "./shared.js?v=79aef9675247";
+import { drawTicker } from "./ui-ticker.js?v=79aef9675247";
+import { actionLabel } from "./ui-copy.js?v=79aef9675247";
+import { returnFocus } from "./ui-a11y.js?v=79aef9675247";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=79aef9675247";
+import { ui } from "./ui-state.js?v=79aef9675247";
+import { add, el, person, namedText } from "./ui-core.js?v=79aef9675247";
+import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=79aef9675247";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=79aef9675247";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=79aef9675247";
 
 export function updateTabDots(state) {
     const marks = tabWatermarks(state);
@@ -118,13 +119,13 @@ export function renderAuctions(s) {
         const ah = add(card, "h4", "");
         nameLink(ah, a.name);
         add(card, "p", phase, "badge");
-        add(card, "p", `Reserve ${a.reserve} ${a.asset}. ${a.high ? "High bid " + a.high.amount + " by " + person(a.high.payer) : "No active high bid."}`);
+        add(card, "p", `Reserve ${a.reserve} ${registryUnit(a.asset)}. ${a.high ? "High bid " + a.high.amount + " by " + person(a.high.payer) : "No active high bid."}`);
         add(card, "p", `Window ${formatDuration(a.window)} + quiet ${formatDuration(a.quiet)} · closes ${formatClock(close)}`);
         if (a.status === "live" && !(typeof s.time === "number" && s.time < a.openAt)) {
             const nextMin = a.high
                 ? minimumNextBid(a.high.amount, ui.cap.increment)
                 : a.reserve;
-            add(card, "p", `Minimum next bid: ${nextMin} ${a.asset} (version ${a.version})`, "badge-ok");
+            add(card, "p", `Minimum next bid: ${nextMin} ${registryUnit(a.asset)} (version ${a.version})`, "badge-ok");
             const btn = add(card, "button", `Add to cart`, "small");
             btn.type = "button";
             btn.addEventListener("click", () => {
@@ -155,14 +156,14 @@ export function renderMarketplace(s) {
     box.replaceChildren();
     const listings = activeResaleOffers(s).filter((x) => x.asset === "POA");
     if (!listings.length) {
-        add(box, "p", "No POA listings right now", "muted");
+        add(box, "p", "No public listings right now", "muted");
         return;
     }
     for (const row of listings) {
         const card = add(box, "article", "", "card");
         const h = add(card, "h4", "");
         nameLink(h, row.name);
-        add(card, "p", `💰 ${row.price} POA`, "badge-ok");
+        add(card, "p", `💰 ${row.price} registry units`, "badge-ok");
         const ownerLine = add(card, "p", "Seller: ");
         if (row.offer?.owner)
             ownerLink(ownerLine, row.offer.owner, person(row.offer.owner));
@@ -188,6 +189,7 @@ export function render(payload) {
     el("freshness").textContent =
         (ui.demo ? "SYNTHETIC DEMO · " : ui.configMode === "live-registry" ? "HOSTED REGISTRY DATA · " : "LOCAL REGISTRY DATA · ") +
             `as of ${formatClock(s.time)}, sequence ${s.sequence}. ${payload.finality}.`;
+    if(payload.publicView?.filtered) el("freshness").textContent += " Public view only; sequence and hash include stored hidden records.";
     if (ui.demo && ui.details.generatedAt)
         el("freshness").textContent +=
             " Built " +
@@ -227,7 +229,7 @@ export function render(payload) {
             `${bids.length} / ${receipts.length}`,
             "recorded bids / committed receipts",
         ],
-        [settledVolume.toString(), "Registry bids + filled offers (not on-chain volume)"],
+        [settledVolume.toString(), "Registry bids + filled offers (internal units, not on-chain volume)"],
         [
             `${ui.cap.emojiAliases ?? "unknown"} / ${ui.reservedSet.size || (ui.cap.reservedCount ?? "unknown")}`,
             "emoji sequences / reserved roots",
@@ -287,7 +289,7 @@ export function render(payload) {
             oh.append("Resale of ");
             nameLink(oh, targetName);
         }
-        add(card, "p", `${o.kind} offer · ${statusText} · price ${o.price} ${o.asset}`, active ? "badge-ok" : "badge");
+        add(card, "p", `${o.kind} offer · ${statusText} · price ${o.price} ${registryUnit(o.asset)}`, active ? "badge-ok" : "badge");
         add(card, "p", `Seller: ${person(o.owner)} · Uses: ${o.uses}/${o.maxUses} · Until ${formatClock(o.validUntil)}`);
         if (o.kind === "child" && o.rights) {
             add(card, "p", `Rights: ${o.rights.kind} · Labels: ${o.labels ? o.labels.join(", ") : "any"}`);
@@ -321,7 +323,7 @@ export function render(payload) {
         const card = add(el("history"), "div", "", "card");
         const hh = add(card, "h4", "");
         nameLink(hh, domainName);
-        hh.append(` — ${b.amount} ${a ? a.asset : "POA"}`);
+        hh.append(` — ${b.amount} ${registryUnit(a ? a.asset : "POA")}`);
         add(card, "p", `Bid status: ${b.status.toUpperCase()} · Sequence #${b.sequence} · ${formatClock(b.at)}`, b.status === "won" || b.status === "high" ? "badge-ok" : "badge");
         add(card, "p", `Payer: ${person(b.payer)} · Beneficiary: ${person(b.beneficiary)}`);
     }
@@ -353,16 +355,17 @@ export function render(payload) {
             continue;
         const card = add(el("balances"), "div", "", "card");
         const a = s.auctions[c.auctionId];
-        add(card, "h4", `Refund: ${c.amount} ${c.asset}`);
+        add(card, "h4", `Refund: ${c.amount} ${registryUnit(c.asset)}`);
         const refundLine = add(card, "p", `${person(c.payer)} · `, "badge-ok");
         if (a) nameLink(refundLine, a.name); else refundLine.append(c.auctionId.slice(0, 12));
         refundLine.append(` · v${c.version}`);
     }
+    if (!Object.keys(s.balances ?? {}).length && !Object.keys(s.credits ?? {}).length) add(el("balances"), "p", "No public registry-unit balances or refunds. These are not POA or wallet balances.", "muted");
     for (const [who, wallet] of Object.entries(s.balances ?? {})) {
         const card = add(el("balances"), "div", "", "card");
         add(card, "h4", person(who));
         const entries = Object.entries(wallet)
-            .map(([asset, amt]) => `${amt} ${asset}`)
+            .map(([asset, amt]) => `${amt} ${registryUnit(asset)}`)
             .join(" · ");
         add(card, "p", entries, "record");
         add(card, "code", who);
