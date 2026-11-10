@@ -1059,7 +1059,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 /* Bundled domain glyphs only, never branding, controls, amounts or principals.
    Escrow selectors target existing immutable markup; escrow.js stays untouched. */
 .domain-name, .idea, #searchInput, #escrowName,
-#escrowSection article.card > h3, #escrowDomain article.card > h3 {
+#escrowMarket article.card > h3, #escrowDomain article.card > h3 {
   font-family: var(--emoji-font), var(--text-font), "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
 }
 

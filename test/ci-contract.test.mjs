@@ -139,3 +139,20 @@ if(code!==0)process.exit(code);console.log(JSON.stringify({sync,app,async:JSON.p
     assert.deepEqual(out, {sync:{covered:false,fixture:true}, app:{covered:true,fixture:true}, async:{covered:false,fixture:true}});
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+// Pages intentionally runs the legacy check with Chromium only. Multi-browser
+// tests belong to an already-required container lane, not that entry point.
+test("three-browser font regression stays in the covered all-browser lane, not Chromium-only Pages check", () => {
+  const pages = parse(readFileSync(".github/workflows/pages.yml", "utf8"));
+  const install = pages.jobs.build.steps.find(step => step.run?.includes("playwright install"));
+  assert.match(install.run, /playwright install --with-deps chromium$/);
+  assert.ok(pages.jobs.build.steps.some(step => step.run?.endsWith("npm run check")));
+  const command = ["node", "test/ui-perf-browser.mjs"];
+  const owners = Object.entries(suites).filter(([, commands]) => commands.some(c => JSON.stringify(c) === JSON.stringify(command))).map(([name]) => name);
+  assert.deepEqual(owners, ["browser-a11y"], "execute the full perf test exactly once, in an all-browser container");
+  assert.ok(workflow.jobs.browser.strategy.matrix.suite.includes("browser-a11y"));
+  assert.ok(workflow.jobs.check.needs.includes("browser"));
+  assert.ok(coverageMatrix.some(([suite, node]) => suite === "browser-a11y" && node === "24"));
+  const source = readFileSync("test/ui-perf-browser.mjs", "utf8");
+  assert.ok(source.includes("[['chromium',chromium],['firefox',firefox],['webkit',webkit]]"), "never reduce the test's browser engines");
+});

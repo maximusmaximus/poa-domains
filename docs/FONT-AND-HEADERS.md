@@ -52,6 +52,13 @@ zero ordinary-UI font requests, exactly one hashed request for an emoji domain,
 and no repeat font bytes reaching the fixture server. Firefox can reuse its
 native font cache without a ResourceTiming entry, so server counters and loaded
 FontFace state are checked too. Results: `test-results/ui-perf-results.json`.
+The complete three-browser test runs once in the required, covered
+`browser-a11y` container lane. The separate Pages workflow intentionally installs
+only Chromium for its legacy `npm run check`; it must not acquire an implicit
+Firefox/WebKit dependency. CI contracts lock that separation and retain all
+browser engines and escrow coverage lanes. The font probe also renders the exact
+existing escrow account/deposit card heading structure: those headings use system
+fonts, while both market and detail listing titles retain the domain font.
 
 A same-origin reverse-proxy fixture exercises the real app under the enforced
 headers, clipboard and an intentionally blocked arbitrary-HTTPS fetch. WebKit

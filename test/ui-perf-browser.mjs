@@ -9,7 +9,7 @@ import {uiHarness} from './fixtures/ui-harness.mjs';
 import {UI_SECURITY,DOMAIN_FONT_FILE,IMMUTABLE_FONT_CACHE} from '../dist/src/ui-policy.js';
 const h=await uiHarness(),report=[];
 let fontServes=0;
-const probe='<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Font budget probe</title><link rel="stylesheet" href="/style.css"></head><body><h1 class="site-title">✅ 🪙 → ✕</h1><button>Updated 2m ago · 123 POA → ✕</button><a href="/p/public123">public123</a><label>Action <select id="action"><option>announceAuction</option></select></label><p class="domain-name" id="probeName">→ ✕</p></body></html>';
+const probe='<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Font budget probe</title><link rel="stylesheet" href="/style.css"></head><body><h1 class="site-title">✅ 🪙 → ✕</h1><button>Updated 2m ago · 123 POA → ✕</button><a href="/p/public123">public123</a><label>Action <select id="action"><option>announceAuction</option></select></label><p class="domain-name" id="probeName">→ ✕</p><section id="escrowSection" class="escrow-screen"><article class="card" id="escrowAccount"><h3>↩️ My escrow &amp; refunds</h3></article><article class="card escrow-deposit" id="escrowDeposit"><h3>📥 Deposit: pending</h3></article><div id="escrowMarket"><article class="card"><h3 id="probeMarketName">→ ✕</h3></article></div></section><section id="escrowDomain" class="escrow-screen"><article class="card"><h3 id="probeDomainName">→ ✕</h3></article></section></body></html>';
 const front=createServer(async(req,res)=>{
  try{
   const url=new URL(req.url,'http://127.0.0.1');
@@ -35,6 +35,13 @@ try{
    // a domain span. This must never download the full bundled font.
    const navigation=await page.goto(base+'/__font_probe');assert.equal(navigation.headers()['access-control-allow-origin'],undefined);
    await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(100);
+   // Exercise actual immutable escrow element types/classes, not a synthetic
+   // selector-only assertion: non-domain emoji headings must use system fonts.
+   for(const id of ['escrowAccount','escrowDeposit']){
+    const heading=page.locator('#'+id+' > h3');await expect(heading).toBeVisible();
+    assert.doesNotMatch(await heading.evaluate(e=>getComputedStyle(e).fontFamily),/Xero|Emoji Local/,name+' '+id+' must use system fonts');
+   }
+   for(const id of ['probeMarketName','probeDomainName'])assert.match(await page.locator('#'+id).evaluate(e=>getComputedStyle(e).fontFamily),/Xero/,name+' listing title must keep domain glyphs');
    assert.equal(requests.filter(x=>x.url.includes('.woff2')).length,0,name+' ordinary glyphs caused a font download');
    const shellBytes=await bytes(page);assert.ok(shellBytes<65000,name+' shell byte budget '+shellBytes);
    await page.evaluate(()=>{document.querySelector('#probeName').textContent='👩‍🦰';});

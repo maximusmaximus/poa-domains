@@ -39,3 +39,12 @@ test('header boundary preserves all response bytes/status/CORS for JSON and MCP;
  assert.equal(html.headers.get('access-control-allow-origin'),null);assert.equal(await html.text(),'<html>same</html>');
  const font=secureUiResponse(new Response('font',{headers:{'cache-control':'no-store'}}),new URL('https://poadomains.grok.me/'+DOMAIN_FONT_FILE));assert.equal(font.headers.get('cache-control'),IMMUTABLE_FONT_CACHE);assert.equal(font.headers.get('content-type'),'font/woff2');
 });
+
+test('escrow domain font selector includes listing titles but excludes account and deposit headings',()=>{
+ const css=readFileSync('reference-web/style.css','utf8');
+ const block=css.match(/([^{}]+)\{[^{}]*font-family:\s*var\(--emoji-font\)[^{}]*\}/g);
+ assert.equal(block.length,1);
+ assert.match(block[0],/#escrowMarket article\.card > h3/);
+ assert.match(block[0],/#escrowDomain article\.card > h3/);
+ assert.doesNotMatch(block[0],/#escrowSection article|#escrowAccount|#escrowDeposit/);
+});
