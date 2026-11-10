@@ -1,3 +1,4 @@
+import {registryRoute} from "../dist/src/registry-routes.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
@@ -87,7 +88,7 @@ test("above-reserve edit matches both capability policies and CLI forwards an ac
     const reply = value => { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(value)); };
     try {
       if (req.method === "GET" && u.pathname === "/v1/capabilities") return reply(c);
-      if (req.method === "GET" && u.pathname === "/v1/state") return reply({ state: engine.snapshot(), observedServerTime: 1000000 });
+      if (req.method === "GET" && ["/v1/time","/v1/quote"].includes(u.pathname)) return reply(JSON.parse(registryRoute(engine,{method:"GET",path:u.pathname,query:Object.fromEntries(u.searchParams)}).jsonText));
       if (req.method === "GET" && u.pathname === "/v1/nonce") return reply({ nonce: engine.nextNonce(u.searchParams.get("signer")) });
       if (req.method === "POST" && u.pathname === "/v1/intents") {
         let raw = ""; for await (const chunk of req) raw += chunk;

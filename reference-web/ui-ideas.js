@@ -1,7 +1,7 @@
-import { ui } from "./ui-state.js?v=6f6694bf7a62";
-import { buildIdeas, inspectName, masonryRows } from "./shared.js?v=6f6694bf7a62";
-import { add, el, variantOwner } from "./ui-core.js?v=6f6694bf7a62";
-import { runSearch } from "./ui-search.js?v=6f6694bf7a62";
+import { ui } from "./ui-state.js?v=7175c3b2d94e";
+import { buildIdeas, inspectName, masonryRows } from "./shared.js?v=7175c3b2d94e";
+import { add, el, variantOwner } from "./ui-core.js?v=7175c3b2d94e";
+import { runSearch } from "./ui-search.js?v=7175c3b2d94e";
 
 export function ideaAccepted(q) {
     if (!ui.cap || !ui.latestState)

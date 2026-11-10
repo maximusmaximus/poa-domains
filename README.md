@@ -190,6 +190,23 @@ All **17 state-mutating actions** in [`src/engine.ts`](src/engine.ts) execute at
 
 ---
 
+### Read → quote → preview → submit
+
+The Worker and local registry share `GET /v1/quote?name=NAME&action=ACTION`,
+`POST /v1/intents/preview`, `/v1/time`, targeted name/auction/offer reads and
+bounded auction/offer pages. Quotes bind current versions and derive prices;
+fees are **included in** the gross price, not added to `maxTotal`. Preview takes
+only a complete signed packet and never consumes a nonce, stores a receipt or
+changes balances. It is not submission or permission to spend.
+
+Default capabilities omit the large emoji tables. Request
+`/v1/capabilities?include=emoji` when normalizing/rendering emoji names (the
+explorer and local MCP adapter do this explicitly). CLI `act` now uses quotes
+and targeted reads, never downloads state just to read the time, and re-quotes
+before the bid in `announceAuction+bid`. Sellers still choose prices/validity;
+recipients, records and spending choices are not invented.
+See [the API planning contract](docs/API.md#quotes-previews-and-targeted-reads).
+
 ## 6. Principals, Signatures & Native `poa1` Cryptography
 
 The registry supports two Ed25519 principal encodings in [`src/auth.ts`](src/auth.ts) and [`src/native-crypto.ts`](src/native-crypto.ts):

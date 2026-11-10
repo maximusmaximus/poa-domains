@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { quoteAction } from "./quote-client.js";
 import { cliFailure } from './cli-errors.js';
 import { readFileSync, writeFileSync, statSync } from "node:fs";
 import { createPrivateKey, generateKeyPairSync, KeyObject } from "node:crypto";
@@ -43,11 +44,7 @@ async function resolveInputMetadata(raw: any, baseUrl: string): Promise<any> {
       cloned.params.metadata.document?.rightsHash ===
         "<PARENT_OFFER_RIGHTS_HASH>")
   ) {
-    const stateResp = await request(baseUrl, "/v1/state");
-    const offer = stateResp?.state?.offers?.[cloned.params.offerId];
-    const parentDeed = offer
-      ? stateResp?.state?.deeds?.[offer.parentId]
-      : undefined;
+    const {offer,parentDeed} = await request(baseUrl, "/v1/offers/"+encodeURIComponent(cloned.params.offerId));
     if (offer && parentDeed) {
       const fullName = `${cloned.params.label}.${parentDeed.name}`;
       cloned.params.metadata = buildMetadataWitness(
@@ -155,111 +152,39 @@ try {
         ? nativePrincipal(primaryKey)
         : publicPrincipal(primaryKey));
     const parsedParams = parseJSON(v.params);
-    const stateResp = await request(baseUrl, "/v1/state");
-    const now = stateResp.observedServerTime ?? Math.floor(Date.now() / 1000);
-    let nonce = (
-      await request(baseUrl, "/v1/nonce?signer=" + encodeURIComponent(signer))
-    ).nonce as number;
+    const {observedServerTime:now} = await request(baseUrl, "/v1/time");
+    let nonce = (await request(baseUrl, "/v1/nonce?signer="+encodeURIComponent(signer))).nonce as number;
     const baseReqId = v["request-id"] ?? `act-${now}-${nonce}`;
-
-    if (v.action === "announceAuction+bid") {
-      const domainName = parsedParams.name;
-      const reserve = parsedParams.reserve ?? "1000";
-      const bidAmount = parsedParams.maxBid ?? reserve;
-      const announceInput = {
-        signer,
-        coSigners: [],
-        requestId: `${baseReqId}-announce`,
-        nonce: nonce++,
-        notBefore: 0,
-        deadline: now + 3600,
-        maxTotal: "0",
-        maxNetworkFee: "0",
-        action: "announceAuction",
-        params: {
-          name: domainName,
-          asset: parsedParams.asset ?? "POA",
-          reserve,
-          openAt: cap.revision === "poa-mainnet-v1" ? now : now + 86400,
-          expectedDeedId: null,
-          expectedVersion: 0,
-          metadata: buildMetadataWitness(
-            domainName,
-            { kind: "permanent" },
-            null,
-            `Root domain ${domainName}`,
-          ),
-        },
-      };
-      const announceBody = prepare(announceInput, cap);
-      const announceReceipt = await request(
-        baseUrl,
-        "/v1/intents",
-        signBody(announceBody, keys),
-      );
-      if (
-        announceReceipt.status !== "succeeded" ||
-        cap.revision !== "poa-mainnet-v1"
-      ) {
-        output({ announceReceipt });
-      } else {
-        const bidInput = {
-          signer,
-          coSigners: [],
-          requestId: `${baseReqId}-bid`,
-          nonce,
-          notBefore: 0,
-          deadline: now + 3600,
-          maxTotal: v["max-total"] ?? bidAmount,
-          maxNetworkFee: "0",
-          action: "bid",
-          params: {
-            auctionId: announceReceipt.result.auctionId,
-            expectedVersion: 1,
-            asset: parsedParams.asset ?? "POA",
-            amount: bidAmount,
-            beneficiary: signer,
-          },
-        };
-        const bidBody = prepare(bidInput, cap);
-        const bidReceipt = await request(
-          baseUrl,
-          "/v1/intents",
-          signBody(bidBody, keys),
-        );
-        output({
-          status: bidReceipt.status,
-          auctionId: announceReceipt.result.auctionId,
-          announceReceipt,
-          bidReceipt,
-        });
+    const submitQuoted=async(action:string,params:Record<string,any>,requestId:string)=>{
+      const plan=await quoteAction(baseUrl,action,params,signer);
+      const maxTotal=v["max-total"]??plan.params.amount??plan.requiredMaxTotal;
+      need(typeof maxTotal==="string","QUOTE_INPUT_REQUIRED");
+      const body=prepare({signer,coSigners:[],requestId,nonce:nonce++,notBefore:0,
+        deadline:plan.observedServerTime+3600,maxTotal,maxNetworkFee:"0",action,params:plan.params},cap);
+      return request(baseUrl,"/v1/intents",signBody(body,keys));
+    };
+    if(v.action === "announceAuction+bid") {
+      const announceParams:Record<string,any>={name:parsedParams.name};
+      for(const field of ["asset","reserve","openAt","metadata"]) if(parsedParams[field]!==undefined)announceParams[field]=parsedParams[field];
+      const announceReceipt=await submitQuoted("announceAuction",announceParams,`${baseReqId}-announce`);
+      if(announceReceipt.status!=="succeeded"||cap.revision!=="poa-mainnet-v1") output({announceReceipt});
+      else {
+        const bidParams:Record<string,any>={auctionId:announceReceipt.result.auctionId,beneficiary:signer};
+        if(parsedParams.maxBid!==undefined)bidParams.amount=parsedParams.maxBid;
+        const bidReceipt=await submitQuoted("bid",bidParams,`${baseReqId}-bid`);
+        output({status:bidReceipt.status,auctionId:announceReceipt.result.auctionId,announceReceipt,bidReceipt});
       }
     } else {
-      const rawIntent = await resolveInputMetadata(
-        {
-          signer,
-          coSigners: [],
-          requestId: baseReqId,
-          nonce,
-          notBefore: 0,
-          deadline: now + 3600,
-          maxTotal:
-            v["max-total"] ??
-            parsedParams.amount ??
-            parsedParams.price ??
-            parsedParams.reserve ??
-            "0",
-          maxNetworkFee: "0",
-          action: v.action,
-          params: parsedParams,
-        },
-        baseUrl,
-      );
-      const body = prepare(rawIntent, cap);
-      output(await request(baseUrl, "/v1/intents", signBody(body, keys)));
+      const resolved=await resolveInputMetadata({action:v.action,params:parsedParams},baseUrl);
+      output(await submitQuoted(v.action,resolved.params,baseReqId));
     }
   } else if (cmd === "submit")
     output(await request(url(), "/v1/intents", input()));
+  else if (cmd === "time") output(await request(url(), "/v1/time"));
+  else if (cmd === "quote") {
+    need(v.name&&v.action,"NAME_REQUIRED");
+    output(await request(url(),"/v1/quote?"+new URLSearchParams({name:v.name,action:v.action,...(v.signer?{signer:v.signer}:{})})));
+  }
   else if (cmd === "capabilities")
     output(await request(url(), "/v1/capabilities"));
   else if (cmd === "state" || cmd === "export")

@@ -1,9 +1,9 @@
-import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=6f6694bf7a62";
-import { ui } from "./ui-state.js?v=6f6694bf7a62";
-import { add, el, person } from "./ui-core.js?v=6f6694bf7a62";
-import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=6f6694bf7a62";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=6f6694bf7a62";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=6f6694bf7a62";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=7175c3b2d94e";
+import { ui } from "./ui-state.js?v=7175c3b2d94e";
+import { add, el, person } from "./ui-core.js?v=7175c3b2d94e";
+import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=7175c3b2d94e";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=7175c3b2d94e";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=7175c3b2d94e";
 
 export function updateTabDots(state) {
     const marks = tabWatermarks(state);
