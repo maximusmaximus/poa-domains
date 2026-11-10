@@ -1,7 +1,7 @@
-import { ui } from "./ui-state.js?v=6f6694bf7a62";
-import { acknowledgeCartItem, buildAgentCartPrompt, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=6f6694bf7a62";
-import { add, el, endpointBase } from "./ui-core.js?v=6f6694bf7a62";
-import { nameLink } from "./ui-router.js?v=6f6694bf7a62";
+import { ui } from "./ui-state.js?v=7175c3b2d94e";
+import { acknowledgeCartItem, buildAgentCartPrompt, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=7175c3b2d94e";
+import { add, el, endpointBase } from "./ui-core.js?v=7175c3b2d94e";
+import { nameLink } from "./ui-router.js?v=7175c3b2d94e";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || shouldHoldTransactions(ui.networkStatus.level) || !!ui.networkStatus.hold;

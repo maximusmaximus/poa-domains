@@ -1233,3 +1233,51 @@ HTTP 400; retryable: false. Validity. Check the documented inputs and current st
 ## WRITER_LOCKED
 
 HTTP 400; retryable: false. Writer locked. Check the documented inputs and current state.
+
+## RESOURCE_ID
+
+HTTP 400; retryable: false. Resource id. Check the documented inputs and current state.
+
+## RESOURCE_NOT_FOUND
+
+HTTP 404; retryable: false. Resource not found. Check the documented inputs and current state.
+
+## PAGE_LIMIT
+
+HTTP 400; retryable: false. Choose a whole-number page limit from 1 to 100.
+
+## PAGE_CURSOR
+
+HTTP 400; retryable: false. Use the unchanged nextCursor from this collection.
+
+## STALE_CURSOR
+
+HTTP 409; retryable: false. The registry changed. Restart this paginated read without a cursor.
+
+## QUOTE_AMBIGUOUS
+
+HTTP 409; retryable: false. Several offers match. Read the offers and quote again with an explicit offerId.
+
+## QUOTE_INPUT_REQUIRED
+
+HTTP 400; retryable: false. Supply each required quote input explicitly before signing.
+
+## DEED_NOT_FOUND
+
+HTTP 400; retryable: false. Deed not found. Check the documented inputs and current state.
+
+## LABEL_NOT_OFFERED
+
+HTTP 400; retryable: false. Label not offered. Check the documented inputs and current state.
+
+## NAME
+
+HTTP 400; retryable: false. Name. Check the documented inputs and current state.
+
+## PARAMS
+
+HTTP 400; retryable: false. Params. Check the documented inputs and current state.
+
+## KEYS
+
+HTTP 400; retryable: false. Keys. Check the documented inputs and current state.

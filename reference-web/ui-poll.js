@@ -1,12 +1,12 @@
-import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=6f6694bf7a62";
-import { ui } from "./ui-state.js?v=6f6694bf7a62";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=6f6694bf7a62";
-import { persistCart, renderCart, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=6f6694bf7a62";
-import { render } from "./ui-render.js?v=6f6694bf7a62";
-import { runSearch } from "./ui-search.js?v=6f6694bf7a62";
-import { renderIdeas } from "./ui-ideas.js?v=6f6694bf7a62";
-import { mountEscrow } from "./escrow.js?v=6f6694bf7a62";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=6f6694bf7a62";
+import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=7175c3b2d94e";
+import { ui } from "./ui-state.js?v=7175c3b2d94e";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=7175c3b2d94e";
+import { persistCart, renderCart, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=7175c3b2d94e";
+import { render } from "./ui-render.js?v=7175c3b2d94e";
+import { runSearch } from "./ui-search.js?v=7175c3b2d94e";
+import { renderIdeas } from "./ui-ideas.js?v=7175c3b2d94e";
+import { mountEscrow } from "./escrow.js?v=7175c3b2d94e";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=7175c3b2d94e";
 
 export function updateFreshness() {
     const text = updatedAge(ui.lastLoadedAt);
@@ -226,7 +226,7 @@ export async function loadRegistry() {
                     throw Error("Public endpoint only");
                 ui.base = u.origin;
             }
-            ui.cap = await json(ui.base + "/v1/capabilities");
+            ui.cap = await json(ui.base + "/v1/capabilities?include=emoji");
             ui.readState = () => json(ui.base + "/v1/state");
         }
         for (const [id, tier, label] of [["premiumPolicy", "premium", "Single emoji"], ["standardPolicy", "standard", "Standard roots"]]) {

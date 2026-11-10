@@ -162,7 +162,7 @@ export default {
         return envelopeResponse(await escrowHttp(request,env,()=>env.REGISTRY.getByName(SINGLETON)),requestId);
       }
       if (u.pathname.startsWith("/v1/admin/")) return envelopeResponse(await admin(request, env, u),requestId);
-      if (request.method !== "GET" && !(request.method === "POST" && u.pathname === "/v1/intents")) return fail(405, { code: "METHOD_NOT_ALLOWED" });
+      if (request.method !== "GET" && !(request.method === "POST" && (u.pathname === "/v1/intents" || u.pathname === "/v1/intents/preview"))) return fail(405, { code: "METHOD_NOT_ALLOWED" });
 
       // Hold state-changing writes while the public PoA network is Down (2 consecutive failures).
       if (request.method === "POST" && u.pathname === "/v1/intents") {
@@ -180,11 +180,12 @@ export default {
         }
       }
 
+      if(request.method === "POST") need(u.search === "", "QUERY_NOT_ALLOWED");
       const packet = request.method === "POST" ? await readPacket(request) : undefined;
-      submitting = request.method === "POST";
+      submitting = request.method === "POST" && u.pathname === "/v1/intents";
       dispatched = true;
       const reply = await env.REGISTRY.getByName(SINGLETON).handle({ method: request.method, path: u.pathname,
-        query: Object.fromEntries(u.searchParams), requestId, ...(submitting ? { packet: JSON.stringify(packet) } : {}) });
+        query: Object.fromEntries(u.searchParams), requestId, ...(packet!==undefined ? { packet: JSON.stringify(packet) } : {}) });
       return envelopeResponse(new Response(reply.jsonText, { status: reply.status, headers: { ...SECURITY, "content-type": "application/json; charset=utf-8", ...(request.method === "GET" ? { "access-control-allow-origin": "*" } : {}) } }),requestId);
     } catch (error) {
       if (error instanceof Fault) return fail(error.code === "BODY_TOO_LARGE" ? 413 : 400, { code: error.code, accepted: false });

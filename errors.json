@@ -1836,6 +1836,78 @@
       "httpStatus": 400,
       "message": "Writer locked. Check the documented inputs and current state.",
       "retryable": false
+    },
+    {
+      "code": "RESOURCE_ID",
+      "httpStatus": 400,
+      "message": "Resource id. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RESOURCE_NOT_FOUND",
+      "httpStatus": 404,
+      "message": "Resource not found. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "PAGE_LIMIT",
+      "httpStatus": 400,
+      "message": "Choose a whole-number page limit from 1 to 100.",
+      "retryable": false
+    },
+    {
+      "code": "PAGE_CURSOR",
+      "httpStatus": 400,
+      "message": "Use the unchanged nextCursor from this collection.",
+      "retryable": false
+    },
+    {
+      "code": "STALE_CURSOR",
+      "httpStatus": 409,
+      "message": "The registry changed. Restart this paginated read without a cursor.",
+      "retryable": false
+    },
+    {
+      "code": "QUOTE_AMBIGUOUS",
+      "httpStatus": 409,
+      "message": "Several offers match. Read the offers and quote again with an explicit offerId.",
+      "retryable": false
+    },
+    {
+      "code": "QUOTE_INPUT_REQUIRED",
+      "httpStatus": 400,
+      "message": "Supply each required quote input explicitly before signing.",
+      "retryable": false
+    },
+    {
+      "code": "DEED_NOT_FOUND",
+      "httpStatus": 400,
+      "message": "Deed not found. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "LABEL_NOT_OFFERED",
+      "httpStatus": 400,
+      "message": "Label not offered. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NAME",
+      "httpStatus": 400,
+      "message": "Name. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "PARAMS",
+      "httpStatus": 400,
+      "message": "Params. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "KEYS",
+      "httpStatus": 400,
+      "message": "Keys. Check the documented inputs and current state.",
+      "retryable": false
     }
   ]
 }

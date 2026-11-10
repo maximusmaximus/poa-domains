@@ -29,7 +29,7 @@ async function compare(path,init={}) {
     const text=await r.text();return {status:r.status,body:r.headers.get('content-type')?.includes('json')?JSON.parse(text):text};
   }));
   assert.deepEqual(replies[0],replies[1],`${init.method??'GET'} ${path}`);
-  const route=REGISTRY_ROUTES.find(([method,template])=>method===(init.method??'GET')&&(template.includes(':id')?path.startsWith('/v1/receipts/'):template===path.split('?')[0]));
+  const route=REGISTRY_ROUTES.find(([method,template])=>method===(init.method??'GET')&&new RegExp('^'+template.split('/').map(part=>part.startsWith(':')?'[^/]+':part).join('/')+'$').test(path.split('?')[0]));
   if(route)observed.add(route.join(' '));count++;return replies[0];
 }
 const post=body=>({method:'POST',headers:{'content-type':'application/json'},body:typeof body==='string'?body:JSON.stringify(body)});
@@ -42,6 +42,7 @@ try {
   }
   assert.ok(ready,`Local contract workerd readiness failed; inspect ${logPath}`);
   for(const path of ['/healthz','/v1/capabilities','/v1/state','/v1/resolve?name=routecheck','/v1/nonce?signer='+issuer,'/v1/receipts/'+'0'.repeat(64),'/v1/unknown'])await compare(path);
+  for(const path of ['/v1/time','/v1/quote?name=routecheck&action=announceAuction&signer='+issuer,'/v1/auctions?limit=1','/v1/offers?limit=100','/v1/names/missing','/v1/auctions/'+'0'.repeat(64),'/v1/offers/'+'0'.repeat(64),'/v1/capabilities?include=emoji','/v1/capabilities?include=bad','/v1/auctions?limit=101','/v1/offers?cursor=bad','/v1/quote?name=routecheck&action=notAnAction'])await compare(path);
   for(const path of ['/d/routecheck','/p/'+issuer,'/ui-cart.js','/ui-poll.js'])await compare(path);
   await compare('/v1/intents',post('{'));
   await compare('/v1/intents',{...post('{}'),headers:{'content-type':'text/plain'}});
@@ -54,9 +55,19 @@ try {
   const packet=signBody(body,[key]);
   const invalid=structuredClone(packet);invalid.signatures[issuer]='00'.repeat(64);
   await compare('/v1/intents',post(invalid));
+  const initial=engine.snapshot();
+  const preview=await compare('/v1/intents/preview',post(packet));assert.equal(preview.body.wouldSucceed,true);assert.equal(preview.body.accepted,false);assert.deepEqual(engine.snapshot(),initial);
+  for(const path of ['/v1/intents/preview','/v1/intents/preview?unexpected=1'])await compare(path,post('{'));
+  await compare('/v1/intents/preview',{...post(packet),headers:{'content-type':'application/json',origin:'https://poadomains.grok.me'}});
+  await compare('/v1/intents/preview',{...post(packet),headers:{'content-type':'application/json','sec-fetch-site':'same-origin'}});
+  await compare('/v1/intents/preview',{...post('{}'),headers:{'content-type':'text/plain'}});
+  await compare('/v1/intents/preview',post('x'.repeat(65537)));
+  await compare('/v1/intents/preview',post(invalid));
   const accepted=await compare('/v1/intents',post(packet));assert.equal(accepted.body.status,'succeeded');
   await compare('/v1/intents',post(packet)); // exact resend, idempotent receipt
   for(const path of ['/v1/state','/v1/nonce?signer='+issuer,'/v1/receipts/'+intentId(body),'/v1/resolve?name=routecheck'])await compare(path);
+  const auctionId=accepted.body.result.auctionId;
+  for(const path of ['/v1/names/routecheck','/v1/auctions/'+auctionId,'/v1/auctions?limit=1','/v1/quote?name=routecheck&action=bid&signer='+issuer])await compare(path);
   assert.equal(observed.size,REGISTRY_ROUTES.length);
   console.log(`PASS Node ↔ real workerd: ${count} equal HTTP status/body contracts; all ${REGISTRY_ROUTES.length} shared routes, signed admission, resend, bounds, browser rejection, custom-host deep links and split modules`);
 } finally {

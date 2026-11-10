@@ -89,7 +89,7 @@ export async function runReferenceMcp(url: string): Promise<void> {
               data = await request(url, "/v1/state");
             } else if (p.name === "read_capabilities") {
               exact(p.arguments, []);
-              data = await request(url, "/v1/capabilities");
+              data = await request(url, "/v1/capabilities?include=emoji");
             } else if (p.name === "resolve_domain") {
               const args = exact(p.arguments, ["name"]);
               data = await request(

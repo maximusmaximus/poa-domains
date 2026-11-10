@@ -1,13 +1,13 @@
-import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=6f6694bf7a62";
-import { ui } from "./ui-state.js?v=6f6694bf7a62";
-import { buildAgentCheckoutHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=6f6694bf7a62";
-import { navigateHome, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=6f6694bf7a62";
-import { el, endpointBase } from "./ui-core.js?v=6f6694bf7a62";
-import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=6f6694bf7a62";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=6f6694bf7a62";
-import { runSearch } from "./ui-search.js?v=6f6694bf7a62";
-import { renderIdeas } from "./ui-ideas.js?v=6f6694bf7a62";
-import { cartCopyBlocked, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=6f6694bf7a62";
+import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=7175c3b2d94e";
+import { ui } from "./ui-state.js?v=7175c3b2d94e";
+import { buildAgentCheckoutHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=7175c3b2d94e";
+import { navigateHome, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=7175c3b2d94e";
+import { el, endpointBase } from "./ui-core.js?v=7175c3b2d94e";
+import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=7175c3b2d94e";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=7175c3b2d94e";
+import { runSearch } from "./ui-search.js?v=7175c3b2d94e";
+import { renderIdeas } from "./ui-ideas.js?v=7175c3b2d94e";
+import { cartCopyBlocked, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=7175c3b2d94e";
 
 try {
     applySiteTitle();

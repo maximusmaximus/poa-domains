@@ -86,7 +86,7 @@ export async function startReferenceServer(
         const reply = registryRoute(engine, {method:"GET",path:u.pathname,query:Object.fromEntries(u.searchParams),requestId},options.routes);
         return send(reply.status,JSON.parse(reply.jsonText));
       }
-      if (req.method === "POST" && u.pathname === "/v1/intents") {
+      if (req.method === "POST" && (u.pathname === "/v1/intents" || u.pathname === "/v1/intents/preview")) {
         need(u.search === "", "QUERY_NOT_ALLOWED");
         need(
           !req.headers.origin && !req.headers["sec-fetch-site"],

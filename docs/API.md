@@ -34,7 +34,7 @@ All paths are under an explicitly allowlisted `http://127.0.0.1:PORT`. No API ke
 
 | Method/path                  | Result                                                                                                      |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `GET /v1/capabilities`       | Exact policies, local registry identity, explicit emoji table and required payload keys for every action    |
+| `GET /v1/capabilities`       | Exact policies, identity and required keys; `?include=emoji` explicitly adds emoji tables    |
 | `GET /v1/state`              | Complete committed local state/hash/sequence/time plus observed local server time and durability            |
 | `GET /v1/resolve?name=...`   | Canonical name and deed only if resolvable as of last commit; no pending owner                              |
 | `GET /v1/nonce?signer=...`   | Next logical nonce                                                                                          |
@@ -148,3 +148,87 @@ capabilities remain 200; other valid public escrow routes return
 `503 ESCROW_DISABLED` **only when off**. Hidden admin authorization remains 404.
 `NETWORK_HELD` includes `Retry-After: 30`. The native-only read guard's availability
 document is intentionally unchanged: it is not an operational naming API.
+
+
+## Quotes, previews and targeted reads
+
+These naming routes are shared by the production Worker registry and the local
+reference server. They do not change the separate native-only availability app.
+They do not call minepoa, submit a PoA transaction or change escrow behavior.
+The registry continues to report `livePoA:false`. The deployment workflow remains
+disarmed; adding these routes to source does not deploy them.
+
+| Route | Result |
+| --- | --- |
+| `GET /v1/time` | Observed server time, committed registry time, sequence and state hash |
+| `GET /v1/names/:name` | Canonical name, name entry, current deed/auction and ownership-class conflict |
+| `GET /v1/auctions/:id` | Auction and its computed close-eligible time |
+| `GET /v1/offers/:id` | Offer and its parent deed (including rights/metadata context) |
+| `GET /v1/auctions?limit=50&cursor=...` | Deterministic ID-sorted `items` and `nextCursor` |
+| `GET /v1/offers?limit=50&cursor=...` | Same paging contract, including historical offers |
+| `GET /v1/quote?name=NAME&action=ACTION` | Current planning data and exact action-params template |
+| `POST /v1/intents/preview` | Hypothetical receipt for a complete signed packet, without committing it |
+
+Targeted missing resources return 404. Collection limits are whole numbers 1–100
+(default 50). Treat `nextCursor` as opaque; pass it unchanged until it is null.
+It is bound to collection, sequence and state hash. Any committed mutation makes
+it stale (409 `STALE_CURSOR`); restart without a cursor. No offset parameter, silent
+page mixing or implicit active-only filter is used. Reads do not advance time,
+sequence, nonce or state. `observedServerTime` is separate from committed time.
+
+### Quote contract
+
+Optional `signer`, `asset`, `auctionId` and `offerId` query fields disambiguate the
+plan. The native asset default is POA. Explicit auction/offer IDs must match the
+canonical name; ambiguous offers fail with 409 `QUOTE_AMBIGUOUS` rather than
+picking a price. A child-fill name is the full child name, not just its parent.
+
+Quotes return `available` (unowned/unreserved for new registration), `owner`,
+`ownershipConflict`, `reserve`, `minimumNextBid`, `price`, `fee`, `feeBps`,
+`requiredMaxTotal`, `expectedVersion`, `params`, `requiredInputs`, and read
+context. An emoji ownership-class conflict returns `blockedBy`, the conflicting
+name, null params/cap and `available:false`; it is never a purchasable quote.
+Unapplicable prices are null. Existing-resource/time failures use the shared
+error catalogue. Seller-chosen prices/expiry, recipients, records and metadata
+updates remain null template slots listed in `requiredInputs`; they are never
+invented. An existing root owner's resale-auction reserve is likewise a seller
+choice; a **new root reserve is fixed to capability policy**.
+
+`requiredMaxTotal` is the required **gross debit**, not price plus fee. The fee
+is floor(gross × feeBps / 10000) and comes out of that gross amount. A bid debits
+the bid now and distributes the included fee at finalization (`feeChargedNow`
+is false); finalization itself requires maxTotal 0. Refund withdrawals are
+credits, not debits. Unknown negotiated legacy terms remain explicit required
+inputs and null fee/cap; production lease actions remain disabled.
+
+A quote is not authorization, a balance check, a signature check or a promise
+that a later submission will succeed. Always prepare a complete signed packet,
+preview it, re-check its approved cap and submit the **same** packet. No private
+key is accepted by these HTTP routes.
+
+### Preview contract
+
+Preview enforces the same 64 KiB, JSON/UTF-8, no-query, no-content-encoding and
+browser-Origin/Sec-Fetch rejection as signed intent ingress. It runs the existing
+read-only title admission guard, then `Engine.preview()` on an isolated candidate.
+It never calls durable submit, journal append or the escrow reservation/write
+path. A public-network hold still gates actual submission, not this read-only
+simulation. Timing, signatures, nonce, versions and balances are evaluated at the
+observed server time and can change before submission.
+
+The result is `{previewOnly:true, accepted:false, committed:false,
+wouldSucceed, receipt, ...readContext}`. The nested receipt is hypothetical;
+a rejected preview's error also has `accepted:false`. Even a successful preview
+leaves the real nonce, sequence, state hash, balances, receipts and journal
+unchanged. Transport failure during preview is a failed read, not an unknown
+financial submission. Only actual `/v1/intents` can produce accepted/unknown
+submission outcomes. Disabled lease actions cannot be enabled through preview.
+
+The browser asks explicitly for full emoji capabilities, as does the existing
+local MCP `read_capabilities` tool. Internal engine capability consumers retain
+their full in-process manifest. CLI `quote --name NAME --action ACTION` and
+`time` are read-only; CLI `act` pins current quoted identity/version fields,
+preserves explicit spending choices and uses targeted offer reads for child
+metadata. The second half of `announceAuction+bid` is quoted again, including
+when another bid has advanced the auction beyond version 1. There is still no
+automatic retry, signing service or HTTP MCP endpoint.
