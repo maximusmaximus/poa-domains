@@ -1,8 +1,8 @@
-import { ui } from "./ui-state.js?v=31f173df57e1";
-import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=31f173df57e1";
-import { add, el, person, variantOwner } from "./ui-core.js?v=31f173df57e1";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=31f173df57e1";
-import { addToCart } from "./ui-cart.js?v=31f173df57e1";
+import { ui } from "./ui-state.js?v=cd436ac0ca0a";
+import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=cd436ac0ca0a";
+import { add, el, person, variantOwner } from "./ui-core.js?v=cd436ac0ca0a";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=cd436ac0ca0a";
+import { addToCart } from "./ui-cart.js?v=cd436ac0ca0a";
 
 export function runSearch(rawQuery, remember = true) {
     if (remember) {
