@@ -1,3 +1,4 @@
+import { correlationId, errorReply } from './errors.js';
 import { createServer, Server } from "node:http";
 import { Fault, need } from "./core.js";
 import { NativeReader, NativeMonitor, nativeFailure } from "./native.js";
@@ -20,6 +21,8 @@ export async function startServer(options: unknown = {}): Promise<{
     res.setHeader("referrer-policy", "no-referrer");
     res.setHeader("connection", "close");
     const send = (status: number, data: unknown) => {
+      // Preserve the fail-closed availability document, not an operational registry error.
+      if(status>=400&&(data as any)?.mode!=="production-only"){const reply=errorReply(status,data,correlationId(req.headers["x-request-id"]));status=reply.status;data=reply.body;}
       res.statusCode = status;
       res.end(JSON.stringify(data));
     };

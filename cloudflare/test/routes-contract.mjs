@@ -25,7 +25,7 @@ closeSync(log);
 const observed=new Set();let count=0;
 async function compare(path,init={}) {
   const replies=await Promise.all([node.url,base].map(async origin=>{
-    const r=await fetch(origin+path,{...init,redirect:'manual',signal:AbortSignal.timeout(8000)});
+    const r=await fetch(origin+path,{...init,headers:{'x-request-id':`contract-${count}`,...init.headers},redirect:'manual',signal:AbortSignal.timeout(8000)});
     const text=await r.text();return {status:r.status,body:r.headers.get('content-type')?.includes('json')?JSON.parse(text):text};
   }));
   assert.deepEqual(replies[0],replies[1],`${init.method??'GET'} ${path}`);

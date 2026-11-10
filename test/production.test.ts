@@ -118,13 +118,11 @@ test("production CLI cannot read supplied files, sign, contact fixture endpoints
         "http://127.0.0.1:1",
       ]),
       (error: any) => {
-        assert.equal(error.code, 1);
+        assert.equal(error.code, 3);
         assert.equal(error.stdout, "");
-        assert.deepEqual(JSON.parse(error.stderr), {
-          code: UNAVAILABLE,
-          accepted: false,
-          submitted: false,
-        });
+        const detail=JSON.parse(error.stderr);
+        assert.deepEqual({code:detail.code,accepted:detail.accepted,submitted:detail.submitted},{code:UNAVAILABLE,accepted:false,submitted:false});
+        assert.equal(detail.sent,false);assert.equal(typeof detail.message,"string");assert.equal(typeof detail.requestId,"string");assert.equal(typeof detail.docs,"string");assert.equal(typeof detail.retryable,"boolean");
         return true;
       },
     );
@@ -151,7 +149,7 @@ test("production CLI cannot read supplied files, sign, contact fixture endpoints
     productionStatus(),
   );
   await assert.rejects(exec(process.execPath, [cli, "ready"]), (error: any) => {
-    assert.equal(error.code, 1);
+    assert.equal(error.code, 3);
     assert.deepEqual(JSON.parse(error.stdout), productionStatus());
     return true;
   });
@@ -223,10 +221,9 @@ test("production MCP advertises only status and public-node reads and refuses re
   for (const id of [4, 5, 6]) {
     const row = result.find((item) => item.id === id);
     assert.equal(row.result.isError, true);
-    assert.deepEqual(
-      JSON.parse(row.result.content[0].text),
-      productionStatus(),
-    );
+    const {docs,requestId,retryable,...held}=JSON.parse(row.result.content[0].text);
+    assert.deepEqual(held,productionStatus());
+    assert.equal(typeof docs,"string");assert.equal(typeof requestId,"string");assert.equal(typeof retryable,"boolean");
   }
 });
 
@@ -265,7 +262,7 @@ test("new native read entry points reject provider/fixture injection and malform
     ["native-receipt", "--id", "../status"],
     ["native-receipt", "--id", "0".repeat(64), "--url", "https://example.invalid"],
   ]) await assert.rejects(exec(process.execPath, [cli, ...args]), (error: any) => {
-    assert.equal(error.code, 1); assert.equal(error.stdout, "");
+    assert.equal(error.code, JSON.parse(error.stderr).code===UNAVAILABLE?3:2); assert.equal(error.stdout, "");
     assert.ok([UNAVAILABLE, "NATIVE_DIGEST"].includes(JSON.parse(error.stderr).code)); return true;
   });
   const server = await startServer();

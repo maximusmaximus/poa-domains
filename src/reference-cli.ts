@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { cliFailure } from './cli-errors.js';
 import { readFileSync, writeFileSync, statSync } from "node:fs";
 import { createPrivateKey, generateKeyPairSync, KeyObject } from "node:crypto";
 import { parseArgs } from "node:util";
@@ -310,12 +311,7 @@ try {
       throw e2;
     }
   } else
-    throw new Fault(
-      "COMMAND: keygen|witness|act|prepare|sign|handoff|submit|capabilities|state|export|resolve|receipt|nonce|mcp|serve",
-    );
-} catch (e) {
-  process.stderr.write(
-    JSON.stringify({ code: e instanceof Fault ? e.code : "CLI_ERROR" }) + "\n",
-  );
-  process.exitCode = 1;
+    throw new Fault("COMMAND");
+ } catch (e) {
+  const failure=cliFailure(e);process.stderr.write(JSON.stringify(failure.body)+"\n");process.exitCode=failure.exitCode;
 }

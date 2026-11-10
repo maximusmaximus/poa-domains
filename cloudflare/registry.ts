@@ -1,4 +1,4 @@
-import { registryRoute } from "../src/registry-routes.js";
+import { registryRoute, type RegistryCall, type RegistryReply } from "../src/registry-routes.js";
 import { marketView, publicCommand } from "./escrow-public.js";
 import { registryTitles } from "./escrow-titles.js";
 import { DurableObject } from "cloudflare:workers";
@@ -33,8 +33,7 @@ interface Bootstrap {
   principals: Record<string, string>;
   keys: Record<string, string>;
 }
-export interface RegistryCall { method: string; path: string; query: Record<string, string>; packet?: string; }
-export interface RegistryReply { status: number; jsonText: string; }
+export type { RegistryCall, RegistryReply } from "../src/registry-routes.js";
 
 export class PoaRegistry extends DurableObject<Env> {
   private engine!: CloudflareEngine;

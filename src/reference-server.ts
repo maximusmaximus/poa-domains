@@ -1,3 +1,4 @@
+import { correlationId, errorReply } from './errors.js';
 import { createServer, Server } from "node:http";
 import { readFileSync } from "node:fs";
 import { Engine } from "./engine.js";
@@ -41,7 +42,9 @@ export async function startReferenceServer(
     }
   }
   const server = createServer(async (req, res) => {
+    const requestId=correlationId(req.headers["x-request-id"]);
     const send = (status: number, data: any) => {
+      if(status>=400){const reply=errorReply(status,data,requestId);status=reply.status;data=reply.body;}
       res.statusCode = status;
       res.setHeader("content-type", "application/json; charset=utf-8");
       res.end(JSON.stringify(data));
@@ -80,7 +83,7 @@ export async function startReferenceServer(
             ),
           );
         }
-        const reply = registryRoute(engine, {method:"GET",path:u.pathname,query:Object.fromEntries(u.searchParams)},options.routes);
+        const reply = registryRoute(engine, {method:"GET",path:u.pathname,query:Object.fromEntries(u.searchParams),requestId},options.routes);
         return send(reply.status,JSON.parse(reply.jsonText));
       }
       if (req.method === "POST" && u.pathname === "/v1/intents") {
@@ -111,7 +114,7 @@ export async function startReferenceServer(
         const body = new TextDecoder("utf-8", { fatal: true }).decode(
           Buffer.concat(chunks),
         );
-        const reply = registryRoute(engine,{method:"POST",path:u.pathname,query:{},packet:body},options.routes);
+        const reply = registryRoute(engine,{method:"POST",path:u.pathname,query:{},packet:body,requestId},options.routes);
         return send(reply.status,JSON.parse(reply.jsonText));
       }
       return send(405, { code: "METHOD_NOT_ALLOWED" });

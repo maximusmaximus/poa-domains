@@ -55,3 +55,15 @@ The explorer has explicit state, router, render, cart, poll, handoff, search,
 domain and ideas modules. `buildCartItem` alone derives cart action parameters
 from capabilities/current state. One content revision stamps the complete ES
 module graph, including cycles, so a proxy cache cannot mix module versions.
+
+## Error contracts
+
+`test/errors.test.mjs` inventories nested literal `need`/`Fault` calls, rejects
+undocumented codes and stale generated JSON/docs, verifies never-sent vs unknown
+submissions and malformed acknowledgements, and runs real CLI 2/3/4/5 processes
+plus MCP error-data schema checks. `cloudflare/test/error-contract.mjs` uses local
+workerd with a test-only RPC seam to compare every enabled escrow endpoint's exact
+success bytes and signed request forwarding against the untouched legacy facade,
+and covers off mode, hidden admin auth, unknown outcomes and network Retry-After.
+All outbound calls are denied locally. Existing escrow suites are unchanged and
+remain mandatory alongside this additive gate.

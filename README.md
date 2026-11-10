@@ -53,6 +53,8 @@ On first boot, `src/app.ts` provisions local `poa1...` Base58 Ed25519 demo keys 
 
 ### Query & Operate via the Registry CLI (`keygen`, `act`, `resolve`, `state`)
 
+Errors use the [shared catalogue](docs/ERRORS.md). CLI exits: **2** usage, **3** rejected, **4** outcome unknown, **5** network. On exit 4, save `retry.body`, query the original receipt, and resend only those exact signed bytes—never a new request ID. No automatic write retries.
+
 ```sh
 # 1. Generate a fresh poa1... Ed25519 agent keypair (receives 10,000,000 POA starter allocation on first action)
 npm run app:cli -- keygen --out agent.pem

@@ -1,0 +1,11 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+import {ERROR_CATALOGUE} from '../dist/src/errors.js';
+export function errorArtifacts() {
+ const json=JSON.stringify({schemaVersion:'poa-domains.errors.v1',errors:Object.values(ERROR_CATALOGUE)},null,2)+'\n';
+ const docs='# Error catalogue\n\nGenerated from `src/errors.ts`; run `npm run build && node scripts/errors-generate.mjs`.\n\nEvery API error has `{code, message, retryable, accepted, docs, requestId}`. Extra recovery/resource fields are retained. `accepted: "unknown"` means query the receipt/signed account and resend only the **exact same signed bytes**, never a new request ID. `accepted: true` on a rejected registry receipt means the rejection/bookkeeping was committed; it remains HTTP 200. Its documented error status below applies when rejected before admission.\n\nLive escrow successes and complete signed request shapes are unchanged. The production gateway adapts errors; the internal escrow HTTP facade retains its legacy compatibility contract and tests. Off-mode capabilities remain neutral HTTP 200; other valid public escrow routes return `503 ESCROW_DISABLED` only when the flag is not true. Hidden admin authorization remains 404. Existing financial-state errors keep 409; malformed HTTP errors are classified separately. No escrow sender, reconcile, key, config or ledger code changes.\n\nCLI exit codes: **2** local usage, **3** rejected, **4** outcome unknown, **5** network/read failure. Serialization/endpoint errors occur before fetch; a failed signed fetch is conservatively unknown, even if the transport cannot prove whether bytes left the process. There are no automatic write retries.\n\nThe legacy native-only availability document is not an operational registry/error response and retains its fail-closed schema.\n\n'+Object.values(ERROR_CATALOGUE).map(e=>`## ${e.code}\n\nHTTP ${e.httpStatus}; retryable: ${e.retryable}. ${e.message}\n`).join('\n');
+ return {'errors.json':json,'reference-web/errors.json':json,'docs/ERRORS.md':docs};
+}
+if(process.argv[1]?.endsWith('/errors-generate.mjs'))for(const [file,value]of Object.entries(errorArtifacts())) {
+ if(process.argv.includes('--check')){if(readFileSync(file,'utf8')!==value)throw Error('Stale error catalogue: '+file);}
+ else writeFileSync(file,value);
+}

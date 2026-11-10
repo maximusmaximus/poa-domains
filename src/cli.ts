@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { cliFailure } from './cli-errors.js';
 import { parseArgs } from "node:util";
 import { Fault } from "./core.js";
 import { productionStatus, rejectRegistryOperation } from "./production.js";
@@ -51,18 +52,11 @@ try {
       process.stdout.write(JSON.stringify(productionStatus()) + "\n");
     else if (command === "ready") {
       process.stdout.write(JSON.stringify(productionStatus()) + "\n");
-      process.exitCode = 1;
+      process.exitCode = 3;
     } else if (command === "mcp") await runMcp();
     else rejectRegistryOperation();
   }
 }
 } catch (error) {
-  process.stderr.write(
-    JSON.stringify({
-      code: error instanceof Fault ? error.code : "CLI_ERROR",
-      accepted: false,
-      submitted: false,
-    }) + "\n",
-  );
-  process.exitCode = 1;
+  const failure=cliFailure(error);process.stderr.write(JSON.stringify(failure.body)+"\n");process.exitCode=failure.exitCode;
 }

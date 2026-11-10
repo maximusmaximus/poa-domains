@@ -1,0 +1,373 @@
+/** Shared, public-safe error contract. Never include exception text, stacks or credentials. */
+import { Fault } from './core.js';
+export type Acceptance = false | true | 'unknown';
+export interface ErrorEnvelope { code:string;message:string;retryable:boolean;accepted:Acceptance;docs:string;requestId:string }
+const codes = `
+ACTION_AND_PARAMS_REQUIRED
+AMOUNT
+AMOUNT_CAP
+AMOUNT_OVERFLOW
+ARTIFACT_DIRECTORY
+ARTIFACT_LINK
+ASSET
+AUCTION_ASSET
+AUCTION_CLOSED
+AUCTION_NOT_FOUND
+AUCTION_TERMINAL
+BACKUP_FORMAT
+BACKUP_SEQUENCE_MISMATCH
+BODY_TOO_LARGE
+BOOTSTRAP_FORMAT
+BOOTSTRAP_MISSING
+BOOTSTRAP_SIZE
+BROWSER_WRITES_DISABLED
+BUILD_DIRECTORY
+CANCEL_WINDOW
+CID
+CID_CONTENT_MISMATCH
+CLI_ERROR
+CLOCK_BACKWARD
+COMMAND
+CONFIG
+CONFIG_AND_DATA_REQUIRED
+CONSENT_REQUIRED
+CONTENT_TYPE
+DEED_GENERATION
+DEPTH
+DOMAIN
+DUPLICATE_KEY
+DUPLICATE_QUERY
+DURABILITY_UNKNOWN_RESTART_AND_QUERY
+EMOJI17_DATA_CORRUPT
+EMOJI_ONLY_LABEL
+EMPTY_BODY
+ENCODING
+ENDPOINT
+ENGINE_STOPPED
+ESCROW_ACCOUNTING
+ESCROW_ACTION
+ESCROW_ADDRESS
+ESCROW_AMOUNT
+ESCROW_AUCTION_CLOSED
+ESCROW_BID_INCREMENT
+ESCROW_CANCEL_NOT_ALLOWED
+ESCROW_CHAIN
+ESCROW_CHECKPOINT
+ESCROW_CHECKPOINT_DETAILS_REQUIRED
+ESCROW_CHECKPOINT_ROLLBACK
+ESCROW_COMMAND_EXPIRY
+ESCROW_CONSENT_EXPIRING
+ESCROW_CONTEXT_UNAVAILABLE
+ESCROW_CUT
+ESCROW_DEPOSIT_BINDING
+ESCROW_DEPOSIT_DUPLICATE
+ESCROW_DEPOSIT_INTENT
+ESCROW_DISABLED
+ESCROW_DISTINCT_WALLET
+ESCROW_DOMAIN
+ESCROW_DUPLICATE_PAYMENT
+ESCROW_ENCUMBERED_TITLE
+ESCROW_ENDPOINT_ACTION
+ESCROW_ENROLLED_SENDER_REQUIRED
+ESCROW_FEE_POLICY
+ESCROW_FUTURE_CHECKPOINT
+ESCROW_HALTED
+ESCROW_IDEMPOTENCY_CONFLICT
+ESCROW_IDEMPOTENCY_KEY
+ESCROW_INCREMENT_POLICY
+ESCROW_INSUFFICIENT_FUNDS
+ESCROW_JOURNAL_CAPACITY
+ESCROW_JOURNAL_CORRUPT
+ESCROW_KEY_IDENTITY
+ESCROW_KEY_OR_TRANSFER_INVALID
+ESCROW_LIMITS
+ESCROW_LOOKUP_HELD
+ESCROW_MARKET_KIND
+ESCROW_NAME
+ESCROW_NETWORK_HELD
+ESCROW_NETWORK_WRITES_DISABLED
+ESCROW_NODE_CHAIN
+ESCROW_NODE_HTTP
+ESCROW_NODE_REDIRECT
+ESCROW_NODE_RESPONSE_LIMIT
+ESCROW_NONCE_CONTEXT
+ESCROW_NONCE_GAP
+ESCROW_NONCE_REUSE
+ESCROW_NOT_FINAL
+ESCROW_NO_ADMIN_CREDENTIAL
+ESCROW_OPERATOR_SETUP_HELD
+ESCROW_OUTBOX_CORRUPT
+ESCROW_OUTBOX_PROOF
+ESCROW_OUTBOX_STATE
+ESCROW_PARENTS
+ESCROW_PAUSE
+ESCROW_PAUSED
+ESCROW_PAYOUT_LIMIT
+ESCROW_POLICY_CHANGED
+ESCROW_PRICE
+ESCROW_PROTOCOL_CHANGED
+ESCROW_PROTOCOL_UNPINNED
+ESCROW_RECEIPT_BINDING
+ESCROW_RECONCILIATION_MISMATCH
+ESCROW_REFUND_DUPLICATE
+ESCROW_RESERVE
+ESCROW_ROUTE
+ESCROW_SECRET_LEAK
+ESCROW_SELF_DEPOSIT
+ESCROW_SELF_RAISE
+ESCROW_SELF_SALE
+ESCROW_SETTLE_NOT_ALLOWED
+ESCROW_SIGNATURE
+ESCROW_SIGNER
+ESCROW_SIGNING_DISABLED
+ESCROW_STALE
+ESCROW_TITLE
+ESCROW_TITLE_COMMIT
+ESCROW_TITLE_CONSENT
+ESCROW_TITLE_NOT_PENDING
+ESCROW_TITLE_NOT_READY
+ESCROW_TITLE_RESERVED
+ESCROW_TXID
+ESCROW_TX_BINDING
+ESCROW_UNALIGNED_CUT
+ESCROW_UNAVAILABLE
+ESCROW_UNKNOWN_DEPOSIT
+FILE_REQUIRED
+HAS_BIDS
+HIGH_SELF_RAISE
+HOST
+HTTP_ERROR
+IDEMPOTENCY_CONFLICT
+INSUFFICIENT_FUNDS
+INTEGER
+INTENT_EXPIRED
+INTENT_ID
+INVALID
+INVALID_REQUEST
+INVARIANT_ASSET
+INVARIANT_CONSERVATION
+INVARIANT_CREDIT
+INVARIANT_DEPTH
+INVARIANT_ESCROW
+INVARIANT_LOCK
+INVARIANT_METADATA
+INVARIANT_RIGHTS
+INVARIANT_TITLE
+JOURNAL_CORRUPT
+JSON
+KEY_FILE_PERMISSIONS
+KEY_FILE_REQUIRED
+KEY_IDENTITY_MISMATCH
+KEY_SCHEME
+LABELS
+LEASE_ASSET
+LEASE_INACTIVE
+LEASE_OBLIGATION
+MANIFEST_MISMATCH
+MCP_ALREADY_INITIALIZED
+MCP_NOT_INITIALIZED
+METADATA_BINDING
+METADATA_VERSION
+METHOD_NOT_ALLOWED
+METHOD_NOT_FOUND
+MIN_RAISE
+NAME_DEPTH
+NAME_LENGTH
+NAME_REQUIRED
+NAME_RESERVED
+NAME_SIZE
+NAME_TAKEN
+NATIVE_ADDRESS
+NATIVE_AMOUNT
+NATIVE_BASE58
+NATIVE_BASE58_LENGTH
+NATIVE_BODY
+NATIVE_BUSY
+NATIVE_CHAIN_MISMATCH
+NATIVE_CHECKPOINT_MISMATCH
+NATIVE_CHECKPOINT_SIGNATURES
+NATIVE_CLOCK
+NATIVE_CONTENT_TYPE
+NATIVE_DIGEST
+NATIVE_DOCUMENT
+NATIVE_FUTURE_CHECKPOINT
+NATIVE_HTTP
+NATIVE_HTTP_HEADERS
+NATIVE_INCONSISTENT
+NATIVE_NAMING_UNAVAILABLE
+NATIVE_PARENTS
+NATIVE_PUBLIC_KEY
+NATIVE_READ_FAILED
+NATIVE_RECEIPT_FLAG
+NATIVE_RECEIPT_MISMATCH
+NATIVE_RECEIPT_STATUS
+NATIVE_REDIRECT
+NATIVE_RELEASE_DRIFT
+NATIVE_ROLLBACK_DETECTED
+NATIVE_ROUTE
+NATIVE_SCHEMA
+NATIVE_SIGNATURE
+NATIVE_SIGNER_MISMATCH
+NATIVE_SIGNING_TYPE_UNSUPPORTED
+NATIVE_STALE_CACHE
+NATIVE_STALE_OBSERVATION
+NATIVE_TRANSPORT
+NATIVE_TRUST_POLICY
+NATIVE_TXID_MISMATCH
+NATIVE_TYPE
+NATIVE_UNSIGNED_REQUIRED
+NETWORK_ERROR
+NETWORK_FEE_POLICY
+NETWORK_HELD
+NONCE
+NONCE_OVERFLOW
+NON_CANONICAL_NAME
+NORMALIZATION_HASH
+NORMALIZATION_MODE
+NORMALIZATION_POLICY
+NOT_CHILD_HOLDER
+NOT_FOUND
+NOT_ISSUER
+NOT_LEASE_HOLDER
+NOT_OBSERVED
+NOT_OWNER
+NOT_SELLER
+NO_BID
+NO_REFUND
+OFFER_CLOSED
+OFFER_EXPIRED
+OFFER_EXPIRY
+OFFER_NOT_FOUND
+OFFER_PRICE
+OFFER_TYPE
+ORIGIN
+OUTCOME_UNKNOWN
+OWNERSHIP_CLASS_TAKEN
+PERMANENT_DEED
+PERMANENT_OWNERSHIP_ONLY
+POLICY_UNSET
+PORT
+PORT_ONLY_FOR_SERVE
+PRINCIPAL
+PRODUCTION_CONFIG_UNSUPPORTED
+PRODUCTION_WEB_CONFIG
+PUBLIC_ARTIFACT
+PUBLIC_JSON
+PUBLIC_NUMBER
+QUERY_NOT_ALLOWED
+QUIET_PERIOD
+RECORDS
+REFUND_EXCEEDED
+REGISTRY_INITIALIZATION_FAILED
+REGISTRY_UNAVAILABLE
+RENEWAL_TERMS
+RENEWAL_WINDOW
+REPLAY_MISMATCH
+REPLAY_ORDER
+REQUEST_ID
+RESALE_POA_ONLY
+RESERVE
+RESERVED_NAME
+RESERVE_POLICY
+RESTORE_DISABLED
+RESTORE_JSON
+RESTORE_JSON_LIMIT
+RESTORE_KEY_FORMAT
+RESTORE_TARGET
+RESTORE_TARGET_IS_LIVE
+RESTORE_VALIDATION_FAILED
+RIGHTS
+ROOT_ONLY
+RPC
+RPC_ERROR
+SCHEMA
+SECRET_FIELD
+SELF_SALE
+SELLER_SELF_BID
+SEQUENCE_OVERFLOW
+SERVICE_URL
+SIGNATURE
+SIGNATURES
+SIZE
+STALE_OFFER
+STALE_VERSION
+STORAGE
+STORAGE_CLOSED
+STORAGE_PATH
+STRING
+TITLE_LOCKED
+TOOL
+TOOL_FAILURE
+UNEXPECTED_BUILD_ARTIFACT
+UNICODE_PUBLIC_ARTIFACT_IDENTITY
+UNKNOWN_OUTCOME
+UNSAFE_KEY
+UNSUPPORTED_ACTION
+UNSUPPORTED_ASSET
+UNSUPPORTED_NAME
+URL_REQUIRED
+URL_SIZE
+VALIDITY
+WRITER_LOCKED
+`.trim().split(/\s+/);
+const statuses:Record<string,number> = {
+ NOT_FOUND:404, METHOD_NOT_ALLOWED:405, BODY_TOO_LARGE:413, URL_SIZE:414, UNKNOWN_OUTCOME:404,
+ NATIVE_NAMING_UNAVAILABLE:503, NATIVE_DIGEST:400, NATIVE_OPTIONS:400,
+ ESCROW_ROUTE:404, ESCROW_DISABLED:503, NETWORK_HELD:503, REGISTRY_UNAVAILABLE:503,
+ DURABILITY_UNKNOWN_RESTART_AND_QUERY:503, OUTCOME_UNKNOWN:503, NETWORK_ERROR:502,
+ ESCROW_UNAVAILABLE:503, ESCROW_HELD:503,
+ // Deployed financial business-state errors retain their existing status contract.
+ ESCROW_PAUSED:409, ESCROW_STALE:409, ESCROW_NETWORK_HELD:409, ESCROW_NOT_FINAL:409, ESCROW_ACTION:409,
+};
+const retry = new Set(['NATIVE_READ_FAILED','NATIVE_HTTP','NATIVE_BUSY','NATIVE_STALE_CACHE','NETWORK_ERROR','NETWORK_HELD','REGISTRY_UNAVAILABLE','ESCROW_DISABLED','ESCROW_UNAVAILABLE','ESCROW_HELD','ESCROW_PAUSED','ESCROW_STALE','ESCROW_NETWORK_HELD','ESCROW_NOT_FINAL','DURABILITY_UNKNOWN_RESTART_AND_QUERY','UNKNOWN_OUTCOME','OUTCOME_UNKNOWN']);
+const messages:Record<string,string> = {
+ COMMAND:'Choose one documented command. See the CLI examples in README.',
+ INVALID_REQUEST:'The request could not be read. Check the documented request shape.',
+ NOT_FOUND:'This route or resource does not exist.',
+ METHOD_NOT_ALLOWED:'Use the documented HTTP method for this route.',
+ BODY_TOO_LARGE:'The request body exceeds the documented limit.',
+ CONTENT_TYPE:'Send exactly application/json without content encoding.',
+ BROWSER_WRITES_DISABLED:'Registry writes must come from an agent with a complete signed packet, not a browser.',
+ SIGNATURE:'The packet signature is invalid. Do not submit a different packet blindly.',
+ NONCE:'The nonce is not current. Query the existing receipt before preparing another request.',
+ IDEMPOTENCY_CONFLICT:'This request ID already belongs to different signed bytes. Query its existing receipt.',
+ STALE_VERSION:'The resource version changed. Read or quote again before approving a new intent.',
+ MIN_RAISE:'The bid is below the current minimum next bid.',
+ AMOUNT_CAP:'The intent exceeds its approved spending cap.',
+ ESCROW_DISABLED:'Escrow is switched off. No escrow command was dispatched.',
+ NETWORK_HELD:'The network is held. No registry write was accepted. Try again after recovery.',
+ REGISTRY_UNAVAILABLE:'Registry reads are temporarily unavailable.',
+ UNKNOWN_OUTCOME:'No receipt is available. Keep and query the original packet; resend only the exact same signed bytes.',
+ OUTCOME_UNKNOWN:'The signed request may have been accepted. Keep it, query its receipt, and resend only the exact same signed bytes.',
+ DURABILITY_UNKNOWN_RESTART_AND_QUERY:'Persistence is uncertain. Query the receipt after restart; resend only the exact same signed bytes.',
+ NETWORK_ERROR:'The read failed before any signed submission. Check the connection and try again.',
+ ESCROW_UNAVAILABLE:'Escrow outcome may be unknown. Keep the exact signed request and query the signed account.',
+ ESCROW_HELD:'Escrow is held. Keep the exact signed request and check its account before another action.',
+};
+export const ERROR_CATALOGUE:Record<string,{code:string;httpStatus:number;message:string;retryable:boolean}> = Object.freeze(Object.fromEntries(codes.map(code=>[code,Object.freeze({code,httpStatus:statuses[code]??(code.startsWith('NATIVE_')?502:400),message:messages[code]??(code.charAt(0)+code.slice(1).toLowerCase().replaceAll('_',' ')+'. Check the documented inputs and current state.'),retryable:retry.has(code)})])));
+export function correlationId(value:unknown):string {
+ return typeof value==='string'&&/^[A-Za-z0-9._:-]{1,128}$/.test(value)?value:crypto.randomUUID();
+}
+export function errorEnvelope(code:string,id:string,options:{accepted?:Acceptance;message?:string}={}):ErrorEnvelope {
+ const entry=Object.hasOwn(ERROR_CATALOGUE,code)?ERROR_CATALOGUE[code]!:ERROR_CATALOGUE.INVALID_REQUEST!;
+ const accepted=options.accepted??false;
+ return {code:entry.code,message:options.message??entry.message,retryable:accepted==='unknown'||entry.retryable,accepted,docs:'https://github.com/maximusmaximus/poa-domains/blob/main/docs/ERRORS.md#'+entry.code.toLowerCase(),requestId:id};
+}
+export function errorReply(status:number,value:unknown,id:string):{status:number;body:Record<string,unknown>} {
+ const old=value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{};
+ const code=typeof old.code==='string'&&Object.hasOwn(ERROR_CATALOGUE,old.code)?old.code:'INVALID_REQUEST';
+ const accepted=old.accepted===true?true:old.accepted==='unknown'||code==='UNKNOWN_OUTCOME'?'unknown':false;
+ const envelope=errorEnvelope(code,id,{accepted,...(typeof old.message==='string'?{message:old.message}:{})});
+ return {status:ERROR_CATALOGUE[code]?.httpStatus??status,body:{...old,...envelope}};
+}
+export async function envelopeResponse(response:Response,id:string):Promise<Response> {
+ if(response.status<400)return response; // byte-for-byte live success compatibility
+ const old=await response.json();const reply=errorReply(response.status,old,id),headers=new Headers(response.headers);
+ headers.delete('content-length');headers.set('content-type','application/json; charset=utf-8');
+ if(reply.body.code==='NETWORK_HELD'||reply.body.code==='ESCROW_NETWORK_HELD')headers.set('retry-after','30');
+ return new Response(JSON.stringify(reply.body),{status:reply.status,headers});
+}
+export function faultEnvelope(error:unknown,id=correlationId(undefined)):ErrorEnvelope {
+ const e=error as {accepted?:Acceptance;detail?:ErrorEnvelope};
+ return errorEnvelope(error instanceof Fault?error.code:'CLI_ERROR',e?.detail?.requestId??id,{accepted:e?.detail?.accepted??false});
+}

@@ -1,3 +1,4 @@
+import { faultEnvelope, errorEnvelope, correlationId } from './errors.js';
 import { createInterface } from "node:readline";
 import { exact, Fault, need, parseJSON } from "./core.js";
 import { NativeReader, NativeMonitor } from "./native.js";
@@ -72,7 +73,7 @@ export async function runMcp(options: unknown = {}): Promise<void> {
           } else
             result = {
               content: [
-                { type: "text", text: JSON.stringify(productionStatus()) },
+                { type: "text", text: JSON.stringify({...productionStatus(),...errorEnvelope(productionStatus().code,correlationId(undefined),{message:productionStatus().message})}) },
               ],
               isError: true,
             };
@@ -91,6 +92,7 @@ export async function runMcp(options: unknown = {}): Promise<void> {
           error: {
             code: -32600,
             message: error instanceof Fault ? error.code : "RPC_ERROR",
+            data:faultEnvelope(error),
           },
         }) + "\n",
       );

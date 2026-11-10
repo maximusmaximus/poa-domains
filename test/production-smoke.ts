@@ -50,7 +50,7 @@ try {
   ])
     await assert.rejects(
       exec(process.execPath, [cli, ...args]),
-      (error: any) => error.code === 1,
+      (error: any) => error.code === (args[0] === "serve" ? 2 : 3),
     );
   checks.push(
     "production CLI rejects signing, submission, fixture configuration and readiness without reading supplied files",
