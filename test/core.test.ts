@@ -649,11 +649,13 @@ test("browser shared module maintains exact canonical, normalization, parser, an
     }),
     "1101",
   );
-  const promptText = web.buildAgentCartPrompt(
+  const promptText = await web.buildAgentCartPrompt(
     [
       {
         name: "quantum",
-        action: "open_and_bid",
+        action: "announceAuction+bid",
+        asset:"POA", isRoot:true,
+        params:{name:"quantum",asset:"POA",reserve:"100",maxBid:"100",expectedDeedId:null,expectedVersion:0},
         amount: "100",
         tier: "standard",
         note: "Open root auction & place opening bid",
@@ -664,12 +666,15 @@ test("browser shared module maintains exact canonical, normalization, parser, an
         amount: "1321",
         tier: "premium",
         note: "Place ascending bid on live auction",
+        asset:"POA",isRoot:true,params:{auctionId:"a".repeat(64),expectedVersion:1,asset:"POA",amount:"1321"},
       },
     ],
     cap,
     c.alice.id,
     "http://127.0.0.1:8787",
-    { liveBackend: true },
+    "local-reference-only",
+    {state:c.e.snapshot(),stateHash:c.e.stateHash()},
+    1000000000,
   );
   assert.match(promptText, /POA DOMAINS REGISTRY CART/);
   assert.match(promptText, /quantum/);

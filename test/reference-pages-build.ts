@@ -53,6 +53,8 @@ export function buildReferenceBundle(directory: string) {
     "ui-search.js",
     "ui-state.js",
     "shared.js",
+    "agent-cart.js",
+    "agent-cart-v2.schema.json",
     "escrow.js",
     "icon.svg",
     "XeroEmoji-COLRv1.woff2",

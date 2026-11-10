@@ -125,6 +125,7 @@ export async function browserSmoke(
     );
     await page.locator("#addToCartBtn").click();
     assert.equal(await page.locator("#cartCount").innerText(), "1");
+    await page.waitForFunction(()=>!(document.querySelector("#copyCartPrompt") as HTMLButtonElement).disabled);
     assert.match(
       await page.locator("#cartPrompt").innerText(),
       /POA DOMAINS REGISTRY CART/,

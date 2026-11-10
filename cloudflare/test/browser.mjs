@@ -25,8 +25,9 @@ export async function browserSmoke(base, evidence) {
     await page.locator("#addToCartBtn").waitFor();
     await page.locator("#addToCartBtn").click();
     assert.equal(await page.locator("#cartCount").innerText(),"2");
+    await page.waitForFunction(()=>!document.querySelector("#copyCartPrompt").disabled);
     const prompt=await page.locator("#cartPrompt").innerText();
-    for(const needle of ["keygen"," act ","submit_intent","quantum"]) assert.ok(prompt.includes(needle),needle);
+    for(const needle of ["get_nonce"," prepare ","submit_intent","quantum","poa-domains.agent-cart.v2"]) assert.ok(prompt.includes(needle),needle);
     assert.equal(await page.locator("#copyCartPrompt").isEnabled(),true);
     assert.equal(await page.locator("#sectionTabs").count(),1);
     assert.equal(await page.locator("#marketSection").count(),1);
@@ -41,6 +42,7 @@ export async function browserSmoke(base, evidence) {
     assert.equal(await page.locator(".auction-tab").count(),3);
     await page.locator("#floatingCartBtn").click();
     assert.equal(await page.locator("#floatingCartPanel").isVisible(),true);
+    await page.waitForFunction(()=>!document.querySelector("#copyCheckoutBtn").disabled);
     assert.equal(await page.locator("#copyCheckoutBtn").isEnabled(),true);
     await page.locator("#floatingCartBackdrop").click();
     assert.equal(await page.locator("#floatingCartPanel").isVisible(),false);

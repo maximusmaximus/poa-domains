@@ -17,7 +17,9 @@ import { capabilities, prepare } from "../dist/src/interface.js";
 import { AUCTION_WINDOWS } from "../dist/src/engine.js";
 import { rootAuctionPolicy, editCartAmount, cartParamsForSigner, buildAgentCartPrompt,
   buildAgentCheckoutHandoff, inspectName, makeBody } from "../reference-web/shared.js";
-export const cap = capabilities(profileEngine());
+const handoffEngine=profileEngine();
+export const cap = capabilities(handoffEngine);
+export const snapshot={state:handoffEngine.snapshot(),stateHash:handoffEngine.stateHash()};
 export const item = { name: "alpha", tier: "standard", isRoot: true, action: "announceAuction+bid", asset: "POA",
   amount: "100", summary: "Old amount", params: { name: "alpha", asset: "POA", reserve: "100", maxBid: "100", expectedDeedId: null, expectedVersion: 0 } };
 
@@ -34,15 +36,16 @@ test("root reserves and both bidding windows match capabilities under both profi
   }
   assert.throws(() => rootAuctionPolicy({ assets: cap.assets }, { tier: "standard" }), /Prices unavailable/);
 });
-test("edited prompt snapshot keeps capability reserve fixed while amount, maxBid, summary, CLI cap and checkout change", () => {
+test("edited prompt snapshot keeps capability reserve fixed while amount, maxBid, summary, CLI cap and checkout change", async () => {
   const edited = editCartAmount(item, "250", cap);
   assert.deepEqual([edited.amount, edited.params.reserve, edited.params.maxBid], ["250", "100", "250"]);
   assert.match(edited.summary, /reserve=100 POA.*maxTotal=250 POA/);
   assert.equal(item.amount, "100", "pure edit does not mutate prior state");
-  const prompt = buildAgentCartPrompt([edited], cap, SIGNER, "http://127.0.0.1:8787");
+  const prompt = await buildAgentCartPrompt([edited], cap, SIGNER, "http://127.0.0.1:8787", "local-reference-only", snapshot, 1000000000);
   assert.equal(prompt, readFileSync("test/fixtures/cart-edited-prompt.txt", "utf8"));
-  const checkout = buildAgentCheckoutHandoff([edited], cap, SIGNER, "http://127.0.0.1:8787");
-  const payload = JSON.parse(checkout.slice(checkout.indexOf("{\n")));
+  const checkout = await buildAgentCheckoutHandoff([edited], cap, SIGNER, "http://127.0.0.1:8787", "local-reference-only", snapshot, 1000000000);
+  assert.equal(checkout,prompt,"both surfaces render the same versioned object");
+  const payload = JSON.parse(checkout.split("```json\n")[1].split("\n```")[0]);
   assert.equal(payload.items[0].amount, "250"); assert.equal(payload.items[0].params.maxBid, "250");
 });
 test("bad, zero, decimal and below-minimum amounts never silently replace the user's choice", () => {
@@ -54,13 +57,13 @@ test("bad, zero, decimal and below-minimum amounts never silently replace the us
   assert.equal(updated.params.amount, "1200"); assert.match(updated.summary, /1200.*minValidBid=1101/);
   assert.throws(() => editCartAmount({ ...bid, action: "buyFixed" }, "1200", cap), /Fixed price/);
 });
-test("both handoffs and Node/browser preparation default bid beneficiary to the real signer", () => {
+test("both handoffs and Node/browser preparation default bid beneficiary to the real signer", async () => {
   const bid = { ...item, action: "bid", amount: "1000", params: { auctionId: "a".repeat(64), expectedVersion: 1, asset: "POA", amount: "1000", beneficiary: "<YOUR_BENEFICIARY_PRINCIPAL>" } };
   assert.equal(cartParamsForSigner(bid, SIGNER).beneficiary, SIGNER);
   const params = cartParamsForSigner(bid, null); assert.ok(!Object.hasOwn(params, "beneficiary"));
   for (const build of [buildAgentCartPrompt, buildAgentCheckoutHandoff]) {
-    assert.ok(!build([bid], cap, null, "http://127.0.0.1:8787").includes("<YOUR_BENEFICIARY_PRINCIPAL>"));
-    assert.ok(build([bid], cap, SIGNER, "http://127.0.0.1:8787").includes(SIGNER));
+    assert.ok(!(await build([bid], cap, null, "http://127.0.0.1:8787", "local-reference-only", snapshot, 1000000000)).includes("<YOUR_BENEFICIARY_PRINCIPAL>"));
+    assert.ok((await build([bid], cap, SIGNER, "http://127.0.0.1:8787", "local-reference-only", snapshot, 1000000000)).includes(SIGNER));
   }
   const input = { signer: SIGNER, coSigners: [], requestId: "beneficiary-default", nonce: 1, notBefore: 0, deadline: 2000000,
     maxTotal: "1000", maxNetworkFee: "0", action: "bid", params };

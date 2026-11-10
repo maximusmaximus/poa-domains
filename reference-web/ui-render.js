@@ -1,9 +1,9 @@
-import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=7175c3b2d94e";
-import { ui } from "./ui-state.js?v=7175c3b2d94e";
-import { add, el, person } from "./ui-core.js?v=7175c3b2d94e";
-import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=7175c3b2d94e";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=7175c3b2d94e";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=7175c3b2d94e";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=e7a77f3f3644";
+import { ui } from "./ui-state.js?v=e7a77f3f3644";
+import { add, el, person } from "./ui-core.js?v=e7a77f3f3644";
+import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=e7a77f3f3644";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=e7a77f3f3644";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=e7a77f3f3644";
 
 export function updateTabDots(state) {
     const marks = tabWatermarks(state);
@@ -194,6 +194,7 @@ export function renderMarketplace(s) {
 }
 
 export function render(payload) {
+    ui.rawSnapshot = payload;
     const s = registryViewState(payload);
     ui.latestState = s;
     el("state").textContent = JSON.stringify(payload, null, 2);

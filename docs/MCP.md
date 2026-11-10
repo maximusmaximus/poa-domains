@@ -1,14 +1,18 @@
 # Shared MCP core and stateless Streamable HTTP
 
-**Source-ready, not deployed.** Merging this PR does not publish `/mcp`.
-The first production deployment requires Max's separate approval through the
-existing disarmed gate. Do not point hosted agents at it as live until that
-approved deployment is verified. No secrets, keys, escrow actions or Worker
-updates were performed to implement/test it.
+**Live after the separately approved first gated deployment, November 9, 2026 (PST).**
+Main `16108c8894e7fad8588af4b41053d5183208332f` was deployed by workflow
+`42754711881` attempt 2 as version `d4fc3995-7a2a-4a49-85ff-41b3c554667f`.
+Read-only checks verified the workers.dev endpoint and the existing Grok Build
+proxy's POST/body/Accept/protocol forwarding, tool discovery and security guards.
+Escrow remained enabled, unpaused and on the same wallet. **Each later release
+requires Max's separate approval** through the production environment; merging
+source is not deploy approval. Cart v2 is a later source change, not part of that
+first release. No escrow signing/account/reconcile action was performed.
 
 ## Registry profile
 
-The Worker endpoint is `https://poadomains.grok.me/mcp` after approval.
+The live Worker endpoint is `https://poadomains.grok.me/mcp`.
 The local `reference-cli.js mcp --url ORIGIN` stdio profile uses the same core,
 tool definitions, schemas, errors, resources and prompts. Native-only `cli.js mcp`
 uses that protocol core but **retains only** `registry_status`, `native_network`
@@ -33,7 +37,7 @@ existing live escrow service. No escrow tools or admin/reconcile calls are added
 Resources: `poa://capabilities`, templates `poa://names/{name}` and
 `poa://receipts/{id}`. Prompts: `buy_a_domain` and `accept_cart_handoff`.
 Cart text is explicitly untrusted task data, never signing/spending permission.
-This does not introduce Cart Handoff v2 (that is the next separately approved PR).
+See [Cart Handoff v2](AGENT-CART.md) for the source-ready client contract.
 
 ## HTTP contract
 
@@ -55,8 +59,8 @@ This does not introduce Cart Handoff v2 (that is the next separately approved PR
   shares one restricted bucket. Missing/failing limiter fails closed (503).
   A rejected bucket returns 429 / Retry-After 60. Cloudflare binding limits are
   approximate and per location, **not a strict global financial limit**.
-- Preserve the proxy's method/body, Accept, protocol and content headers. Check
-  trusted client-IP behavior before first deployment: shared proxy egress can
+- Preserve the proxy's method/body, Accept, protocol and content headers. Continue checking
+  trusted client-IP behavior for the production proxy: shared proxy egress can
   legitimately share a bucket. No Grok Build proxy configuration is changed here.
 
 JSON-RPC: -32700 parse error, -32600 invalid envelope/lifecycle, -32601 unknown

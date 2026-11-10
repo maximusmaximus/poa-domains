@@ -1,4 +1,4 @@
-# Reviewed Worker deployment gate (currently disarmed)
+# Reviewed Worker deployment gate
 
 Production is the `poadomains-registry` Worker and the existing
 `REGISTRY` / `PoaRegistry` / `poa-mainnet-registry-v1` Durable Object. Node and
@@ -7,10 +7,10 @@ create credentials, change escrow code, pause/unpause it or perform a PoA action
 
 ## Observed live settings (read-only, November 9, 2026)
 
-The active deployment `1528f497-589a-46f5-a61d-8db7a690bcf5`, created
-at 4:51:44 PM PST, has source `wrangler`, serving 100% version
-`46459dd0-989d-46dc-ad79-c8b24a867595`. Both version bindings and Worker settings
-show **plaintext variables**, not secrets:
+The pre-gated deployment `1528f497-589a-46f5-a61d-8db7a690bcf5`, created
+at 4:51:44 PM PST, had source `wrangler`, serving 100% version
+`46459dd0-989d-46dc-ad79-c8b24a867595`. Both the earlier and approved first-release version/settings
+show the same **plaintext variables**, not secrets:
 
 - `POA_ESCROW_ENABLED=true`
 - `POA_ESCROW_NETWORK_WRITES=approved-v1` (not the boolean string `true`)
@@ -21,9 +21,9 @@ show **plaintext variables**, not secrets:
 and types were inspected; no secret values were retrieved. The active version's
 source establishes a Wrangler deployment with non-repository policy overrides;
 this API metadata cannot prove the exact original CLI flags or exclude earlier
-dashboard edits. Max confirmed escrow is unpaused. The public workers.dev
-capabilities read returned HTTP 403 from this network, so pause state was not
-independently re-verified. No admin request was attempted.
+dashboard edits. Subsequent first-release checks independently verified enabled,
+unpaused and not held through public capabilities on both hosts. No admin or
+signed account request was attempted.
 
 The committed disabled defaults remain unchanged. A plain `wrangler deploy`
 against those defaults is **not** the production upgrade procedure.
@@ -33,10 +33,13 @@ against those defaults is **not** the production upgrade procedure.
 `.github/workflows/deploy-worker.yml` dry-runs on PRs without credentials. On a
 successful `native-and-reference-checks` run for main, it also dry-runs that exact
 SHA. The production job is skipped unless repository variable
-`WORKER_DEPLOY_ENABLED` is explicitly set to `true`. It is intentionally unset
-now. No token was created and no deployment approval is requested by this change.
+`WORKER_DEPLOY_ENABLED` is explicitly set to `true`. Max authorized this switch
+and the first production review on November 9, 2026 (PST); the switch is now true,
+with the required environment secret and seven expected-policy variables set.
+No token value was read, created or committed. Each subsequent release still
+requires a new, explicit production approval from Max.
 
-Before Max enables deployments:
+Deployment prerequisites (configured for the approved first release):
 
 1. The GitHub `production` environment must require **only Max
    (`maximusmaximus`, user ID 15719015)** as reviewer, disable administrator bypass,
@@ -106,11 +109,22 @@ Sources:
 
 ## First gated MCP deploy: non-secret expected policy
 
-MCP source was added without deployment. Max's separate approval is still
-required to make `/mcp` live. The repository `WORKER_DEPLOY_ENABLED` remains
-unset, and the workflow is unchanged. Before enabling it, provide the environment
-API-token secret separately (never paste its value into a PR or inbox), keep the
-Max-only production review gate, and use the latest green main SHA.
+Max separately approved the first release at 8:19 PM PST on November 9, 2026.
+Workflow `42754711881` attempt 2 deployed main
+`16108c8894e7fad8588af4b41053d5183208332f`, deployment
+`007ab4f5-bd8b-4500-81c0-3db7c275c999`, version
+`d4fc3995-7a2a-4a49-85ff-41b3c554667f` at 100%. Rollback version is
+`46459dd0-989d-46dc-ad79-c8b24a867595`. All seven live public policy bindings were
+unchanged; public escrow capabilities reported enabled/unpaused/not held and the
+same wallet/limits. `/v1/escrow/account` requires a signed wallet query and was
+not called. Both hosts passed health/capabilities/UI and read-only MCP checks.
+The proxy passed POST/body/Accept/protocol forwarding and Origin/version/Accept
+rejections. The reviewer rules/admin-bypass restriction were not changed.
+
+The switch remains true; later main releases wait for Max's new production review.
+Do not treat that first approval as standing permission. Cart v2 was not included
+and is not deployed by merging its source. Never paste an API-token value into a
+PR or inbox.
 
 Read-only reinspection on November 9, 2026 (PST) found the same active deployment
 `1528f497-589a-46f5-a61d-8db7a690bcf5` and version
@@ -139,4 +153,4 @@ The first MCP deploy also adds `MCP_RATE_LIMITER` (namespace `2026110908`,
 door (there is no grok.me zone/custom-domain binding here), confirm it passes
 POST/body/protocol/Accept headers and trusted client-IP behavior, and verify the
 remote handshake/security guards **after** the separately approved deployment.
-Merging this source does not configure the proxy, arm the switch or deploy it.
+Merging later source does not configure the proxy, grant approval or deploy it.
