@@ -1,13 +1,13 @@
 # PoA Domains — Full-Stack Registry Application, Human Explorer & Native Read Guard
 
 - **Primary Interactive Explorer**: https://poadomains.grok.me
-- **GitHub Pages Mirror & Guard**: https://maximusmaximus.github.io/poa-domains/
+- **Static GitHub Pages landing page**: https://maximusmaximus.github.io/poa-domains/
 - **Proof of Agent Mainnet**: https://minepoa.com · **Proof Floor**: https://poa.grok.me
 - **Xero Emoji COLRv1 Font**: https://github.com/maximusmaximus/xeroemoji
 
 > **Production hosting and local development:**
 >
-> - **Public GitHub Pages & Default Native-Chain Read Guard (`src/cli.ts`, `src/server.ts`, `src/mcp.ts`, `web/`)**: Strictly read-only status monitor and local Unicode 17 emoji spelling checker. **The upstream native naming registry is not yet enabled on the public chain; these native-chain guard entry points never simulate ownership or accept writes.**
+> - **Public GitHub Pages & Default Native-Chain Read Guard (`src/cli.ts`, `src/server.ts`, `src/mcp.ts`, `web/`)**: Static Explorer-first landing page, read-only network check and local Unicode 17 emoji spelling checker. **The upstream native naming registry is not yet enabled on the public chain; these native-chain guard entry points never simulate ownership or accept writes.**
 > - **Production Worker**: `poadomains-registry` serves the explorer and Durable Object registry at https://poadomains.grok.me through the existing Grok Build proxy. Worker = production; Node/Docker = local development only. See [hosting](docs/cloudflare-hosting.md) and the [reviewed, escrow-preserving deployment gate](docs/worker-deploy.md). The registry retains `livePoA:false`; this is distinct from the separately enabled escrow service.
 > - **Local Full-Stack Persistent Registry Application (`src/app.ts`, `src/reference-server.ts`, `src/reference-cli.ts`, `src/reference-mcp.ts`, `reference-web/`)**: Complete, deterministic, single-writer PoA Domains registry engine (`poa-mainnet-v1` profile) with fsynced journal persistence, `poa1...` Base58 Ed25519 principals, all **5,216 official Unicode 17 emoji sequences** rendered with the bundled emoji OpenType COLRv1 web font (`XeroEmoji-COLRv1.woff2`), **655 reserved root domains**, **`100,000 POA` (`100k POA`) single-emoji / `1,000 POA` (`1k POA`) multi-emoji mainnet-profile default minimum bid policy (the UI always reads capabilities)**, human domain availability search, multi-domain **Agent Bid & Purchase Cart** with copy-paste agent prompts, purchase/bid/settlement history, standing child & fixed-price resale offers, and an interactive 17-action handoff explorer.
 
@@ -265,7 +265,7 @@ The read-only API (`npm start`) has no ownership or settlement backend:
 
 Production CLI signing, preparation, handoffs, submission, state/receipt/nonce/resolve/export commands are rejected. Supplied `--config`/`--data` are rejected without file access. Supplied provider URLs and key/input/output paths do not enable processing. Status metadata is not a live network probe; process liveness is not registry readiness.
 
-`npm run pages:build` emits a sixteen-file bundle of public assets into `_site/`. The builder imports no fixture generator or reference engine. The browser validates relative configuration/status JSON, then reads only the two fixed official-node status and network-facts URLs. It rejects demo modes, backend overrides, forged ready flags and extra ledger fields. Prior generated demo files are removed during a validated rebuild; unexpected artifacts or symlinks fail the build. GitHub Pages hosts no `/v1` API.
+`npm run pages:build` emits a 22-file bundle of public assets into `_site/`. The builder imports no fixture generator or reference engine. The browser validates relative configuration/status JSON, then reads only the two fixed official-node status and network-facts URLs. It rejects demo modes, backend overrides, forged ready flags and extra ledger fields. Prior generated demo files are removed during a validated rebuild; unexpected artifacts or symlinks fail the build. GitHub Pages hosts no `/v1` API. The static landing describes current live tools, links to the production Explorer, and includes metadata, a sitemap and the requested footer. See [landing-page behavior and display-only incident recovery](docs/PAGES-LANDING.md).
 
 ---
 
@@ -300,7 +300,7 @@ npm run native:smoke # explicit GET-only public-network smoke; requires node ava
 5. `test` — runs all unit, integration, cryptographic, state-machine, journal persistence, and full-stack registry app tests (`test/core.test.ts` & `test/production.test.ts`).
 6. `smoke` — runs the production read-only CLI/API/MCP guard smoke check.
 7. `reference:smoke` — runs the end-to-end 17-action reference engine + headless Playwright browser smoke check (`test/browser.ts`).
-8. `pages:build` — builds and verifies the 15-file `_site/` public Pages bundle.
+8. `pages:build` — builds and verifies the 22-file `_site/` public Pages bundle.
 9. `pages:verify` — runs headless Playwright verification against the public Pages bundle.
 10. `reference:pages:verify` — builds and verifies the static reference explorer bundle in headless Chromium (`test/reference-pages-browser.ts`), including domain search, Agent Cart prompt generation, standing offers, and purchase/bid history.
 11. `format:check` — verifies Prettier formatting across all files.

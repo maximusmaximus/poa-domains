@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  font-family: system-ui, "Xero Emoji", "XeroEmoji", sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   background: #10151e;
   color: #e7eef8;
 }
@@ -125,3 +125,17 @@ footer {
 .visually-hidden, .skip-link:not(:focus) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .skip-link:focus { position: fixed; top: .5rem; left: .5rem; z-index: 100; padding: .6rem; background: #fff; color: #123; }
 :focus-visible { outline: 3px solid #ffe08a; outline-offset: 3px; }
+
+.value { font-size: 1.35rem; line-height: 1.5; }
+.availability-table { width: 100%; border-collapse: collapse; }
+.availability-table caption { text-align: left; margin-bottom: .8rem; color: #c5d5eb; }
+.availability-table th, .availability-table td { text-align: left; vertical-align: top; padding: .8rem .5rem; border-bottom: 1px solid #455269; line-height: 1.6; }
+.availability-table th[scope="row"] { width: 30%; }
+code { overflow-wrap: anywhere; }
+#network-details { margin: 1rem 0; }
+#network-details dt { font-weight: 700; margin-top: .7rem; }
+#network-details dd { margin: .2rem 0 0; overflow-wrap: anywhere; }
+button:disabled { background: #455269; color: #e7eef8; cursor: progress; }
+.muted { color: #c5d5eb; }
+.footer-credit { text-align: center; font-size: .9rem; }
+@media (max-width: 480px) { main { padding: 1.5rem 1rem; } section { padding: 1rem; } .availability-table th, .availability-table td { padding: .6rem .3rem; } }

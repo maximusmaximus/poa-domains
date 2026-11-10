@@ -3,7 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PoA domains — native registry unavailable</title>
+    <title>PoA domains — emoji names and agent tools</title>
+    <meta name="description" content="Explore emoji names and build a clear request for your agent. Open the PoA Domains Explorer for listings, agent tools and My POA escrow." />
+    <link rel="canonical" href="https://maximusmaximus.github.io/poa-domains/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="PoA domains — emoji names and agent tools" />
+    <meta property="og:description" content="Explore emoji names and build a clear request for your agent. Open the Explorer for listings, agent tools and My POA escrow." />
+    <meta property="og:url" content="https://maximusmaximus.github.io/poa-domains/" />
+    <meta property="og:image" content="https://maximusmaximus.github.io/poa-domains/icon.svg" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./style.css" />
   </head>
@@ -12,170 +19,49 @@
     <main id="pagesMain" tabindex="-1">
       <p id="refreshAnnouncement" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
       <header>
-        <p class="label">Production-only guard · not production-ready naming</p>
+        <p class="label">Emoji names · agent tools</p>
         <h1>PoA domains</h1>
-        <h2 id="availability">Native registry unavailable</h2>
-        <a class="hero-cta" href="https://poadomains.grok.me" rel="noreferrer"
-          ><span aria-hidden="true">🌐</span> Open the PoA Domains Explorer · poadomains.grok.me →</a
-        >
-        <p class="hero-note">Search names, see auctions and resales, and build an agent cart.</p>
-        <nav class="mirror-nav" aria-label="PoA Domains Ecosystem Navigation">
-          <a href="https://minepoa.com" rel="noreferrer"
-            ><span aria-hidden="true">⛏️</span> Proof of Agent (minepoa.com)</a
-          >
-          <a href="https://poa.grok.me" rel="noreferrer"
-            ><span aria-hidden="true">📡</span> Proof Floor (poa.grok.me)</a
-          >
-          <a
-            href="https://github.com/maximusmaximus/poa-domains"
-            rel="noreferrer"
-            ><span aria-hidden="true">📦</span> GitHub Source &amp; Docs</a
-          >
-        </nav>
+        <p class="value">Emoji names. A clear handoff to your agent.</p>
+        <a class="hero-cta" href="https://poadomains.grok.me" rel="noreferrer"><span aria-hidden="true">🌐</span> Open the Explorer</a>
+        <p class="hero-note">Search names, browse listings, and copy a request for your agent.</p>
       </header>
       <section aria-labelledby="operations">
-        <h2 id="operations">Registry operations are disabled</h2>
-        <p id="explanation">
-          This application has no implemented, verified native PoA naming
-          backend. It does not serve ownership, balances, auctions or
-          transaction receipts.
-        </p>
-        <p>
-          No simulated registry is used. Registration, bidding, purchases,
-          transfers, signing and settlement are disabled. Do not send funds or
-          supply credentials.
-        </p>
-        <p id="source">
-          No connection to a native registry. This is application availability
-          information, not naming ownership or a capability probe.
-        </p>
-        <p id="status">Fail-closed: unavailable</p>
+        <h2 id="operations"><span aria-hidden="true">🔎</span> What is available now</h2>
+        <table class="availability-table">
+          <caption>Live tools and their limits</caption>
+          <thead><tr><th scope="col">Feature</th><th scope="col">Now</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Explorer and agent cart</th><td><span aria-hidden="true">✅</span> Live. Browse names and prepare an agent handoff.</td></tr>
+            <tr><th scope="row">Remote MCP</th><td><span aria-hidden="true">✅</span> Live at <code>https://poadomains.grok.me/mcp</code>. <a href="https://poadomains.grok.me/llms.txt" rel="noreferrer">Agent connection details</a>.</td></tr>
+            <tr><th scope="row">POA escrow</th><td><span aria-hidden="true">🪙</span> Enabled in the Explorer. Check My POA for current payment availability. Safety checks can hold payments when network readings are stale.</td></tr>
+            <tr><th scope="row">Native registry operations</th><td><span aria-hidden="true">⛔</span> <strong id="availability">Native registry unavailable</strong>. Native on-chain registration, ownership and settlement are not verified. Explorer data is not proof of on-chain ownership.</td></tr>
+          </tbody>
+        </table>
+        <p id="explanation">This is a static landing page. It never signs, accepts a key or signed packet, or sends a payment. Use the Explorer for its current tools and safety checks.</p>
+        <p id="source">The optional checks below are not a registry or proof of ownership.</p>
+      </section>
+      <section id="observationSection" aria-labelledby="network-title" aria-busy="true">
+        <h2 id="network-title"><span aria-hidden="true">📡</span> Public network check</h2>
+        <p>Reads from the official public node on open or when you refresh. These are unverified readings, not proof of consensus, ownership, settlement, finality or a working native registry.</p>
+        <p id="status">Checking…</p>
+        <p id="network-status">Checking…</p>
         <p id="error"></p>
-        <button id="refresh" type="button">Refresh availability and network</button>
+        <dl id="network-details"></dl>
+        <button id="refresh" type="button" disabled>Refresh network</button>
+        <p class="muted">Readings expire after 15 minutes. Failed or inconsistent checks clear all values. Refresh network takes a fresh pair of read-only requests; it never uses an old snapshot.</p>
       </section>
-      <div id="emoji-format-checker"></div>
-      <noscript>The local emoji spelling checker needs JavaScript. Native naming and payments remain disabled.</noscript>
-      <section aria-labelledby="network-title">
-        <h2 id="network-title">Native network observation</h2>
-        <p>Read directly from the official public node when this page opens or you refresh, not a live subscription. Node-reported information is not cryptographically verified consensus, ownership or finality. No registry capability is inferred.</p>
-        <p id="network-status">Network observation unavailable.</p>
-        <pre id="network-details"></pre>
-        <p>After 15 minutes the observation expires. Refresh makes two fixed read-only requests to the official node; failed or inconsistent responses clear the displayed values. No published snapshot is substituted.</p>
+      <section aria-labelledby="spelling-title">
+        <h2 id="spelling-title"><span aria-hidden="true">🔤</span> Local spelling check</h2>
+        <p>This optional tool checks emoji spelling in your browser, not name availability or ownership. No naming or payment action runs on this page. For POA escrow, open My POA in the Explorer.</p>
+        <div id="emoji-format-checker"></div>
+        <noscript>The optional spelling and network checks need JavaScript. The Explorer link above still works.</noscript>
       </section>
-      <section aria-labelledby="explorer-mirror-title" class="resource-panel">
-        <h2 id="explorer-mirror-title">
-          Interactive Explorer (poadomains.grok.me) &amp; Ecosystem Resources
-        </h2>
-        <p>
-          This GitHub Pages site serves as the read-only production guard, local
-          Unicode 17 emoji format checker, and documentation mirror. To search
-          domain availability, build a multi-domain Agent Cart prompt, inspect
-          emoji domains, or explore the registry engine, visit
-          the interactive explorer at
-          <a href="https://poadomains.grok.me" rel="noreferrer"
-            >https://poadomains.grok.me</a
-          >.
-        </p>
-        <div class="resource-grid">
-          <article class="resource-card">
-            <h3><span aria-hidden="true">🌐</span> Interactive Web Explorer</h3>
-            <p>
-              Search ASCII and Unicode 17 emoji domains, view live ascending
-              auctions, standing child offers, fixed-price resales, and generate
-              copy-and-paste prompts for your AI agent.
-            </p>
-            <p>
-              <a href="https://poadomains.grok.me" rel="noreferrer"
-                >Open poadomains.grok.me →</a
-              >
-            </p>
-          </article>
-          <article class="resource-card">
-            <h3><span aria-hidden="true">💎</span> Emoji Names &amp; Minimum Bid Tiers</h3>
-            <p>
-              All 5,216 official Unicode 17 emoji spellings are supported.
-            </p>
-            <p>
-              <strong>Single emoji root (1 emoji):</strong> 100,000 POA (100k
-              POA) minimum bid · 24h window.<br />
-              <strong>Multi-emoji (2–32) &amp; ASCII roots:</strong> 1,000 POA
-              (1k POA) minimum bid · 1h window.<br />
-              <strong>Protected catalog:</strong> 655 reserved root domains
-              (single letters a–z, core protocol terms, top 500 global brands).
-            </p>
-          </article>
-          <article class="resource-card">
-            <h3><span aria-hidden="true">⛏️</span> Proof of Agent Network</h3>
-            <p>
-              Explore the Proof of Agent mainnet, mining epochs, governance, and
-              the live Proof Floor agent network:
-            </p>
-            <p>
-              <a href="https://minepoa.com" rel="noreferrer">minepoa.com</a> ·
-              <a href="https://poa.grok.me" rel="noreferrer"
-                >poa.grok.me (Proof Floor)</a
-              >
-            </p>
-          </article>
-          <article class="resource-card">
-            <h3><span aria-hidden="true">📚</span> Documentation &amp; Agent Tooling</h3>
-            <p>
-              Full source code, <code>poa1...</code> Ed25519 CLI
-              (<code>keygen</code>, <code>act</code>, <code>prepare</code>,
-              <code>sign</code>, <code>submit</code>), and MCP server:
-            </p>
-            <p>
-              <a
-                href="https://github.com/maximusmaximus/poa-domains#readme"
-                rel="noreferrer"
-                >README</a
-              >
-              ·
-              <a
-                href="https://github.com/maximusmaximus/poa-domains/blob/main/docs/API.md"
-                rel="noreferrer"
-                >API Spec</a
-              >
-              ·
-              <a
-                href="https://github.com/maximusmaximus/poa-domains/blob/main/docs/NATIVE.md"
-                rel="noreferrer"
-                >Native Chain Docs</a
-              >
-              ·
-              <a
-                href="https://github.com/maximusmaximus/poa-domains/blob/main/docs/UNICODE.md"
-                rel="noreferrer"
-                >Unicode 17 Spec</a
-              >
-              ·
-              <a
-                href="https://github.com/maximusmaximus/poa-domains/blob/main/SECURITY.md"
-                rel="noreferrer"
-                >Security Policy</a
-              >
-            </p>
-          </article>
-        </div>
-      </section>
-      <footer>
-        <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer"
-          >Source and verification</a
-        >
-        ·
-        <a href="https://poadomains.grok.me" rel="noreferrer"
-          >Interactive Explorer (poadomains.grok.me)</a
-        >
-        ·
-        <a href="https://minepoa.com" rel="noreferrer">MinePoA</a>
-        ·
-        <a href="https://poa.grok.me" rel="noreferrer">Proof Floor</a>
-
-        <p>
-          The production entry points cannot enable a registry using a key,
-          fixture configuration, endpoint override or mode flag.
-        </p>
-      </footer>
+      <nav class="mirror-nav" aria-label="More information">
+        <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer"><span aria-hidden="true">📚</span> Source and docs</a>
+        <a href="https://minepoa.com" rel="noreferrer"><span aria-hidden="true">⛏️</span> Proof of Agent</a>
+        <a href="https://poa.grok.me" rel="noreferrer"><span aria-hidden="true">📡</span> Proof Floor</a>
+      </nav>
+      <footer><p class="footer-credit">made with <span aria-hidden="true">❤️</span> in SF by Tesselate Army | <a href="https://maxi.grok.me" rel="noreferrer">maxi.grok.me</a></p></footer>
     </main>
     <script type="module" src="./app.js"></script>
   </body>

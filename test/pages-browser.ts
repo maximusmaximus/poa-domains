@@ -44,7 +44,7 @@ export async function verifyStaticPage(url: string, screenshot?: string) {
   const syntheticStatus = () => ({ chain_id: 'poa-mainnet-1', checkpoint: { height: 12345, cutoff_ts: cutoff }, epochs_closed: 57, agents_joined: 77, txs, final, K: 5 });
   const syntheticFacts = () => ({ chain_id: 'poa-mainnet-1', open_epoch: 57, engine_sha256: 'a'.repeat(64), params_sha256: 'b'.repeat(64), economics: { K: 5 } });
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ serviceWorkers: 'block' });
+  const context = await browser.newContext({ serviceWorkers: 'block', timezoneId: 'Asia/Tokyo' });
   context.setDefaultTimeout(10000);
   const page = await context.newPage();
   page.on('pageerror', error => pageErrors.push(error.name));
@@ -149,7 +149,8 @@ export async function verifyStaticPage(url: string, screenshot?: string) {
     assert.equal(await page.evaluate(() => (window as any).__poaPwned), undefined);
     const body = await page.locator('body').innerText();
     assert.ok(!body.includes('BROKEN_SECRET') && !body.includes('attacker.invalid') && !body.includes('onerror='), 'Raw upstream data must not be reflected');
-    assert.match(body, /not production-ready naming/i);
+    assert.match(body, /Native on-chain registration, ownership and settlement are not verified/i);
+    assert.doesNotMatch(body, /xero\s*emoji|roadmap|coming\s+soon|future\s+plans/i);
     assert.match((await page.locator('#availability').innerText()).trim(), /^Native registry unavailable$/i);
   }
   async function settled() {
@@ -162,6 +163,11 @@ export async function verifyStaticPage(url: string, screenshot?: string) {
     await settled();
     await page.waitForFunction(() => /Verified application guard/i.test(document.querySelector('#status')?.textContent || ''));
     await page.waitForFunction(() => /Official.node observation\s*\(unverified\)/i.test(document.querySelector('#network-status')?.textContent || ''));
+    assert.equal(await page.locator('dl#network-details > dt').count(), 8);
+    assert.equal(await page.locator('dl#network-details > dd').count(), 8);
+    const local = await page.locator('#network-details time').evaluate(time => ({actual:time.textContent,expected:new Date((time as HTMLTimeElement).dateTime).toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'})}));
+    assert.equal(local.actual, local.expected, 'Observation uses the visitor timezone, not the build/server timezone');
+    assert.match(local.actual ?? '', /GMT\+9|JST/);
     const details = (await page.locator('#network-details').innerText()).replace(/,/g, '');
     assert.match(details, /Network\s*:?\s*poa-mainnet-1/i);
     for (const n of [77, expectedTransactions, 57]) assert.match(details, new RegExp(`\\b${n}\\b`), 'Expected test-only node counters');
@@ -192,7 +198,20 @@ export async function verifyStaticPage(url: string, screenshot?: string) {
     await settled();
   }
   try {
-    await load(); await ready();
+    liveGate = new Promise<void>(resolve => { releaseGate = resolve; });
+    await page.goto(entry.href, {waitUntil:'commit'});
+    await until(() => counts.backend === 2, 'initial network reads pending');
+    assert.equal(await page.locator('#refresh').isDisabled(), true);
+    assert.equal(await page.locator('#network-status').innerText(), 'Checking…');
+    assert.equal(await page.locator('#observationSection').getAttribute('aria-busy'), 'true');
+    assert.equal(await page.locator('header .hero-cta').getAttribute('href'), 'https://poadomains.grok.me');
+    assert.equal((await page.locator('footer').innerText()).replace(/\s+/g,' ').trim(), 'made with ❤️ in SF by Tesselate Army | maxi.grok.me');
+    assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), 'https://maximusmaximus.github.io/poa-domains/');
+    assert.ok(await page.locator('meta[name="description"]').getAttribute('content'));
+    assert.equal(await page.locator('meta[property="og:type"]').getAttribute('content'), 'website');
+    releaseHeldRequests(); await ready();
+    assert.equal(await page.locator('#observationSection').getAttribute('aria-busy'), 'false');
+    checks.push('Static Explorer-first live-only landing, exact footer/SEO and visible checking/disabled refresh before replies');
     assert.equal(counts.backend, 2, 'Initial load performs one pair of real-reader GETs with synthetic transport responses');
     const csp = await page.locator('meta[http-equiv="Content-Security-Policy" i]').getAttribute('content');
     assert.ok(csp, 'An explicit CSP meta policy is required');
@@ -216,29 +235,29 @@ export async function verifyStaticPage(url: string, screenshot?: string) {
     await ready(43); assert.equal(counts.backend, before + 2);
     checks.push('Refresh fetches a new pair; eight pending clicks coalesce or stay disabled');
 
-    for (const [mode, pattern] of [['429', /rate.limit/i], ['503', /unavailable/i]] as const) {
+    for (const [mode, pattern] of [['429', /too many reads/i], ['503', /unavailable/i]] as const) {
       liveMode = mode; await refresh(); await failed(pattern);
       liveMode = 'good'; await refresh(); await ready();
     }
     checks.push('HTTP429 and HTTP503 clear previous values, show safe failures, then recover');
 
     for (const mode of ['malformed', 'content-type', 'chain'] as const) {
-      await load(mode); await failed(/JSON|chain|response|unavailable/i);
+      await load(mode); await failed(/response|node checks disagree|unavailable/i);
       if (mode === 'chain') {
-        const start: number = counts.backend; liveMode = 'good'; await refresh(); await failed(/chain|unavailable/i);
-        assert.equal(counts.backend, start, 'Chain incident stays sticky without further official GETs');
+        const start: number = counts.backend; liveMode = 'good'; txs++; await refresh(); await ready();
+        assert.equal(counts.backend, start + 2, 'Explicit refresh acknowledges a cleared display incident and fetches a fresh pair');
       }
     }
     checks.push('Fresh-page malformed JSON, wrong content type and malicious chain ID fail safely without XSS or stale values');
 
     for (const mode of ['checkpoint', 'hash'] as const) {
       await load(); await ready(); liveMode = mode; await refresh();
-      await failed(mode === 'checkpoint' ? /checkpoint|inconsisten|unavailable/i : /digest|hash|changed|unavailable/i);
-      const start: number = counts.backend; liveMode = 'good'; await refresh();
-      await failed(mode === 'checkpoint' ? /checkpoint|inconsisten|unavailable/i : /digest|hash|changed|unavailable/i);
-      assert.equal(counts.backend, start, 'Consistency incidents stay sticky for the page reader lifetime');
+      await failed(/node checks disagree/i);
+      const start: number = counts.backend; liveMode = 'good'; txs++; await refresh();
+      await ready();
+      assert.equal(counts.backend, start + 2, 'Explicit incident recovery fetches a fresh pair; no stale fallback');
     }
-    checks.push('Same-height cutoff change and digest drift are sticky; no previous-value fallback');
+    checks.push('Same-height cutoff change and digest drift clear values; explicit user refresh recovers with a new read pair, never previous values');
 
     for (const mode of ['ready', 'state', 'message', 'demo', 'backend'] as const) {
       const start: number = counts.backend; await load('good', mode);
