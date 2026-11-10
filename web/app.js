@@ -42,7 +42,7 @@ function renderNetwork(value) {
   exact(value.checkpoint, ["height", "cutoffTs"]);
   const counts = [value.observedAt, value.expiresAt, value.checkpoint.height, value.checkpoint.cutoffTs, value.epochsClosed, value.agentsJoined, value.transactions, value.reportedFinalTransactions, value.attestationThreshold];
   if (value.kind !== "native-network-observation" || value.source !== "https://minepoa.com" || value.chainId !== "poa-mainnet-1" || value.verification !== "node-reported-unverified" || value.finalityVerified !== false || value.registryReady !== false || !counts.every(n => Number.isSafeInteger(n) && n >= 0) || value.expiresAt !== value.observedAt + 900000 || value.observedAt > now + 300000 || now > value.expiresAt || value.checkpoint.cutoffTs * 1000 > value.observedAt + 300000 || value.reportedFinalTransactions > value.transactions || value.attestationThreshold < 1 || value.attestationThreshold > 256 || !/^[a-f0-9]{64}$/.test(value.engineSha256) || !/^[a-f0-9]{64}$/.test(value.paramsSha256)) throw Error("Observation unavailable");
-  document.getElementById("network-status").textContent = "Official-node observation (unverified), naming still unavailable. Observed " + new Date(value.observedAt).toLocaleString("en-US", { timeZone: "America/Los_Angeles", timeZoneName: "short" });
+  document.getElementById("network-status").textContent = "Official-node observation (unverified), naming still unavailable. Observed " + new Date(value.observedAt).toLocaleString("en-US", { timeZone: "America/Los_Angeles", year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
   document.getElementById("network-details").textContent = "Network: " + value.chainId + "\nReported checkpoint: " + value.checkpoint.height + "\nClosed epochs: " + value.epochsClosed + "\nJoined agents: " + value.agentsJoined + "\nReported transactions: " + value.transactions + "\nReported engine SHA-256: " + value.engineSha256 + "\nReported params SHA-256: " + value.paramsSha256;
   expiryTimer = setTimeout(() => clearNetwork("Network observation expired; no current network state is displayed."), Math.min(value.expiresAt - now + 1, 900001));
 }
@@ -107,6 +107,9 @@ function refresh() {
   refreshFlight = refreshOnce().finally(() => {
     refreshFlight = undefined;
     button.disabled = false;
+    const announcement = document.getElementById("refreshAnnouncement");
+    const summary = [document.getElementById("status").textContent,error.textContent,document.getElementById("network-status").textContent].filter(Boolean).join(" ");
+    if(announcement.textContent!==summary)announcement.textContent=summary;
   });
   return refreshFlight;
 }

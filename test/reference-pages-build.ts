@@ -42,6 +42,7 @@ export function buildReferenceBundle(directory: string) {
     "index.html",
     "style.css",
     "app.js",
+    "ui-a11y.js",
     "ui-cart.js",
     "ui-core.js",
     "ui-domain.js",

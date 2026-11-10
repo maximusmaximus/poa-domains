@@ -848,7 +848,7 @@ button:focus-visible {
   line-height: 1.1;
   white-space: nowrap;
   scroll-snap-align: center;
-  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  transition: transform 0.1s ease;
   -webkit-tap-highlight-color: transparent;
 }
 .section-tab:hover { background: #142a37; color: #dfecf5; }
@@ -1050,3 +1050,14 @@ header { padding-bottom: 0.75rem; }
 #registryError { padding: .7rem; border: 1px solid #bf964f; border-radius: .6rem; color: #ffe2a5; }
 #registryAge, .tab-age { color: #a4b8c7; font-size: .68rem; }
 .tab-age { display: block; font-weight: normal; white-space: nowrap; }
+
+/* Real tab panels at every viewport; hidden and inert controls are never focusable. */
+main#homeMain > section[data-section][hidden] { display: none; }
+main#homeMain > section[data-section]:not([hidden]) { display: block; grid-column: 1 / -1; }
+a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 3px solid #ffe08a; outline-offset: 3px; }
+
+[hidden] { display: none !important; }
+.footer-credit a { text-decoration: underline; text-underline-offset: 3px; }
+
+.section-navigation { position: sticky; top: 0; z-index: 30; }
+.section-navigation > .section-tabs { position: relative; }

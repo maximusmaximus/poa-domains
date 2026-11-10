@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=de064ee15921" />
+    <link rel="stylesheet" href="/style.css?v=c1e315405b25" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -14,7 +14,7 @@
       <p id="mode">⏳ Loading registry data…</p>
     </header>
 
-    <div class="registry-read-status">
+    <div class="registry-read-status" role="region" aria-label="Registry updates">
       <p id="registryLoading" role="status">⏳ Loading registry data… You can use the tabs and type a search now.</p>
       <p id="registryAge" title="Registry data only. My POA refreshes separately.">Registry data not loaded yet · My POA refreshes separately.</p>
       <div id="registryError" role="alert" hidden><span id="registryErrorText"></span> <button id="registryRetry" type="button" class="secondary small">🔄 Refresh</button></div>
@@ -31,26 +31,28 @@
       </div>
     </div>
 
+    <div class="section-navigation" role="navigation" aria-label="Explorer navigation">
     <nav id="sectionTabs" class="section-tabs" role="tablist" aria-label="Site sections">
-      <button type="button" class="section-tab is-active" role="tab" aria-selected="true" data-tab="find" id="tabFind">
+      <button type="button" class="section-tab is-active" role="tab" aria-selected="true" data-tab="find" id="tabFind" aria-controls="searchSection" tabindex="0">
         <span class="tab-icon" aria-hidden="true">🔍</span><span class="tab-label">Find</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
-      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="auctions" id="tabAuctions">
+      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="auctions" id="tabAuctions" aria-controls="auctionsSection" tabindex="-1">
         <span class="tab-icon" aria-hidden="true">🏷️</span><span class="tab-label">Auctions</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
-      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="market" id="tabMarket">
+      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="market" id="tabMarket" aria-controls="marketSection" tabindex="-1">
         <span class="tab-icon" aria-hidden="true">💰</span><span class="tab-label">For sale</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
-      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="explore" id="tabExplore">
+      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="explore" id="tabExplore" aria-controls="explorerSection" tabindex="-1">
         <span class="tab-icon" aria-hidden="true">🧭</span><span class="tab-label">Explore</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
-      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="escrow" id="tabEscrow"><span class="tab-icon" aria-hidden="true">🪙</span><span class="tab-label">My POA</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span></button>
-      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="handoff" id="tabHandoff">
+      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="escrow" id="tabEscrow" aria-controls="escrowSection" tabindex="-1"><span class="tab-icon" aria-hidden="true">🪙</span><span class="tab-label">My POA</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span></button>
+      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="handoff" id="tabHandoff" aria-controls="handoffSection" tabindex="-1">
         <span class="tab-icon" aria-hidden="true">🧾</span><span class="tab-label">Handoff</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
     </nav>
+    </div>
 
-    <aside id="detailView" class="detail-view" hidden>
+    <aside id="detailView" class="detail-view" role="dialog" aria-labelledby="detailTitle" hidden>
       <div class="detail-header">
         <h2 id="detailTitle">Detail</h2>
         <button type="button" id="detailClose" class="secondary" aria-label="Close detail">Close</button>
@@ -60,8 +62,8 @@
       <div id="detailActions" class="button-row"></div>
     </aside>
 
-    <main id="homeMain">
-      <section id="searchSection" data-section="find" class="is-active-section">
+    <main id="homeMain" tabindex="-1">
+      <section id="searchSection" data-section="find" role="tabpanel" aria-labelledby="tabFind" tabindex="0" class="is-active-section">
         <h2>🔍 Find a name</h2>
         <p class="howto">Type a name → Check → Add to cart or open its page.</p>
         <div class="search-bar">
@@ -76,12 +78,14 @@
         <div class="ideas" aria-labelledby="ideasHeading">
           <div class="ideas-head">
             <h3 id="ideasHeading">💡 Ideas</h3>
+            <button type="button" id="ideasPause" class="secondary small" aria-pressed="false">⏸️ Pause ideas</button>
             <button type="button" id="ideasShuffle" class="ideas-shuffle secondary small" aria-label="Show new ideas">🔀 New ideas</button>
           </div>
           <p class="ideas-hint">Tap one to check it and add it to your 🛒 cart.</p>
           <div id="ideasStrip" class="ideas-strip" role="group" aria-label="Name ideas"></div>
           <p id="ideasStatus" class="ideas-status" role="status" aria-live="polite"></p>
         </div>
+        <p id="searchResultStatus" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
         <div id="searchResult" class="search-result"></div>
 
         <div id="cartAnchor" class="cart-panel">
@@ -96,29 +100,29 @@
           <div class="button-row">
             <button id="copyCartPrompt" type="button" disabled>Copy prompt</button>
             <button id="downloadCartJSON" type="button" class="secondary" disabled>📥 Download JSON</button>
-            <span id="cartStatus" class="muted"></span>
+            <span id="cartStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
           </div>
         </div>
       </section>
 
-      <section id="auctionsSection" data-section="auctions">
+      <section id="auctionsSection" data-section="auctions" role="tabpanel" aria-labelledby="tabAuctions" tabindex="0" hidden>
         <h2>🏷️ Auctions</h2>
         <p class="howto">Past · Current · Upcoming. Tap a name for history.</p>
         <div class="auction-tabs" role="tablist" aria-label="Auction filters">
-          <button type="button" class="auction-tab is-active" role="tab" aria-selected="true" data-auction-tab="current">Current</button>
-          <button type="button" class="auction-tab" role="tab" aria-selected="false" data-auction-tab="upcoming">Upcoming</button>
-          <button type="button" class="auction-tab" role="tab" aria-selected="false" data-auction-tab="past">Past</button>
+          <button type="button" class="auction-tab is-active" role="tab" aria-selected="true" data-auction-tab="current" id="auctionTabCurrent" aria-controls="auctions" tabindex="0">Current</button>
+          <button type="button" class="auction-tab" role="tab" aria-selected="false" data-auction-tab="upcoming" id="auctionTabUpcoming" aria-controls="auctions" tabindex="-1">Upcoming</button>
+          <button type="button" class="auction-tab" role="tab" aria-selected="false" data-auction-tab="past" id="auctionTabPast" aria-controls="auctions" tabindex="-1">Past</button>
         </div>
-        <div id="auctions" class="cards"></div>
+        <div id="auctions" class="cards" role="tabpanel" aria-labelledby="auctionTabCurrent" tabindex="0"></div>
       </section>
 
-      <section id="marketSection" data-section="market">
+      <section id="marketSection" data-section="market" role="tabpanel" aria-labelledby="tabMarket" tabindex="0" hidden>
         <h2>💰 For sale</h2>
         <p class="howto">Fixed-price listings in POA. Open a name to buy or manage.</p>
         <div id="marketplace" class="cards"></div>
       </section>
 
-      <section id="explorerSection" data-section="explore">
+      <section id="explorerSection" data-section="explore" role="tabpanel" aria-labelledby="tabExplore" tabindex="0" hidden>
         <h2>🧭 Explore</h2>
         <p id="freshness"></p>
         <div id="stats" class="stats"></div>
@@ -135,9 +139,34 @@
           <summary>Raw state</summary>
           <pre id="state"></pre>
         </details>
+      <section id="resourcesSection" class="span-2">
+        <h2>Resources</h2>
+        <div class="cards">
+          <article class="card">
+            <h3>Explorer</h3>
+            <p><a href="https://poadomains.grok.me" rel="noreferrer">https://poadomains.grok.me</a></p>
+            <p><a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer">https://maximusmaximus.github.io/poa-domains/</a></p>
+          </article>
+          <article class="card">
+            <h3>🎨 Emoji bids</h3>
+            <p id="premiumPolicy">⚪ Checking prices…</p>
+            <p id="standardPolicy">⚪ Checking prices…</p>
+          </article>
+          <article class="card">
+            <h3>CLI / MCP</h3>
+            <code>node dist/src/reference-cli.js keygen --out agent.pem</code>
+            <p><a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer">github.com/maximusmaximus/poa-domains</a></p>
+          </article>
+          <article class="card">
+            <h3>PoA</h3>
+            <p><a href="https://minepoa.com" rel="noreferrer">https://minepoa.com</a></p>
+            <p><a href="https://poa.grok.me" rel="noreferrer">https://poa.grok.me</a></p>
+          </article>
+        </div>
+      </section>
       </section>
 
-      <section id="handoffSection" data-section="handoff">
+      <section id="handoffSection" data-section="handoff" role="tabpanel" aria-labelledby="tabHandoff" tabindex="0" hidden>
         <h2>🧾 Handoff</h2>
         <p class="howto">Build an unsigned intent for your agent. No keys here.</p>
         <button type="button" id="example" hidden>Load example</button>
@@ -166,32 +195,7 @@
         <button type="button" id="copy" disabled>Copy</button>
       </section>
 
-      <section id="resourcesSection" class="span-2" data-section="explore">
-        <h2>Resources</h2>
-        <div class="cards">
-          <article class="card">
-            <h3>Explorer</h3>
-            <p><a href="https://poadomains.grok.me" rel="noreferrer">https://poadomains.grok.me</a></p>
-            <p><a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer">https://maximusmaximus.github.io/poa-domains/</a></p>
-          </article>
-          <article class="card">
-            <h3>🎨 Emoji bids</h3>
-            <p id="premiumPolicy">⚪ Checking prices…</p>
-            <p id="standardPolicy">⚪ Checking prices…</p>
-          </article>
-          <article class="card">
-            <h3>CLI / MCP</h3>
-            <code>node dist/src/reference-cli.js keygen --out agent.pem</code>
-            <p><a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer">github.com/maximusmaximus/poa-domains</a></p>
-          </article>
-          <article class="card">
-            <h3>PoA</h3>
-            <p><a href="https://minepoa.com" rel="noreferrer">https://minepoa.com</a></p>
-            <p><a href="https://poa.grok.me" rel="noreferrer">https://poa.grok.me</a></p>
-          </article>
-        </div>
-      </section>
-      <section id="escrowSection" data-section="escrow"></section>
+      <section id="escrowSection" data-section="escrow" role="tabpanel" aria-labelledby="tabEscrow" tabindex="0" hidden></section>
     </main>
 
     <main id="domainMain" hidden>
@@ -256,7 +260,7 @@
       aria-expanded="false"
     >
       <span aria-hidden="true">🛒</span>
-      <span id="floatingCartBadge" class="floating-cart-badge" hidden>0</span>
+      <span id="floatingCartBadge" aria-hidden="true" class="floating-cart-badge" hidden>0</span>
     </button>
 
     <div id="floatingCartBackdrop" class="floating-cart-backdrop" hidden></div>
@@ -264,6 +268,7 @@
       id="floatingCartPanel"
       class="floating-cart-panel"
       role="dialog"
+      tabindex="-1"
       aria-modal="true"
       aria-labelledby="floatingCartHeading"
       hidden
@@ -278,9 +283,9 @@
         <button type="button" id="floatingCartClear" class="secondary" disabled>Clear</button>
         <button type="button" id="copyCheckoutBtn" disabled>Copy checkout for agent</button>
       </div>
-      <p id="floatingCartStatus" class="muted" role="status"></p>
+      <p id="floatingCartStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
 
-    <script type="module" src="/app.js?v=e7a77f3f3644"></script>
+    <script type="module" src="/app.js?v=5c150edb6e15"></script>
   </body>
 </html>

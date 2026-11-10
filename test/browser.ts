@@ -59,6 +59,7 @@ export async function browserSmoke(
       expectedVersion: d.version,
       metadata: witness("alpha", d.rights, null, description),
     };
+    await page.locator("#tabHandoff").click();
     for (const [id, value] of Object.entries({
       signer,
       requestId: "ui-safe-1",
@@ -117,6 +118,7 @@ export async function browserSmoke(
     await page.locator("button[type=submit]").click();
     assert.equal(await page.locator("#body").innerText(), "");
     checks.push("UI rejects duplicate keys and private credential fields");
+    await page.locator("#tabFind").click();
     await page.locator("#searchInput").fill("quantum");
     await page.locator("#searchBtn").click();
     assert.match(

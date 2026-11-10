@@ -49,8 +49,10 @@ export async function browserSmoke(base, evidence) {
     await page.locator("#floatingCartBtn").click();
     await page.keyboard.press("Escape");
     assert.equal(await page.locator("#floatingCartPanel").isVisible(),false);
+    await page.locator("#tabAuctions").click();
     await page.locator('.auction-tab[data-auction-tab="past"]').click();
     await page.locator('.auction-tab[data-auction-tab="current"]').click();
+    await page.locator("#tabFind").click();
     await page.locator("#searchInput").fill("openai"); await page.locator("#searchBtn").click();
     assert.match(await page.locator("#searchResult").innerText(),/RESERVED/i);
     await page.evaluate(()=>document.fonts.ready);

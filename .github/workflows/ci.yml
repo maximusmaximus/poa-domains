@@ -80,6 +80,7 @@ jobs:
           - browser-smoke
           - browser-e2e
           - browser-escrow
+          - browser-a11y
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -123,6 +124,7 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
           path: |
+            test-results/a11y-results.json
             test-results/emoji-format-product-results.json
             test-results/emoji-format-product/*/error-context.md
             test-results/emoji-format-product/*/attachments/*.json

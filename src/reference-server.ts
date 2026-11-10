@@ -17,7 +17,7 @@ const files: Record<string, [string, string]> = {
   "/XeroEmoji-COLRv1.woff2": ["XeroEmoji-COLRv1.woff2", "font/woff2"],
 };
 // Explicit module allowlist, never arbitrary filesystem paths.
-for (const name of ["agent-cart.js", "ui-cart.js", "ui-core.js", "ui-domain.js", "ui-handoff.js", "ui-ideas.js", "ui-poll.js", "ui-render.js", "ui-router.js", "ui-search.js", "ui-state.js"]) files["/"+name] = [name, "text/javascript; charset=utf-8"];
+for (const name of ["agent-cart.js", "ui-a11y.js", "ui-cart.js", "ui-core.js", "ui-domain.js", "ui-handoff.js", "ui-ideas.js", "ui-poll.js", "ui-render.js", "ui-router.js", "ui-search.js", "ui-state.js"]) files["/"+name] = [name, "text/javascript; charset=utf-8"];
 export interface ReferenceServerOptions {
   host?: string;
   publicUrl?: string;

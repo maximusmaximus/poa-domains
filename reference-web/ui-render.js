@@ -1,9 +1,10 @@
-import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=e7a77f3f3644";
-import { ui } from "./ui-state.js?v=e7a77f3f3644";
-import { add, el, person } from "./ui-core.js?v=e7a77f3f3644";
-import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=e7a77f3f3644";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=e7a77f3f3644";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=e7a77f3f3644";
+import { returnFocus } from "./ui-a11y.js?v=5c150edb6e15";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=5c150edb6e15";
+import { ui } from "./ui-state.js?v=5c150edb6e15";
+import { add, el, person } from "./ui-core.js?v=5c150edb6e15";
+import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=5c150edb6e15";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=5c150edb6e15";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=5c150edb6e15";
 
 export function updateTabDots(state) {
     const marks = tabWatermarks(state);
@@ -63,14 +64,19 @@ export function renderTicker(state) {
     }
 }
 
+let detailOpener = null;
 export function closeDetail() {
+    const wasOpen = !el("detailView").hidden;
     ui.detailTarget = null;
     el("detailView").hidden = true;
+    if(wasOpen) returnFocus(detailOpener,document.querySelector(".section-tab[aria-selected=true]"));
+    detailOpener = null;
 }
 
 export function openDetail(item) {
     if (!ui.latestState)
         return;
+    if(el("detailView").hidden) detailOpener=document.activeElement;
     ui.detailTarget = item;
     const view = el("detailView");
     view.hidden = false;
