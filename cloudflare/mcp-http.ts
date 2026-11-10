@@ -124,7 +124,10 @@ export async function mcpHttp(request: Request, env: Env): Promise<Response> {
         reply = await env.REGISTRY.getByName(SINGLETON).handle({
           method,
           path,
-          query,
+          // The hardened MCP parser intentionally returns null-prototype records.
+          // DO RPC accepts ordinary records, not those parser objects. These are
+          // schema-validated flat string filters; signed packets stay JSON text.
+          query: { ...query },
           requestId,
           ...(packet !== undefined ? { packet: JSON.stringify(packet) } : {}),
         });

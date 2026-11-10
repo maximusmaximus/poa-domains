@@ -139,3 +139,5 @@ button:disabled { background: #455269; color: #e7eef8; cursor: progress; }
 .muted { color: #c5d5eb; }
 .footer-credit { text-align: center; font-size: .9rem; }
 @media (max-width: 480px) { main { padding: 1.5rem 1rem; } section { padding: 1rem; } .availability-table th, .availability-table td { padding: .6rem .3rem; } }
+
+.github-mark { flex:none; vertical-align:middle; }

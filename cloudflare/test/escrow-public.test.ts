@@ -29,3 +29,31 @@ test('OFF capabilities are neutral; every other public route is absent without i
 
 test('post-dispatch storage/outcome failures are UNKNOWN, never falsely rejected',async()=>{for(const error of [Error('ESCROW_UNAVAILABLE'),Error('storage failed after commit')]){const r=await escrowHttp(req('intent',packet(3,'intent',{amount:'1.000000'})),env,()=>({escrowRead:async()=>({}),escrowCommand:async()=>{throw error;}}));assert.equal(r.status,503);assert.equal((await r.json() as any).accepted,'unknown');}});
 test('known pre-write business failure stays rejected without exposing details',async()=>{const r=await escrowHttp(req('withdraw',packet(3,'withdraw',{amount:'1.000000'})),env,()=>({escrowRead:async()=>({}),escrowCommand:async()=>{throw Error('ESCROW_PAUSED');}}));assert.equal(r.status,409);assert.equal((await r.json() as any).accepted,false);});
+
+test('slow overlapping display probes are one flight even after 10s; cache TTL starts when settled',async()=>{
+ const e=fixture();await e.escrow.pause(false);let probes=0,release!:(v:any)=>void;
+ Object.assign(e.net,{displayStatus:()=>{probes++;return new Promise(r=>{release=r;});}});
+ const first=e.escrow.readiness();e.net.now+=11000;
+ const second=e.escrow.readiness();assert.equal(first,second);assert.equal(probes,1);
+ release({chain:e.net.chain,asOf:e.net.now,stale:false,height:10,root:'a'.repeat(64),fee:'0.000000'});
+ const shown=await first;assert.equal(shown.held,false);assert.equal(shown.durationMs,11000);assert.equal(shown.slow,true);assert.equal(shown.code,null);
+ e.net.now+=9999;assert.equal((await e.escrow.readiness()).held,false);assert.equal(probes,1);
+ e.net.now+=2;const next=e.escrow.readiness();assert.equal(probes,2);release(await e.net.status());await next;assert.equal(e.net.calls,0);
+});
+test('inflight or cached display success cannot authorize a stale signed financial command',async()=>{
+ const e=fixture();await e.escrow.pause(false);let release!:(v:any)=>void;Object.assign(e.net,{displayStatus:()=>new Promise(r=>{release=r;})});
+ const pending=e.escrow.readiness(),before=e.escrow.state();e.net.stale=true;
+ await assert.rejects(()=>call(e,3,'intent',{amount:'1.000000'},'pending-display','intent'),/ESCROW_STALE/);
+ release({...await e.net.status(),stale:false});assert.equal((await pending).held,false);
+ await assert.rejects(()=>call(e,3,'intent',{amount:'1.000000'},'cached-display','intent'),/ESCROW_STALE/);
+ assert.deepEqual(e.escrow.state(),before);assert.equal(e.net.calls,0);
+});
+test('display success expires at the unchanged financial age limit, not only its TTL',async()=>{
+ const e=fixture();let probes=0;const asOf=e.net.now-89000;Object.assign(e.net,{displayStatus:async()=>{probes++;return {...await e.net.status(),asOf};}});
+ assert.equal((await e.escrow.readiness()).held,false);e.net.now+=1001;
+ const shown=await e.escrow.readiness();assert.equal(shown.held,true);assert.equal(shown.code,'ESCROW_STALE');assert.equal(probes,2);
+});
+test('display error telemetry is bounded public codes, never raw private exception details',async()=>{
+ const e=fixture();Object.assign(e.net,{displayStatus:async()=>{throw Error('synthetic-private-node-url-and-credential');}});
+ const shown=await e.escrow.readiness();assert.equal(shown.held,true);assert.equal(shown.code,'ESCROW_NODE_UNAVAILABLE');assert.equal(shown.timing,null);assert.ok(!JSON.stringify(shown).includes('synthetic-private'));
+});
