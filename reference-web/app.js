@@ -43,7 +43,7 @@ import {
   cartMinimum,
   cartSummary,
   editCartAmount,
-} from "./shared.js?v=ac2c1d3185fc";
+} from "./shared.js?v=68c6d10f3228";
 
 const el = (id) => document.getElementById(id);
 let cap,
@@ -1666,6 +1666,7 @@ try {
     if (item.action === "announceAuction+bid") item.params.maxBid = item.amount;
     try {
       item.minimumAmount = cartMinimum(item, cap, null);
+      if (item.action === "announceAuction+bid") item.params.reserve = item.minimumAmount;
       if (BigInt(item.amount) < BigInt(item.minimumAmount) ||
           (item.params.reserve && BigInt(item.params.reserve) > BigInt(item.amount))) throw Error("⚠️ Review this cart amount before copying.");
       item.summary = cartSummary(item);

@@ -260,7 +260,8 @@ export function editCartAmount(item, raw, cap, state) {
   delete updated.validationError;
   if (Object.hasOwn(updated.params, "amount")) updated.params.amount = amount;
   if (item.action === "announceAuction+bid") {
-    updated.params.reserve = amount;
+    // The registry requires the exact capability reserve, not the spending cap.
+    updated.params.reserve = minimum;
     updated.params.maxBid = amount;
   }
   updated.summary = cartSummary(updated);

@@ -1,6 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createServer } from "node:http";
+import { generateKeyPairSync } from "node:crypto";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { Engine } from "../dist/src/engine.js";
+import { ManualClock } from "../dist/src/clock.js";
+import { fixtureConfig } from "../dist/src/config.js";
+import { publicPrincipal } from "../dist/src/auth.js";
 import { profileEngine, SIGNER } from "./fixtures/ui-harness.mjs";
 import { capabilities, prepare } from "../dist/src/interface.js";
 import { AUCTION_WINDOWS } from "../dist/src/engine.js";
@@ -23,10 +33,10 @@ test("root reserves and both bidding windows match capabilities under both profi
   }
   assert.throws(() => rootAuctionPolicy({ assets: cap.assets }, { tier: "standard" }), /Prices unavailable/);
 });
-test("edited prompt snapshot keeps amount, reserve, maxBid, summary, CLI cap and checkout consistent", () => {
+test("edited prompt snapshot keeps capability reserve fixed while amount, maxBid, summary, CLI cap and checkout change", () => {
   const edited = editCartAmount(item, "250", cap);
-  assert.deepEqual([edited.amount, edited.params.reserve, edited.params.maxBid], ["250", "250", "250"]);
-  assert.match(edited.summary, /reserve=250 POA.*maxTotal=250 POA/);
+  assert.deepEqual([edited.amount, edited.params.reserve, edited.params.maxBid], ["250", "100", "250"]);
+  assert.match(edited.summary, /reserve=100 POA.*maxTotal=250 POA/);
   assert.equal(item.amount, "100", "pure edit does not mutate prior state");
   const prompt = buildAgentCartPrompt([edited], cap, SIGNER, "http://127.0.0.1:8787");
   assert.equal(prompt, readFileSync("test/fixtures/cart-edited-prompt.txt", "utf8"));
@@ -55,4 +65,48 @@ test("both handoffs and Node/browser preparation default bid beneficiary to the 
     maxTotal: "1000", maxNetworkFee: "0", action: "bid", params };
   assert.equal(prepare(input, cap).params.beneficiary, SIGNER);
   assert.equal(makeBody(input, cap).params.beneficiary, SIGNER);
+});
+
+// Disposable local fixture identity only: never an account key or an upstream request.
+test("above-reserve edit matches both capability policies and CLI forwards an accepted announcement", { timeout: 20000 }, async () => {
+  for (const profile of ["fixture", "mainnet"]) {
+    const c = capabilities(profileEngine(profile));
+    const minimum = rootAuctionPolicy(c, inspectName("alpha", c.emojiManifest)).reserve;
+    const edited = editCartAmount({ ...item, amount: minimum, params: { ...item.params, reserve: minimum } }, (BigInt(minimum) * 3n).toString(), c);
+    assert.equal(edited.params.reserve, minimum);
+    assert.equal(edited.params.maxBid, edited.amount);
+    assert.match(edited.summary, new RegExp(`reserve=${minimum} POA.*maxTotal=${edited.amount} POA`));
+  }
+  const key = generateKeyPairSync("ed25519").privateKey;
+  const issuer = publicPrincipal(key), engine = new Engine(fixtureConfig(issuer, "ed25519:" + "3".repeat(64), []), new ManualClock(1000000));
+  const c = capabilities(engine), edited = editCartAmount(item, "250", c), received = [];
+  const dir = mkdtempSync(join(tmpdir(), "poa-cart-regression-")), keyFile = join(dir, "fixture.pem");
+  writeFileSync(keyFile, key.export({ type: "pkcs8", format: "pem" }), { mode: 0o600 });
+  const server = createServer(async (req, res) => {
+    const u = new URL(req.url, "http://127.0.0.1");
+    const reply = value => { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(value)); };
+    try {
+      if (req.method === "GET" && u.pathname === "/v1/capabilities") return reply(c);
+      if (req.method === "GET" && u.pathname === "/v1/state") return reply({ state: engine.snapshot(), observedServerTime: 1000000 });
+      if (req.method === "GET" && u.pathname === "/v1/nonce") return reply({ nonce: engine.nextNonce(u.searchParams.get("signer")) });
+      if (req.method === "POST" && u.pathname === "/v1/intents") {
+        let raw = ""; for await (const chunk of req) raw += chunk;
+        const packet = JSON.parse(raw); received.push(packet.body);
+        return reply(engine.submit(packet)); // Synthetic in-memory registry only.
+      }
+      res.writeHead(404); res.end();
+    } catch (error) { res.writeHead(400, { "content-type": "application/json" }); res.end(JSON.stringify({ error: error.message })); }
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const { stdout } = await promisify(execFile)(process.execPath, ["dist/src/reference-cli.js", "act", "--url", `http://127.0.0.1:${server.address().port}`, "--key-file", keyFile, "--action", edited.action, "--params", JSON.stringify(edited.params), "--max-total", edited.amount], { timeout: 15000 });
+    assert.equal(JSON.parse(stdout).announceReceipt.status, "succeeded");
+    assert.equal(received.length, 1); assert.equal(received[0].action, "announceAuction");
+    assert.equal(received[0].params.reserve, c.assets.POA.standardReserve);
+    assert.equal(Object.values(engine.snapshot().auctions)[0].reserve, "100");
+    assert.equal(edited.amount, "250"); assert.equal(edited.params.maxBid, "250");
+  } finally {
+    await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

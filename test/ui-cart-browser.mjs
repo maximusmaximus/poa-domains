@@ -25,12 +25,18 @@ try {
         const cartInput = page.getByLabel("Amount or max bid for " + name, { exact: true });
         await cartInput.fill(edited);
         const prompt = await page.locator("#cartPrompt").innerText();
-        assert.ok(prompt.includes(`"reserve":"${edited}","maxBid":"${edited}"`));
+        assert.ok(prompt.includes(`"reserve":"${reserve}","maxBid":"${edited}"`));
         assert.ok(prompt.includes(`maxTotal=${edited}`));
-        assert.ok((await page.locator("#cartList").innerText()).includes(`reserve=${edited}`));
+        assert.ok((await page.locator("#cartList").innerText()).includes(`reserve=${reserve}`));
         await cartInput.fill("bad"); assert.equal(await page.locator("#copyCartPrompt").isDisabled(), true);
         assert.match(await page.locator("#cartList").innerText(), /positive whole-number/);
         await cartInput.fill(edited); assert.equal(await page.locator("#copyCartPrompt").isEnabled(), true);
+        // Reload a cart saved by the buggy PR #40: repair reserve without raising its cap.
+        await page.evaluate(() => { const key = "poadomains.cart.v1"; const saved = JSON.parse(localStorage.getItem(key)); saved[0].params.reserve = saved[0].amount; localStorage.setItem(key, JSON.stringify(saved)); });
+        await page.reload(); await page.locator("#stats strong").first().waitFor();
+        const repaired = await page.locator("#cartPrompt").innerText();
+        assert.ok(repaired.includes(`"reserve":"${reserve}","maxBid":"${edited}"`));
+        assert.equal(await page.getByLabel("Amount or max bid for " + name, { exact: true }).inputValue(), edited);
         await page.locator("#clearCart").click();
       }
       // Capability timing is not a presentation constant: use a deliberately different read-only fixture.
