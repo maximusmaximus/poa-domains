@@ -1,3 +1,4 @@
+import { parseNetworkStatus } from "../web/network-schema.js";
 /** Read-only PoA public-node status for the UI banner and write-hold gate. No API keys. */
 
 export type NetworkLevel = "checking" | "online" | "degraded" | "down";
@@ -170,11 +171,10 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
         });
       }
       const body = (await response.json()) as Record<string, unknown>;
-      const chainOk =
-        body &&
-        (body.chain_id === CHAIN || body.chain_id === undefined) &&
-        typeof body.epochs_closed === "number";
-      if (!chainOk) {
+      let parsed;
+      try { parsed = parseNetworkStatus(body, {availabilityOnly:true, now:started, fail: () => { throw Error("NETWORK_SCHEMA"); }}); }
+      catch { /* Keep the deployed status-only probe failure/hold behavior. */ }
+      if (!parsed) {
         consecutiveFailures += 1;
         const level = classifyProbe({
           ok: false,
@@ -190,13 +190,8 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
       }
       consecutiveFailures = 0;
       everSucceeded = true;
-      const checkpoint = body.checkpoint as
-        | { height?: number }
-        | undefined;
-      const stale =
-        typeof body.stale === "boolean" ? body.stale : null;
-      const staleAgeS =
-        typeof body.stale_age_s === "number" ? body.stale_age_s : null;
+      const {staleAgeS, ...detail} = parsed;
+      const stale = detail.stale;
       const level = classifyProbe({
         ok: true,
         latencyMs,
@@ -209,21 +204,7 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
         checkedAt: now(),
         failures: 0,
         latencyMs,
-        detail: {
-          epochsClosed:
-            typeof body.epochs_closed === "number" ? body.epochs_closed : null,
-          checkpointHeight:
-            typeof checkpoint?.height === "number"
-              ? checkpoint.height
-              : typeof body.checkpoint_height === "number"
-                ? body.checkpoint_height
-                : null,
-          agentsJoined:
-            typeof body.agents_joined === "number" ? body.agents_joined : null,
-          txs: typeof body.txs === "number" ? body.txs : null,
-          final: typeof body.final === "number" ? body.final : null,
-          stale,
-        },
+        detail,
       });
     } catch {
       consecutiveFailures += 1;

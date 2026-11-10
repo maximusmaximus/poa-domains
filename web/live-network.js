@@ -1,3 +1,4 @@
+import { parseNetworkStatus } from "./network-schema.js";
 // Independent component: official public-node observations, NEVER registry state.
 const SOURCE = 'https://minepoa.com';
 const CHAIN = 'poa-mainnet-1';
@@ -141,30 +142,6 @@ export function parseBoundedJson(bytes) {
 
 const record = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const count = v => Number.isSafeInteger(v) && v >= 0;
-function observation(status, facts, now) {
-  if (!record(status) || !record(facts) || !record(status.checkpoint) || !record(facts.economics)) fail('INVALID_SCHEMA');
-  if (typeof status.chain_id !== 'string' || typeof facts.chain_id !== 'string') fail('INVALID_SCHEMA');
-  if (status.chain_id !== CHAIN || facts.chain_id !== CHAIN) fail('CHAIN_MISMATCH');
-  for (const n of [status.checkpoint.height, status.checkpoint.cutoff_ts, status.epochs_closed,
-    status.agents_joined, status.txs, status.final, status.K, facts.open_epoch, facts.economics.K]) {
-    if (!count(n)) fail('INVALID_SCHEMA');
-  }
-  if (status.K < 1 || status.K > 256 || facts.economics.K < 1 || facts.economics.K > 256) fail('INVALID_SCHEMA');
-  if (status.K !== facts.economics.K || facts.open_epoch !== status.epochs_closed || status.final > status.txs) fail('CONSISTENCY_MISMATCH');
-  for (const digest of [facts.engine_sha256, facts.params_sha256]) {
-    if (typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest)) fail('INVALID_SCHEMA');
-  }
-  if (status.checkpoint.cutoff_ts > Math.floor((now + 300000) / 1000)) fail('FUTURE_CHECKPOINT');
-  return Object.freeze({
-    kind: 'native-network-observation', source: SOURCE, chainId: CHAIN,
-    observedAt: now, expiresAt: now + TTL_MS,
-    verification: 'node-reported-unverified', finalityVerified: false, registryReady: false,
-    checkpoint: Object.freeze({ height: status.checkpoint.height, cutoffTs: status.checkpoint.cutoff_ts }),
-    epochsClosed: status.epochs_closed, agentsJoined: status.agents_joined,
-    transactions: status.txs, reportedFinalTransactions: status.final,
-    attestationThreshold: status.K, engineSha256: facts.engine_sha256, paramsSha256: facts.params_sha256,
-  });
-}
 
 /** Only fetch/now are injectable code-level dependencies; URLs and limits are fixed. */
 export function createLiveNetworkReader(options = {}) {
@@ -247,7 +224,7 @@ export function createLiveNetworkReader(options = {}) {
       const [status, facts] = await Promise.race([work, deadline]);
       const end = clock();
       if (end - start > OVERALL_MS) fail('CLOCK_JUMP');
-      const result = observation(status, facts, end);
+      const result = parseNetworkStatus(status, {facts, now:end, fail});
       if (previous) {
         if (result.checkpoint.height === previous.checkpoint.height && result.checkpoint.cutoffTs !== previous.checkpoint.cutoffTs) fail('CHECKPOINT_MISMATCH');
         if (result.checkpoint.height < previous.checkpoint.height || result.checkpoint.cutoffTs < previous.checkpoint.cutoffTs) fail('CHECKPOINT_ROLLBACK');

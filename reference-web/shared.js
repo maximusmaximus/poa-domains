@@ -1420,3 +1420,33 @@ export function registryViewState(payload) {
       !Number.isSafeInteger(observed) || observed < state.time) throw Error("Invalid registry time or state");
   return { ...state, time: observed };
 }
+
+/** Every UI entry point constructs cart params from the same current public facts. */
+export function buildCartItem(input, cap, state) {
+  if (!state) throw Error("Refresh registry data before adding an item.");
+  const info = inspectName(input.name, cap.emojiManifest), name = info.canonical, action = input.action;
+  let asset, amount, params;
+  if (action === "announceAuction+bid") {
+    asset = "POA"; const reserve = rootAuctionPolicy(cap, info).reserve;
+    amount = input.amount ?? reserve;
+    params = { name, asset, reserve, maxBid: amount, expectedDeedId: null, expectedVersion: 0 };
+  } else if (action === "bid") {
+    const a = state.auctions?.[input.auctionId];
+    if (!a || a.name !== name || a.status !== "live") throw Error("Check the current auction again.");
+    asset = a.asset; amount = input.amount ?? (a.high ? minimumNextBid(a.high.amount, cap.increment) : a.reserve);
+    params = { auctionId: a.id, expectedVersion: a.version, asset, amount };
+  } else if (["buyFixed", "fillChildOffer"].includes(action)) {
+    const o = state.offers?.[input.offerId];
+    if (!o || !offerIsActive(o, state.time)) throw Error("Check the current offer again.");
+    asset = o.asset; amount = o.price;
+    params = { offerId: o.id, expectedVersion: o.version, asset, amount };
+    if (action === "fillChildOffer") Object.assign(params, {
+      expectedGeneration: (state.names?.[name]?.generation ?? 0) + 1, label: info.childLabel,
+      metadata: { cid: "<COMPUTED_CIDV1_SHA256>", document: { schema: "poa-domains.metadata.v1", name,
+        rightsHash: "<PARENT_OFFER_RIGHTS_HASH>", description: `Child domain ${name}` } },
+    });
+  } else throw Error("Unknown cart action");
+  const item = { name, tier: info.tier, isRoot: info.isRoot, action, asset, amount: String(amount), params };
+  item.minimumAmount = cartMinimum(item, cap, state); item.summary = cartSummary(item);
+  return recheckCartItem(item, cap, state);
+}

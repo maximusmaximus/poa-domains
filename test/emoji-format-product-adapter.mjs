@@ -7,7 +7,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 export const PRODUCT_CSP="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https://minepoa.com/chain/poa-mainnet-1/api/status https://minepoa.com/chain/poa-mainnet-1/api/network-facts; img-src 'self'; base-uri 'none'; form-action 'none'";
 export const OFFICIAL_READ_URLS=Object.freeze(['https://minepoa.com/chain/poa-mainnet-1/api/status','https://minepoa.com/chain/poa-mainnet-1/api/network-facts']);
-export const BUILD_FILES=Object.freeze(['.nojekyll','LICENSE-UNICODE.txt','PUBLIC-PROVENANCE.json','app.js','config.json','emoji-format-checker.css','emoji-format-checker.mjs','emoji17-data.mjs','emoji17.mjs','icon.svg','index.html','live-network.js','network.json','status.json','style.css']);
+export const BUILD_FILES=Object.freeze(['.nojekyll','LICENSE-UNICODE.txt','PUBLIC-PROVENANCE.json','app.js','config.json','emoji-format-checker.css','emoji-format-checker.mjs','emoji17-data.mjs','emoji17.mjs','icon.svg','index.html','live-network.js','network-schema.js','network.json','status.json','style.css']);
 export const PUBLIC_PINS=Object.freeze({
  'emoji-format-checker.mjs':'f7c6e412c63951c6a617ff79e59ddd7b36cceba2be39b57c882a131a4783869b',
  'emoji-format-checker.css':'32d2c62e558ee2997b0c37d7a42f104fd334240e16afb5b772868f88737bb120',
@@ -18,7 +18,7 @@ export const PUBLIC_PINS=Object.freeze({
 });
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
 export function loadBuiltArtifact(buildDir=process.env.POA_FORMAT_BUILD_DIR??path.resolve(process.cwd(),'_site')){
- const root=fs.realpathSync(path.resolve(buildDir)),names=fs.readdirSync(root).sort();assert.deepEqual(names,[...BUILD_FILES].sort(),'The build must contain exactly the15 explicit public files');
+ const root=fs.realpathSync(path.resolve(buildDir)),names=fs.readdirSync(root).sort();assert.deepEqual(names,[...BUILD_FILES].sort(),'The build must contain exactly the16 explicit public files');
  const files=new Map(),hashes={};
  for(const name of BUILD_FILES){const file=path.join(root,name),stat=fs.lstatSync(file);assert.ok(stat.isFile()&&!stat.isSymbolicLink(),'No directories or linked file targets');assert.equal(path.dirname(fs.realpathSync(file)),root);const body=fs.readFileSync(file),digest=sha(body);if(Object.hasOwn(PUBLIC_PINS,name))assert.equal(digest,PUBLIC_PINS[name],'Reviewed public artifact changed: '+name);files.set(name,body);hashes[name]={bytes:body.length,sha256:digest};}
  return {files,hashes};

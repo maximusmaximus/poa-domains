@@ -33,8 +33,8 @@ test("domain view shows a variant spelling as taken, links the holder, and leave
 });
 
 test("UI shows no renewal or expiry wording for permanent names", async () => {
-  const { readFileSync } = await import("node:fs");
-  const app = readFileSync(new URL("../reference-web/app.js", import.meta.url), "utf8");
+  const { readFileSync, readdirSync } = await import("node:fs");
+  const app = readdirSync(new URL("../reference-web/", import.meta.url)).filter(name => name.endsWith(".js")).map(name => readFileSync(new URL("../reference-web/" + name, import.meta.url), "utf8")).join("\n");
   assert.match(app, /Owned forever/);
   assert.doesNotMatch(app, /Expiry \$\{d\.expiry\}/);
   assert.doesNotMatch(app, /renewLease/);
