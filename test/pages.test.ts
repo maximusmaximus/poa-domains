@@ -98,8 +98,22 @@ test("Pages deployment archive retains exactly the tested public discovery files
     execFileSync(process.execPath,["scripts/pages-archive.mjs",dir,archive]);
     const entries=execFileSync("tar",["--list","--file",archive],{encoding:"utf8"}).trim().split("\n").sort();
     assert.ok(entries.every(file=>file.startsWith("./")&&!file.includes("..")),"PAGES_TAR_RELATIVE_PREFIX");
-    assert.deepEqual(entries,[...PUBLIC_FILES].map(file=>"./"+file).sort());
+    // Inspect physical headers: tar --list silently hides POSIX x/PAX records.
+    const bytes=readFileSync(archive),regular:string[]=[],directories:string[]=[];
+    for(let offset=0;offset+512<=bytes.length;){
+      const header=bytes.subarray(offset,offset+512);if(header.every(n=>n===0))break;
+      const type=String.fromCharCode(header[156]!),name=header.subarray(0,100).toString().split("\0")[0]!;
+      assert.ok(["0","5"].includes(type),"PAGES_PHYSICAL_TAR_TYPE "+type);
+      (type==="0"?regular:directories).push(name);
+      const size=parseInt(header.subarray(124,136).toString().replace(/\0/g,"").trim()||"0",8);
+      offset+=512+Math.ceil(size/512)*512;
+    }
+    assert.deepEqual(regular.sort(),[...PUBLIC_FILES].map(file=>"./"+file).sort());
+    assert.deepEqual(directories.sort(),["./","./.well-known/","./schemas/"].sort());
     for(const file of [".well-known/agent.json",".nojekyll"])assert.equal(execFileSync("tar",["--extract","--to-stdout","--file",archive,"--","./"+file],{encoding:"utf8"}),readFileSync(join(dir,file),"utf8"));
+    mkdirSync(join(dir,"demo"));
+    assert.throws(()=>execFileSync(process.execPath,["scripts/pages-archive.mjs",dir,join(work,"empty-private.tar")],{stdio:"pipe"}));
+    assert.equal(existsSync(join(work,"empty-private.tar")),false);rmSync(join(dir,"demo"),{recursive:true});
     writeFileSync(join(dir,".private-note"),"not public");
     assert.throws(()=>execFileSync(process.execPath,["scripts/pages-archive.mjs",dir,join(work,"bad.tar")],{stdio:"pipe"}));
     assert.equal(existsSync(join(work,"bad.tar")),false);
