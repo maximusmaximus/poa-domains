@@ -1,3 +1,4 @@
+import { correlationId, errorReply, envelopeResponse } from '../src/errors.js';
 import { escrowHttp } from "./escrow-http.js";
 import { Fault, need, parseJSON } from "../src/core.js";
 import { parseRestoreInput, RESTORE_INPUT_LIMIT } from "./restore-input.js";
@@ -121,6 +122,8 @@ export default {
     }));
   },
   async fetch(request: Request, env: Env): Promise<Response> {
+    const requestId=correlationId(request.headers.get("x-request-id"));
+    const fail=(status:number,body:unknown)=>{const reply=errorReply(status,body,requestId);const r=json(reply.status,reply.body);if(reply.body.code==="NETWORK_HELD")r.headers.set("retry-after","30");return r;};
     let submitting = false, dispatched = false;
     try {
       need(request.url.length <= 8192, "URL_SIZE");
@@ -132,13 +135,13 @@ export default {
 
       // Same-origin network status: Worker probes minepoa.com; browser never needs a PoA key.
       if (u.pathname === "/v1/network-status") {
-        if (request.method !== "GET" && request.method !== "HEAD") return json(405, { code: "METHOD_NOT_ALLOWED" });
+        if (request.method !== "GET" && request.method !== "HEAD") return fail(405, { code: "METHOD_NOT_ALLOWED" });
         const status = await networkStatusMonitor.getStatus();
         return json(200, status, true);
       }
 
       if (u.pathname !== "/healthz" && !u.pathname.startsWith("/v1/")) {
-        if (request.method !== "GET" && request.method !== "HEAD") return json(405, { code: "METHOD_NOT_ALLOWED" });
+        if (request.method !== "GET" && request.method !== "HEAD") return fail(405, { code: "METHOD_NOT_ALLOWED" });
         // Deep links: return the SPA shell at 200 without following Assets redirects to "/".
         if (/^\/(d|p)\/[^/]+\/?$/.test(u.pathname)) {
           let shell = await env.ASSETS.fetch(new Request(new URL("/", u.origin), { method: "GET" }));
@@ -152,16 +155,21 @@ export default {
         }
         return env.ASSETS.fetch(request);
       }
-      if (u.pathname.startsWith("/v1/escrow/")) return escrowHttp(request,env,()=>env.REGISTRY.getByName(SINGLETON));
-      if (u.pathname.startsWith("/v1/admin/")) return await admin(request, env, u);
-      if (request.method !== "GET" && !(request.method === "POST" && u.pathname === "/v1/intents")) return json(405, { code: "METHOD_NOT_ALLOWED" });
+      if (u.pathname.startsWith("/v1/escrow/")) {
+        const part=u.pathname.slice("/v1/escrow/".length);
+        if(String(env.POA_ESCROW_ENABLED)!=="true"&&["capabilities","market","domain","intent","withdraw","command","account"].includes(part)&&!(part==="capabilities"&&request.method==="GET"))
+          return fail(503,{code:"ESCROW_DISABLED",accepted:false});
+        return envelopeResponse(await escrowHttp(request,env,()=>env.REGISTRY.getByName(SINGLETON)),requestId);
+      }
+      if (u.pathname.startsWith("/v1/admin/")) return envelopeResponse(await admin(request, env, u),requestId);
+      if (request.method !== "GET" && !(request.method === "POST" && u.pathname === "/v1/intents")) return fail(405, { code: "METHOD_NOT_ALLOWED" });
 
       // Hold state-changing writes while the public PoA network is Down (2 consecutive failures).
       if (request.method === "POST" && u.pathname === "/v1/intents") {
         need(u.search === "", "QUERY_NOT_ALLOWED");
         const net = networkStatusMonitor.peekStatus();
         if (net.hold) {
-          return json(503, {
+          return fail(503, {
             code: "NETWORK_HELD",
             accepted: false,
             hold: true,
@@ -176,13 +184,13 @@ export default {
       submitting = request.method === "POST";
       dispatched = true;
       const reply = await env.REGISTRY.getByName(SINGLETON).handle({ method: request.method, path: u.pathname,
-        query: Object.fromEntries(u.searchParams), ...(submitting ? { packet: JSON.stringify(packet) } : {}) });
-      return new Response(reply.jsonText, { status: reply.status, headers: { ...SECURITY, "content-type": "application/json; charset=utf-8", ...(request.method === "GET" ? { "access-control-allow-origin": "*" } : {}) } });
+        query: Object.fromEntries(u.searchParams), requestId, ...(submitting ? { packet: JSON.stringify(packet) } : {}) });
+      return envelopeResponse(new Response(reply.jsonText, { status: reply.status, headers: { ...SECURITY, "content-type": "application/json; charset=utf-8", ...(request.method === "GET" ? { "access-control-allow-origin": "*" } : {}) } }),requestId);
     } catch (error) {
-      if (error instanceof Fault) return json(error.code === "BODY_TOO_LARGE" ? 413 : 400, { code: error.code, accepted: false });
-      if (!dispatched && error instanceof TypeError) return json(400, { code: "INVALID_REQUEST", accepted: false });
-      if (submitting) return json(503, { code: "DURABILITY_UNKNOWN_RESTART_AND_QUERY", accepted: "unknown" });
-      return json(503, { code: "REGISTRY_UNAVAILABLE", accepted: false });
+      if (error instanceof Fault) return fail(error.code === "BODY_TOO_LARGE" ? 413 : 400, { code: error.code, accepted: false });
+      if (!dispatched && error instanceof TypeError) return fail(400, { code: "INVALID_REQUEST", accepted: false });
+      if (submitting) return fail(503, { code: "DURABILITY_UNKNOWN_RESTART_AND_QUERY", accepted: "unknown" });
+      return fail(503, { code: "REGISTRY_UNAVAILABLE", accepted: false });
     }
   },
 } satisfies ExportedHandler<Env>;

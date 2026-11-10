@@ -75,10 +75,9 @@ test("unknown receipt is explicitly UNKNOWN, not a failed transaction or safe pe
   try {
     const r = await fetch(s.url + "/v1/receipts/" + "0".repeat(64));
     assert.equal(r.status, 404);
-    assert.deepEqual(await r.json(), {
-      status: "unknown",
-      code: "UNKNOWN_OUTCOME",
-    });
+    const detail=await r.json() as any;
+    assert.deepEqual({status:detail.status,code:detail.code,accepted:detail.accepted,retryable:detail.retryable},{status:"unknown",code:"UNKNOWN_OUTCOME",accepted:"unknown",retryable:true});
+    for(const key of ["message","docs","requestId"])assert.equal(typeof detail[key],"string");
   } finally {
     await s.close();
   }

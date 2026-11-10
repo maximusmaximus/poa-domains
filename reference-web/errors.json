@@ -1,0 +1,1841 @@
+{
+  "schemaVersion": "poa-domains.errors.v1",
+  "errors": [
+    {
+      "code": "ACTION_AND_PARAMS_REQUIRED",
+      "httpStatus": 400,
+      "message": "Action and params required. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "AMOUNT",
+      "httpStatus": 400,
+      "message": "Amount. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "AMOUNT_CAP",
+      "httpStatus": 400,
+      "message": "The intent exceeds its approved spending cap.",
+      "retryable": false
+    },
+    {
+      "code": "AMOUNT_OVERFLOW",
+      "httpStatus": 400,
+      "message": "Amount overflow. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACT_DIRECTORY",
+      "httpStatus": 400,
+      "message": "Artifact directory. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACT_LINK",
+      "httpStatus": 400,
+      "message": "Artifact link. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ASSET",
+      "httpStatus": 400,
+      "message": "Asset. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "AUCTION_ASSET",
+      "httpStatus": 400,
+      "message": "Auction asset. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "AUCTION_CLOSED",
+      "httpStatus": 400,
+      "message": "Auction closed. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "AUCTION_NOT_FOUND",
+      "httpStatus": 400,
+      "message": "Auction not found. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "AUCTION_TERMINAL",
+      "httpStatus": 400,
+      "message": "Auction terminal. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "BACKUP_FORMAT",
+      "httpStatus": 400,
+      "message": "Backup format. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "BACKUP_SEQUENCE_MISMATCH",
+      "httpStatus": 400,
+      "message": "Backup sequence mismatch. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "BODY_TOO_LARGE",
+      "httpStatus": 413,
+      "message": "The request body exceeds the documented limit.",
+      "retryable": false
+    },
+    {
+      "code": "BOOTSTRAP_FORMAT",
+      "httpStatus": 400,
+      "message": "Bootstrap format. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "BOOTSTRAP_MISSING",
+      "httpStatus": 400,
+      "message": "Bootstrap missing. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "BOOTSTRAP_SIZE",
+      "httpStatus": 400,
+      "message": "Bootstrap size. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "BROWSER_WRITES_DISABLED",
+      "httpStatus": 400,
+      "message": "Registry writes must come from an agent with a complete signed packet, not a browser.",
+      "retryable": false
+    },
+    {
+      "code": "BUILD_DIRECTORY",
+      "httpStatus": 400,
+      "message": "Build directory. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "CANCEL_WINDOW",
+      "httpStatus": 400,
+      "message": "Cancel window. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "CID",
+      "httpStatus": 400,
+      "message": "Cid. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "CID_CONTENT_MISMATCH",
+      "httpStatus": 400,
+      "message": "Cid content mismatch. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "CLI_ERROR",
+      "httpStatus": 400,
+      "message": "Cli error. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "CLOCK_BACKWARD",
+      "httpStatus": 400,
+      "message": "Clock backward. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "COMMAND",
+      "httpStatus": 400,
+      "message": "Choose one documented command. See the CLI examples in README.",
+      "retryable": false
+    },
+    {
+      "code": "CONFIG",
+      "httpStatus": 400,
+      "message": "Config. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "CONFIG_AND_DATA_REQUIRED",
+      "httpStatus": 400,
+      "message": "Config and data required. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "CONSENT_REQUIRED",
+      "httpStatus": 400,
+      "message": "Consent required. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "CONTENT_TYPE",
+      "httpStatus": 400,
+      "message": "Send exactly application/json without content encoding.",
+      "retryable": false
+    },
+    {
+      "code": "DEED_GENERATION",
+      "httpStatus": 400,
+      "message": "Deed generation. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "DEPTH",
+      "httpStatus": 400,
+      "message": "Depth. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "DOMAIN",
+      "httpStatus": 400,
+      "message": "Domain. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "DUPLICATE_KEY",
+      "httpStatus": 400,
+      "message": "Duplicate key. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "DUPLICATE_QUERY",
+      "httpStatus": 400,
+      "message": "Duplicate query. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "DURABILITY_UNKNOWN_RESTART_AND_QUERY",
+      "httpStatus": 503,
+      "message": "Persistence is uncertain. Query the receipt after restart; resend only the exact same signed bytes.",
+      "retryable": true
+    },
+    {
+      "code": "EMOJI17_DATA_CORRUPT",
+      "httpStatus": 400,
+      "message": "Emoji17 data corrupt. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "EMOJI_ONLY_LABEL",
+      "httpStatus": 400,
+      "message": "Emoji only label. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "EMPTY_BODY",
+      "httpStatus": 400,
+      "message": "Empty body. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ENCODING",
+      "httpStatus": 400,
+      "message": "Encoding. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ENDPOINT",
+      "httpStatus": 400,
+      "message": "Endpoint. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ENGINE_STOPPED",
+      "httpStatus": 400,
+      "message": "Engine stopped. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_ACCOUNTING",
+      "httpStatus": 400,
+      "message": "Escrow accounting. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_ACTION",
+      "httpStatus": 409,
+      "message": "Escrow action. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_ADDRESS",
+      "httpStatus": 400,
+      "message": "Escrow address. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_AMOUNT",
+      "httpStatus": 400,
+      "message": "Escrow amount. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_AUCTION_CLOSED",
+      "httpStatus": 400,
+      "message": "Escrow auction closed. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_BID_INCREMENT",
+      "httpStatus": 400,
+      "message": "Escrow bid increment. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_CANCEL_NOT_ALLOWED",
+      "httpStatus": 400,
+      "message": "Escrow cancel not allowed. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_CHAIN",
+      "httpStatus": 400,
+      "message": "Escrow chain. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_CHECKPOINT",
+      "httpStatus": 400,
+      "message": "Escrow checkpoint. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_CHECKPOINT_DETAILS_REQUIRED",
+      "httpStatus": 400,
+      "message": "Escrow checkpoint details required. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_CHECKPOINT_ROLLBACK",
+      "httpStatus": 400,
+      "message": "Escrow checkpoint rollback. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_COMMAND_EXPIRY",
+      "httpStatus": 400,
+      "message": "Escrow command expiry. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_CONSENT_EXPIRING",
+      "httpStatus": 400,
+      "message": "Escrow consent expiring. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_CONTEXT_UNAVAILABLE",
+      "httpStatus": 400,
+      "message": "Escrow context unavailable. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_CUT",
+      "httpStatus": 400,
+      "message": "Escrow cut. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_DEPOSIT_BINDING",
+      "httpStatus": 400,
+      "message": "Escrow deposit binding. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_DEPOSIT_DUPLICATE",
+      "httpStatus": 400,
+      "message": "Escrow deposit duplicate. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_DEPOSIT_INTENT",
+      "httpStatus": 400,
+      "message": "Escrow deposit intent. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_DISABLED",
+      "httpStatus": 503,
+      "message": "Escrow is switched off. No escrow command was dispatched.",
+      "retryable": true
+    },
+    {
+      "code": "ESCROW_DISTINCT_WALLET",
+      "httpStatus": 400,
+      "message": "Escrow distinct wallet. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_DOMAIN",
+      "httpStatus": 400,
+      "message": "Escrow domain. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_DUPLICATE_PAYMENT",
+      "httpStatus": 400,
+      "message": "Escrow duplicate payment. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_ENCUMBERED_TITLE",
+      "httpStatus": 400,
+      "message": "Escrow encumbered title. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_ENDPOINT_ACTION",
+      "httpStatus": 400,
+      "message": "Escrow endpoint action. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_ENROLLED_SENDER_REQUIRED",
+      "httpStatus": 400,
+      "message": "Escrow enrolled sender required. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_FEE_POLICY",
+      "httpStatus": 400,
+      "message": "Escrow fee policy. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_FUTURE_CHECKPOINT",
+      "httpStatus": 400,
+      "message": "Escrow future checkpoint. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_HALTED",
+      "httpStatus": 400,
+      "message": "Escrow halted. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_IDEMPOTENCY_CONFLICT",
+      "httpStatus": 400,
+      "message": "Escrow idempotency conflict. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_IDEMPOTENCY_KEY",
+      "httpStatus": 400,
+      "message": "Escrow idempotency key. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_INCREMENT_POLICY",
+      "httpStatus": 400,
+      "message": "Escrow increment policy. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_INSUFFICIENT_FUNDS",
+      "httpStatus": 400,
+      "message": "Escrow insufficient funds. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_JOURNAL_CAPACITY",
+      "httpStatus": 400,
+      "message": "Escrow journal capacity. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_JOURNAL_CORRUPT",
+      "httpStatus": 400,
+      "message": "Escrow journal corrupt. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_KEY_IDENTITY",
+      "httpStatus": 400,
+      "message": "Escrow key identity. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_KEY_OR_TRANSFER_INVALID",
+      "httpStatus": 400,
+      "message": "Escrow key or transfer invalid. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_LIMITS",
+      "httpStatus": 400,
+      "message": "Escrow limits. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_LOOKUP_HELD",
+      "httpStatus": 400,
+      "message": "Escrow lookup held. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_MARKET_KIND",
+      "httpStatus": 400,
+      "message": "Escrow market kind. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_NAME",
+      "httpStatus": 400,
+      "message": "Escrow name. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_NETWORK_HELD",
+      "httpStatus": 409,
+      "message": "Escrow network held. Check the documented inputs and current state.",
+      "retryable": true
+    },
+    {
+      "code": "ESCROW_NETWORK_WRITES_DISABLED",
+      "httpStatus": 400,
+      "message": "Escrow network writes disabled. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_NODE_CHAIN",
+      "httpStatus": 400,
+      "message": "Escrow node chain. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_NODE_HTTP",
+      "httpStatus": 400,
+      "message": "Escrow node http. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_NODE_REDIRECT",
+      "httpStatus": 400,
+      "message": "Escrow node redirect. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_NODE_RESPONSE_LIMIT",
+      "httpStatus": 400,
+      "message": "Escrow node response limit. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_NONCE_CONTEXT",
+      "httpStatus": 400,
+      "message": "Escrow nonce context. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_NONCE_GAP",
+      "httpStatus": 400,
+      "message": "Escrow nonce gap. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_NONCE_REUSE",
+      "httpStatus": 400,
+      "message": "Escrow nonce reuse. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_NOT_FINAL",
+      "httpStatus": 409,
+      "message": "Escrow not final. Check the documented inputs and current state.",
+      "retryable": true
+    },
+    {
+      "code": "ESCROW_NO_ADMIN_CREDENTIAL",
+      "httpStatus": 400,
+      "message": "Escrow no admin credential. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_OPERATOR_SETUP_HELD",
+      "httpStatus": 400,
+      "message": "Escrow operator setup held. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_OUTBOX_CORRUPT",
+      "httpStatus": 400,
+      "message": "Escrow outbox corrupt. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_OUTBOX_PROOF",
+      "httpStatus": 400,
+      "message": "Escrow outbox proof. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_OUTBOX_STATE",
+      "httpStatus": 400,
+      "message": "Escrow outbox state. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_PARENTS",
+      "httpStatus": 400,
+      "message": "Escrow parents. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_PAUSE",
+      "httpStatus": 400,
+      "message": "Escrow pause. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_PAUSED",
+      "httpStatus": 409,
+      "message": "Escrow paused. Check the documented inputs and current state.",
+      "retryable": true
+    },
+    {
+      "code": "ESCROW_PAYOUT_LIMIT",
+      "httpStatus": 400,
+      "message": "Escrow payout limit. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_POLICY_CHANGED",
+      "httpStatus": 400,
+      "message": "Escrow policy changed. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_PRICE",
+      "httpStatus": 400,
+      "message": "Escrow price. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_PROTOCOL_CHANGED",
+      "httpStatus": 400,
+      "message": "Escrow protocol changed. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_PROTOCOL_UNPINNED",
+      "httpStatus": 400,
+      "message": "Escrow protocol unpinned. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_RECEIPT_BINDING",
+      "httpStatus": 400,
+      "message": "Escrow receipt binding. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_RECONCILIATION_MISMATCH",
+      "httpStatus": 400,
+      "message": "Escrow reconciliation mismatch. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_REFUND_DUPLICATE",
+      "httpStatus": 400,
+      "message": "Escrow refund duplicate. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_RESERVE",
+      "httpStatus": 400,
+      "message": "Escrow reserve. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_ROUTE",
+      "httpStatus": 404,
+      "message": "Escrow route. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_SECRET_LEAK",
+      "httpStatus": 400,
+      "message": "Escrow secret leak. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_SELF_DEPOSIT",
+      "httpStatus": 400,
+      "message": "Escrow self deposit. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_SELF_RAISE",
+      "httpStatus": 400,
+      "message": "Escrow self raise. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_SELF_SALE",
+      "httpStatus": 400,
+      "message": "Escrow self sale. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_SETTLE_NOT_ALLOWED",
+      "httpStatus": 400,
+      "message": "Escrow settle not allowed. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_SIGNATURE",
+      "httpStatus": 400,
+      "message": "Escrow signature. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_SIGNER",
+      "httpStatus": 400,
+      "message": "Escrow signer. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_SIGNING_DISABLED",
+      "httpStatus": 400,
+      "message": "Escrow signing disabled. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_STALE",
+      "httpStatus": 409,
+      "message": "Escrow stale. Check the documented inputs and current state.",
+      "retryable": true
+    },
+    {
+      "code": "ESCROW_TITLE",
+      "httpStatus": 400,
+      "message": "Escrow title. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_TITLE_COMMIT",
+      "httpStatus": 400,
+      "message": "Escrow title commit. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_TITLE_CONSENT",
+      "httpStatus": 400,
+      "message": "Escrow title consent. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_TITLE_NOT_PENDING",
+      "httpStatus": 400,
+      "message": "Escrow title not pending. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_TITLE_NOT_READY",
+      "httpStatus": 400,
+      "message": "Escrow title not ready. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_TITLE_RESERVED",
+      "httpStatus": 400,
+      "message": "Escrow title reserved. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_TXID",
+      "httpStatus": 400,
+      "message": "Escrow txid. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_TX_BINDING",
+      "httpStatus": 400,
+      "message": "Escrow tx binding. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_UNALIGNED_CUT",
+      "httpStatus": 400,
+      "message": "Escrow unaligned cut. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_UNAVAILABLE",
+      "httpStatus": 503,
+      "message": "Escrow outcome may be unknown. Keep the exact signed request and query the signed account.",
+      "retryable": true
+    },
+    {
+      "code": "ESCROW_UNKNOWN_DEPOSIT",
+      "httpStatus": 400,
+      "message": "Escrow unknown deposit. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "FILE_REQUIRED",
+      "httpStatus": 400,
+      "message": "File required. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "HAS_BIDS",
+      "httpStatus": 400,
+      "message": "Has bids. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "HIGH_SELF_RAISE",
+      "httpStatus": 400,
+      "message": "High self raise. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "HOST",
+      "httpStatus": 400,
+      "message": "Host. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "HTTP_ERROR",
+      "httpStatus": 400,
+      "message": "Http error. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "IDEMPOTENCY_CONFLICT",
+      "httpStatus": 400,
+      "message": "This request ID already belongs to different signed bytes. Query its existing receipt.",
+      "retryable": false
+    },
+    {
+      "code": "INSUFFICIENT_FUNDS",
+      "httpStatus": 400,
+      "message": "Insufficient funds. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "INTEGER",
+      "httpStatus": 400,
+      "message": "Integer. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "INTENT_EXPIRED",
+      "httpStatus": 400,
+      "message": "Intent expired. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "INTENT_ID",
+      "httpStatus": 400,
+      "message": "Intent id. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "INVALID",
+      "httpStatus": 400,
+      "message": "Invalid. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "INVALID_REQUEST",
+      "httpStatus": 400,
+      "message": "The request could not be read. Check the documented request shape.",
+      "retryable": false
+    },
+    {
+      "code": "INVARIANT_ASSET",
+      "httpStatus": 400,
+      "message": "Invariant asset. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "INVARIANT_CONSERVATION",
+      "httpStatus": 400,
+      "message": "Invariant conservation. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "INVARIANT_CREDIT",
+      "httpStatus": 400,
+      "message": "Invariant credit. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "INVARIANT_DEPTH",
+      "httpStatus": 400,
+      "message": "Invariant depth. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "INVARIANT_ESCROW",
+      "httpStatus": 400,
+      "message": "Invariant escrow. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "INVARIANT_LOCK",
+      "httpStatus": 400,
+      "message": "Invariant lock. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "INVARIANT_METADATA",
+      "httpStatus": 400,
+      "message": "Invariant metadata. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "INVARIANT_RIGHTS",
+      "httpStatus": 400,
+      "message": "Invariant rights. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "INVARIANT_TITLE",
+      "httpStatus": 400,
+      "message": "Invariant title. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "JOURNAL_CORRUPT",
+      "httpStatus": 400,
+      "message": "Journal corrupt. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "JSON",
+      "httpStatus": 400,
+      "message": "Json. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "KEY_FILE_PERMISSIONS",
+      "httpStatus": 400,
+      "message": "Key file permissions. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "KEY_FILE_REQUIRED",
+      "httpStatus": 400,
+      "message": "Key file required. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "KEY_IDENTITY_MISMATCH",
+      "httpStatus": 400,
+      "message": "Key identity mismatch. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "KEY_SCHEME",
+      "httpStatus": 400,
+      "message": "Key scheme. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "LABELS",
+      "httpStatus": 400,
+      "message": "Labels. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "LEASE_ASSET",
+      "httpStatus": 400,
+      "message": "Lease asset. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "LEASE_INACTIVE",
+      "httpStatus": 400,
+      "message": "Lease inactive. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "LEASE_OBLIGATION",
+      "httpStatus": 400,
+      "message": "Lease obligation. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MANIFEST_MISMATCH",
+      "httpStatus": 400,
+      "message": "Manifest mismatch. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MCP_ALREADY_INITIALIZED",
+      "httpStatus": 400,
+      "message": "Mcp already initialized. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MCP_NOT_INITIALIZED",
+      "httpStatus": 400,
+      "message": "Mcp not initialized. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "METADATA_BINDING",
+      "httpStatus": 400,
+      "message": "Metadata binding. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "METADATA_VERSION",
+      "httpStatus": 400,
+      "message": "Metadata version. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "METHOD_NOT_ALLOWED",
+      "httpStatus": 405,
+      "message": "Use the documented HTTP method for this route.",
+      "retryable": false
+    },
+    {
+      "code": "METHOD_NOT_FOUND",
+      "httpStatus": 400,
+      "message": "Method not found. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MIN_RAISE",
+      "httpStatus": 400,
+      "message": "The bid is below the current minimum next bid.",
+      "retryable": false
+    },
+    {
+      "code": "NAME_DEPTH",
+      "httpStatus": 400,
+      "message": "Name depth. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NAME_LENGTH",
+      "httpStatus": 400,
+      "message": "Name length. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NAME_REQUIRED",
+      "httpStatus": 400,
+      "message": "Name required. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NAME_RESERVED",
+      "httpStatus": 400,
+      "message": "Name reserved. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NAME_SIZE",
+      "httpStatus": 400,
+      "message": "Name size. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NAME_TAKEN",
+      "httpStatus": 400,
+      "message": "Name taken. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_ADDRESS",
+      "httpStatus": 502,
+      "message": "Native address. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_AMOUNT",
+      "httpStatus": 502,
+      "message": "Native amount. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_BASE58",
+      "httpStatus": 502,
+      "message": "Native base58. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_BASE58_LENGTH",
+      "httpStatus": 502,
+      "message": "Native base58 length. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_BODY",
+      "httpStatus": 502,
+      "message": "Native body. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_BUSY",
+      "httpStatus": 502,
+      "message": "Native busy. Check the documented inputs and current state.",
+      "retryable": true
+    },
+    {
+      "code": "NATIVE_CHAIN_MISMATCH",
+      "httpStatus": 502,
+      "message": "Native chain mismatch. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_CHECKPOINT_MISMATCH",
+      "httpStatus": 502,
+      "message": "Native checkpoint mismatch. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_CHECKPOINT_SIGNATURES",
+      "httpStatus": 502,
+      "message": "Native checkpoint signatures. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_CLOCK",
+      "httpStatus": 502,
+      "message": "Native clock. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_CONTENT_TYPE",
+      "httpStatus": 502,
+      "message": "Native content type. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_DIGEST",
+      "httpStatus": 400,
+      "message": "Native digest. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_DOCUMENT",
+      "httpStatus": 502,
+      "message": "Native document. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_FUTURE_CHECKPOINT",
+      "httpStatus": 502,
+      "message": "Native future checkpoint. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_HTTP",
+      "httpStatus": 502,
+      "message": "Native http. Check the documented inputs and current state.",
+      "retryable": true
+    },
+    {
+      "code": "NATIVE_HTTP_HEADERS",
+      "httpStatus": 502,
+      "message": "Native http headers. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_INCONSISTENT",
+      "httpStatus": 502,
+      "message": "Native inconsistent. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_NAMING_UNAVAILABLE",
+      "httpStatus": 503,
+      "message": "Native naming unavailable. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_PARENTS",
+      "httpStatus": 502,
+      "message": "Native parents. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_PUBLIC_KEY",
+      "httpStatus": 502,
+      "message": "Native public key. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_READ_FAILED",
+      "httpStatus": 502,
+      "message": "Native read failed. Check the documented inputs and current state.",
+      "retryable": true
+    },
+    {
+      "code": "NATIVE_RECEIPT_FLAG",
+      "httpStatus": 502,
+      "message": "Native receipt flag. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_RECEIPT_MISMATCH",
+      "httpStatus": 502,
+      "message": "Native receipt mismatch. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_RECEIPT_STATUS",
+      "httpStatus": 502,
+      "message": "Native receipt status. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_REDIRECT",
+      "httpStatus": 502,
+      "message": "Native redirect. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_RELEASE_DRIFT",
+      "httpStatus": 502,
+      "message": "Native release drift. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_ROLLBACK_DETECTED",
+      "httpStatus": 502,
+      "message": "Native rollback detected. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_ROUTE",
+      "httpStatus": 502,
+      "message": "Native route. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_SCHEMA",
+      "httpStatus": 502,
+      "message": "Native schema. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_SIGNATURE",
+      "httpStatus": 502,
+      "message": "Native signature. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_SIGNER_MISMATCH",
+      "httpStatus": 502,
+      "message": "Native signer mismatch. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_SIGNING_TYPE_UNSUPPORTED",
+      "httpStatus": 502,
+      "message": "Native signing type unsupported. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_STALE_CACHE",
+      "httpStatus": 502,
+      "message": "Native stale cache. Check the documented inputs and current state.",
+      "retryable": true
+    },
+    {
+      "code": "NATIVE_STALE_OBSERVATION",
+      "httpStatus": 502,
+      "message": "Native stale observation. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_TRANSPORT",
+      "httpStatus": 502,
+      "message": "Native transport. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_TRUST_POLICY",
+      "httpStatus": 502,
+      "message": "Native trust policy. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_TXID_MISMATCH",
+      "httpStatus": 502,
+      "message": "Native txid mismatch. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_TYPE",
+      "httpStatus": 502,
+      "message": "Native type. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NATIVE_UNSIGNED_REQUIRED",
+      "httpStatus": 502,
+      "message": "Native unsigned required. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NETWORK_ERROR",
+      "httpStatus": 502,
+      "message": "The read failed before any signed submission. Check the connection and try again.",
+      "retryable": true
+    },
+    {
+      "code": "NETWORK_FEE_POLICY",
+      "httpStatus": 400,
+      "message": "Network fee policy. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NETWORK_HELD",
+      "httpStatus": 503,
+      "message": "The network is held. No registry write was accepted. Try again after recovery.",
+      "retryable": true
+    },
+    {
+      "code": "NONCE",
+      "httpStatus": 400,
+      "message": "The nonce is not current. Query the existing receipt before preparing another request.",
+      "retryable": false
+    },
+    {
+      "code": "NONCE_OVERFLOW",
+      "httpStatus": 400,
+      "message": "Nonce overflow. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NON_CANONICAL_NAME",
+      "httpStatus": 400,
+      "message": "Non canonical name. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NORMALIZATION_HASH",
+      "httpStatus": 400,
+      "message": "Normalization hash. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NORMALIZATION_MODE",
+      "httpStatus": 400,
+      "message": "Normalization mode. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NORMALIZATION_POLICY",
+      "httpStatus": 400,
+      "message": "Normalization policy. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NOT_CHILD_HOLDER",
+      "httpStatus": 400,
+      "message": "Not child holder. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NOT_FOUND",
+      "httpStatus": 404,
+      "message": "This route or resource does not exist.",
+      "retryable": false
+    },
+    {
+      "code": "NOT_ISSUER",
+      "httpStatus": 400,
+      "message": "Not issuer. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NOT_LEASE_HOLDER",
+      "httpStatus": 400,
+      "message": "Not lease holder. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NOT_OBSERVED",
+      "httpStatus": 400,
+      "message": "Not observed. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NOT_OWNER",
+      "httpStatus": 400,
+      "message": "Not owner. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NOT_SELLER",
+      "httpStatus": 400,
+      "message": "Not seller. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NO_BID",
+      "httpStatus": 400,
+      "message": "No bid. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "NO_REFUND",
+      "httpStatus": 400,
+      "message": "No refund. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "OFFER_CLOSED",
+      "httpStatus": 400,
+      "message": "Offer closed. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "OFFER_EXPIRED",
+      "httpStatus": 400,
+      "message": "Offer expired. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "OFFER_EXPIRY",
+      "httpStatus": 400,
+      "message": "Offer expiry. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "OFFER_NOT_FOUND",
+      "httpStatus": 400,
+      "message": "Offer not found. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "OFFER_PRICE",
+      "httpStatus": 400,
+      "message": "Offer price. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "OFFER_TYPE",
+      "httpStatus": 400,
+      "message": "Offer type. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ORIGIN",
+      "httpStatus": 400,
+      "message": "Origin. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "OUTCOME_UNKNOWN",
+      "httpStatus": 503,
+      "message": "The signed request may have been accepted. Keep it, query its receipt, and resend only the exact same signed bytes.",
+      "retryable": true
+    },
+    {
+      "code": "OWNERSHIP_CLASS_TAKEN",
+      "httpStatus": 400,
+      "message": "Ownership class taken. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "PERMANENT_DEED",
+      "httpStatus": 400,
+      "message": "Permanent deed. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "PERMANENT_OWNERSHIP_ONLY",
+      "httpStatus": 400,
+      "message": "Permanent ownership only. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "POLICY_UNSET",
+      "httpStatus": 400,
+      "message": "Policy unset. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "PORT",
+      "httpStatus": 400,
+      "message": "Port. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "PORT_ONLY_FOR_SERVE",
+      "httpStatus": 400,
+      "message": "Port only for serve. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "PRINCIPAL",
+      "httpStatus": 400,
+      "message": "Principal. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "PRODUCTION_CONFIG_UNSUPPORTED",
+      "httpStatus": 400,
+      "message": "Production config unsupported. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "PRODUCTION_WEB_CONFIG",
+      "httpStatus": 400,
+      "message": "Production web config. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "PUBLIC_ARTIFACT",
+      "httpStatus": 400,
+      "message": "Public artifact. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "PUBLIC_JSON",
+      "httpStatus": 400,
+      "message": "Public json. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "PUBLIC_NUMBER",
+      "httpStatus": 400,
+      "message": "Public number. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "QUERY_NOT_ALLOWED",
+      "httpStatus": 400,
+      "message": "Query not allowed. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "QUIET_PERIOD",
+      "httpStatus": 400,
+      "message": "Quiet period. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RECORDS",
+      "httpStatus": 400,
+      "message": "Records. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "REFUND_EXCEEDED",
+      "httpStatus": 400,
+      "message": "Refund exceeded. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "REGISTRY_INITIALIZATION_FAILED",
+      "httpStatus": 400,
+      "message": "Registry initialization failed. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "REGISTRY_UNAVAILABLE",
+      "httpStatus": 503,
+      "message": "Registry reads are temporarily unavailable.",
+      "retryable": true
+    },
+    {
+      "code": "RENEWAL_TERMS",
+      "httpStatus": 400,
+      "message": "Renewal terms. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RENEWAL_WINDOW",
+      "httpStatus": 400,
+      "message": "Renewal window. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "REPLAY_MISMATCH",
+      "httpStatus": 400,
+      "message": "Replay mismatch. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "REPLAY_ORDER",
+      "httpStatus": 400,
+      "message": "Replay order. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "REQUEST_ID",
+      "httpStatus": 400,
+      "message": "Request id. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RESALE_POA_ONLY",
+      "httpStatus": 400,
+      "message": "Resale poa only. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RESERVE",
+      "httpStatus": 400,
+      "message": "Reserve. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RESERVED_NAME",
+      "httpStatus": 400,
+      "message": "Reserved name. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RESERVE_POLICY",
+      "httpStatus": 400,
+      "message": "Reserve policy. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RESTORE_DISABLED",
+      "httpStatus": 400,
+      "message": "Restore disabled. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RESTORE_JSON",
+      "httpStatus": 400,
+      "message": "Restore json. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RESTORE_JSON_LIMIT",
+      "httpStatus": 400,
+      "message": "Restore json limit. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RESTORE_KEY_FORMAT",
+      "httpStatus": 400,
+      "message": "Restore key format. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RESTORE_TARGET",
+      "httpStatus": 400,
+      "message": "Restore target. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RESTORE_TARGET_IS_LIVE",
+      "httpStatus": 400,
+      "message": "Restore target is live. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RESTORE_VALIDATION_FAILED",
+      "httpStatus": 400,
+      "message": "Restore validation failed. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RIGHTS",
+      "httpStatus": 400,
+      "message": "Rights. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ROOT_ONLY",
+      "httpStatus": 400,
+      "message": "Root only. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RPC",
+      "httpStatus": 400,
+      "message": "Rpc. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RPC_ERROR",
+      "httpStatus": 400,
+      "message": "Rpc error. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "SCHEMA",
+      "httpStatus": 400,
+      "message": "Schema. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "SECRET_FIELD",
+      "httpStatus": 400,
+      "message": "Secret field. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "SELF_SALE",
+      "httpStatus": 400,
+      "message": "Self sale. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "SELLER_SELF_BID",
+      "httpStatus": 400,
+      "message": "Seller self bid. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "SEQUENCE_OVERFLOW",
+      "httpStatus": 400,
+      "message": "Sequence overflow. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "SERVICE_URL",
+      "httpStatus": 400,
+      "message": "Service url. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "SIGNATURE",
+      "httpStatus": 400,
+      "message": "The packet signature is invalid. Do not submit a different packet blindly.",
+      "retryable": false
+    },
+    {
+      "code": "SIGNATURES",
+      "httpStatus": 400,
+      "message": "Signatures. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "SIZE",
+      "httpStatus": 400,
+      "message": "Size. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "STALE_OFFER",
+      "httpStatus": 400,
+      "message": "Stale offer. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "STALE_VERSION",
+      "httpStatus": 400,
+      "message": "The resource version changed. Read or quote again before approving a new intent.",
+      "retryable": false
+    },
+    {
+      "code": "STORAGE",
+      "httpStatus": 400,
+      "message": "Storage. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "STORAGE_CLOSED",
+      "httpStatus": 400,
+      "message": "Storage closed. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "STORAGE_PATH",
+      "httpStatus": 400,
+      "message": "Storage path. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "STRING",
+      "httpStatus": 400,
+      "message": "String. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "TITLE_LOCKED",
+      "httpStatus": 400,
+      "message": "Title locked. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "TOOL",
+      "httpStatus": 400,
+      "message": "Tool. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "TOOL_FAILURE",
+      "httpStatus": 400,
+      "message": "Tool failure. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "UNEXPECTED_BUILD_ARTIFACT",
+      "httpStatus": 400,
+      "message": "Unexpected build artifact. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "UNICODE_PUBLIC_ARTIFACT_IDENTITY",
+      "httpStatus": 400,
+      "message": "Unicode public artifact identity. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "UNKNOWN_OUTCOME",
+      "httpStatus": 404,
+      "message": "No receipt is available. Keep and query the original packet; resend only the exact same signed bytes.",
+      "retryable": true
+    },
+    {
+      "code": "UNSAFE_KEY",
+      "httpStatus": 400,
+      "message": "Unsafe key. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "UNSUPPORTED_ACTION",
+      "httpStatus": 400,
+      "message": "Unsupported action. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "UNSUPPORTED_ASSET",
+      "httpStatus": 400,
+      "message": "Unsupported asset. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "UNSUPPORTED_NAME",
+      "httpStatus": 400,
+      "message": "Unsupported name. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "URL_REQUIRED",
+      "httpStatus": 400,
+      "message": "Url required. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "URL_SIZE",
+      "httpStatus": 414,
+      "message": "Url size. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "VALIDITY",
+      "httpStatus": 400,
+      "message": "Validity. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "WRITER_LOCKED",
+      "httpStatus": 400,
+      "message": "Writer locked. Check the documented inputs and current state.",
+      "retryable": false
+    }
+  ]
+}

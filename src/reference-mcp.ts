@@ -1,3 +1,4 @@
+import { faultEnvelope } from './errors.js';
 import { createInterface } from "node:readline";
 import { need, parseJSON, Fault, exact, text } from "./core.js";
 import { request } from "./client.js";
@@ -122,9 +123,7 @@ export async function runReferenceMcp(url: string): Promise<void> {
               content: [
                 {
                   type: "text",
-                  text: JSON.stringify({
-                    code: e instanceof Fault ? e.code : "TOOL_FAILURE",
-                  }),
+                  text: JSON.stringify(faultEnvelope(e)),
                 },
               ],
               isError: true,
@@ -151,6 +150,7 @@ export async function runReferenceMcp(url: string): Promise<void> {
           error: {
             code: -32600,
             message: e instanceof Fault ? e.code : "RPC_ERROR",
+            data:faultEnvelope(e),
           },
         }) + "\n",
       );

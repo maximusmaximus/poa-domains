@@ -6,7 +6,7 @@ The default executable is `dist/src/cli.js`. `status` and `capabilities` report 
 
 Configuration/ledger injection into the production server is rejected; only a numeric listening port is accepted. The production CLI rejects config/data options without reading files, and rejects supplied URLs, key/input/output paths and all registry/signing/handoff commands. There is no environment-based reference fallback.
 
-`cli.js mcp` supports the initialization handshake, read-only `registry_status`, ping and empty resources/prompts. The additional `native_network` and `native_receipt` tools use fixed public read-only routes; no caller-selected endpoint is accepted. Reference tool names such as `read_state` and `submit_intent` return `isError:true` with the unavailable document; no caller-selected provider, fixture, local ledger or signer is loaded.
+`cli.js mcp` supports the initialization handshake, read-only `registry_status`, ping and empty resources/prompts. The additional `native_network` and `native_receipt` tools use fixed public read-only routes; no caller-selected endpoint is accepted. Reference tool names such as `read_state` and `submit_intent` return `isError:true` with the unavailable document plus shared error metadata; no caller-selected provider, fixture, local ledger or signer is loaded.
 
 Public Pages serves a fixed availability interface and explicit current read-only native-node observations on load and refresh, with no snapshot fallback. It has no API, state explorer, wallet, unsigned-body builder or transaction form. Browser configuration is exactly `mode:production-only`, `publicApiBase:null`, `statusFile:./status.json`, `networkFile:./network.json`; any demo mode, provider override or simulated state fails closed.
 
@@ -106,7 +106,7 @@ Metadata is `{cid,document:{schema:"poa-domains.metadata.v1",name,rightsHash,des
 
 ### Receipts and errors
 
-Business receipt: `intentId,requestId,signer,sequence,time,status,code,result`, plus HTTP `accepted:true`, explicit durability/finality label. Status is `succeeded` or `rejected`. Rejections such as `STALE_VERSION`, `MIN_RAISE`, `AMOUNT_CAP`, `LEASE_OBLIGATION` make no economic/title changes; admitted nonce/outcome bookkeeping still advances. Invalid authentication/domain/nonce is a bounded nonadmission error `{code,accepted:false}`. Durability failure returns HTTP 503 with `accepted:"unknown"`, halts writes and requires restart/query. Unknown receipt is not permission to change nonce or generate a new request.
+Business receipt: `intentId,requestId,signer,sequence,time,status,code,result`, plus HTTP `accepted:true`, explicit durability/finality label. Status is `succeeded` or `rejected`. Rejections such as `STALE_VERSION`, `MIN_RAISE`, `AMOUNT_CAP`, `LEASE_OBLIGATION` make no economic/title changes; admitted nonce/outcome bookkeeping still advances. Invalid authentication/domain/nonce is a bounded nonadmission error `{code,message,retryable,accepted:false,docs,requestId}`. Durability failure returns HTTP 503 with `accepted:"unknown"`, halts writes and requires restart/query. Unknown receipt is not permission to change nonce or generate a new request.
 
 ## Reference CLI / MCP / static interface
 
@@ -121,3 +121,30 @@ The isolated reference UI lists all 17 reference actions and builds unsigned loc
 The read-only web checker recognizes exact emoji-only Unicode 17 spellings and counts 1–32 whole emoji sequences. It runs locally with fixed options and does not transmit, persist, trim or normalize the entered spelling. Results describe format only, not name availability, ownership, pricing or registration. Native registry operations remain disabled. The bundle contains only the pinned public Unicode runtime, data, license and source provenance plus the checker module and external stylesheet; candidate equivalence data is not included.
 
 The local `web/emoji17.mjs` module exports `getDataInfo()` and `tokenizeEmojiLabel(input, { qualification: "listed", presentation: "emoji-test-only" })`. This is exact spelling recognition, not a registry API. `canonicalizeOwnershipLabel` always rejects with `CANONICAL_POLICY_UNAPPROVED`; display qualification must not be used as an ownership key.
+
+### Shared error envelope and safe retries
+
+The Worker and Node registry adapters, public/admin escrow ingress, and MCP error
+data use `{code,message,retryable,accepted,docs,requestId}`. The complete generated
+[catalogue](ERRORS.md) and [`errors.json`](../errors.json) define status and retry
+policy for every bounded source error code. Send `X-Request-Id` (1–128 safe ASCII
+identifier characters) to correlate an ingress error; invalid IDs are replaced.
+Committed business-rejection receipts retain HTTP 200 and `accepted:true` because
+the nonce/bookkeeping was committed. A missing receipt stays HTTP 404 with
+`accepted:"unknown"`; it is not a rejected transaction.
+
+The client validates a complete public signed packet before fetch. Local endpoint,
+serialization/schema/signature failures have never been sent. Transport loss or a
+malformed acknowledgement after signed dispatch is **unknown**, never a false
+rejection. CLI exits are 2 usage, 3 rejected, 4 unknown, 5 network/read failure.
+An unknown CLI submission includes `retry.body`: save those exact signed request
+bytes, query its receipt, and only resend those bytes. Never create a new request
+ID/nonce as a retry. No automatic write retries occur. Keys never enter retry data.
+
+Enabled escrow success bytes, addresses and signed request shapes are unchanged.
+Only the production gateway adapts its errors; the internal escrow facade, sender,
+reconcile and all existing escrow tests remain untouched. Neutral disabled
+capabilities remain 200; other valid public escrow routes return
+`503 ESCROW_DISABLED` **only when off**. Hidden admin authorization remains 404.
+`NETWORK_HELD` includes `Retry-After: 30`. The native-only read guard's availability
+document is intentionally unchanged: it is not an operational naming API.
