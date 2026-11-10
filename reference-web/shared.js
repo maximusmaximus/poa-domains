@@ -195,7 +195,6 @@ export function inspectName(value, manifest) {
     emojiCount: lastEmojis,
     isSingleEmoji,
     isMultiEmoji,
-    minimumBidPoa: isSingleEmoji ? "100000" : "1000",
     tier: isFullEmoji17
       ? isSingleEmoji
         ? "premium"
@@ -219,6 +218,61 @@ export function minimumNextBid(high, rule) {
   const bpsRaise = (h * BigInt(rule.bps)) / 10000n + 1n;
   const minUnits = BigInt(rule.minUnits ?? rule.minUnit ?? "1");
   return (h + (bpsRaise > minUnits ? bpsRaise : minUnits)).toString();
+}
+// Public capabilities are authoritative; never guess prices or bidding windows.
+export function rootAuctionPolicy(cap, info, asset = "POA") {
+  const policy = cap?.assets?.[asset];
+  const timing = cap?.auctionWindows?.[info.tier];
+  const reserve = info.tier === "premium" ? policy?.premiumReserve : policy?.standardReserve;
+  if (!/^[1-9][0-9]{0,38}$/.test(reserve ?? "") || !Number.isSafeInteger(timing?.window) ||
+      !Number.isSafeInteger(timing?.quiet) || timing.window <= 0 || timing.quiet <= 0)
+    throw Error("⚠️ Prices unavailable. Refresh before adding this name.");
+  return { reserve, window: timing.window, quiet: timing.quiet };
+}
+export function compactAmount(value) {
+  const n = BigInt(value);
+  return n >= 1000n && n % 1000n === 0n ? `${n / 1000n}k` : n.toString();
+}
+export function cartMinimum(item, cap, state) {
+  if (item.action === "announceAuction+bid") return rootAuctionPolicy(cap, inspectName(item.name, cap.emojiManifest), item.asset).reserve;
+  if (item.action === "bid") {
+    const auction = state?.auctions?.[item.params.auctionId];
+    if (auction) return auction.high ? minimumNextBid(auction.high.amount, cap.increment) : auction.reserve;
+  }
+  return item.minimumAmount ?? item.amount;
+}
+export function cartSummary(item) {
+  const p = item.params;
+  if (item.action === "announceAuction+bid")
+    return `Request root auction announcement for "${item.name}" (reserve=${p.reserve} ${item.asset}) and place opening bid up to maxTotal=${item.amount} ${item.asset}.`;
+  if (item.action === "bid")
+    return `Place ascending bid of ${item.amount} ${item.asset} on live auction ${p.auctionId.slice(0, 16)}… (expectedVersion=${p.expectedVersion}, minValidBid=${item.minimumAmount ?? item.amount}).`;
+  return item.summary;
+}
+export function editCartAmount(item, raw, cap, state) {
+  const amount = String(raw).trim();
+  if (!/^[1-9][0-9]{0,38}$/.test(amount)) throw Error("⚠️ Enter a positive whole-number amount.");
+  const minimum = cartMinimum(item, cap, state);
+  if (BigInt(amount) < BigInt(minimum)) throw Error(`⚠️ Minimum bid is ${minimum} ${item.asset}.`);
+  if (!["bid", "announceAuction+bid"].includes(item.action) && amount !== item.amount)
+    throw Error(`⚠️ Fixed price is ${item.amount} ${item.asset}.`);
+  const updated = { ...item, amount, minimumAmount: minimum, params: { ...item.params } };
+  delete updated.validationError;
+  if (Object.hasOwn(updated.params, "amount")) updated.params.amount = amount;
+  if (item.action === "announceAuction+bid") {
+    updated.params.reserve = amount;
+    updated.params.maxBid = amount;
+  }
+  updated.summary = cartSummary(updated);
+  return updated;
+}
+export function cartParamsForSigner(item, signer) {
+  const params = { ...item.params };
+  if (item.action === "bid" && (!params.beneficiary || params.beneficiary === "<YOUR_BENEFICIARY_PRINCIPAL>")) {
+    delete params.beneficiary;
+    if (validPrincipal(signer)) params.beneficiary = signer;
+  }
+  return params;
 }
 export function buildAgentCartPrompt(
   items,
@@ -255,17 +309,19 @@ export function buildAgentCartPrompt(
     `2. Verify GET ${endpoint}/v1/capabilities matches chainId="${cap.chainId}", registryId="${cap.registryId}", and policyHash="${cap.policyHash}".`,
     `3. Execute each cart item below using the one-command CLI ('act'), the 3-step CLI ('prepare' + 'sign' + 'submit'), or MCP tool 'submit_intent'. Never exceed the user-approved maxTotal cap.`,
     ``,
+    `Bid beneficiary defaults to the authorized signer. Resolve that principal before prepare/sign; never submit a placeholder.`,
     `Cart Items:`,
   ];
   items.forEach((item, idx) => {
+    const params = cartParamsForSigner(item, signerPrincipal);
     lines.push(
       `--- Item ${idx + 1}: ${item.name} (${item.tier} ${item.isRoot ? "root" : "child"}) ---`,
       `Action: ${item.action}`,
       `Summary: ${item.summary}`,
       `Asset: ${item.asset} | Amount / Max Bid: ${item.amount} base units (maxTotal=${item.amount})`,
-      `Action Parameters JSON: ${JSON.stringify(item.params)}`,
+      `Action Parameters JSON: ${JSON.stringify(params)}`,
       `One-Command Agent Execution:`,
-      `  node dist/src/reference-cli.js act --url ${endpoint} --key-file agent.pem --action ${item.action} --params '${JSON.stringify(item.params)}' --max-total ${item.amount}`,
+      `  node dist/src/reference-cli.js act --url ${endpoint} --key-file agent.pem --action ${item.action} --params '${JSON.stringify(params)}' --max-total ${item.amount}`,
       `Step-by-Step CLI Prepare & Submit Example:`,
       `  # Save intent input to item-${idx + 1}.json with nonce = N+${idx}, notBefore = NOW, deadline = NOW+3600, maxTotal = "${item.amount}", maxNetworkFee = "0"`,
       `  node dist/src/reference-cli.js prepare --url ${endpoint} --file item-${idx + 1}.json --out unsigned-${idx + 1}.json`,
@@ -297,6 +353,7 @@ export function validPrincipal(s) {
 export function makeBody(input, cap) {
   safeObject(input);
   const params = structuredClone(input.params);
+  if (input.action === "bid" && !Object.hasOwn(params, "beneficiary")) params.beneficiary = input.signer;
   const required = cap.actions[input.action];
   if (
     !required ||
@@ -1131,6 +1188,7 @@ export function buildAgentCheckoutHandoff(
     policyHash: cap?.policyHash ?? null,
     revision: cap?.revision ?? null,
     signerPrincipal: signer,
+    defaults: { bidBeneficiary: "signer" },
     itemCount: items.length,
     items: items.map((item, index) => ({
       index: index + 1,
@@ -1143,7 +1201,7 @@ export function buildAgentCheckoutHandoff(
       summary: item.summary,
       auctionId: item.params?.auctionId ?? null,
       offerId: item.params?.offerId ?? null,
-      params: item.params,
+      params: cartParamsForSigner(item, signer),
     })),
   };
   const lines = [

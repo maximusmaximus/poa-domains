@@ -2,7 +2,7 @@ import { ACTIONS, Action } from "./actions.js";
 import { ownershipInfo } from "./emoji-ownership.js";
 import { Body, DOMAIN, validateBody, intentId } from "./auth.js";
 import { canonical, exact, need } from "./core.js";
-import { Engine } from "./engine.js";
+import { Engine, AUCTION_WINDOWS } from "./engine.js";
 import { cidFor, Metadata } from "./metadata.js";
 import { Rights, rightsHash } from "./model.js";
 import {
@@ -50,6 +50,7 @@ export function capabilities(e: Engine): any {
     onboardingGrantPoa:
       e.config.revision === "poa-mainnet-v1" ? "10000000" : "0",
     assets: e.config.assets,
+    auctionWindows: AUCTION_WINDOWS,
     increment: e.config.increment,
     feeBps: e.config.feeBps,
     highestSelfRaise: e.config.highestSelfRaise,
@@ -93,6 +94,7 @@ export function prepare(input: unknown, cap: any): Body {
   ]);
   need(Object.hasOwn(ACTIONS, i.action), "UNSUPPORTED_ACTION");
   const params = structuredClone(i.params);
+  if (i.action === "bid" && !Object.hasOwn(params, "beneficiary")) params.beneficiary = i.signer;
   exact(params, [...ACTIONS[i.action as Action]]);
   const mode = normalizationModeForHash(cap.normalizationHash);
   for (const k of ["name", "parent"])

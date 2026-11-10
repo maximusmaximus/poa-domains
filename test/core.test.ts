@@ -632,13 +632,15 @@ test("browser shared module maintains exact canonical, normalization, parser, an
   assert.equal(inspectedPremium.tier, "premium");
   assert.equal(inspectedPremium.tokenCount, 1);
   assert.equal(inspectedPremium.isSingleEmoji, true);
-  assert.equal(inspectedPremium.minimumBidPoa, "100000");
+  assert.equal(web.rootAuctionPolicy(cap, inspectedPremium).reserve, cap.assets.POA.premiumReserve);
+  assert.equal(Object.hasOwn(inspectedPremium, "minimumBidPoa"), false);
   const inspectedMultiEmoji = web.inspectName("🚀🚀", emoji17Manifest);
   assert.equal(inspectedMultiEmoji.name, "🚀🚀");
   assert.equal(inspectedMultiEmoji.tier, "standard");
   assert.equal(inspectedMultiEmoji.tokenCount, 2);
   assert.equal(inspectedMultiEmoji.isMultiEmoji, true);
-  assert.equal(inspectedMultiEmoji.minimumBidPoa, "1000");
+  assert.equal(web.rootAuctionPolicy(cap, inspectedMultiEmoji).reserve, cap.assets.POA.standardReserve);
+  assert.equal(Object.hasOwn(inspectedMultiEmoji, "minimumBidPoa"), false);
   assert.equal(
     web.minimumNextBid("1000", {
       kind: "eos10Percent",
