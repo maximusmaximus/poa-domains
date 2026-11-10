@@ -195,7 +195,6 @@ export function inspectName(value, manifest) {
     emojiCount: lastEmojis,
     isSingleEmoji,
     isMultiEmoji,
-    minimumBidPoa: isSingleEmoji ? "100000" : "1000",
     tier: isFullEmoji17
       ? isSingleEmoji
         ? "premium"
