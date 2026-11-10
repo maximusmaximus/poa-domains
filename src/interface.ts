@@ -1,3 +1,4 @@
+import { API_SCHEMA_VERSION, API_SURFACE, API_LIMITS } from "./api-contract.js";
 import { ACTIONS, Action } from "./actions.js";
 import { ownershipInfo } from "./emoji-ownership.js";
 import { Body, DOMAIN, validateBody, intentId } from "./auth.js";
@@ -32,6 +33,9 @@ export function capabilities(e: Engine): any {
   return {
     mode: "poa-domains-registry",
     livePoA: false,
+    schemaVersion: API_SCHEMA_VERSION,
+    surface: API_SURFACE,
+    limits: API_LIMITS,
     revision: e.config.revision,
     domain: DOMAIN,
     chainId: e.config.chainId,

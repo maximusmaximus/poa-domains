@@ -1,3 +1,4 @@
+import { discoveryDocument } from "../src/discovery.js";
 import {mcpHttp} from "./mcp-http.js";
 import { correlationId, errorReply, envelopeResponse } from '../src/errors.js';
 import { escrowHttp } from "./escrow-http.js";
@@ -134,6 +135,8 @@ export default {
       need(host === "localhost" || host === "127.0.0.1" || host === env.BACKEND_HOST || host === "poadomains.grok.me" ||
         host === new URL(env.PUBLIC_EXPLORER_URL).hostname || host.endsWith(".grok.me"), "HOST");
 
+      const discovery=discoveryDocument(u.pathname);
+      if(discovery){if(request.method!=="GET"&&request.method!=="HEAD")return fail(405,{code:"METHOD_NOT_ALLOWED"});return new Response(request.method==="HEAD"?null:discovery.text,{headers:{...SECURITY,"content-type":discovery.type,"access-control-allow-origin":"*"}});}
       if(u.pathname === "/mcp") return mcpHttp(request,env);
 
       // Same-origin network status: Worker probes minepoa.com; browser never needs a PoA key.

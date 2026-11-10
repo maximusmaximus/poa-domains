@@ -13,8 +13,6 @@ import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { canonical, need, noSecrets } from "./core.js";
-import { nativeFailure, validateNetworkDocument } from "./native.js";
-import { Fault } from "./core.js";
 import { productionStatus } from "./production.js";
 
 const unicodePublicPins: Record<string, { bytes: number; sha256: string }> = {
@@ -44,6 +42,7 @@ const unicodePublicPins: Record<string, { bytes: number; sha256: string }> = {
   }
 };
 
+const discoveryFiles=["llms.txt",".well-known/agent.json","openapi.json","schemas/signed-packet.json","schemas/mcp-tools.json"] as const;
 export const PUBLIC_FILES = [
   "index.html",
   "app.js",
@@ -59,21 +58,26 @@ export const PUBLIC_FILES = [
   "icon.svg",
   "config.json",
   "status.json",
-  "network.json",
+  ...discoveryFiles,
   ".nojekyll",
 ] as const;
 // Known generated assets from the replaced public demo may be removed, but an
 // unexpected file or symlink fails closed rather than being uploaded/deleted.
 const previous = new Set([
   ...PUBLIC_FILES,
+  "network.json",
   "shared.js",
   "demo/state.json",
   "demo/capabilities.json",
   "demo/examples.json",
   "demo/details.json",
 ]);
-export function buildProductionBundle(directory = resolve("_site"), observation: unknown = nativeFailure(new Fault("NOT_OBSERVED"))) {
-  const network = validateNetworkDocument(observation);
+export function publicArtifactFiles(directory:string):string[]{
+ const out:string[]=[];
+ for(const entry of readdirSync(directory,{recursive:true}) as string[]){const stat=lstatSync(join(directory,entry));need(!stat.isSymbolicLink(),"ARTIFACT_LINK");if(stat.isDirectory())need(["demo",".well-known","schemas"].includes(entry),"UNEXPECTED_BUILD_ARTIFACT");else{need(stat.isFile(),"ARTIFACT_DIRECTORY");out.push(entry);}}
+ return out.sort();
+}
+export function buildProductionBundle(directory = resolve("_site"), _unusedObservation?: unknown) {
   const output = resolve(directory);
   need(
     output === resolve("_site") ||
@@ -85,21 +89,7 @@ export function buildProductionBundle(directory = resolve("_site"), observation:
       lstatSync(output).isDirectory() && !lstatSync(output).isSymbolicLink(),
       "ARTIFACT_DIRECTORY",
     );
-    for (const file of readdirSync(output)) {
-      const path = join(output, file),
-        stat = lstatSync(path);
-      need(!stat.isSymbolicLink(), "ARTIFACT_LINK");
-      if (file === "demo" && stat.isDirectory()) {
-        for (const child of readdirSync(path))
-          need(
-            previous.has("demo/" + child) &&
-              lstatSync(join(path, child)).isFile() &&
-              !lstatSync(join(path, child)).isSymbolicLink(),
-            "UNEXPECTED_BUILD_ARTIFACT",
-          );
-      } else
-        need(stat.isFile() && previous.has(file), "UNEXPECTED_BUILD_ARTIFACT");
-    }
+    for(const file of publicArtifactFiles(output))need(previous.has(file),"UNEXPECTED_BUILD_ARTIFACT");
     rmSync(output, { recursive: true });
   }
   mkdirSync(output);
@@ -112,7 +102,6 @@ export function buildProductionBundle(directory = resolve("_site"), observation:
         mode: "production-only",
         publicApiBase: null,
         statusFile: "./status.json",
-        networkFile: "./network.json",
       }),
     "PRODUCTION_WEB_CONFIG",
   );
@@ -126,8 +115,10 @@ export function buildProductionBundle(directory = resolve("_site"), observation:
     join(output, "status.json"),
     JSON.stringify(status, null, 2) + "\n",
   );
-  noSecrets(network);
-  writeFileSync(join(output, "network.json"), JSON.stringify(network, null, 2) + "\n");
+  // Copy verified generated public text only. Never import Engine/auth/MCP into
+  // the production-only Pages guard's dependency graph.
+  for(const name of discoveryFiles){const source=join("reference-web",name),file=join(output,name);need(lstatSync(source).isFile()&&!lstatSync(source).isSymbolicLink(),"ARTIFACT_LINK");if(name.includes("/"))need(!lstatSync(join("reference-web",name.split("/")[0]!)).isSymbolicLink(),"ARTIFACT_LINK");mkdirSync(join(file,".."),{recursive:true});copyFileSync(source,file);}
+
   const policy =
     "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https://minepoa.com/chain/poa-mainnet-1/api/status https://minepoa.com/chain/poa-mainnet-1/api/network-facts; img-src 'self'; base-uri 'none'; form-action 'none'";
   writeFileSync(
@@ -141,8 +132,8 @@ export function buildProductionBundle(directory = resolve("_site"), observation:
   );
   writeFileSync(join(output, ".nojekyll"), "");
   need(
-    readdirSync(output).length === PUBLIC_FILES.length &&
-      readdirSync(output).every((file) =>
+    publicArtifactFiles(output).length === PUBLIC_FILES.length &&
+      publicArtifactFiles(output).every((file) =>
         (PUBLIC_FILES as readonly string[]).includes(file),
       ),
     "UNEXPECTED_BUILD_ARTIFACT",

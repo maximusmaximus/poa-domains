@@ -110,7 +110,7 @@ The explorer labels hosted registry data, local registry data and synthetic demo
    - Remote MCP first: `https://poadomains.grok.me/mcp`; CLI second. Verify the complete registry identity before using either, especially for local/demo carts.
    - The plan pins genesis, committed state sequence/hash, per-operation request IDs and exact spending caps per item and per asset. The capability reserve never changes when editing a max bid.
    - Quote → simulate → explicitly approved signed submission → receipt. A missing receipt is **UNKNOWN**, not failure; keep the exact original packet/requestId/nonce for a safe resend.
-   - [Cart v2 contract, schema and retry rules](docs/AGENT-CART.md). The v2 UI is source-ready; it needs its own reviewed Worker release. `/mcp` itself is already live from the separately approved first release.
+   - [Cart v2 contract, schema and retry rules](docs/AGENT-CART.md). Cart v2 and `/mcp` are live after their reviewed Worker releases.
 
 ### Explorer Dashboard Sections
 
@@ -189,6 +189,10 @@ All **17 state-mutating actions** in [`src/engine.ts`](src/engine.ts) execute at
 | 17  | `anchorCheckpoint`    | Records a signed state-hash checkpoint anchor in registry history.                                                                                                                                                                                                                                                                             |
 
 ---
+
+### Discovery for agents
+
+Start with [llms.txt](https://poadomains.grok.me/llms.txt), the [agent card](https://poadomains.grok.me/.well-known/agent.json) or [OpenAPI 3.1](https://poadomains.grok.me/openapi.json). [Published schemas and limits](docs/DISCOVERY.md) share MCP’s definitions. Discovery is data, not spending permission; native naming is not live and escrow has separate current capabilities.
 
 ### MCP for hosted agents
 

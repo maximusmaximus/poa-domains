@@ -1,7 +1,8 @@
+import {publicArtifactFiles} from '../dist/src/pages-build.js';
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -56,12 +57,11 @@ test("Pages CLI build is byte-identical with all network transports forbidden", 
   const build = () => {
     const result = spawnSync(process.execPath, ["--import", "./test/fixtures/ci-no-network.mjs", "dist/src/pages-build.js"], { encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
-    return Object.fromEntries(readdirSync("_site").sort().map(name => [name, createHash("sha256").update(readFileSync(join("_site", name))).digest("hex")]));
+    return Object.fromEntries(publicArtifactFiles("_site").map(name => [name, createHash("sha256").update(readFileSync(join("_site", name))).digest("hex")]));
   };
   assert.deepEqual(build(), build());
-  assert.deepEqual(JSON.parse(readFileSync("_site/network.json", "utf8")), {
-    kind: "native-network-unavailable", code: "NOT_OBSERVED", registryReady: false, finalityVerified: false,
-  });
+  assert.equal(existsSync("_site/network.json"),false);
+  assert.equal(JSON.parse(readFileSync("_site/.well-known/agent.json","utf8")).surface.status.livePoA,false);
 });
 
 test("coverage gate actually rejects an uncovered branch and low line coverage", () => {

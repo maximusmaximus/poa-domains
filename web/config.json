@@ -1,6 +1,5 @@
 {
   "mode": "production-only",
   "publicApiBase": null,
-  "statusFile": "./status.json",
-  "networkFile": "./network.json"
+  "statusFile": "./status.json"
 }

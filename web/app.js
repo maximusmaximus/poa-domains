@@ -51,12 +51,11 @@ async function refreshOnce() {
   error.textContent = "";
   try {
     const config = await read("./config.json");
-    exact(config, ["mode", "publicApiBase", "statusFile", "networkFile"]);
+    exact(config, ["mode", "publicApiBase", "statusFile"]);
     if (
       config.mode !== "production-only" ||
       config.publicApiBase !== null ||
-      config.statusFile !== "./status.json" ||
-      config.networkFile !== "./network.json"
+      config.statusFile !== "./status.json"
     )
       throw Error("Unavailable");
     const value = await read("./status.json");

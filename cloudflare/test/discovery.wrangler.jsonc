@@ -1,0 +1,12 @@
+{
+  "name": "poa-discovery-contract-test",
+  "main": "discovery-worker.ts",
+  "compatibility_date": "2026-11-08",
+  "compatibility_flags": ["nodejs_compat"],
+  "alias": { "#poa-unicode-data": "../unicode-data.ts" },
+  "rules": [{ "type": "Text", "globs": ["**/*.txt"], "fallthrough": true }],
+  "vars": {
+    "PUBLIC_EXPLORER_URL": "https://poadomains.grok.me",
+    "BACKEND_HOST": "poadomains-registry.maxinfeld-artshow.workers.dev",
+  },
+}

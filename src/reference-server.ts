@@ -1,3 +1,4 @@
+import { discoveryDocument } from "./discovery.js";
 import { correlationId, errorReply } from './errors.js';
 import { createServer, Server } from "node:http";
 import { readFileSync } from "node:fs";
@@ -72,6 +73,8 @@ export async function startReferenceServer(
         "HOST",
       );
       const u = new URL(req.url ?? "/", "http://127.0.0.1");
+      const discovery=discoveryDocument(u.pathname);
+      if(discovery){if(req.method!=="GET"&&req.method!=="HEAD")return send(405,{code:"METHOD_NOT_ALLOWED"});res.setHeader("content-type",discovery.type);res.setHeader("access-control-allow-origin","*");return void res.end(req.method==="HEAD"?undefined:discovery.text);}
       if (req.method === "GET") {
         res.setHeader("access-control-allow-origin", "*");
         const assetPath = /^\/(d|p)\/[^/]+\/?$/.test(u.pathname) ? "/" : u.pathname;
