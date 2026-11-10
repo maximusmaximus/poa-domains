@@ -1,14 +1,14 @@
-import { bindTabKeys } from "./ui-a11y.js?v=5c150edb6e15";
-import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=5c150edb6e15";
-import { ui } from "./ui-state.js?v=5c150edb6e15";
-import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=5c150edb6e15";
-import { navigateHome, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=5c150edb6e15";
-import { el, endpointBase } from "./ui-core.js?v=5c150edb6e15";
-import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=5c150edb6e15";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=5c150edb6e15";
-import { runSearch } from "./ui-search.js?v=5c150edb6e15";
-import { renderIdeas, toggleIdeasMotion } from "./ui-ideas.js?v=5c150edb6e15";
-import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=5c150edb6e15";
+import { bindTabKeys } from "./ui-a11y.js?v=9f3d6420d4eb";
+import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=9f3d6420d4eb";
+import { ui } from "./ui-state.js?v=9f3d6420d4eb";
+import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=9f3d6420d4eb";
+import { navigateHome, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=9f3d6420d4eb";
+import { el, endpointBase } from "./ui-core.js?v=9f3d6420d4eb";
+import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=9f3d6420d4eb";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=9f3d6420d4eb";
+import { runSearch } from "./ui-search.js?v=9f3d6420d4eb";
+import { renderIdeas, toggleIdeasMotion } from "./ui-ideas.js?v=9f3d6420d4eb";
+import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=9f3d6420d4eb";
 
 try {
     applySiteTitle();

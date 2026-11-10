@@ -1,9 +1,9 @@
-import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=5c150edb6e15";
-import { ui } from "./ui-state.js?v=5c150edb6e15";
-import { add, el } from "./ui-core.js?v=5c150edb6e15";
-import { runSearch } from "./ui-search.js?v=5c150edb6e15";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=5c150edb6e15";
-import { updateTabDots } from "./ui-render.js?v=5c150edb6e15";
+import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=9f3d6420d4eb";
+import { ui } from "./ui-state.js?v=9f3d6420d4eb";
+import { add, el } from "./ui-core.js?v=9f3d6420d4eb";
+import { runSearch } from "./ui-search.js?v=9f3d6420d4eb";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=9f3d6420d4eb";
+import { updateTabDots } from "./ui-render.js?v=9f3d6420d4eb";
 
 export function writeViewURL(path = location.pathname) {
     const next = viewPath(path, ui.lastSearch, ui.activeSectionTab);
@@ -28,7 +28,7 @@ export function nameLink(parent, name, css = "domain-link") {
         return add(parent, "span", "—", css);
     const a = document.createElement("a");
     a.href = domainPath(name);
-    a.className = css;
+    a.className = css + " domain-name";
     a.textContent = name;
     a.addEventListener("click", (event) => {
         event.preventDefault();

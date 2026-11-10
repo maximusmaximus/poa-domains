@@ -1,3 +1,4 @@
+import { DOMAIN_FONT_FILE } from "../src/ui-policy.js";
 import {
   mkdirSync,
   readFileSync,
@@ -59,6 +60,7 @@ export function buildReferenceBundle(directory: string) {
     "escrow.js",
     "icon.svg",
     "XeroEmoji-COLRv1.woff2",
+    DOMAIN_FONT_FILE,
   ];
   for (const file of files)
     copyFileSync(join("reference-web", file), join(output, file));
