@@ -1,9 +1,9 @@
-import { actionLabel } from "./ui-copy.js?v=94d33d638672";
-import { trapDialog } from "./ui-a11y.js?v=94d33d638672";
-import { ui } from "./ui-state.js?v=94d33d638672";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=94d33d638672";
-import { add, el, endpointBase } from "./ui-core.js?v=94d33d638672";
-import { nameLink } from "./ui-router.js?v=94d33d638672";
+import { actionLabel } from "./ui-copy.js?v=5c1f8083f451";
+import { trapDialog } from "./ui-a11y.js?v=5c1f8083f451";
+import { ui } from "./ui-state.js?v=5c1f8083f451";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=5c1f8083f451";
+import { add, el, endpointBase } from "./ui-core.js?v=5c1f8083f451";
+import { nameLink } from "./ui-router.js?v=5c1f8083f451";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || shouldHoldTransactions(ui.networkStatus.level) || !!ui.networkStatus.hold;
@@ -48,6 +48,7 @@ export function updateHandoffAge(){
 }
 export async function updatePromptText() {
     const generation=++handoffGeneration;
+    el("cartAnchor").classList.toggle("cart-empty",!ui.cart.length);
     ui.handoffData=null;ui.handoffPending=false;
     if(!ui.cart.length||!ui.cap){
         if(!ui.cart.length)el("cartPrompt").textContent="Add one or more domains from availability search, live auctions, or standing offers to generate your agent prompt.";

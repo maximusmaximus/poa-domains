@@ -164,6 +164,14 @@ async function assertResponsiveGeometry(
   }
 }
 
+async function searchDetails(page: Page): Promise<string> {
+  await page.locator("#help-searchResult").click();
+  assert.equal(await page.locator("#info-searchResult").isVisible(), true);
+  const text = await page.locator("#searchResult").innerText();
+  await page.keyboard.press("Escape");
+  return text;
+}
+
 async function runFullUiUxFlowsOnRegistryApp(
   page: Page,
   browserName: string,
@@ -211,7 +219,7 @@ async function runFullUiUxFlowsOnRegistryApp(
         "searchSection",
         "searchInput",
         "searchBtn",
-        "cartPrompt",
+        "cartAnchor",
         "names",
         "auctions",
         "offers",
@@ -260,7 +268,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   await firstIdea.click();
   assert.equal(await page.locator("#searchInput").inputValue(), ideaQuery);
   assert.ok(
-    (await page.locator("#searchResult").innerText()).length > 10,
+    (await searchDetails(page)).length > 10,
     `${browserName}: idea ${ideaQuery} rendered non-empty search result`,
   );
   if (await page.locator("#clearCart").isEnabled())
@@ -271,7 +279,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#searchInput").fill("bad--domain");
   await page.locator("#searchInput").press("Enter");
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /Invalid name.*Use letters, numbers or supported emoji/,
   );
 
@@ -279,29 +287,29 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#searchInput").fill("google");
   await page.locator("#searchBtn").click();
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /Reserved|RESERVED ROOT DOMAIN \(PROTECTED\)/,
   );
-  assert.match(await page.locator("#searchResult").innerText(), /655-name/);
+  assert.match(await searchDetails(page), /655-name/);
   assert.equal(await page.locator("#addToCartBtn").count(), 0);
 
   // (c) Available single-emoji root via poa: prefix (100k POA minimum bid)
   await page.locator("#searchInput").fill("poa:🚀");
   await page.locator("#searchInput").press("Enter");
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /Available|AVAILABLE ROOT DOMAIN/,
   );
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /Root · PREMIUM/,
   );
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /100k POA single-emoji minimum bid/,
   );
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /Opening auction reserve: 100000 POA/,
   );
 
@@ -309,19 +317,19 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#searchInput").fill("🔥🔥");
   await page.locator("#searchInput").press("Enter");
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /Available|AVAILABLE ROOT DOMAIN/,
   );
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /Root · STANDARD/,
   );
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /1k POA multi-emoji minimum bid/,
   );
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /Opening auction reserve: 1000 POA/,
   );
 
@@ -329,11 +337,11 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#searchInput").fill("quantum");
   await page.locator("#searchBtn").click();
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /Available|AVAILABLE ROOT DOMAIN/,
   );
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /Root · STANDARD/,
   );
   await page.locator("#addToCartBtn").click();
@@ -343,11 +351,11 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#searchInput").fill("🌐");
   await page.locator("#searchBtn").click();
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /In auction|IN LIVE ASCENDING AUCTION/,
   );
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /Minimum next valid bid: 110001 POA/,
   );
 
@@ -355,7 +363,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#searchInput").fill("builder.nexus");
   await page.locator("#searchBtn").click();
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /Child offer open|AVAILABLE VIA STANDING CHILD OFFER/,
   );
 
@@ -363,11 +371,11 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#searchInput").fill("🫪.👩‍🦰");
   await page.locator("#searchBtn").click();
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /OWNED \(PERMANENT DEED\)/,
   );
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /Active fixed-price resale listing: 2500 POA/,
   );
 
@@ -415,9 +423,11 @@ async function runFullUiUxFlowsOnRegistryApp(
   assert.equal(await page.locator("#clearCart").isDisabled(), true);
   assert.equal(await page.locator("#copyCartPrompt").isDisabled(), true);
   assert.match(
-    await page.locator("#cartPrompt").innerText(),
+    (await page.locator("#cartPrompt").textContent()) ?? "",
     /Add one or more domains/,
   );
+
+  assert.equal(await page.locator("#cartPrompt").isVisible(), false);
 
   // 10. Test mobile viewport (375x812) with populated 3-item cart to ensure cart cards don't overflow
   await page.setViewportSize({ width: 375, height: 812 });
@@ -432,6 +442,8 @@ async function runFullUiUxFlowsOnRegistryApp(
     ["searchSection", "cartList", "cartPrompt"],
     `${browserName}:mobile-populated-cart`,
   );
+  for (const vp of VIEWPORTS) await assertResponsiveGeometry(page, vp,
+    ["searchSection", "cartList", "cartPrompt"], `${browserName}:populated-cart-v4`);
   await page.locator("#clearCart").click();
   await page.setViewportSize({ width: 1440, height: 900 });
 
@@ -487,7 +499,7 @@ async function runAgentRoundtripVerification(
   await page.locator("#searchInput").fill("builder.nexus");
   await page.locator("#searchBtn").click();
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /Child offer open|AVAILABLE VIA STANDING CHILD OFFER/,
   );
   await page.locator("#addToCartBtn").click();
@@ -605,7 +617,7 @@ async function runAgentRoundtripVerification(
   await page.locator("#searchInput").fill("builder.nexus");
   await page.locator("#searchBtn").click();
   assert.match(
-    await page.locator("#searchResult").innerText(),
+    await searchDetails(page),
     /OWNED \(PERMANENT DEED\)/,
   );
 
@@ -675,7 +687,7 @@ async function runStaticReferenceMultiBrowserSmoke(staticUrl: string) {
       await page.locator("#searchInput").fill("orbit");
       await page.locator("#searchBtn").click();
       assert.match(
-        await page.locator("#searchResult").innerText(),
+        await searchDetails(page),
         /In auction|IN LIVE ASCENDING AUCTION/,
       );
       await page.locator("#addToCartBtn").click();

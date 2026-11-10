@@ -52,7 +52,10 @@ try {
       h.cap.auctionWindows = { premium: { window: 7200, quiet: 5400 }, standard: { window: 1800, quiet: 900 } };
       await page.reload(); await readyFind(page);
       await page.locator("#searchInput").fill("🚀"); await page.locator("#searchBtn").click();
-      assert.match(await page.locator("#searchResult").innerText(), /2h minimum window \+ 1h 30m quiet/);
+      await page.locator("#help-searchResult").click();
+      assert.equal(await page.locator("#info-searchResult").isVisible(),true);
+      assert.match(await page.locator("#info-searchResult").innerText(), /2h minimum window \+ 1h 30m quiet/);
+      await page.keyboard.press("Escape");
       assert.ok(await page.locator('#searchResult a[href="/d/%F0%9F%9A%80"]').count());
       assert.equal(await page.locator("#siteFooter").count(), 1);
       assert.ok(await page.locator("#sectionTabs .tab-dot").count() >= 6);

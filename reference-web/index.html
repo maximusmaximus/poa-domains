@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=4df1be1c082e" />
+    <link rel="stylesheet" href="/style.css?v=8a8508ab0cce" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -69,7 +69,7 @@
           <div class="ideas-head">
             <div id="ideasHeading" role="group" aria-label="Name ideas"></div>
           </div>
-          <p class="ideas-hint">Tap a name to check it and add it to your planning cart. No payment is sent.</p>
+          <p data-info-description class="ideas-hint">Tap a name to check it and add it to your planning cart. No payment is sent.</p>
           <p id="ideasContext" class="muted">Ideas load after registry data.</p>
           <div id="ideasStrip" class="ideas-strip" role="group" aria-label="Name ideas"></div>
           <p id="ideasStatus" class="ideas-status" role="status" aria-live="polite"></p>
@@ -84,14 +84,14 @@
           />
           <button id="searchBtn" type="button">Check</button>
         </div>
-        <p id="searchHelpText" class="muted">Enter a name or emoji, then select 🔍 to check its registry availability. Add a result to your planning cart or open its page. No payment is sent.</p>
-        <p id="searchPrivacy" class="muted">Submitted name searches are saved without IP or account details to improve suggestions. Query text is saved: do not enter personal information, wallet addresses or keys.</p>
-        <p id="searchLogStatus" class="muted" role="status" aria-live="polite"></p>
+        <p data-info-description id="searchHelpText" class="muted">Enter a name or emoji, then select 🔍 to check its registry availability. Add a result to your planning cart or open its page. No payment is sent.</p>
+        <p data-info-description id="searchPrivacy" class="muted">Submitted name searches are saved without IP or account details to improve suggestions. Query text is saved: do not enter personal information, wallet addresses or keys.</p>
+        <p data-info-description id="searchLogStatus" class="muted" role="status" aria-live="polite"></p>
         <p id="searchResultStatus" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
-        <p class="muted">Results below are for the last name you checked. Press Check after editing.</p>
+        <p data-info-description id="searchLastChecked" class="muted">Results below are for the last name you checked. Press Check after editing.</p>
         <div id="searchResult" class="search-result"></div>
 
-        <div id="cartAnchor" class="cart-panel">
+        <div id="cartAnchor" class="cart-panel cart-empty">
           <div class="cart-header">
             <h3>🛒 Cart (<span id="cartCount">0</span>)</h3>
             <button id="clearCart" type="button" class="secondary" disabled>Clear</button>
@@ -110,7 +110,7 @@
 
       <section id="auctionsSection" data-section="auctions" role="tabpanel" aria-labelledby="tabAuctions" tabindex="0" hidden>
         <h2>🏷️ Auctions</h2>
-        <p class="howto">Past · Current · Upcoming. Tap a name for history.</p>
+        <p data-info-description class="howto">Past · Current · Upcoming. Tap a name for history.</p>
         <div class="auction-tabs" role="tablist" aria-label="Auction filters">
           <button type="button" class="auction-tab is-active" role="tab" aria-selected="true" data-auction-tab="current" id="auctionTabCurrent" aria-controls="auctions" tabindex="0">Current</button>
           <button type="button" class="auction-tab" role="tab" aria-selected="false" data-auction-tab="upcoming" id="auctionTabUpcoming" aria-controls="auctions" tabindex="-1">Upcoming</button>
@@ -121,7 +121,7 @@
 
       <section id="marketSection" data-section="market" role="tabpanel" aria-labelledby="tabMarket" tabindex="0" hidden>
         <h2>💰 For sale</h2>
-        <p class="howto">Fixed-price listings in POA. Open a name to buy or manage.</p>
+        <p data-info-description class="howto">Fixed-price listings in POA. Open a name to buy or manage.</p>
         <div id="marketplace" class="cards"></div>
       </section>
 
@@ -171,10 +171,10 @@
 
       <section id="handoffSection" data-section="handoff" role="tabpanel" aria-labelledby="tabHandoff" tabindex="0" hidden>
         <h2>🧾 Handoff</h2>
-        <p class="howto">Give your agent a clear request — this page does not sign, pay or register a name.</p>
+        <p data-info-description class="howto">Give your agent a clear request — this page does not sign, pay or register a name.</p>
         <ol class="handoff-steps"><li>🔍 Find a name and add it to your planning cart.</li><li>🛒 Check each POA amount, then copy the cart request or download its JSON.</li><li>🤖 Give it to your agent. Ask it to check prices and ownership again, preview the action, and ask for your approval before sending anything.</li></ol>
-        <p>Why? Your agent needs the exact name, amount limit and current registry version. A copied request is not a payment or proof of ownership.</p>
-        <details id="advancedHandoff"><summary>Advanced: build one unsigned action by hand</summary><p>For agents and experienced users. Public addresses and data only. Never paste a private key. Machine field names below match the API; times are Unix timestamps, not a countdown.</p>
+        <p data-info-description>Why? Your agent needs the exact name, amount limit and current registry version. A copied request is not a payment or proof of ownership.</p>
+        <details id="advancedHandoff"><summary>Advanced: build one unsigned action by hand</summary><p data-info-description>For agents and experienced users. Public addresses and data only. Never paste a private key. Machine field names below match the API; times are Unix timestamps, not a countdown.</p>
         <button type="button" id="example" hidden>Load example</button>
         <p id="exampleNotice"></p>
         <form id="handoff">
@@ -205,9 +205,9 @@
       <section id="escrowSection" data-section="escrow" role="tabpanel" aria-labelledby="tabEscrow" tabindex="0" hidden>
         <div id="manageDomains" class="manage-domains">
           <h2>🌱 Manage domains and subdomains</h2>
-          <p>View a public owner address. This is not a wallet connection or proof that you own it. These are application-registry names, not verified native-chain ownership.</p>
+          <p data-info-description>View a public owner address. This is not a wallet connection or proof that you own it. These are application-registry names, not verified native-chain ownership.</p>
           <label for="manageOwner">Public owner address — never a private key</label><div class="search-bar"><input id="manageOwner" autocomplete="off" placeholder="poa1… public owner address" /><button id="manageLookup" type="button">View names</button></div>
-          <p>Open a name to view it, or prepare a sale or subdomain request for its owner's agent. Retiring a subdomain needs both the child holder and parent owner. Nothing is sent from these controls.</p>
+          <p data-info-description>Open a name to view it, or prepare a sale or subdomain request for its owner's agent. Retiring a subdomain needs both the child holder and parent owner. Nothing is sent from these controls.</p>
           <div id="manageNames" class="cards"></div><pre id="managePrompt" class="prompt-box" role="status">No management request prepared.</pre>
         </div>
         <div id="escrowPayments"></div>
@@ -224,7 +224,7 @@
         <div id="domainActions" class="button-row"></div>
         <div id="domainOwnerTools" class="owner-tools" hidden>
           <h3>💰 Sell (POA only)</h3>
-          <p class="howto">Owners list, change price, or unlist. Copy a prompt for your agent — nothing submits here.</p>
+          <p data-info-description class="howto">Owners list, change price, or unlist. Copy a prompt for your agent — nothing submits here.</p>
           <label>
             Price (POA)
             <input id="listPriceInput" inputmode="numeric" placeholder="2500" aria-label="List price in POA" />
@@ -261,9 +261,23 @@
 
     <footer id="siteFooter" class="site-footer">
       <nav class="footer-links" aria-label="Project links">
-        <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer">📦 poa-domains on GitHub</a>
-        <a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer">🛡️ GitHub Pages</a>
+        <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer"><svg class="github-mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg> <span>poa-domains on GitHub</span></a>
+        <a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer" title="Mirror Site — static read-only landing page"><svg class="github-mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg> <span>Mirror Site</span></a>
       </nav>
+      <details id="siteTerms" class="site-terms">
+        <summary>📜 Terms &amp; conditions</summary>
+        <section aria-labelledby="termsHeading">
+          <h2 id="termsHeading" class="visually-hidden">Terms &amp; conditions</h2>
+          <h3>📜 About</h3><p>This is a separate application registry, not a native PoA naming protocol. These notes summarize the app's current rules.</p>
+          <h3>🔑 Ownership</h3><p>Registry ownership is permanent, with no renewals or expiry. Names can change hands by resale or transfer. Retiring a subdomain requires its holder and parent owner; the retired path stays reserved.</p>
+          <h3>💰 Payments &amp; fees</h3><p>The cart is an unsigned plan, not a checkout. POA escrow supports resale or auctions of existing deeds, not new-name issuance. Review the current price, fees, recipient, amount and unique memo before approving a payment. Funding escrow is not a bid, purchase or title transfer.</p>
+          <h3>↩️ Refunds</h3><p>Eligible outbid, cancellation and expiry refunds go only to the original payer. Pauses do not erase obligations. There is no automatic refund after an uncertain or verified payout; check the recorded status before retrying anything.</p>
+          <h3>🤖 Agents</h3><p>The browser does not sign. Copied requests need separate review and approval. Never share private keys, passwords or recovery phrases. Re-check ownership, prices and versions before signing.</p>
+          <h3>🔒 Privacy &amp; search logs</h3><p>Submitted name searches are stored in private search logs without IP addresses or account identifiers. Query text is saved; do not enter personal information, wallet addresses or keys. Typing alone is not logged.</p>
+          <h3>⚠️ Risks</h3><p>Availability, uninterrupted service and successful transactions are not guaranteed. Escrow is custodial; payments and registry title transfer are not atomic. Compromised custody can lose funds. No independent security audit is claimed.</p>
+          <h3>⚖️ Disputes</h3><p>The app has no built-in arbitration, dispute-resolution or key-recovery service.</p>
+        </section>
+      </details>
       <p class="footer-credit">made with ❤️ in SF by Tesselate Army | <a href="https://maxi.grok.me" rel="noreferrer">maxi.grok.me</a></p>
     </footer>
 
@@ -302,6 +316,6 @@
       <p id="floatingCartStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
 
-    <script type="module" src="/app.js?v=94d33d638672"></script>
+    <script type="module" src="/app.js?v=5c1f8083f451"></script>
   </body>
 </html>

@@ -35,3 +35,19 @@ test('emoji actions retain exact accessible purpose and leave technical payment/
  for(const technical of ['Generate','Copy unsigned request','Use credited POA to buy','Prepare: Offer subdomains'])assert.equal(buttonIcon(technical),null);
  const untouched={textContent:'Copy prompt',closest:()=>true};decorateEmojiButton(untouched);assert.equal(untouched.textContent,'Copy prompt');
 });
+
+test('v4 keeps privacy and non-guaranteed/unsigned explanations in per-area help, with a gentle motion-safe field',()=>{
+ const html=readFileSync('reference-web/index.html','utf8'),css=readFileSync('reference-web/style.css','utf8'),help=readFileSync('reference-web/ui-help.js','utf8');
+ for(const id of ['searchHelpText','searchPrivacy','searchLogStatus','searchLastChecked'])assert.ok(html.includes('data-info-description id="'+id+'"'));
+ assert.match(help,/Availability is not guaranteed/);assert.match(help,/query text itself is stored/);assert.match(help,/unsigned plan, not a payment/);assert.match(help,/filter\(n=>!n.closest\(".info-popover"\)\)/);
+ assert.match(css,/@keyframes search-invite/);assert.match(css,/animation:search-invite 4s ease-in-out infinite/);assert.match(css,/#searchInput:focus,#searchInput\[data-typing="true"\]/);assert.match(css,/@media\(prefers-reduced-motion:reduce\) \{ #searchInput \{ animation:none/);
+ assert.match(help,/field.addEventListener\("input"/);assert.match(css,/min-height:64px/);
+});
+
+test('bottom Terms reuse documented live ownership/escrow/privacy limits without inventing guarantees',()=>{
+ const html=readFileSync('reference-web/index.html','utf8'),footer=html.split('<footer')[1];
+ assert.ok(footer.indexOf('footer-links')<footer.indexOf('id="siteTerms"')&&footer.indexOf('id="siteTerms"')<footer.indexOf('footer-credit'));
+ for(const section of ['📜 About','🔑 Ownership','💰 Payments &amp; fees','↩️ Refunds','🤖 Agents','🔒 Privacy &amp; search logs','⚠️ Risks','⚖️ Disputes'])assert.ok(footer.includes('<h3>'+section+'</h3>'));
+ for(const truth of ['no renewals or expiry','original payer','no automatic refund','Query text is saved','not atomic','not guaranteed','no built-in arbitration'])assert.ok(footer.includes(truth),truth);
+ assert.equal((footer.match(/class="github-mark"/g)??[]).length,2);assert.equal((footer.match(/aria-hidden="true" focusable="false"/g)??[]).length,2);assert.match(footer,/>Mirror Site<\/span>/);assert.doesNotMatch(footer,/GitHub Pages/);
+});
