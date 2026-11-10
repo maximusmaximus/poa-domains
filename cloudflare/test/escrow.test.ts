@@ -447,3 +447,37 @@ test("native submission retains write gate and never follows a redirect",async()
  await assert.rejects(new PoaHttpNetwork(()=>false,request).submit(body),/ESCROW_NETWORK_WRITES_DISABLED/);assert.equal(calls,0);
  await assert.rejects(new PoaHttpNetwork(()=>true,request).submit(body),/ESCROW_NODE_REDIRECT/);assert.equal(calls,1);
 });
+
+// Display-only regressions: do not loosen or cache the financial safety lane.
+test("slow successful display reads keep pins/freshness while financial status retains its exact 12s gate", async()=>{
+ for(const latency of [3000,11000,12001]){
+  let now=1800000000000;const cutoff=Math.floor(now/1000)-60;
+  const request=(async(url:any)=>{const status=String(url).endsWith('/api/status');if(status)now+=latency;
+   return Response.json(status?{K:5,chain_id:CHAIN,checkpoint:{height:10,cutoff_ts:cutoff},as_of:new Date(now).toISOString(),stale:false,state_root:root}:{chain_id:CHAIN,engine_sha256:MAINNET_ENGINE_SHA256,params_sha256:MAINNET_PARAMS_SHA256});}) as typeof fetch;
+  const n=new PoaHttpNetwork(()=>false,request,undefined,()=>now);
+  if(latency>12000)await assert.rejects(n.status(),/ESCROW_STALE/);else assert.equal((await n.status()).stale,false);
+  const shown=await n.displayStatus();assert.equal(shown.stale,false);assert.equal(shown.readTiming?.totalMs,latency);
+ }
+});
+test("display and financial reads share protocol/checkpoint rollback pins, not cached authorizations",async()=>{
+ let height=11,changed=false;const now=1800000000000;
+ const request=(async(url:any)=>Response.json(String(url).endsWith('/api/status')?{K:5,chain_id:CHAIN,checkpoint:{height,cutoff_ts:Math.floor(now/1000)-60},as_of:new Date(now).toISOString(),stale:false,state_root:root}:{chain_id:CHAIN,engine_sha256:changed?'0'.repeat(64):MAINNET_ENGINE_SHA256,params_sha256:MAINNET_PARAMS_SHA256})) as typeof fetch;
+ const n=new PoaHttpNetwork(()=>false,request,undefined,()=>now);await n.displayStatus();height=10;
+ await assert.rejects(n.status(),/ESCROW_CHECKPOINT_ROLLBACK/);await assert.rejects(n.displayStatus(),/ESCROW_CHECKPOINT_ROLLBACK/);
+ height=11;changed=true;await assert.rejects(n.status(),/ESCROW_PROTOCOL_CHANGED/);await assert.rejects(n.displayStatus(),/ESCROW_PROTOCOL_CHANGED/);
+});
+test("display pairs settle both siblings and share one deadline across aliases; no orphan probe behind the cache",async()=>{
+ let release!:()=>void;const gate=new Promise<void>(r=>{release=r;}),signals:AbortSignal[]=[];let done=false;
+ const request=(async(url:any,init:any)=>{signals.push(init.signal);if(String(url).endsWith('/api/status'))throw new DOMException('synthetic','TimeoutError');await gate;return Response.json({chain_id:CHAIN,engine_sha256:MAINNET_ENGINE_SHA256,params_sha256:MAINNET_PARAMS_SHA256});}) as typeof fetch;
+ const n=new PoaHttpNetwork(()=>false,request);const pending=n.displayStatus().finally(()=>{done=true;});
+ await new Promise(r=>setImmediate(r));assert.equal(done,false);release();await assert.rejects(pending,/ESCROW_NODE_TIMEOUT/);assert.equal(new Set(signals).size,1);
+});
+
+test("display fallback aliases use one overall read deadline, not a new deadline per request",async()=>{
+ const now=1800000000000,signals=new Set<AbortSignal>();let requests=0;
+ const request=(async(url:any,init:any)=>{requests++;signals.add(init.signal);const path=new URL(String(url)).pathname;
+  if(path==='/api/status')return Response.json({K:5,chain_id:CHAIN,checkpoint:{height:10,cutoff_ts:Math.floor(now/1000)-60},as_of:new Date(now).toISOString(),stale:false,state_root:root});
+  if(path==='/api/network/facts')return Response.json({chain_id:CHAIN,engine_sha256:MAINNET_ENGINE_SHA256,params_sha256:MAINNET_PARAMS_SHA256});
+  return new Response(null,{status:404});}) as typeof fetch;
+ const shown=await new PoaHttpNetwork(()=>false,request,undefined,()=>now).displayStatus();assert.equal(shown.stale,false);assert.equal(requests,5);assert.equal(signals.size,1);
+});

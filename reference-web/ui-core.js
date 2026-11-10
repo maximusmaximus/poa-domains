@@ -1,6 +1,6 @@
-import { decorateEmojiButton } from "./ui-copy.js?v=4ebb3841970c";
-import { buildOwnershipIndex, ownershipConflict, safeObject } from "./shared.js?v=4ebb3841970c";
-import { ui } from "./ui-state.js?v=4ebb3841970c";
+import { decorateEmojiButton } from "./ui-copy.js?v=1065cb322a67";
+import { buildOwnershipIndex, ownershipConflict, safeObject } from "./shared.js?v=1065cb322a67";
+import { ui } from "./ui-state.js?v=1065cb322a67";
 
 export const el = (id) => document.getElementById(id);
 
@@ -83,6 +83,29 @@ export function statusLabel(status) {
 }
 
 /** Link known names in human prose only; machine JSON remains inert and unchanged. */
-export function namedText(node,text,names=Object.keys(ui.latestState?.names??{})){
- let rest=String(text??"");const list=[...new Set(names)].filter(Boolean).sort((a,b)=>b.length-a.length);while(rest){let at=-1,match="";for(const n of list){const i=rest.indexOf(n);if(i>=0&&(at<0||i<at)){at=i;match=n;}}if(at<0){node.append(rest);break;}node.append(rest.slice(0,at));const a=document.createElement("a");a.className="domain-name";a.href="/d/"+encodeURIComponent(match);a.textContent=match;node.append(a);rest=rest.slice(at+match.length);}return node;
+export function namedText(node, text, names = Object.keys(ui.latestState?.names ?? {})) {
+    let rest = String(text ?? "");
+    const list = [...new Set(names)].filter(Boolean).sort((a, b) => b.length - a.length);
+    // A short name must not become a link inside another word, child name, or emoji name.
+    const tail = /[\p{L}\p{N}\p{M}_\-\u200d\p{Extended_Pictographic}\p{Regional_Indicator}]$/u;
+    const head = /^[\p{L}\p{N}\p{M}_\-\u200d\p{Extended_Pictographic}\p{Regional_Indicator}]/u;
+    while (rest) {
+        let at = -1, match = "";
+        for (const name of list) {
+            let i = rest.indexOf(name);
+            while (i >= 0) {
+                const before = rest.slice(0, i), after = rest.slice(i + name.length);
+                const left = tail.test(before) || (before.endsWith(".") && tail.test(before.slice(0, -1)));
+                const right = head.test(after) || (after.startsWith(".") && head.test(after.slice(1)));
+                if (!left && !right) { if (at < 0 || i < at) { at = i; match = name; } break; }
+                i = rest.indexOf(name, i + name.length);
+            }
+        }
+        if (at < 0) { node.append(rest); break; }
+        node.append(rest.slice(0, at));
+        const a = document.createElement("a");
+        a.className = "domain-name"; a.href = "/d/" + encodeURIComponent(match); a.textContent = match;
+        node.append(a); rest = rest.slice(at + match.length);
+    }
+    return node;
 }

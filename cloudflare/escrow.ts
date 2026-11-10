@@ -1,3 +1,4 @@
+import { DisplayReadError, displayCode, displayReason, type DisplayReadiness, type ReadTiming } from "./display-freshness.js";
 import { canonical, exact, integer, need, obj, text } from "../src/core.js";
 import { Packet, authenticate } from "../src/auth.js";
 import { CHAIN, Command, Signer, Transfer, address, decimal, digest, micros, txid, verifyTransfer } from "./escrow-codec.js";
@@ -13,13 +14,16 @@ export interface Observation {
   checkpoint: { height: number; root: string; anchored: boolean; quorum: number } | null;
 }
 export interface Status {
-  chain: string; asOf: number; stale: boolean; height: number; root: string; fee: string; cutoff?: number;
+  chain: string; asOf: number; stale: boolean; height: number; root: string; fee: string; cutoff?: number; readTiming?: ReadTiming;
 }
 export interface Context { nextNonce: number; parents: string[]; cutoff: number; }
 export interface Cut { chain: string; height: number; root: string; balance: string; covered: string[]; }
 /** These are trusted-node observations, not independent consensus-proof verification. */
 export interface Network {
-  status(): Promise<Status>; lookup(id: string): Promise<Observation | null>;
+  status(): Promise<Status>;
+  /** Optional display-only observation; NEVER authorizes a financial operation. */
+  displayStatus?(): Promise<Status>;
+  lookup(id: string): Promise<Observation | null>;
   context(wallet: string, knownTxid?: string): Promise<Context>; cut(wallet: string, ids: string[], status: Status): Promise<Cut>;
   submit(body: Transfer): Promise<void>;
 }
@@ -154,12 +158,34 @@ export class Escrow {
     });
   }
   private halt(code:string): void { if(this.state().halt!==code)this.journal.append("halt",{code},s=>{s.halt=code;}); }
-  private publicFresh?: { until: number; value: Promise<{ held: boolean; reason: string | null; asOf: number | null }> };
-  /** Display-only cached read. Commands always run the uncached financial gate. */
-  readiness(): Promise<{ held: boolean; reason: string | null; asOf: number | null }> {
-    if (!this.publicFresh || this.publicFresh.until <= this.now()) this.publicFresh = { until: this.now()+10000,
-      value: this.fresh().then(s=>({held:false,reason:null,asOf:s.asOf})).catch(()=>({held:true,reason:"Network freshness or verification is held",asOf:null})) };
-    return this.publicFresh.value;
+  private publicFresh?: { until: number; value: DisplayReadiness };
+  private publicInflight?: Promise<DisplayReadiness>;
+  /** Display-only single flight. Its TTL starts at settlement, not request start.
+   * Commands still call fresh() directly and never read either display field. */
+  readiness(): Promise<DisplayReadiness> {
+    if (this.publicInflight) return this.publicInflight;
+    if (this.publicFresh && this.publicFresh.until > this.now()) return Promise.resolve(this.publicFresh.value);
+    const started = this.now();
+    const probe = async (): Promise<DisplayReadiness> => {
+      try {
+        const status = await (this.network.displayStatus?.() ?? this.network.status());
+        this.verifyFresh(status);
+        const checkedAt = this.now(), durationMs = Math.max(0, checkedAt - started);
+        return { held: false, reason: null, asOf: status.asOf, code: null, checkedAt, durationMs,
+          slow: durationMs >= 3000, timing: status.readTiming ?? null };
+      } catch (error) {
+        const checkedAt = this.now(), durationMs = Math.max(0, checkedAt - started), code = displayCode(error);
+        return { held: true, reason: displayReason(code), asOf: null, code, checkedAt, durationMs,
+          slow: durationMs >= 3000, timing: error instanceof DisplayReadError ? error.timing : null };
+      }
+    };
+    this.publicInflight = probe().then(value => {
+      // Never serve a successful display beyond the same financial age boundary.
+      this.publicFresh = { until: Math.min(this.now() + 10000,
+        value.asOf === null ? Infinity : value.asOf + this.policy.maxAgeMs), value };
+      return value;
+    }).finally(() => { this.publicInflight = undefined; });
+    return this.publicInflight;
   }
   /** Read-only receipt preview: never credits funds or signs/sends a transaction. */
   async depositView(id: string, candidate?: string): Promise<unknown> {
@@ -183,6 +209,9 @@ export class Escrow {
     let status:Status;
     try { status=await this.network.status(); }
     catch { throw new Error("ESCROW_NETWORK_HELD"); }
+    return this.verifyFresh(status);
+  }
+  private verifyFresh(status: Status): Status {
     need(status.chain===CHAIN,"ESCROW_CHAIN");
     need(status.stale===false && Number.isSafeInteger(status.asOf) && status.asOf<=this.now()+5000 && this.now()-status.asOf<=this.policy.maxAgeMs,"ESCROW_STALE");
     need(status.fee==="0.000000","ESCROW_FEE_POLICY"); integer(status.height); need(/^[0-9a-f]{64}$/.test(status.root),"ESCROW_CHECKPOINT");

@@ -1,4 +1,5 @@
 /** Fixed-origin native transport. Public node data is explicitly trusted, not a consensus verifier. */
+import { DisplayReadError, type ReadTiming } from "./display-freshness.js";
 import { integer, need } from "../src/core.js";
 import { CHAIN, Transfer, address, digest, verifyTransfer } from "./escrow-codec.js";
 import { Context, Cut, Network, Observation, Status } from "./escrow.js";
@@ -16,8 +17,8 @@ export class PoaHttpNetwork implements Network {
     // Arrow-function mocks and already-bound injected clients retain their behavior.
     this.request=request.bind(globalThis);
   }
-  private async get(path:string, limit=2000000):Promise<any> {
-    const r=await this.request(`https://minepoa.com${path}`,{signal:AbortSignal.timeout(12000),redirect:"manual",headers:{Accept:"application/json"}});
+  private async get(path:string, limit=2000000, displaySignal?:AbortSignal):Promise<any> {
+    const r=await this.request(`https://minepoa.com${path}`,{signal:displaySignal ?? AbortSignal.timeout(12000),redirect:"manual",headers:{Accept:"application/json"}});
     // workerd supports manual, not error. Never follow a redirected node URL.
     if(r.status>=300&&r.status<400){await r.body?.cancel();throw new Error("ESCROW_NODE_REDIRECT");}
     if(r.status===404)return null;need(r.ok,"ESCROW_NODE_HTTP");
@@ -29,23 +30,44 @@ export class PoaHttpNetwork implements Network {
     const bytes=new Uint8Array(size);let offset=0;for(const part of chunks){bytes.set(part,offset);offset+=part.length;}
     return JSON.parse(new TextDecoder("utf-8",{fatal:true}).decode(bytes));
   }
-  private async getFirst(paths:string[], limit=2000000):Promise<any> {
+  private async getFirst(paths:string[], limit=2000000, displaySignal?:AbortSignal):Promise<any> {
     let lastErr:unknown;
     for(const path of paths){
-      try{const v=await this.get(path,limit);if(v!==null)return v;}
+      try{const v=await this.get(path,limit,displaySignal);if(v!==null)return v;}
       catch(e){if(e instanceof Error&&e.message==="ESCROW_NODE_HTTP"){lastErr=e;continue;}throw e;}
     }
     if(lastErr)throw lastErr;
     return null;
   }
-  async status():Promise<Status> {
+  async status():Promise<Status> { return this.readStatus(false); }
+  /** Read-only observation using the SAME protocol and rollback checks.
+   * A little transport/processing grace avoids labelling slow successful reads stale.
+   * The uncached financial path retains its exact 12s deadline and every pin/age check. */
+  displayStatus():Promise<Status> {
+    return this.readStatus(true);
+  }
+  private async readStatus(display:boolean):Promise<Status> {
     const started=integer(this.clock());
-    const [s,f]=await Promise.all([
-      this.getFirst([`/chain/${CHAIN}/api/status`,"/api/status"]),
-      this.getFirst([`/chain/${CHAIN}/api/network-facts`,"/api/network-facts","/api/network/facts"]),
-    ]);
-    const observedAt=integer(this.clock());
-    need(observedAt>=started && observedAt-started<=12000,"ESCROW_STALE");
+    const timing:ReadTiming={statusMs:null,factsMs:null,totalMs:0};
+    const displaySignal=display?AbortSignal.timeout(15000):undefined;
+    const read=async(paths:string[],kind:"statusMs"|"factsMs")=>{
+      try{return await this.getFirst(paths,2000000,displaySignal);}
+      finally{if(display)timing[kind]=Math.max(0,this.clock()-started);}
+    };
+    try {
+      const pending=[read([`/chain/${CHAIN}/api/status`,"/api/status"],"statusMs"),
+        read([`/chain/${CHAIN}/api/network-facts`,"/api/network-facts","/api/network/facts"],"factsMs")];
+      let s:any,f:any;
+      if(display){
+        // Wait for BOTH reads to settle, including a failed sibling. A completed
+        // display probe must not leave an old upstream request behind the cache.
+        const settled=await Promise.allSettled(pending);
+        const failure=settled.find(v=>v.status==="rejected");
+        if(failure?.status==="rejected")throw failure.reason;
+        [s,f]=settled.map(v=>(v as PromiseFulfilledResult<any>).value);
+      }else [s,f]=await Promise.all(pending);
+      const observedAt=integer(this.clock());
+      need(observedAt>=started && (display || observedAt-started<=12000),"ESCROW_STALE");
     need(f?.chain_id===CHAIN&&s?.K===5&&(s.chain_id===undefined||s.chain_id===CHAIN),"ESCROW_NODE_CHAIN");
     if(f.economics?.K!==undefined)need(integer(f.economics.K)===5,"ESCROW_NODE_CHAIN");
     if(s.epochs_closed!==undefined&&f.open_epoch!==undefined)need(integer(s.epochs_closed)===integer(f.open_epoch),"ESCROW_UNALIGNED_CUT");
@@ -71,7 +93,11 @@ export class PoaHttpNetwork implements Network {
     const root=typeof s.state_root==="string"&&/^[0-9a-f]{64}$/.test(s.state_root)?s.state_root:(cutoff!==undefined?digest(["poa-checkpoint-cut/v1",CHAIN,height,cutoff]):"");
     return {chain:f.chain_id,asOf,stale,height,root, ...(cutoff!==undefined?{cutoff}:{}),
       // Native transfers are documented fee-free; if exposed, a contrary node fee fails closed.
-      fee:s.transfer_fee ?? "0.000000"};
+      fee:s.transfer_fee ?? "0.000000", ...(display?{readTiming:{...timing,totalMs:Math.max(0,this.clock()-started)}}:{})};
+    } catch(error) {
+      if(display)throw new DisplayReadError(error,{...timing,totalMs:Math.max(0,this.clock()-started)});
+      throw error;
+    }
   }
   async lookup(id:string):Promise<Observation|null> {
     need(/^[0-9a-f]{64}$/.test(id),"ESCROW_TXID");

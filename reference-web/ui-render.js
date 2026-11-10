@@ -1,12 +1,12 @@
-import { drawTicker } from "./ui-ticker.js?v=4ebb3841970c";
-import { actionLabel } from "./ui-copy.js?v=4ebb3841970c";
-import { returnFocus } from "./ui-a11y.js?v=4ebb3841970c";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=4ebb3841970c";
-import { ui } from "./ui-state.js?v=4ebb3841970c";
-import { add, el, person, namedText } from "./ui-core.js?v=4ebb3841970c";
-import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=4ebb3841970c";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=4ebb3841970c";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=4ebb3841970c";
+import { drawTicker } from "./ui-ticker.js?v=1065cb322a67";
+import { actionLabel } from "./ui-copy.js?v=1065cb322a67";
+import { returnFocus } from "./ui-a11y.js?v=1065cb322a67";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=1065cb322a67";
+import { ui } from "./ui-state.js?v=1065cb322a67";
+import { add, el, person, namedText } from "./ui-core.js?v=1065cb322a67";
+import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=1065cb322a67";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=1065cb322a67";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=1065cb322a67";
 
 export function updateTabDots(state) {
     const marks = tabWatermarks(state);
@@ -340,7 +340,7 @@ export function render(payload) {
                     ? `Offer published`
                     : `Records updated`;
         const card = add(el("history"), "div", "", "card");
-        add(card, "h4", label);
+        namedText(add(card, "h4", ""), label);
         add(card, "p", `Receipt #${r.sequence} · ${formatClock(r.time)} · Status: ${r.status}`, "badge");
         add(card, "p", `Signer: ${person(r.signer)} · Request: ${r.requestId}`);
         add(card, "code", `intentId: ${r.intentId.slice(0, 24)}…`);
@@ -354,7 +354,9 @@ export function render(payload) {
         const card = add(el("balances"), "div", "", "card");
         const a = s.auctions[c.auctionId];
         add(card, "h4", `Refund: ${c.amount} ${c.asset}`);
-        add(card, "p", `${person(c.payer)} · ${a ? a.name : c.auctionId.slice(0, 12)} · v${c.version}`, "badge-ok");
+        const refundLine = add(card, "p", `${person(c.payer)} · `, "badge-ok");
+        if (a) nameLink(refundLine, a.name); else refundLine.append(c.auctionId.slice(0, 12));
+        refundLine.append(` · v${c.version}`);
     }
     for (const [who, wallet] of Object.entries(s.balances ?? {})) {
         const card = add(el("balances"), "div", "", "card");
