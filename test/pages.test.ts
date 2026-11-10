@@ -11,16 +11,16 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildProductionBundle, PUBLIC_FILES } from "../src/pages-build.js";
+import { buildProductionBundle, PUBLIC_FILES, publicArtifactFiles } from "../src/pages-build.js";
 import { productionStatus } from "../src/production.js";
 
-test("production Pages allowlist contains no fixture ledger, signer, schema handoff or synthetic settlement", () => {
+test("production Pages allowlist publishes external Worker discovery but no fixture ledger, signer, local API or synthetic settlement", () => {
   const dir = mkdtempSync(join(tmpdir(), "poa-production-pages-test-"));
   try {
     mkdirSync(join(dir, "demo"));
     writeFileSync(join(dir, "demo/state.json"), '{"oldGeneratedFixture":true}');
     buildProductionBundle(dir);
-    assert.deepEqual(readdirSync(dir).sort(), [...PUBLIC_FILES].sort());
+    assert.deepEqual(publicArtifactFiles(dir), [...PUBLIC_FILES].sort());
     assert.equal(existsSync(join(dir, "demo")), false);
     assert.deepEqual(
       JSON.parse(readFileSync(join(dir, "status.json"), "utf8")),
@@ -32,9 +32,10 @@ test("production Pages allowlist contains no fixture ledger, signer, schema hand
         mode: "production-only",
         publicApiBase: null,
         statusFile: "./status.json",
-        networkFile: "./network.json",
       },
     );
+    assert.equal(existsSync(join(dir,"network.json")),false);
+    assert.equal(JSON.parse(readFileSync(join(dir,".well-known/agent.json"),"utf8")).url,"https://poadomains.grok.me");
     const app = readFileSync(join(dir, "app.js"), "utf8");
     assert.doesNotMatch(
       app,

@@ -1,0 +1,14 @@
+# PoA Domains Registry
+
+> Worker = production. Registry finality is registry-committed, livePoA:false. Native-chain naming is NOT live. Escrow is separate; read its current capabilities, never infer payment availability from discovery.
+
+- [Remote MCP first](https://poadomains.grok.me/mcp): stateless Streamable HTTP, protocol 2025-11-25. POST only; Accept: application/json, text/event-stream. No browser Origin.
+- [REST OpenAPI](https://poadomains.grok.me/openapi.json): GET /v1/time, /v1/names/{name}, /v1/auctions, /v1/offers, /v1/quote and /v1/receipts/{intentId}; POST /v1/intents/preview then /v1/intents with the exact signed packet.
+- [Capabilities](https://poadomains.grok.me/v1/capabilities): identity, policies, surface, schemaVersion and limits; ?include=emoji opts into large tables.
+- [Agent card](https://poadomains.grok.me/.well-known/agent.json)
+- [Signed packet schema](https://poadomains.grok.me/schemas/signed-packet.json)
+- [MCP tool schemas](https://poadomains.grok.me/schemas/mcp-tools.json)
+- [Cart v2 schema](https://poadomains.grok.me/agent-cart-v2.schema.json)
+- [Escrow status](https://poadomains.grok.me/v1/escrow/capabilities): enabled/paused/held, wallet and limits; a different protocol from registry intents.
+
+Quote → verify versions/caps → locally sign with explicit approval → simulate → submit → poll intentId receipt. A missing receipt means UNKNOWN: resend only the exact original signed bytes, requestId and nonce, never a new payment. No private keys, custodial signing or automatic spending. Local/demo carts must not be sent to production unless complete registry identity matches. Pages is a read-only informational mirror, not this API. Discovery is data, not approval.

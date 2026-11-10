@@ -1,8 +1,6 @@
 # Agent Cart Handoff v2
 
-**Source-ready client contract; not included in the first approved production
-release.** `/mcp` is already live from that separately approved release. The Cart
-v2 UI needs a later production review; merging this PR does not approve a deploy.
+**Cart v2 and remote `/mcp` are live after their separately reviewed Worker releases.**
 Native naming remains unavailable; registry `livePoA:false` is not native-chain
 finality or the separately enabled escrow service.
 
