@@ -28,9 +28,9 @@ const scratch=mkdtempSync(join(tmpdir(),'poa-agent-journey-')),logPath=join(scra
 const child=spawn(process.execPath,['node_modules/wrangler/bin/wrangler.js','dev','--config','cloudflare/test/agent-journey.wrangler.jsonc','--local','--ip','127.0.0.1','--port',String(port),'--inspector-port','0','--persist-to',join(scratch,'state'),'--var',`CONTRACT_CONFIG:${JSON.stringify(config)}`],{detached:true,stdio:['ignore',log,log],env:{HOME:process.env.HOME,PATH:process.env.PATH,LANG:'C.UTF-8',WRANGLER_SEND_METRICS:'false',...(process.env.NODE_OPTIONS?{NODE_OPTIONS:process.env.NODE_OPTIONS,NODE_V8_COVERAGE:process.env.NODE_V8_COVERAGE}:{})}});closeSync(log);
 let counter=0,signatures=0,browser,clientIp="192.0.2.14";const requests=[],errors=[],blocked=[];
 async function rpc(method,params={},extra={}){
- const body=JSON.stringify({jsonrpc:'2.0',id:++counter,method,params});
+ const notification=method.startsWith('notifications/');const body=JSON.stringify({jsonrpc:'2.0',...(notification?{}:{id:++counter}),method,params});
  const response=await fetch(localTarget(target),{method:'POST',redirect:'error',headers:{'content-type':'application/json',accept:'application/json, text/event-stream','mcp-protocol-version':'2025-11-25','cf-connecting-ip':clientIp,...extra},body,signal:AbortSignal.timeout(8000)});
- requests.push({url:target,method:'POST',params,body});assert.equal(response.status,200);assert.equal(response.headers.get('x-test-outbound-attempts'),'0');
+ requests.push({url:target,method:'POST',params,body});assert.equal(response.status,notification?202:200);assert.equal(response.headers.get('x-test-outbound-attempts'),'0');if(notification){assert.equal(await response.text(),'');return null;}
  const data=await response.json();assert.equal(data.error,undefined,JSON.stringify(data.error));return data.result;
 }
 const result=async(name,args={},extra={})=>rpc('tools/call',{name,arguments:args},extra);
@@ -83,6 +83,7 @@ let page;
 try{
  let ready=false;for(let i=0;i<100;i++){if(child.exitCode!==null)throw Error('Local workerd exited: '+logPath);try{const r=await fetch(base+'/healthz',{signal:AbortSignal.timeout(500)});if(r.ok){ready=true;break;}}catch{}await delay(100);}assert.ok(ready,'Local workerd startup: '+logPath);
  await rpc('initialize',{protocolVersion:'2025-11-25',capabilities:{},clientInfo:{name:'local-agent-journey',version:'1'}});
+ await rpc('notifications/initialized');
  pinIdentity(await tool('read_capabilities'));
  browser=await chromium.launch({headless:true});page=await browser.newPage({viewport:{width:390,height:844},serviceWorkers:'block'});
  page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',async route=>{const req=route.request();if(new URL(req.url()).origin!==base||req.method()!=='GET'||new URL(req.url()).pathname.startsWith('/v1/escrow/')){blocked.push(req.url());return route.abort();}return route.continue();});
