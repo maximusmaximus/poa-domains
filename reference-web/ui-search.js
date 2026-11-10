@@ -1,17 +1,17 @@
-import { ui } from "./ui-state.js?v=e7a77f3f3644";
-import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=e7a77f3f3644";
-import { add, el, person, variantOwner } from "./ui-core.js?v=e7a77f3f3644";
-import { compactAmount, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=e7a77f3f3644";
-import { addToCart } from "./ui-cart.js?v=e7a77f3f3644";
+import { ui } from "./ui-state.js?v=5c150edb6e15";
+import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=5c150edb6e15";
+import { add, el, person, variantOwner } from "./ui-core.js?v=5c150edb6e15";
+import { compactAmount, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=5c150edb6e15";
+import { addToCart } from "./ui-cart.js?v=5c150edb6e15";
 
 export function runSearch(rawQuery, remember = true) {
     if (remember) {
         ui.lastSearch = (rawQuery ?? "").trim().slice(0, 2048);
         writeViewURL();
     }
-    const container = el("searchResult");
+    const container = el("searchResult"), q = (rawQuery ?? "").trim();
+    try {
     container.replaceChildren();
-    const q = (rawQuery ?? "").trim();
     if (!q)
         return;
     if (!ui.cap || !ui.latestState) {
@@ -186,4 +186,9 @@ export function runSearch(rawQuery, remember = true) {
             amount: chosen
         });
     });
+    } finally {
+        const status=el("searchResultStatus"),line=container.querySelector(".badge-ok,.badge-warn")??container.querySelector("p");
+        const text=q&&line?`${q}: ${line.textContent}`:"";
+        if(status && status.textContent!==text)status.textContent=text;
+    }
 }

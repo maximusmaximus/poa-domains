@@ -1,13 +1,14 @@
-import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=e7a77f3f3644";
-import { ui } from "./ui-state.js?v=e7a77f3f3644";
-import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=e7a77f3f3644";
-import { navigateHome, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=e7a77f3f3644";
-import { el, endpointBase } from "./ui-core.js?v=e7a77f3f3644";
-import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=e7a77f3f3644";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=e7a77f3f3644";
-import { runSearch } from "./ui-search.js?v=e7a77f3f3644";
-import { renderIdeas } from "./ui-ideas.js?v=e7a77f3f3644";
-import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=e7a77f3f3644";
+import { bindTabKeys } from "./ui-a11y.js?v=5c150edb6e15";
+import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=5c150edb6e15";
+import { ui } from "./ui-state.js?v=5c150edb6e15";
+import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=5c150edb6e15";
+import { navigateHome, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=5c150edb6e15";
+import { el, endpointBase } from "./ui-core.js?v=5c150edb6e15";
+import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=5c150edb6e15";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=5c150edb6e15";
+import { runSearch } from "./ui-search.js?v=5c150edb6e15";
+import { renderIdeas, toggleIdeasMotion } from "./ui-ideas.js?v=5c150edb6e15";
+import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=5c150edb6e15";
 
 try {
     applySiteTitle();
@@ -23,15 +24,15 @@ try {
     keys();
     for (const id of ["refresh", "registryRetry"])
         el(id).addEventListener("click", () => ui.readState ? refreshRegistry() : loadRegistry());
+    bindTabKeys(el("sectionTabs"), tab => tab.click());
+    bindTabKeys(document.querySelector(".auction-tabs"), tab => tab.click());
+    el("ideasPause")?.addEventListener("click", toggleIdeasMotion);
     for (const btn of document.querySelectorAll(".section-tab")) {
         btn.addEventListener("click", () => {
             const id = btn.getAttribute("data-tab") || "find";
             setSectionTab(id, true);
             btn.scrollIntoView({ block: "nearest", inline: "nearest" });
-            // Wide screens show every section, so jump to it.
-            if (globalThis.matchMedia?.("(min-width: 721px)").matches) {
-                document.querySelector(`main#homeMain > section[data-section="${id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-            }
+
         });
     }
     el("domainHomeLink")?.addEventListener("click", (event) => {
@@ -84,7 +85,9 @@ try {
                 const on = t === tab;
                 t.classList.toggle("is-active", on);
                 t.setAttribute("aria-selected", on ? "true" : "false");
+                t.tabIndex = on ? 0 : -1;
             }
+            el("auctions").setAttribute("aria-labelledby", tab.id);
             if (ui.latestState)
                 renderAuctions(ui.latestState);
         });

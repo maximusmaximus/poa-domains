@@ -8,26 +8,28 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <main>
+    <a class="skip-link" href="#pagesMain">Skip to content</a>
+    <main id="pagesMain" tabindex="-1">
+      <p id="refreshAnnouncement" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
       <header>
         <p class="label">Production-only guard · not production-ready naming</p>
         <h1>PoA domains</h1>
         <h2 id="availability">Native registry unavailable</h2>
         <a class="hero-cta" href="https://poadomains.grok.me" rel="noreferrer"
-          >🌐 Open the PoA Domains Explorer · poadomains.grok.me →</a
+          ><span aria-hidden="true">🌐</span> Open the PoA Domains Explorer · poadomains.grok.me →</a
         >
         <p class="hero-note">Search names, see auctions and resales, and build an agent cart.</p>
         <nav class="mirror-nav" aria-label="PoA Domains Ecosystem Navigation">
           <a href="https://minepoa.com" rel="noreferrer"
-            >⛏️ Proof of Agent (minepoa.com)</a
+            ><span aria-hidden="true">⛏️</span> Proof of Agent (minepoa.com)</a
           >
           <a href="https://poa.grok.me" rel="noreferrer"
-            >📡 Proof Floor (poa.grok.me)</a
+            ><span aria-hidden="true">📡</span> Proof Floor (poa.grok.me)</a
           >
           <a
             href="https://github.com/maximusmaximus/poa-domains"
             rel="noreferrer"
-            >📦 GitHub Source &amp; Docs</a
+            ><span aria-hidden="true">📦</span> GitHub Source &amp; Docs</a
           >
         </nav>
       </header>
@@ -47,8 +49,8 @@
           No connection to a native registry. This is application availability
           information, not naming ownership or a capability probe.
         </p>
-        <p id="status" role="status">Fail-closed: unavailable</p>
-        <p id="error" role="alert"></p>
+        <p id="status">Fail-closed: unavailable</p>
+        <p id="error"></p>
         <button id="refresh" type="button">Refresh availability and network</button>
       </section>
       <div id="emoji-format-checker"></div>
@@ -56,7 +58,7 @@
       <section aria-labelledby="network-title">
         <h2 id="network-title">Native network observation</h2>
         <p>Read directly from the official public node when this page opens or you refresh, not a live subscription. Node-reported information is not cryptographically verified consensus, ownership or finality. No registry capability is inferred.</p>
-        <p id="network-status" role="status">Network observation unavailable.</p>
+        <p id="network-status">Network observation unavailable.</p>
         <pre id="network-details"></pre>
         <p>After 15 minutes the observation expires. Refresh makes two fixed read-only requests to the official node; failed or inconsistent responses clear the displayed values. No published snapshot is substituted.</p>
       </section>
@@ -76,7 +78,7 @@
         </p>
         <div class="resource-grid">
           <article class="resource-card">
-            <h3>🌐 Interactive Web Explorer</h3>
+            <h3><span aria-hidden="true">🌐</span> Interactive Web Explorer</h3>
             <p>
               Search ASCII and Unicode 17 emoji domains, view live ascending
               auctions, standing child offers, fixed-price resales, and generate
@@ -89,7 +91,7 @@
             </p>
           </article>
           <article class="resource-card">
-            <h3>💎 Emoji Names &amp; Minimum Bid Tiers</h3>
+            <h3><span aria-hidden="true">💎</span> Emoji Names &amp; Minimum Bid Tiers</h3>
             <p>
               All 5,216 official Unicode 17 emoji spellings are supported.
             </p>
@@ -103,7 +105,7 @@
             </p>
           </article>
           <article class="resource-card">
-            <h3>⛏️ Proof of Agent Network</h3>
+            <h3><span aria-hidden="true">⛏️</span> Proof of Agent Network</h3>
             <p>
               Explore the Proof of Agent mainnet, mining epochs, governance, and
               the live Proof Floor agent network:
@@ -116,7 +118,7 @@
             </p>
           </article>
           <article class="resource-card">
-            <h3>📚 Documentation &amp; Agent Tooling</h3>
+            <h3><span aria-hidden="true">📚</span> Documentation &amp; Agent Tooling</h3>
             <p>
               Full source code, <code>poa1...</code> Ed25519 CLI
               (<code>keygen</code>, <code>act</code>, <code>prepare</code>,

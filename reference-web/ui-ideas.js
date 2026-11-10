@@ -1,7 +1,7 @@
-import { ui } from "./ui-state.js?v=e7a77f3f3644";
-import { buildIdeas, inspectName, masonryRows } from "./shared.js?v=e7a77f3f3644";
-import { add, el, variantOwner } from "./ui-core.js?v=e7a77f3f3644";
-import { runSearch } from "./ui-search.js?v=e7a77f3f3644";
+import { ui } from "./ui-state.js?v=5c150edb6e15";
+import { buildIdeas, inspectName, masonryRows } from "./shared.js?v=5c150edb6e15";
+import { add, el, variantOwner } from "./ui-core.js?v=5c150edb6e15";
+import { runSearch } from "./ui-search.js?v=5c150edb6e15";
 
 export function ideaAccepted(q) {
     if (!ui.cap || !ui.latestState)
@@ -22,8 +22,12 @@ export function ideaAccepted(q) {
     return true;
 }
 
+let ideasPaused = false;
+function updateIdeasMotion(){const button=el("ideasPause");if(!button)return;const reduced=globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;button.disabled=!!reduced;button.setAttribute("aria-pressed",String(!ui.ideasAutoScroll));button.textContent=reduced?"⏸️ Ideas paused (reduced motion)":ui.ideasAutoScroll?"⏸️ Pause ideas":"▶️ Play ideas";}
+export function toggleIdeasMotion(){if(ui.ideasAutoScroll){ideasPaused=true;stopIdeasAutoScroll();}else{ideasPaused=false;startIdeasAutoScroll();}}
 export function stopIdeasAutoScroll() {
     ui.ideasAutoScroll = false;
+    updateIdeasMotion();
     if (ui.ideasRaf) {
         cancelAnimationFrame(ui.ideasRaf);
         ui.ideasRaf = 0;
@@ -35,10 +39,10 @@ export function startIdeasAutoScroll() {
     if (!strip)
         return;
     const reduce = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-    if (reduce)
-        return;
     stopIdeasAutoScroll();
+    if (reduce || ideasPaused || strip.contains(document.activeElement)) return;
     ui.ideasAutoScroll = true;
+    updateIdeasMotion();
     let last = performance.now();
     const tick = (now) => {
         if (!ui.ideasAutoScroll)
@@ -59,7 +63,9 @@ export function wireIdeasScrollStop() {
     if (!strip || strip.dataset.scrollWired)
         return;
     strip.dataset.scrollWired = "1";
-    const stop = () => stopIdeasAutoScroll();
+    const stop = () => { ideasPaused = true; stopIdeasAutoScroll(); };
+    strip.addEventListener("focusin", stop);
+    globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.addEventListener("change",()=>{if(globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches)stop();else updateIdeasMotion();});
     strip.addEventListener("wheel", stop, { passive: true });
     strip.addEventListener("touchstart", stop, { passive: true });
     strip.addEventListener("pointerdown", stop);

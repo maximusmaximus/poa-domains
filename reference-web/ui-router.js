@@ -1,9 +1,9 @@
-import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=e7a77f3f3644";
-import { ui } from "./ui-state.js?v=e7a77f3f3644";
-import { add, el } from "./ui-core.js?v=e7a77f3f3644";
-import { runSearch } from "./ui-search.js?v=e7a77f3f3644";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=e7a77f3f3644";
-import { updateTabDots } from "./ui-render.js?v=e7a77f3f3644";
+import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=5c150edb6e15";
+import { ui } from "./ui-state.js?v=5c150edb6e15";
+import { add, el } from "./ui-core.js?v=5c150edb6e15";
+import { runSearch } from "./ui-search.js?v=5c150edb6e15";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=5c150edb6e15";
+import { updateTabDots } from "./ui-render.js?v=5c150edb6e15";
 
 export function writeViewURL(path = location.pathname) {
     const next = viewPath(path, ui.lastSearch, ui.activeSectionTab);
@@ -116,10 +116,12 @@ export function setSectionTab(tabId, markSeen = true) {
         const on = btn.getAttribute("data-tab") === tabId;
         btn.classList.toggle("is-active", on);
         btn.setAttribute("aria-selected", on ? "true" : "false");
+        btn.tabIndex = on ? 0 : -1;
     }
     for (const section of document.querySelectorAll("main#homeMain > section[data-section]")) {
         const on = section.getAttribute("data-section") === tabId;
         section.classList.toggle("is-active-section", on);
+        section.hidden = !on;
     }
     if (markSeen && ui.latestState) {
         const marks = tabWatermarks(ui.latestState);

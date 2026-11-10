@@ -4,7 +4,7 @@ import {
   safeObject,
   validPrincipal,
   cartParamsForSigner,
-} from "./shared.js?v=e7a77f3f3644";
+} from "./shared.js?v=5c150edb6e15";
 export const CART_SCHEMA_VERSION = "poa-domains.agent-cart.v2";
 const HASH = { type: "string", pattern: "^[a-f0-9]{64}$" },
   UINT = { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER };

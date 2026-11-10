@@ -91,6 +91,10 @@ The Web Explorer (`reference-web/`) provides a complete, zero-framework, XSS-har
 
 The explorer labels hosted registry data, local registry data and synthetic demo data separately; native naming remains distinct from the live escrow service. Registry-read age appears on every tab in minutes/hours (My POA refreshes separately). A failed read keeps the last view with a visible error and pauses cart copying. Changed cart versions/minimums need **Review changed item**; expired offers, changed fixed prices or unavailable names must be removed and checked again. Polling never raises a spending cap or wipes a draft. Share a view with `?q=alpha&tab=auctions`.
 
+### Keyboard access
+
+Use Left/Right and Home/End in the section tabs on any screen size. The cart keeps keyboard focus until closed with Escape or Close, then returns it to its opener. Pause the moving ideas with ⏸️ Pause ideas; reduced-motion preferences are respected. [Accessibility behavior and regression coverage](docs/ACCESSIBILITY.md).
+
 ### Human Domain Availability Search & Agent Bid/Purchase Cart
 
 1. **Search Any Root or Child Domain (`#searchSection`)**:

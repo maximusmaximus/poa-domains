@@ -372,9 +372,11 @@ async function runFullUiUxFlowsOnRegistryApp(
   );
 
   // 4. Add items to cart directly from #auctions and #offers cards
+  await page.locator("#tabAuctions").click();
   await page.locator("#auctions article button").first().click();
   assert.equal(await page.locator("#cartCount").innerText(), "2");
 
+  await page.locator("#tabExplore").click();
   const offerButtons = page.locator("#offers .card button");
   assert.equal(await offerButtons.count(), 2);
   await offerButtons.nth(0).click();
@@ -382,6 +384,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   assert.equal(await page.locator("#cartCount").innerText(), "4");
 
   // 5. Edit bid amount inside cart item and verify prompt updates live
+  await page.locator("#tabFind").click();
   const firstCartInput = page.locator("#cartList .card input").first();
   await firstCartInput.fill("25000");
   await firstCartInput.dispatchEvent("input");
@@ -419,6 +422,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   // 10. Test mobile viewport (375x812) with populated 3-item cart to ensure cart cards don't overflow
   await page.setViewportSize({ width: 375, height: 812 });
   await page.locator('.section-tab[data-tab="auctions"]').click();
+  await page.locator("#tabAuctions").click();
   await page.locator("#auctions article button").first().click();
   await page.locator('.section-tab[data-tab="explore"]').click();
   await offerButtons.nth(0).click();
@@ -444,6 +448,7 @@ async function runFullUiUxFlowsOnRegistryApp(
     expectedVersion: nexusDeed.version,
     records: [{ type: "service", url: "https://nexus.poa.domains/v2" }],
   };
+  await page.locator("#tabHandoff").click();
   await page.locator("#signer").fill(carolPrincipal);
   await page.locator("#requestId").fill(`e2e-${browserName}-1`);
   await page.locator("#nonce").fill("0");
@@ -585,6 +590,7 @@ async function runAgentRoundtripVerification(
   assert.equal(bidReceipt.status, "succeeded");
 
   // Human clicks #refresh in the Web UI and verifies all sections reflect the agent's execution
+  await page.locator("#tabExplore").click();
   await page.locator("#refresh").click();
   await page.waitForFunction(() =>
     document.querySelector("#names")?.textContent?.includes("builder.nexus"),
@@ -594,6 +600,7 @@ async function runAgentRoundtripVerification(
   assert.match(await page.locator("#names").innerText(), /builder\.nexus/);
 
   // Verify searching builder.nexus now reports OWNED (PERMANENT DEED)
+  await page.locator("#tabFind").click();
   await page.locator("#searchInput").fill("builder.nexus");
   await page.locator("#searchBtn").click();
   assert.match(
@@ -601,11 +608,13 @@ async function runAgentRoundtripVerification(
     /OWNED \(PERMANENT DEED\)/,
   );
 
+  await page.locator("#tabAuctions").click();
   // Verify #auctions reflects bob's 125000 high bid and new 137501 minimum next bid
   const auctionsText = await page.locator("#auctions").innerText();
   assert.match(auctionsText, /High bid 125000 by/);
   assert.match(auctionsText, /137501 POA/);
 
+  await page.locator("#tabExplore").click();
   // Verify #history shows the new child purchase and carol's displaced bid as OUTBID
   const historyText = await page.locator("#history").innerText();
   assert.match(historyText, /Child purchase: builder\.nexus/);

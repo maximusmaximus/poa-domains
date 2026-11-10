@@ -90,6 +90,7 @@ export async function verifyReferenceStaticPage(
     const actions = await page
       .locator("#action option")
       .evaluateAll((nodes) => nodes.map((n) => (n as HTMLOptionElement).value));
+    await page.locator("#tabHandoff").click();
     for (const action of actions) {
       await page.locator("#action").selectOption(action);
       await page.locator("#example").click();
@@ -167,6 +168,7 @@ export async function verifyReferenceStaticPage(
     await page.waitForFunction(
       () => document.querySelector("#digest")!.textContent!.length === 64,
     );
+    await page.locator("#tabExplore").click();
     await page.locator("#refresh").click();
     assert.deepEqual(violations, []);
     assert.deepEqual(errors, []);

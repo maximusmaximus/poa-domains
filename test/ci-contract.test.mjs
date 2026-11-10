@@ -96,7 +96,7 @@ test("coverage matrix matches every configured suite/version; Node 22 includes e
     j.strategy.matrix.suite.flatMap(suite => j.strategy.matrix.node.map(node => [suite, node.split(".")[0]])));
   const key = x => x.join(":");
   assert.deepEqual(actual.map(key).sort(), coverageMatrix.map(key).sort());
-  assert.equal(actual.length, 10);
+  assert.equal(actual.length, 11);
   assert.deepEqual(commandsFor("escrow-unit", "22").at(-1), ["node", "--test", "dist/escrow-tests/unit.mjs", "dist/escrow-tests/public.mjs"]);
 });
 

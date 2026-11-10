@@ -1,7 +1,8 @@
-import { ui } from "./ui-state.js?v=e7a77f3f3644";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=e7a77f3f3644";
-import { add, el, endpointBase } from "./ui-core.js?v=e7a77f3f3644";
-import { nameLink } from "./ui-router.js?v=e7a77f3f3644";
+import { trapDialog } from "./ui-a11y.js?v=5c150edb6e15";
+import { ui } from "./ui-state.js?v=5c150edb6e15";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=5c150edb6e15";
+import { add, el, endpointBase } from "./ui-core.js?v=5c150edb6e15";
+import { nameLink } from "./ui-router.js?v=5c150edb6e15";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || shouldHoldTransactions(ui.networkStatus.level) || !!ui.networkStatus.hold;
@@ -89,14 +90,16 @@ export function renderFloatingCart() {
         copyBtn.classList.add("action-held");
     else
         copyBtn.classList.remove("action-held");
+    const restoreListFocus = !el("floatingCartPanel").hidden && list.contains(document.activeElement);
     list.replaceChildren();
+    if(restoreListFocus)el("floatingCartClose").focus();
     if (!ui.cart.length) {
         add(list, "p", "Cart empty", "muted");
         return;
     }
     ui.cart.forEach((item, index) => {
         const card = add(list, "div", "", "card");
-        const h = add(card, "h4", "");
+        const h = add(card, "h3", "");
         nameLink(h, item.name);
         add(card, "p", `${item.action} · ${item.amount} ${item.asset}`, "badge");
         add(card, "p", item.summary);
@@ -120,7 +123,7 @@ export function renderCart() {
         else
             el("copyCartPrompt").classList.remove("action-held");
     }
-    el("cartStatus").textContent = "";
+    el("cartStatus").textContent = `🛒 Cart: ${ui.cart.length} ${ui.cart.length === 1 ? "item" : "items"}.`;
     const listNode = el("cartList");
     listNode.replaceChildren();
     if (!ui.cart.length) {
@@ -190,20 +193,15 @@ export function renderCart() {
     renderFloatingCart();
 }
 
+let releaseCartFocus = null;
 export function setFloatingCartOpen(open) {
-    const panel = el("floatingCartPanel");
-    const backdrop = el("floatingCartBackdrop");
-    const btn = el("floatingCartBtn");
+    const panel = el("floatingCartPanel"), backdrop = el("floatingCartBackdrop"), btn = el("floatingCartBtn"), wasOpen = !panel.hidden;
+    if(open === wasOpen) return;
     panel.hidden = !open;
     backdrop.hidden = !open;
-    btn.setAttribute("aria-expanded", open ? "true" : "false");
-    if (open) {
-        renderFloatingCart();
-        el("floatingCartClose").focus();
-    }
-    else {
-        btn.focus();
-    }
+    btn.setAttribute("aria-expanded", String(open));
+    if(open){renderFloatingCart();releaseCartFocus=trapDialog(panel,backdrop,btn);}
+    else{releaseCartFocus?.();releaseCartFocus=null;}
 }
 
 export function syncIdeaMarks() {
