@@ -1196,3 +1196,25 @@ button.box-close { margin:0; }
 
 /* Include existing dialog padding/borders in their viewport width, including new corner controls. */
 .detail-view,.floating-cart-panel { box-sizing:border-box; }
+
+/* Max v4: explanations live in their area's information popover, not below fields. */
+[data-info-description] { display:none; }
+.info-popover [data-info-description] { display:revert; }
+#searchResult.help-box > .card > h4 { padding-right:3rem; }
+#searchInput { min-height:64px; min-width:0; padding:.9rem 1.1rem; font-size:1.3rem; border-radius:1rem; border-color:#65cfa8; animation:search-invite 4s ease-in-out infinite; }
+@keyframes search-invite {
+  0%,100% { box-shadow:0 0 0 1px #65cfa822,0 0 8px #65cfa812; }
+  50% { box-shadow:0 0 0 2px #65cfa855,0 0 20px #65cfa838; }
+}
+#searchInput:focus,#searchInput[data-typing="true"] { animation:none; box-shadow:0 0 0 2px #65cfa855; }
+@media(prefers-reduced-motion:reduce) { #searchInput { animation:none; box-shadow:0 0 0 1px #65cfa822; } }
+@media(max-width:600px) { #searchInput { min-height:60px; font-size:1.2rem; } }
+
+.github-mark { flex:none; vertical-align:middle; }
+.footer-links a { display:inline-flex; align-items:center; gap:.45rem; }
+.site-terms { max-width:58rem; margin:1.2rem auto .8rem; text-align:left; color:#b4cad6; font-size:.9rem; line-height:1.6; }
+.site-terms > summary { cursor:pointer; min-height:44px; display:list-item; align-content:center; color:#dfecf5; }
+.site-terms h3 { margin:1rem 0 .3rem; font-size:1rem; color:#dfecf5; }
+.site-terms p { margin:.3rem 0 .8rem; }
+
+#cartAnchor.cart-empty > h4,#cartAnchor.cart-empty > #cartPrompt,#cartAnchor.cart-empty > #cartHandoffMeta { display:none; }

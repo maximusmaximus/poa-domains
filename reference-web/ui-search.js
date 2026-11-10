@@ -1,8 +1,8 @@
-import { ui } from "./ui-state.js?v=94d33d638672";
-import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=94d33d638672";
-import { add, el, person, variantOwner } from "./ui-core.js?v=94d33d638672";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=94d33d638672";
-import { addToCart } from "./ui-cart.js?v=94d33d638672";
+import { ui } from "./ui-state.js?v=5c1f8083f451";
+import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=5c1f8083f451";
+import { add, el, person, variantOwner } from "./ui-core.js?v=5c1f8083f451";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=5c1f8083f451";
+import { addToCart } from "./ui-cart.js?v=5c1f8083f451";
 
 export function runSearch(rawQuery, remember = true) {
     if (remember) {
@@ -47,7 +47,7 @@ export function runSearch(rawQuery, remember = true) {
         add(card, "p", "🔒 Taken — same emoji as another name", "badge-warn");
         const p = add(card, "p", "Owned or in auction as ");
         nameLink(p, sameEmoji);
-        add(card, "p", "One owner per emoji, whatever the skin tone or style.");
+        add(card, "p", "One owner per emoji, whatever the skin tone or style.").setAttribute("data-info-description", "");
         return;
     }
     const entry = s.names[name];
@@ -159,7 +159,7 @@ export function runSearch(rawQuery, remember = true) {
     const { reserve } = pricing;
     const tierNote = `${compactAmount(reserve)} POA ${info.isSingleEmoji ? "single-emoji" : info.isMultiEmoji ? "multi-emoji" : "root"} minimum bid`;
     add(card, "p", "🟢 Available in the registry snapshot", "badge-ok");
-    add(card, "p", `Unclaimed ${info.tier} root domain (${tierNote}). Opening auction reserve: ${reserve} POA (${formatDuration(pricing.window)} minimum window + ${formatDuration(pricing.quiet)} quiet period).`);
+    add(card, "p", `Unclaimed ${info.tier} root domain (${tierNote}). Opening auction reserve: ${reserve} POA (${formatDuration(pricing.window)} minimum window + ${formatDuration(pricing.quiet)} quiet period).`).setAttribute("data-info-description", "");
     const controls = add(card, "div", "", "inline-controls");
     const maxBidInput = document.createElement("input");
     maxBidInput.value = reserve;
