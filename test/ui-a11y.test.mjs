@@ -108,6 +108,7 @@ test("Pages has one coordinated refresh live region, a keyboard skip target, and
 test("new axe/keyboard lane is parallel and fully included in coverage; no existing escrow suite replaced", () => {
   assert.deepEqual(suites["browser-a11y"], [
     ["node", "test/ui-a11y-browser.mjs"],
+    ["node", "test/ui-perf-browser.mjs"],
   ]);
   assert.ok(
     coverageMatrix.some(
