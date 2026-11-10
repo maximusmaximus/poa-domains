@@ -92,7 +92,8 @@ export async function verifyReferenceStaticPage(
       .evaluateAll((nodes) => nodes.map((n) => (n as HTMLOptionElement).value));
     await page.locator("#tabHandoff").click();
     for (const action of actions) {
-      await page.locator("#action").selectOption(action);
+      await page.locator("#advancedHandoff").evaluate((n) => { (n as HTMLDetailsElement).open = true; });
+    await page.locator("#action").selectOption(action);
       await page.locator("#example").click();
       await page.locator("button[type=submit]").click();
       await page.waitForFunction(

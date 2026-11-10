@@ -131,6 +131,15 @@ Use Left/Right and Home/End in the section tabs on any screen size. The cart kee
 
 ---
 
+### 💡 Ideas, domain management and privacy
+
+- Ideas sit above Find in three separate, continuously scrolling rows: single words, two-emoji names, and single emojis. They use a local catalogue and the current capability/registry snapshot, not AI or invented availability. Typed topics adjust the catalogue; picking a name only adds a planning item. Hover, touch, focus or reduced-motion settings stop animation. The rows recycle with bounded DOM and repeat over time.
+- The full-width recent-actions strip shows recorded registry actions, not native-chain finality. Repeated scrolling is not new activity. You can pause it and scroll by hand.
+- ℹ️ buttons explain modules; the floating left ℹ️ explains how to find them. Handoff gives plain steps before its optional unsigned API builder. POA units and top-right remove buttons are shown on cart items.
+- **Manage domains** looks up a public owner address and its root/subdomains without claiming wallet authentication. It prepares unsigned sale/subdomain-offer/retirement requests and listing removal; no click signs or submits. Retiring a permanent subdomain requires its holder plus the parent owner; the permanent path stays reserved.
+- **Production search privacy:** only explicit Check/Enter/idea selections, not typing or polling, POST to `/v1/search-log`; immediate same-query repeats are debounced. The Worker saves bounded canonical name queries to private `poadomains-search-log` via `SEARCH_LOGS`. Contact/wallet/key-like strings, extra fields, bad Origins and oversized inputs are rejected. The UI discloses saved query text and reports save failures without blocking name checks. Do not enter personal information. Local/demo views do not save searches.
+- Stored fields are `query`, server `timestamp`, `host`, untrusted client-reported coarse `result`, and constant `source`. No IP, account/principal, cookie, user-agent, request identifier or identifier hash is saved. Daily-partitioned, immutable random-key JSONL shards avoid concurrent append loss. Objects have no public read endpoint; bucket public access stays disabled. The existing limiter uses one aggregate anonymous key, not a personal identifier. This bucket/binding is separate from all escrow storage and policy.
+
 ## 3. Domain Naming Rules, Tiers & Unicode 17 Emoji Canonicalization
 
 ### Syntax & Hierarchy (`src/names.ts`)

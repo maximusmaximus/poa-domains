@@ -1074,3 +1074,44 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .site-title .title-glyph:nth-child(8) { --i: 7; }
 .site-title .title-glyph:nth-child(9) { --i: 8; }
 .site-title .title-glyph:nth-child(10) { --i: 9; }
+
+/* Continuous, bounded ideas and recent actions. No horizontal scrollbar chrome. */
+.ideas { position:relative; margin:1rem 0 1.4rem; padding:.8rem 0; }
+.ideas-head { display:flex; align-items:center; }
+.ideas-head h3 { position:relative; padding-right:2.5rem; }
+.ideas-strip { mask-image:none; -webkit-mask-image:none; overflow:visible; padding:0; display:block; }
+.idea-lane { min-width:0; margin:.4rem 0 .75rem; }
+.idea-lane h4 { margin:.15rem 0; color:#b4cad6; font-size:.8rem; }
+.ideas-row { display:flex; width:100%; min-width:0; gap:12px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; padding:5px 20px!important; box-sizing:border-box; mask-image:linear-gradient(to right,transparent,#000 20px,#000 calc(100% - 20px),transparent); }
+.ideas-row::-webkit-scrollbar,.live-ticker::-webkit-scrollbar { display:none; }
+.ideas-row .idea { justify-content:center; line-height:1.35; flex:0 0 auto; min-width:90px; padding:.55rem .9rem; color:#b9ffe4; text-decoration:none; border:1px solid #416655; border-radius:1rem; background:#11272c; text-align:center; box-sizing:border-box; }
+.ideas-row .idea:hover,.ideas-row .idea:focus-visible { background:#204238; border-color:#9cffe0; }
+.ideas-row .idea.is-added { border-color:#65cfa8; background:#244c40; }
+.live-ticker { width:100vw; max-width:none; margin-left:calc(50% - 50vw); margin-right:calc(50% - 50vw); border-radius:0; overflow-x:auto; scrollbar-width:none; box-sizing:border-box; min-height:64px; position:relative; }
+.live-ticker-track { width:max-content; display:flex; animation:none; padding:.6rem 2rem; }
+.ticker-chip { flex-shrink:0; text-decoration:none; color:#b9ffe4; }
+.cart-item { position:relative; padding-right:3.2rem; }
+.cart-remove { position:absolute; right:.35rem; top:.35rem; width:40px; height:40px; padding:.25rem; }
+.amount-label { flex:1; min-width:170px; font-size:.9rem; }
+.amount-label small { display:block; max-width:42ch; margin-top:.3rem; }
+.amount-unit { max-width:28rem; display:block; position:relative; margin:.3rem 0; }
+.amount-unit input { width:100%; padding-right:4rem; }
+.input-unit { position:absolute; right:.75rem; top:50%; transform:translateY(-50%); color:#9cffe0; pointer-events:none; }
+:where(section,.ideas-head h3,#cartAnchor,#manageDomains,#escrowPayments) { position:relative; }
+.module-info { width:36px; min-height:36px; padding:.2rem; float:right; margin:0 .2rem .2rem .4rem; border-radius:50%; background:#12333f; }
+.floating-info { position:fixed; left:.5rem; bottom:1rem; z-index:48; width:44px; height:44px; padding:.4rem; border-radius:50%; box-shadow:0 3px 12px #0008; }
+.info-popover { position:fixed; inset:auto auto auto .8rem; top:25vh; width:min(330px,calc(100vw - 3rem)); max-height:65vh; overflow:auto; box-sizing:border-box; padding:1rem; margin:0; background:#142e3b; color:#e8f2f6; border:1px solid #65cfa8; border-radius:.7rem; box-shadow:0 15px 45px #0008; z-index:100; }
+.info-popover h2 { font-size:1rem; }
+.info-popover::backdrop { background:transparent; }
+.show-module-info .module-info { outline:2px solid #9cffe0; outline-offset:3px; }
+.manage-domains { margin-bottom:1.5rem; padding-bottom:1.5rem; border-bottom:1px solid #466271; }
+.handoff-steps { line-height:1.8; padding-left:1.4rem; }
+#advancedHandoff { margin-top:1.5rem; padding:.8rem; border:1px solid #466271; border-radius:.5rem; }
+#advancedHandoff summary { cursor:pointer; color:#b9ffe4; }
+@media(max-width:600px) { .tab-label { font-size:.72rem; } .amount-label { min-width:130px; } .floating-info { left:.35rem; bottom:.8rem; } .info-popover { top:18vh; } }
+
+/* Keep long labels/ages inside their own tab; never let them overlap adjacent targets. */
+.section-tabs { justify-content:flex-start; }
+.section-tab { flex:1 0 auto; flex-direction:column; min-width:7rem; padding:.4rem .65rem; }
+.section-tab > .tab-icon,.section-tab > .tab-label,.section-tab > .tab-age { flex-shrink:0; }
+@media(max-width:600px) { .section-tab { min-width:5.6rem; } }

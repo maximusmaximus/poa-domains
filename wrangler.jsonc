@@ -69,6 +69,10 @@
     {
       "binding": "BACKUPS",
       "bucket_name": "poadomains-registry-backups"
+    },
+    {
+      "binding": "SEARCH_LOGS",
+      "bucket_name": "poadomains-search-log"
     }
   ],
   "triggers": {

@@ -1,8 +1,9 @@
-import { ui } from "./ui-state.js?v=9f3d6420d4eb";
-import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=9f3d6420d4eb";
-import { add, el, ownershipView, person, statusLabel } from "./ui-core.js?v=9f3d6420d4eb";
-import { nameLink, ownerLink } from "./ui-router.js?v=9f3d6420d4eb";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=9f3d6420d4eb";
+import { actionLabel } from "./ui-copy.js?v=31f173df57e1";
+import { ui } from "./ui-state.js?v=31f173df57e1";
+import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=31f173df57e1";
+import { add, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=31f173df57e1";
+import { nameLink, ownerLink } from "./ui-router.js?v=31f173df57e1";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=31f173df57e1";
 
 export function renderDomainPage(name) {
     if (!ui.latestState || !name)
@@ -16,7 +17,7 @@ export function renderDomainPage(name) {
     if (view.owner) {
         ownerNode.append("Owner: ");
         ownerLink(ownerNode, view.owner, person(view.owner));
-        ownerNode.append(" · ♾️ Owned forever · resale or transfer only");
+        ownerNode.append(" · ♾️ Permanent registry rights · not proof of native-chain ownership");
     }
     else if (view.variantOf) {
         ownerNode.append("🔒 Same emoji as ");
@@ -83,8 +84,8 @@ export function renderDomainPage(name) {
         add(hist, "p", "No history yet", "muted");
     for (const row of view.history) {
         const card = add(hist, "div", "", "card");
-        add(card, "p", row.text);
-        add(card, "p", `#${row.sequence} · ${row.kind}`, "badge");
+        namedText(add(card,"p",""),row.text);
+        add(card, "p", `#${row.sequence} · ${actionLabel(row.kind)}`, "badge");
     }
 }
 

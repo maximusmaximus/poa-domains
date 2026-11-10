@@ -1,10 +1,12 @@
-import { returnFocus } from "./ui-a11y.js?v=9f3d6420d4eb";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=9f3d6420d4eb";
-import { ui } from "./ui-state.js?v=9f3d6420d4eb";
-import { add, el, person } from "./ui-core.js?v=9f3d6420d4eb";
-import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=9f3d6420d4eb";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=9f3d6420d4eb";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=9f3d6420d4eb";
+import { drawTicker } from "./ui-ticker.js?v=31f173df57e1";
+import { actionLabel } from "./ui-copy.js?v=31f173df57e1";
+import { returnFocus } from "./ui-a11y.js?v=31f173df57e1";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=31f173df57e1";
+import { ui } from "./ui-state.js?v=31f173df57e1";
+import { add, el, person, namedText } from "./ui-core.js?v=31f173df57e1";
+import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=31f173df57e1";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=31f173df57e1";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=31f173df57e1";
 
 export function updateTabDots(state) {
     const marks = tabWatermarks(state);
@@ -39,35 +41,7 @@ export function applySiteTitle() {
     document.title = "PoA domains";
 }
 
-export function renderTicker(state) {
-    const track = el("liveTickerTrack");
-    track.replaceChildren();
-    const items = shapeLiveActions(state);
-    if (!items.length) {
-        add(track, "span", "No live actions", "ticker-empty muted");
-        return;
-    }
-    for (const item of items) {
-        const chip = document.createElement("button");
-        chip.type = "button";
-        chip.className = "ticker-chip";
-        const at = item.name ? item.label.indexOf(item.name) : -1;
-        if(at < 0) chip.textContent = item.label;
-        else {
-            chip.append(document.createTextNode(item.label.slice(0,at)));
-            add(chip,"span",item.name,"domain-name");
-            chip.append(document.createTextNode(item.label.slice(at+item.name.length)));
-        }
-        chip.setAttribute("aria-label", `Open ${item.label}`);
-        chip.addEventListener("click", () => {
-            if (item.name)
-                navigateDomain(item.name);
-            else
-                openDetail(item);
-        });
-        track.append(chip);
-    }
-}
+export function renderTicker(state) { drawTicker(state); }
 
 let detailOpener = null;
 export function closeDetail() {
@@ -85,9 +59,10 @@ export function openDetail(item) {
     ui.detailTarget = item;
     const view = el("detailView");
     view.hidden = false;
-    el("detailTitle").textContent = item.name || item.label || "Detail";
+    el("detailTitle").replaceChildren();
+    if(item.name)nameLink(el("detailTitle"),item.name);else el("detailTitle").textContent=actionLabel(item.label||"Detail");
     el("detailTitle").classList.toggle("domain-name", !!item.name);
-    el("detailSummary").textContent = item.label || item.kind || "";
+    el("detailSummary").replaceChildren();namedText(el("detailSummary"),actionLabel(item.label || item.kind || ""));
     const hist = el("detailHistory");
     hist.replaceChildren();
     const rows = historyForTarget(ui.latestState, {
@@ -98,8 +73,8 @@ export function openDetail(item) {
         add(hist, "p", "No history", "muted");
     for (const row of rows) {
         const card = add(hist, "div", "", "card");
-        add(card, "p", row.text);
-        add(card, "p", `#${row.sequence} · ${row.kind}`, "badge");
+        namedText(add(card, "p", ""), row.text);
+        add(card, "p", `#${row.sequence} · ${actionLabel(row.kind)}`, "badge");
     }
     const actions = el("detailActions");
     actions.replaceChildren();
@@ -242,7 +217,7 @@ export function render(payload) {
             auctions.filter((a) => a.status === "live").length,
             "unsettled auctions",
         ],
-        [Object.keys(ui.cap.actions).length, "implemented handoff actions"],
+        [Object.keys(ui.cap.actions).filter(a=>!ui.cap.ownership?.disabledActions?.includes(a)).length, "enabled registry actions"],
         [`${rootDeeds} / ${childDeeds}`, "root / child active deeds"],
         [
             `${activeOffers.length} / ${offers.length}`,
@@ -252,9 +227,9 @@ export function render(payload) {
             `${bids.length} / ${receipts.length}`,
             "recorded bids / committed receipts",
         ],
-        [settledVolume.toString(), "POA base units settled & bid"],
+        [settledVolume.toString(), "Registry bids + filled offers (not on-chain volume)"],
         [
-            `${ui.cap.emojiAliases ?? 140} / ${ui.reservedSet.size || (ui.cap.reservedCount ?? 655)}`,
+            `${ui.cap.emojiAliases ?? "unknown"} / ${ui.reservedSet.size || (ui.cap.reservedCount ?? "unknown")}`,
             "emoji sequences / reserved roots",
         ],
     ]) {
@@ -272,9 +247,7 @@ export function render(payload) {
         ownerLink(ownerLine, d.owner, person(d.owner));
         add(card, "p", `Generation ${d.generation} · owner version ${d.ownerVersion} · deed version ${d.version}`);
         if (d.parentId)
-            add(card, "p", "Protected child of " +
-                s.deeds[d.parentId].name +
-                "; parent transfer does not remove these rights.");
+            namedText(add(card,"p",""),"Protected child of "+s.deeds[d.parentId].name+"; parent transfer does not remove these registry rights.");
         add(card, "p", d.rights.kind === "lease"
             ? "📜 Legacy lease record · renewals are off"
             : "♾️ Owned forever · resale or transfer only", "badge-ok");

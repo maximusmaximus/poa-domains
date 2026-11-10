@@ -14,15 +14,22 @@ export function profileEngine(profile = "fixture") {
   const config = (profile === "mainnet" ? mainnetConfig : fixtureConfig)(issuer, treasury, [buyer]);
   return new Engine(config, new ManualClock(1000000));
 }
-export async function uiHarness(profile = "fixture") {
+export async function uiHarness(profile = "fixture", options = {}) {
   const engine = profileEngine(profile);
   const h = { cap: capabilities(engine), payload: { state: engine.snapshot(), finality: "registry-committed" },
-    stateStatus: 200, stateDelay: 0, stateReads: 0, writes: [] };
+    stateStatus: 200, stateDelay: 0, stateReads: 0, writes: [], telemetry: [] };
   const root = resolve("reference-web");
   const server = createServer(async (req, res) => {
     const u = new URL(req.url, "http://127.0.0.1");
+    // Only the dedicated telemetry fixture accepts this non-financial local POST.
+    // All existing GET-only suites explicitly receive local config and keep rejecting every write.
+    if(options.logSearches && u.pathname === "/v1/search-log" && req.method === "POST") {
+      let body="";for await(const part of req){body+=part;if(body.length>1024){res.writeHead(413);return res.end();}}
+      h.telemetry.push(JSON.parse(body));res.writeHead(200,{"content-type":"application/json"});return res.end(JSON.stringify(h.telemetryReply??{saved:true,key:'v1/2026-11-10/00000000-0000-0000-0000-000000000001.jsonl'}));
+    }
     if (req.method !== "GET" && req.method !== "HEAD") { h.writes.push(req.method); res.writeHead(405); return res.end(); }
     const json = (body, status = 200) => { res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" }); res.end(JSON.stringify(body)); };
+    if (u.pathname === "/config.json") return json({mode:options.logSearches?"live-registry":"local-reference-only",publicApiBase:""});
     if (u.pathname === "/v1/capabilities") return json(h.cap);
     if (u.pathname === "/v1/state") {
       h.stateReads++;

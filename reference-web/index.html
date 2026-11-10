@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=7638861bb0e1" />
+    <link rel="stylesheet" href="/style.css?v=fcd5a70e4d48" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -16,7 +16,7 @@
 
     <div class="registry-read-status" role="region" aria-label="Registry updates">
       <p id="registryLoading" role="status">⏳ Loading registry data… You can use the tabs and type a search now.</p>
-      <p id="registryAge" title="Registry data only. My POA refreshes separately.">Registry data not loaded yet · My POA refreshes separately.</p>
+      <p id="registryAge" title="Registry data only. POA payments refresh separately.">Registry data not loaded yet · POA payments refresh separately.</p>
       <div id="registryError" role="alert" hidden><span id="registryErrorText"></span> <button id="registryRetry" type="button" class="secondary small">🔄 Refresh</button></div>
     </div>
     <div id="networkStatusBar" class="network-status-bar" data-level="checking" role="status" aria-live="polite" hidden>
@@ -25,29 +25,29 @@
       <button type="button" id="networkStatusDismiss" class="network-status-dismiss" aria-label="Dismiss network status">✕</button>
     </div>
 
-    <div id="liveTicker" class="live-ticker" role="region" aria-label="Live actions">
+    <div id="liveTicker" class="live-ticker" role="region" aria-label="Recent registry actions" tabindex="0">
       <div id="liveTickerTrack" class="live-ticker-track">
-        <span class="ticker-empty muted">No live actions</span>
+        <span class="ticker-empty muted">No recent registry actions</span>
       </div>
     </div>
 
     <div class="section-navigation" role="navigation" aria-label="Explorer navigation">
     <nav id="sectionTabs" class="section-tabs" role="tablist" aria-label="Site sections">
       <button type="button" class="section-tab is-active" role="tab" aria-selected="true" data-tab="find" id="tabFind" aria-controls="searchSection" tabindex="0">
-        <span class="tab-icon" aria-hidden="true">🔍</span><span class="tab-label">Find</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
+        <span class="tab-icon" aria-hidden="true">🔍</span><span class="tab-label">Find</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="auctions" id="tabAuctions" aria-controls="auctionsSection" tabindex="-1">
-        <span class="tab-icon" aria-hidden="true">🏷️</span><span class="tab-label">Auctions</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
+        <span class="tab-icon" aria-hidden="true">🏷️</span><span class="tab-label">Auctions</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="market" id="tabMarket" aria-controls="marketSection" tabindex="-1">
-        <span class="tab-icon" aria-hidden="true">💰</span><span class="tab-label">For sale</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
+        <span class="tab-icon" aria-hidden="true">💰</span><span class="tab-label">For sale</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="explore" id="tabExplore" aria-controls="explorerSection" tabindex="-1">
-        <span class="tab-icon" aria-hidden="true">🧭</span><span class="tab-label">Explore</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
+        <span class="tab-icon" aria-hidden="true">🧭</span><span class="tab-label">Explore</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
-      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="escrow" id="tabEscrow" aria-controls="escrowSection" tabindex="-1"><span class="tab-icon" aria-hidden="true">🪙</span><span class="tab-label">My POA</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span></button>
+      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="escrow" id="tabEscrow" aria-controls="escrowSection" tabindex="-1"><span class="tab-icon" aria-hidden="true">🪙</span><span class="tab-label">Manage domains</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span></button>
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="handoff" id="tabHandoff" aria-controls="handoffSection" tabindex="-1">
-        <span class="tab-icon" aria-hidden="true">🧾</span><span class="tab-label">Handoff</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
+        <span class="tab-icon" aria-hidden="true">🧾</span><span class="tab-label">Handoff</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
     </nav>
     </div>
@@ -66,6 +66,16 @@
       <section id="searchSection" data-section="find" role="tabpanel" aria-labelledby="tabFind" tabindex="0" class="is-active-section">
         <h2>🔍 Find a name</h2>
         <p class="howto">Type a name → Check → Add to cart or open its page.</p>
+        <div class="ideas" aria-labelledby="ideasHeading">
+          <div class="ideas-head">
+            <h3 id="ideasHeading">💡 Ideas</h3>
+          </div>
+          <p class="ideas-hint">Tap a name to check it and add it to your planning cart. No payment is sent.</p>
+          <p id="ideasContext" class="muted">Ideas load after registry data.</p>
+          <div id="ideasStrip" class="ideas-strip" role="group" aria-label="Name ideas"></div>
+          <p id="ideasStatus" class="ideas-status" role="status" aria-live="polite"></p>
+        </div>
+        <label for="searchInput">Name or emoji to check</label>
         <div class="search-bar">
           <input
             id="searchInput"
@@ -75,17 +85,10 @@
           />
           <button id="searchBtn" type="button">Check</button>
         </div>
-        <div class="ideas" aria-labelledby="ideasHeading">
-          <div class="ideas-head">
-            <h3 id="ideasHeading">💡 Ideas</h3>
-            <button type="button" id="ideasPause" class="secondary small" aria-pressed="false">⏸️ Pause ideas</button>
-            <button type="button" id="ideasShuffle" class="ideas-shuffle secondary small" aria-label="Show new ideas">🔀 New ideas</button>
-          </div>
-          <p class="ideas-hint">Tap one to check it and add it to your 🛒 cart.</p>
-          <div id="ideasStrip" class="ideas-strip" role="group" aria-label="Name ideas"></div>
-          <p id="ideasStatus" class="ideas-status" role="status" aria-live="polite"></p>
-        </div>
+        <p id="searchPrivacy" class="muted">Submitted name searches are saved without IP or account details to improve suggestions. Query text is saved: do not enter personal information, wallet addresses or keys.</p>
+        <p id="searchLogStatus" class="muted" role="status" aria-live="polite"></p>
         <p id="searchResultStatus" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
+        <p class="muted">Results below are for the last name you checked. Press Check after editing.</p>
         <div id="searchResult" class="search-result"></div>
 
         <div id="cartAnchor" class="cart-panel">
@@ -145,7 +148,7 @@
           <article class="card">
             <h3>Explorer</h3>
             <p><a href="https://poadomains.grok.me" rel="noreferrer">https://poadomains.grok.me</a></p>
-            <p><a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer">https://maximusmaximus.github.io/poa-domains/</a></p>
+
           </article>
           <article class="card">
             <h3>🎨 Emoji bids</h3>
@@ -155,7 +158,7 @@
           <article class="card">
             <h3>CLI / MCP</h3>
             <code>node dist/src/reference-cli.js keygen --out agent.pem</code>
-            <p><a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer">github.com/maximusmaximus/poa-domains</a></p>
+
           </article>
           <article class="card">
             <h3>PoA</h3>
@@ -168,21 +171,24 @@
 
       <section id="handoffSection" data-section="handoff" role="tabpanel" aria-labelledby="tabHandoff" tabindex="0" hidden>
         <h2>🧾 Handoff</h2>
-        <p class="howto">Build an unsigned intent for your agent. No keys here.</p>
+        <p class="howto">Give your agent a clear request — this page does not sign, pay or register a name.</p>
+        <ol class="handoff-steps"><li>🔍 Find a name and add it to your planning cart.</li><li>🛒 Check each POA amount, then copy the cart request or download its JSON.</li><li>🤖 Give it to your agent. Ask it to check prices and ownership again, preview the action, and ask for your approval before sending anything.</li></ol>
+        <p>Why? Your agent needs the exact name, amount limit and current registry version. A copied request is not a payment or proof of ownership.</p>
+        <details id="advancedHandoff"><summary>Advanced: build one unsigned action by hand</summary><p>For agents and experienced users. Public addresses and data only. Never paste a private key. Machine field names below match the API; times are Unix timestamps, not a countdown.</p>
         <button type="button" id="example" hidden>Load example</button>
         <p id="exampleNotice"></p>
         <form id="handoff">
           <label>Action <select id="action"></select></label>
-          <p>Keys: <code id="keys"></code></p>
+          <p>Required machine fields: <code id="keys"></code></p>
           <label>Signer <input id="signer" required autocomplete="off" /></label>
           <label>Co-signers <input id="coSigners" value="[]" required /></label>
           <label>Request ID <input id="requestId" required /></label>
           <label>Nonce <input id="nonce" required inputmode="numeric" /></label>
           <label>Not before <input id="notBefore" required inputmode="numeric" /></label>
           <label>Deadline <input id="deadline" required inputmode="numeric" /></label>
-          <label>Max total <input id="maxTotal" required inputmode="numeric" /></label>
-          <label>Max network fee <input id="maxNetworkFee" required inputmode="numeric" /></label>
-          <label>Params <textarea id="params" rows="12" required>{}</textarea></label>
+          <label>Maximum amount (POA registry units) <input id="maxTotal" required inputmode="numeric" /></label>
+          <label>Maximum network fee (POA) <input id="maxNetworkFee" required inputmode="numeric" /></label>
+          <label>Action details (public JSON) <textarea id="params" rows="12" required>{}</textarea></label>
           <button type="submit">Generate</button>
         </form>
         <p id="error" role="alert"></p>
@@ -192,10 +198,20 @@
         <pre id="body"></pre>
         <h3>Digest</h3>
         <pre id="digest"></pre>
-        <button type="button" id="copy" disabled>Copy</button>
+        <button type="button" id="copy" disabled>Copy unsigned request</button>
+        </details>
       </section>
 
-      <section id="escrowSection" data-section="escrow" role="tabpanel" aria-labelledby="tabEscrow" tabindex="0" hidden></section>
+      <section id="escrowSection" data-section="escrow" role="tabpanel" aria-labelledby="tabEscrow" tabindex="0" hidden>
+        <div id="manageDomains" class="manage-domains">
+          <h3>🌱 Manage domains and subdomains</h3>
+          <p>View a public owner address. This is not a wallet connection or proof that you own it. These are application-registry names, not verified native-chain ownership.</p>
+          <label for="manageOwner">Public owner address — never a private key</label><div class="search-bar"><input id="manageOwner" autocomplete="off" placeholder="poa1… public owner address" /><button id="manageLookup" type="button">View names</button></div>
+          <p>Open a name to view it, or prepare a sale or subdomain request for its owner's agent. Retiring a subdomain needs both the child holder and parent owner. Nothing is sent from these controls.</p>
+          <div id="manageNames" class="cards"></div><pre id="managePrompt" class="prompt-box" role="status">No management request prepared.</pre>
+        </div>
+        <div id="escrowPayments"></div>
+      </section>
     </main>
 
     <main id="domainMain" hidden>
@@ -286,6 +302,8 @@
       <p id="floatingCartStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
 
-    <script type="module" src="/app.js?v=9f3d6420d4eb"></script>
+    <button id="floatingInfo" class="floating-info" type="button" popovertarget="infoHint" aria-controls="infoHint" aria-expanded="false" aria-label="How to use module information">ℹ️</button>
+    <div id="infoHint" class="info-popover info-hint" popover="auto" role="dialog" aria-labelledby="infoHintTitle"><h2 id="infoHintTitle">ℹ️ Need a hand?</h2><p>Tap the small ℹ️ on a module to learn what it does and what it does not do. You can also reach each one with Tab and open it with Enter. Tap outside or press Escape to close.</p><button type="button" popovertarget="infoHint" popovertargetaction="hide">Close</button></div>
+    <script type="module" src="/app.js?v=31f173df57e1"></script>
   </body>
 </html>

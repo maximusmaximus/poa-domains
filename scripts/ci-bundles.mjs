@@ -9,3 +9,6 @@ for (const [source, name] of [["escrow.test.ts", "unit.mjs"], ["escrow-public.te
   await build({ entryPoints: [resolve("cloudflare/test", source)], bundle: true,
     platform: "node", format: "esm", sourcemap: "inline",
     alias: { "#poa-unicode-data": resolve("cloudflare/unicode-data.ts") }, outfile: resolve(output, name) });
+
+// Search telemetry's real handler is covered in Node as well as local workerd/R2 integration.
+await build({entryPoints:[resolve("cloudflare/search-log.ts")],bundle:true,platform:"node",format:"esm",sourcemap:"inline",alias:{"#poa-unicode-data":resolve("cloudflare/unicode-data.ts")},outfile:resolve("dist/search-log.mjs")});

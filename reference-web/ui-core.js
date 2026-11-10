@@ -1,5 +1,5 @@
-import { buildOwnershipIndex, ownershipConflict, safeObject } from "./shared.js?v=9f3d6420d4eb";
-import { ui } from "./ui-state.js?v=9f3d6420d4eb";
+import { buildOwnershipIndex, ownershipConflict, safeObject } from "./shared.js?v=31f173df57e1";
+import { ui } from "./ui-state.js?v=31f173df57e1";
 
 export const el = (id) => document.getElementById(id);
 
@@ -78,4 +78,9 @@ export function statusLabel(status) {
         unknown: "❓ Unknown",
     };
     return map[status] || status;
+}
+
+/** Link known names in human prose only; machine JSON remains inert and unchanged. */
+export function namedText(node,text,names=Object.keys(ui.latestState?.names??{})){
+ let rest=String(text??"");const list=[...new Set(names)].filter(Boolean).sort((a,b)=>b.length-a.length);while(rest){let at=-1,match="";for(const n of list){const i=rest.indexOf(n);if(i>=0&&(at<0||i<at)){at=i;match=n;}}if(at<0){node.append(rest);break;}node.append(rest.slice(0,at));const a=document.createElement("a");a.className="domain-name";a.href="/d/"+encodeURIComponent(match);a.textContent=match;node.append(a);rest=rest.slice(at+match.length);}return node;
 }

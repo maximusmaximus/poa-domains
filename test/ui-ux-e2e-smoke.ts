@@ -245,10 +245,10 @@ async function runFullUiUxFlowsOnRegistryApp(
   assert.ok(
     (await page
       .locator(
-        '#resourcesSection a[href="https://maximusmaximus.github.io/poa-domains/"]',
+        '#siteFooter a[href="https://maximusmaximus.github.io/poa-domains/"]',
       )
       .count()) >= 1,
-    `${browserName}: GitHub Pages mirror link present in resources section`,
+    `${browserName}: GitHub Pages mirror link present in footer`,
   );
 
   // 2. Idea strip UX: 3-row masonry, tap fills search + adds to cart
@@ -449,7 +449,8 @@ async function runFullUiUxFlowsOnRegistryApp(
     records: [{ type: "service", url: "https://nexus.poa.domains/v2" }],
   };
   await page.locator("#tabHandoff").click();
-  await page.locator("#signer").fill(carolPrincipal);
+  await page.locator("#advancedHandoff").evaluate((n) => { (n as HTMLDetailsElement).open = true; });
+    await page.locator("#signer").fill(carolPrincipal);
   await page.locator("#requestId").fill(`e2e-${browserName}-1`);
   await page.locator("#nonce").fill("0");
   await page.locator("#notBefore").fill("0");

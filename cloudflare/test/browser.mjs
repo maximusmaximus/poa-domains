@@ -4,9 +4,9 @@ import { resolve } from "node:path";
 export async function browserSmoke(base, evidence) {
   const browser=await chromium.launch({headless:true});
   try {
-    const page=await browser.newPage({viewport:{width:1440,height:1000}}), errors=[], writes=[];
+    const page=await browser.newPage({viewport:{width:1440,height:1000}}), errors=[], writes=[], searchLogs=[];
     page.on("pageerror", error=>errors.push(error.message));
-    page.on("request", request=>{if(request.method()==="POST")writes.push(request.url());});
+    page.on("request", request=>{if(!["GET","HEAD"].includes(request.method())){if(request.method()==="POST"&&request.url()===base+"/v1/search-log"){const body=request.postDataJSON();assert.deepEqual(Object.keys(body),["query","result"]);searchLogs.push(body);}else writes.push(request.url());}});
     await page.goto(base,{waitUntil:"networkidle"});
     await page.waitForFunction(()=>document.querySelectorAll("#action option").length===17);
     for(const id of ["searchInput","searchBtn","cartList","cartPrompt","copyCartPrompt","stats","names","auctions","offers","history","balances","handoff"]) assert.equal(await page.locator(`#${id}`).count(),1,id);
@@ -19,7 +19,7 @@ export async function browserSmoke(base, evidence) {
     const idea=page.locator("#ideasStrip .idea").first(); const ideaName=await idea.getAttribute("data-query");
     await idea.click();
     assert.equal(await page.locator("#searchInput").inputValue(),ideaName);
-    assert.match(await page.locator("#ideasStatus").innerText(),/Added/);
+    assert.match(await page.locator("#ideasStatus").innerText(),/added/i);
     assert.equal(await page.locator("#cartCount").innerText(),"1");
     await page.locator("#searchInput").fill("quantum"); await page.locator("#searchBtn").click();
     await page.locator("#addToCartBtn").waitFor();
@@ -57,10 +57,10 @@ export async function browserSmoke(base, evidence) {
     assert.match(await page.locator("#searchResult").innerText(),/RESERVED/i);
     await page.evaluate(()=>document.fonts.ready);
     assert.equal(await page.locator("#error").innerText(),"");
-    assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);
+    assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);assert.deepEqual(searchLogs.map(x=>x.query),[ideaName,"quantum","openai"]);
     await page.locator("#floatingCartBtn").click();
     assert.equal(await page.locator("#floatingCartPanel").isVisible(),true);
     await page.screenshot({path:resolve(evidence,"browser.png"),fullPage:true});
-    return {actionOptions:17,ideaRows:3,cartPrompt:true,pageErrors:errors,browserWrites:writes};
+    return {actionOptions:17,ideaRows:3,cartPrompt:true,pageErrors:errors,browserWrites:writes,anonymousSearchLogs:searchLogs.length};
   } finally {await browser.close();}
 }

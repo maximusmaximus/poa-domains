@@ -1,0 +1,19 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {createIdeaGenerator,ideaPools} from "../reference-web/ideas-generator.js";
+import {recentActions} from "../reference-web/ui-ticker.js";
+import {actionLabel} from "../reference-web/ui-copy.js";
+import {managedNames,managementPlan} from "../reference-web/ui-manage.js";
+import {inspectName} from "../reference-web/shared.js";
+import {profileEngine} from "./fixtures/ui-harness.mjs";
+import {capabilities} from "../dist/src/interface.js";
+const cap=capabilities(profileEngine('mainnet'));
+test('separate single words / double emoji / single emoji keep generating with bounded recent exclusions',()=>{
+ const g=createIdeaGenerator({query:'moon',manifest:cap.emojiManifest});for(const lane of ['words','double','single']){const out=[];for(let i=0;i<250;i++){const q=g.next(lane);assert.ok(q,lane+' exhausted');const n=inspectName(q,cap.emojiManifest);assert.ok(n.isRoot);assert.equal(n.emojiCount,lane==='words'?0:lane==='double'?2:1);if(lane==='words')assert.match(q,/^[a-z]+$/);out.push(q);}assert.ok(new Set(out).size>20);}
+ assert.ok(ideaPools('robot',cap.emojiManifest).words.includes('robothub'));assert.ok(ideaPools('robot',cap.emojiManifest).related);const pools=ideaPools('moon',cap.emojiManifest);assert.ok(pools.related);assert.equal(pools.words[0],'moonbeam');assert.equal(createIdeaGenerator({manifest:cap.emojiManifest,accept:()=>false}).next('single'),null);
+});
+test('UI uses human actions, actual info, footer-only project links and no Ideas control buttons',()=>{assert.equal(actionLabel('announceAuction+bid'),'Start auction + place bid');for(const name of ['createChildOffer','buyFixed','setRecords'])assert.doesNotMatch(actionLabel(name),/[a-z][A-Z]/);const html=readFileSync('reference-web/index.html','utf8');assert.ok(html.indexOf('id="ideasStrip"')<html.indexOf('id="searchInput"'));assert.doesNotMatch(html,/id="ideas(?:Pause|Shuffle)"/);assert.match(html,/id="floatingInfo"/);assert.match(html,/Query text is saved/);assert.match(html,/>Manage domains</);assert.match(html,/advancedHandoff/);assert.match(html,/made with ❤️ in SF by Tesselate Army/);const preFooter=html.split('<footer')[0];assert.ok(!preFooter.includes('https://github.com/maximusmaximus/poa-domains'));assert.ok(!preFooter.includes('https://maximusmaximus.github.io/poa-domains/'));});
+test('management includes owned children and honest retirement co-signing, without state mutation',()=>{const root={id:'root',name:'garden',owner:'owner',version:3,ownerVersion:2},child={id:'child',name:'seed.garden',owner:'owner',version:4,parentId:'root'},state={time:100,names:{garden:{activeId:'root'},'seed.garden':{activeId:'child'}},deeds:{root,child}};const before=JSON.stringify(state);assert.equal(managedNames(state,'owner').length,2);const offer=managementPlan('createChildOffer',root,state,'owner','250');assert.equal(offer.params.rights.kind,'permanent');assert.equal(offer.params.maxUses,1);assert.equal(managementPlan('revokeChild',child,state,'owner').coSigners[0],'owner');assert.throws(()=>managementPlan('createChildOffer',child,state,'owner'));assert.throws(()=>managementPlan('sellFixed',child,state,'other'));assert.throws(()=>managementPlan('sellFixed',child,state,'owner','-1'));assert.equal(JSON.stringify(state),before);});
+
+test('the ticker includes every committed receipt, including rejected actions and names missing from legacy projection',()=>{const state={time:1,names:{},deeds:{},receipts:{a:{intentId:'a',sequence:1,status:'rejected',result:{name:'garden'}},b:{intentId:'b',sequence:2,status:'succeeded',result:{}},c:{intentId:'c',sequence:3,status:'succeeded',result:{name:'ocean'}}}};const items=recentActions(state);assert.equal(items.length,3);assert.deepEqual(items.map(x=>x.sequence),[3,2,1]);assert.ok(items.find(x=>x.name==='garden').label.includes('garden'));});

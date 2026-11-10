@@ -1038,6 +1038,26 @@ HTTP 400; retryable: false. Registry initialization failed. Check the documented
 
 HTTP 503; retryable: true. Registry reads are temporarily unavailable.
 
+## SEARCH_LOG_DISABLED
+
+HTTP 503; retryable: true. Search saving is not configured. Name checks still work.
+
+## SEARCH_LOG_FAILED
+
+HTTP 503; retryable: true. Search could not be saved. Name checks still work.
+
+## SEARCH_LOG_RATE_LIMITED
+
+HTTP 429; retryable: true. Search saving is busy. Name checking still works.
+
+## SEARCH_LOG_LIMITER_UNAVAILABLE
+
+HTTP 503; retryable: true. Search saving is temporarily unavailable. Name checking still works.
+
+## SEARCH_QUERY_PRIVATE
+
+HTTP 400; retryable: false. Only name queries without contact, wallet or key-like text can be saved.
+
 ## RENEWAL_TERMS
 
 HTTP 400; retryable: false. Renewal terms. Check the documented inputs and current state.

@@ -1,8 +1,9 @@
-import { trapDialog } from "./ui-a11y.js?v=9f3d6420d4eb";
-import { ui } from "./ui-state.js?v=9f3d6420d4eb";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=9f3d6420d4eb";
-import { add, el, endpointBase } from "./ui-core.js?v=9f3d6420d4eb";
-import { nameLink } from "./ui-router.js?v=9f3d6420d4eb";
+import { actionLabel } from "./ui-copy.js?v=31f173df57e1";
+import { trapDialog } from "./ui-a11y.js?v=31f173df57e1";
+import { ui } from "./ui-state.js?v=31f173df57e1";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=31f173df57e1";
+import { add, el, endpointBase } from "./ui-core.js?v=31f173df57e1";
+import { nameLink } from "./ui-router.js?v=31f173df57e1";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || shouldHoldTransactions(ui.networkStatus.level) || !!ui.networkStatus.hold;
@@ -98,14 +99,15 @@ export function renderFloatingCart() {
         return;
     }
     ui.cart.forEach((item, index) => {
-        const card = add(list, "div", "", "card");
+        const card = add(list, "div", "", "card cart-item");
         const h = add(card, "h3", "");
         nameLink(h, item.name);
-        add(card, "p", `${item.action} · ${item.amount} ${item.asset}`, "badge");
+        add(card, "p", `${actionLabel(item.action)} · ${item.amount} ${item.asset}`, "badge");
         add(card, "p", item.summary);
         if (item.needsReview)
             add(card, "p", "⚠️ " + item.reviewMessage + " Open Find to review your cart.", "badge-warn");
-        const btn = add(card, "button", "Remove", "secondary small");
+        const btn = add(card, "button", "✖️", "secondary small cart-remove");
+        btn.setAttribute("aria-label", "Remove " + item.name + " from cart");
         btn.type = "button";
         btn.addEventListener("click", () => removeCartAt(index));
     });
@@ -132,10 +134,10 @@ export function renderCart() {
         return;
     }
     ui.cart.forEach((item, index) => {
-        const card = add(listNode, "div", "", "card");
+        const card = add(listNode, "div", "", "card cart-item");
         const h = add(card, "h4", "");
         nameLink(h, item.name);
-        add(card, "p", `${item.action} · ${item.tier} ${item.isRoot ? "root" : "child"}`, "badge");
+        add(card, "p", `${actionLabel(item.action)} · ${item.tier} ${item.isRoot ? "root" : "child"}`, "badge");
         const summaryNode = add(card, "p", item.summary);
         if (item.needsReview)
             add(card, "p", "⚠️ " + item.reviewMessage, "badge-warn");
@@ -163,7 +165,7 @@ export function renderCart() {
         amountInput.value = item.amount;
         amountInput.dataset.fieldKey = item.action + ":" + item.name;
         amountInput.setAttribute("inputmode", "numeric");
-        amountInput.setAttribute("aria-label", "Amount or max bid for " + item.name);
+        amountInput.setAttribute("aria-label", "Bid or price amount in POA for " + item.name);
         amountInput.readOnly = !["bid", "announceAuction+bid"].includes(item.action);
         amountInput.addEventListener("input", () => {
             try {
@@ -184,10 +186,14 @@ export function renderCart() {
             updatePromptText();
             renderFloatingCart();
         });
-        const removeBtn = add(controls, "button", "Remove", "secondary small");
+        const removeBtn = add(card, "button", "✖️", "secondary small cart-remove");
+        removeBtn.setAttribute("aria-label", "Remove " + item.name + " from cart");
         removeBtn.type = "button";
         removeBtn.addEventListener("click", () => removeCartAt(index));
-        controls.prepend(amountInput);
+        const amountLabel = add(controls, "label", amountInput.readOnly ? "Listed price (POA)" : "Bid amount (POA)", "amount-label");
+        const unitBox=add(amountLabel,"span","","amount-unit");unitBox.append(amountInput);add(unitBox,"span","POA","input-unit");
+        amountInput.placeholder="Whole-number POA amount";
+        add(amountLabel,"small",amountInput.readOnly?"The current listing price; not an editable bid.":"Maximum bid for this name. Editing it does not change the auction reserve.","muted");
     });
     updatePromptText();
     renderFloatingCart();

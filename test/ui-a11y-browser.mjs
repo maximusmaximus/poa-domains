@@ -132,48 +132,15 @@ try {
     await page.locator("#floatingCartBtn").click();
     await scan(page, `cart dialog ${width}`);
     await page.keyboard.press("Escape");
-    // Pause is persistent through shuffle; keyboard focus also stops movement.
-    await page.locator("#ideasPause").click();
-    await expect(page.locator("#ideasPause")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    const before = await page
-      .locator("#ideasStrip")
-      .evaluate((n) => n.scrollLeft);
-    await page.evaluate(
-      () =>
-        new Promise((r) =>
-          requestAnimationFrame(() => requestAnimationFrame(r)),
-        ),
-    );
-    assert.equal(
-      await page.locator("#ideasStrip").evaluate((n) => n.scrollLeft),
-      before,
-    );
-    await page.locator("#ideasShuffle").click();
-    await expect(page.locator("#ideasPause")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await page.locator("#ideasPause").click();
-    await expect(page.locator("#ideasPause")).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
-    await page.locator("#ideasStrip button").first().focus();
-    await expect(page.locator("#ideasPause")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await expect(page.locator("#ideasPause")).toBeDisabled();
-    await page.emulateMedia({ reducedMotion: "no-preference" });
-    await page.locator("#ideasPause").click();
-    await expect(page.locator("#ideasPause")).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
+    // Motion is controlled by interaction, not refresh/play buttons. Focus and reduced motion stop it.
+    assert.equal(await page.locator("#ideasPause,#ideasShuffle").count(),0);
+    const row=page.locator('#ideasStrip .ideas-row').first();await row.focus();
+    await expect(row).toHaveAttribute('data-motion','paused');
+    const before=await row.evaluate(n=>n.scrollLeft);await page.waitForTimeout(100);
+    assert.equal(await row.evaluate(n=>n.scrollLeft),before);
+    await page.emulateMedia({reducedMotion:'reduce'});await expect(row).toHaveAttribute('data-motion','reduced');
+    await page.emulateMedia({reducedMotion:'no-preference'});await page.locator('#searchInput').focus();await page.mouse.move(0,0);
+    await expect(row).toHaveAttribute('data-motion','running',{timeout:4000});
     await context.close();
   }
   await browser.close();
