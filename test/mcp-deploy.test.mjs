@@ -42,6 +42,6 @@ test("first MCP deploy keeps disabled committed defaults, live-binding preservat
   assert.match(workflow, /environment: production/);
   assert.match(
     readFileSync("docs/MCP.md", "utf8"),
-    /Source-ready, not deployed/,
+    /Each later release\s+requires Max's separate approval/,
   );
 });

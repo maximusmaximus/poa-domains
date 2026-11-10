@@ -1,5 +1,5 @@
-import { buildOwnershipIndex, ownershipConflict, safeObject } from "./shared.js?v=7175c3b2d94e";
-import { ui } from "./ui-state.js?v=7175c3b2d94e";
+import { buildOwnershipIndex, ownershipConflict, safeObject } from "./shared.js?v=e7a77f3f3644";
+import { ui } from "./ui-state.js?v=e7a77f3f3644";
 
 export const el = (id) => document.getElementById(id);
 

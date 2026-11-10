@@ -55,11 +55,11 @@ try {
   await expect(p.locator('#copyCartPrompt')).toBeDisabled(); await expect(p.locator('#cartList')).toContainText('outbid'); await expect(p.locator('#tabAuctions .tab-dot')).toBeVisible();
   await p.reload(); await ready(p); await expect(p.locator('#copyCartPrompt')).toBeDisabled();
   await p.getByRole('button',{name:'Review changed item'}).click(); await expect(p.locator('#copyCartPrompt')).toBeEnabled();
-  assert.match(await p.locator('#cartPrompt').innerText(),/"expectedVersion":2/);
+  assert.match(await p.locator('#cartPrompt').innerText(),/"expectedVersion":\s*2/);
   a.version=3; a.high.amount='3000'; await poll(h,p); await expect(amount).toHaveValue('2000');
   await expect(p.getByRole('button',{name:'Review changed item'})).toBeDisabled(); await amount.fill('4000');
   await expect(p.locator('#copyCartPrompt')).toBeDisabled(); await p.getByRole('button',{name:'Review changed item'}).click();
-  await expect(p.locator('#copyCartPrompt')).toBeEnabled(); assert.match(await p.locator('#cartPrompt').innerText(),/"expectedVersion":3/);
+  await expect(p.locator('#copyCartPrompt')).toBeEnabled(); assert.match(await p.locator('#cartPrompt').innerText(),/"expectedVersion":\s*3/);
   h.stateStatus=500; await poll(h,p); await expect(p.locator('#registryError')).toBeVisible(); await expect(p.locator('#copyCartPrompt')).toBeDisabled();
   await p.locator('#floatingCartBtn').click(); await expect(p.locator('#copyCheckoutBtn')).toBeDisabled(); await p.locator('#floatingCartClose').click();
   h.stateStatus=200; await p.locator('#registryRetry').click(); await ready(p); await expect(p.locator('#copyCartPrompt')).toBeEnabled();

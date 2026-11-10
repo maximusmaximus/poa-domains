@@ -1,15 +1,15 @@
-import { ui } from "./ui-state.js?v=7175c3b2d94e";
-import { acknowledgeCartItem, buildAgentCartPrompt, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=7175c3b2d94e";
-import { add, el, endpointBase } from "./ui-core.js?v=7175c3b2d94e";
-import { nameLink } from "./ui-router.js?v=7175c3b2d94e";
+import { ui } from "./ui-state.js?v=e7a77f3f3644";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=e7a77f3f3644";
+import { add, el, endpointBase } from "./ui-core.js?v=e7a77f3f3644";
+import { nameLink } from "./ui-router.js?v=e7a77f3f3644";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || shouldHoldTransactions(ui.networkStatus.level) || !!ui.networkStatus.hold;
 }
 
 export function updateCartCopyState() {
-    for (const id of ["copyCartPrompt", "copyCheckoutBtn"])
-        el(id).disabled = !ui.cart.length || cartCopyBlocked();
+    for (const id of ["copyCartPrompt", "copyCheckoutBtn", "downloadCartJSON"])
+        el(id).disabled = !ui.cart.length || cartCopyBlocked() || ui.handoffPending || !ui.handoffData;
 }
 
 export function persistCart() {
@@ -39,19 +39,39 @@ export function clearAllCart() {
     renderCart();
 }
 
-export function updatePromptText() {
-    if (!ui.cart.length || !ui.cap) {
-        if (!ui.cart.length) {
-            el("cartPrompt").textContent =
-                "Add one or more domains from availability search, live auctions, or standing offers to generate your agent prompt.";
-        }
-        return;
+let handoffGeneration=0;
+export function updateHandoffAge(){
+    const text=ui.handoffData?"🧾 Agent Cart Handoff v2 · "+updatedAge(ui.handoffData.generatedAt).replace("updated","generated"):"🧾 Agent Cart Handoff v2 · "+(ui.handoffPending?"building…":"not ready");
+    for(const id of ["cartHandoffMeta","floatingHandoffMeta"])if(el(id))el(id).textContent=text;
+}
+export async function updatePromptText() {
+    const generation=++handoffGeneration;
+    ui.handoffData=null;ui.handoffPending=false;
+    if(!ui.cart.length||!ui.cap){
+        if(!ui.cart.length)el("cartPrompt").textContent="Add one or more domains from availability search, live auctions, or standing offers to generate your agent prompt.";
+        updateHandoffAge();updateCartCopyState();return;
     }
-    if (cartCopyBlocked()) {
-        el("cartPrompt").textContent = ui.refreshing ? "⏳ Checking registry data before copying…" : ui.registryReadFailed ? "⚠️ Refresh registry data before copying." : "⚠️ Review changed cart items and fix any amount before copying.";
-        return;
+    if(cartCopyBlocked()){
+        el("cartPrompt").textContent=ui.refreshing?"⏳ Checking registry data before copying…":ui.registryReadFailed?"⚠️ Refresh registry data before copying.":"⚠️ Review changed cart items and fix any amount before copying.";
+        updateHandoffAge();updateCartCopyState();return;
     }
-    el("cartPrompt").textContent = buildAgentCartPrompt(ui.cart, ui.cap, "", endpointBase(), ui.configMode);
+    ui.handoffPending=true;updateHandoffAge();updateCartCopyState();
+    el("cartPrompt").textContent="⏳ Building your versioned cart handoff…";
+    try{
+        const data=await buildAgentCartHandoff(structuredClone(ui.cart),ui.cap,"",endpointBase(),ui.configMode,structuredClone(ui.rawSnapshot));
+        if(generation!==handoffGeneration||cartCopyBlocked())return;
+        ui.handoffData=data;el("cartPrompt").textContent=renderAgentCartHandoff(data);
+    }catch{
+        if(generation===handoffGeneration)el("cartPrompt").textContent="⚠️ Could not build the cart handoff. Refresh registry data and try again. Nothing was submitted.";
+    }finally{
+        if(generation===handoffGeneration){ui.handoffPending=false;updateHandoffAge();updateCartCopyState();}
+    }
+}
+export function downloadCartJSON(){
+    if(!ui.handoffData||ui.handoffPending||cartCopyBlocked())return;
+    const blob=new Blob([JSON.stringify(ui.handoffData,null,2)+"\n"],{type:"application/json"}),url=URL.createObjectURL(blob),link=document.createElement("a");
+    link.href=url;link.download="poa-domains-cart-v2.json";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    el("cartStatus").textContent="📥 JSON downloaded — unsigned, nothing submitted.";
 }
 
 export function renderFloatingCart() {
@@ -64,7 +84,7 @@ export function renderFloatingCart() {
     el("floatingCartBtn").setAttribute("aria-label", ui.cart.length ? `Open cart, ${ui.cart.length} items` : "Open cart");
     clearBtn.disabled = ui.cart.length === 0;
     const held = shouldHoldTransactions(ui.networkStatus.level) || !!ui.networkStatus.hold;
-    copyBtn.disabled = ui.cart.length === 0 || cartCopyBlocked();
+    copyBtn.disabled = ui.cart.length === 0 || cartCopyBlocked() || ui.handoffPending || !ui.handoffData;
     if (held)
         copyBtn.classList.add("action-held");
     else
@@ -94,7 +114,7 @@ export function renderCart() {
     el("clearCart").disabled = ui.cart.length === 0;
     {
         const held = shouldHoldTransactions(ui.networkStatus.level) || !!ui.networkStatus.hold;
-        el("copyCartPrompt").disabled = ui.cart.length === 0 || cartCopyBlocked();
+        el("copyCartPrompt").disabled = ui.cart.length === 0 || cartCopyBlocked() || ui.handoffPending || !ui.handoffData;
         if (held)
             el("copyCartPrompt").classList.add("action-held");
         else

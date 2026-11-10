@@ -104,13 +104,13 @@ The explorer labels hosted registry data, local registry data and synthetic demo
      - **`RESERVED ROOT`**: Flags any of the 655 protected root domains (`RESERVED_NAME`) that cannot be opened for public auction.
 2. **Add Domains to the Agent Bid & Purchase Cart (`#cartList`)**:
    - Click **Add to Agent Cart** from the search result card, from any live auction card (`Add minimum bid (N POA) to cart`), or from any standing offer card (`Add purchase to cart`).
-   - Adjust your custom bid amount in `POA` directly inside the cart or enter your agent's signer principal (`poa1...` or `ed25519:...`) in `#cartSigner`.
-3. **Copy-Paste Prompt for Your AI Agent (`#cartPrompt`)**:
-   - The cart automatically builds a structured, self-contained **Agent Execution Prompt** containing:
-     - Registry endpoint, chain ID, configuration revision, and normalization mode.
-     - Per-domain itemized instructions (`openRootAuction` + `bid`, `bid` on existing auction, `buyFixed`, or `acceptChildOffer`) with exact `name`, `offerId`, `expectedDeedId`, `expectedVersion`, and `maxTotal` caps.
-     - Ready-to-run `reference-cli.js submit` shell commands and MCP `submit_intent` JSON tool arguments.
-     - Explicit safety rules reminding the agent to generate an IPFS CIDv1/base32/raw/sha2-256 metadata witness and never expose private keys in chat logs or URLs.
+   - Adjust your custom bid amount in `POA` directly inside the cart and confirm the real signer privately with your agent. The UI does not request a key or automatically sign.
+3. **Copy or download Agent Cart Handoff v2**:
+   - Both copy buttons and **📥 Download JSON** use one versioned, schema-validated plan with a human summary. The UI shows its age in minutes/hours.
+   - Remote MCP first: `https://poadomains.grok.me/mcp`; CLI second. Verify the complete registry identity before using either, especially for local/demo carts.
+   - The plan pins genesis, committed state sequence/hash, per-operation request IDs and exact spending caps per item and per asset. The capability reserve never changes when editing a max bid.
+   - Quote → simulate → explicitly approved signed submission → receipt. A missing receipt is **UNKNOWN**, not failure; keep the exact original packet/requestId/nonce for a safe resend.
+   - [Cart v2 contract, schema and retry rules](docs/AGENT-CART.md). The v2 UI is source-ready; it needs its own reviewed Worker release. `/mcp` itself is already live from the separately approved first release.
 
 ### Explorer Dashboard Sections
 
@@ -190,12 +190,13 @@ All **17 state-mutating actions** in [`src/engine.ts`](src/engine.ts) execute at
 
 ---
 
-### MCP for hosted agents (prepared, not yet deployed)
+### MCP for hosted agents
 
-The shared MCP core now supports nine typed registry tools, resources and prompts
-over local stdio and stateless Streamable HTTP `/mcp`. **Production `/mcp` still
-needs Max’s separate gated-deploy approval; merging does not make it live.**
-See [MCP contracts and tests](docs/MCP.md) and the [non-secret first-deploy checklist](docs/worker-deploy.md#first-gated-mcp-deploy-non-secret-expected-policy).
+The shared MCP core exposes nine typed registry tools, resources and prompts
+over local stdio and stateless Streamable HTTP `/mcp`. **Production `/mcp` was
+verified after Max's separately approved first gated deployment on November 9,
+2026 (PST). Each later release still requires Max's separate approval.**
+See [MCP contracts and tests](docs/MCP.md) and the [non-secret deployment policy](docs/worker-deploy.md#first-gated-mcp-deploy-non-secret-expected-policy).
 
 ### Read → quote → preview → submit
 

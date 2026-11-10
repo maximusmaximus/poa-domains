@@ -1,14 +1,15 @@
-import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=7175c3b2d94e";
-import { ui } from "./ui-state.js?v=7175c3b2d94e";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=7175c3b2d94e";
-import { persistCart, renderCart, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=7175c3b2d94e";
-import { render } from "./ui-render.js?v=7175c3b2d94e";
-import { runSearch } from "./ui-search.js?v=7175c3b2d94e";
-import { renderIdeas } from "./ui-ideas.js?v=7175c3b2d94e";
-import { mountEscrow } from "./escrow.js?v=7175c3b2d94e";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=7175c3b2d94e";
+import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=e7a77f3f3644";
+import { ui } from "./ui-state.js?v=e7a77f3f3644";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=e7a77f3f3644";
+import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=e7a77f3f3644";
+import { render } from "./ui-render.js?v=e7a77f3f3644";
+import { runSearch } from "./ui-search.js?v=e7a77f3f3644";
+import { renderIdeas } from "./ui-ideas.js?v=e7a77f3f3644";
+import { mountEscrow } from "./escrow.js?v=e7a77f3f3644";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=e7a77f3f3644";
 
 export function updateFreshness() {
+    updateHandoffAge();
     const text = updatedAge(ui.lastLoadedAt);
     for (const node of document.querySelectorAll(".tab-age"))
         node.textContent = text;
@@ -136,6 +137,7 @@ export function applyNetworkHold() {
     const heldIds = [
         "copyCheckoutBtn",
         "copyCartPrompt",
+        "downloadCartJSON",
         "copyListPromptBtn",
         "copyChangePromptBtn",
         "copyUnlistPromptBtn",

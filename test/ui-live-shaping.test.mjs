@@ -1,3 +1,5 @@
+import {profileEngine} from "./fixtures/ui-harness.mjs";
+import {capabilities} from "../dist/src/interface.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -137,8 +139,9 @@ test("historyForTarget returns auction and bid rows", () => {
   assert.ok(rows.some((r) => r.kind === "bid"));
 });
 
-test("buildAgentCheckoutHandoff is unsigned machine-readable without secrets", () => {
-  const text = buildAgentCheckoutHandoff(
+test("buildAgentCheckoutHandoff is unsigned machine-readable without secrets", async () => {
+  const engine=profileEngine();
+  const text = await buildAgentCheckoutHandoff(
     [
       {
         name: "quantum",
@@ -148,20 +151,18 @@ test("buildAgentCheckoutHandoff is unsigned machine-readable without secrets", (
         asset: "POA",
         amount: "1000",
         summary: "announce",
-        params: { name: "quantum", asset: "POA", reserve: "1000", maxBid: "1000" },
+        params: { name: "quantum", asset: "POA", reserve: "100", maxBid: "1000", expectedDeedId:null, expectedVersion:0 },
       },
     ],
-    {
-      chainId: "poa-mainnet-1",
-      registryId: "reg",
-      policyHash: "abc",
-      revision: "poa-mainnet-v1",
-    },
+    capabilities(engine),
     "",
-    "https://example.test",
+    "http://127.0.0.1:8787",
+    "local-reference-only",
+    {state:engine.snapshot(),stateHash:engine.stateHash()},
+    1000000000,
   );
-  assert.match(text, /POA DOMAINS AGENT CHECKOUT/);
-  assert.match(text, /poa-domains\.agent-checkout\.v1/);
+  assert.match(text, /POA DOMAINS REGISTRY CART/);
+  assert.match(text, /poa-domains\.agent-cart\.v2/);
   assert.match(text, /\/v1\/intents/);
   assert.match(text, /submit_intent/);
   assert.match(text, /quantum/);

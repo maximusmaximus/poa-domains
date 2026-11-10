@@ -385,13 +385,14 @@ async function runFullUiUxFlowsOnRegistryApp(
   const firstCartInput = page.locator("#cartList .card input").first();
   await firstCartInput.fill("25000");
   await firstCartInput.dispatchEvent("input");
+  await page.waitForFunction(()=>!(document.querySelector("#copyCartPrompt") as HTMLButtonElement).disabled);
   assert.match(await page.locator("#cartPrompt").innerText(), /25000/);
 
-  // 6. Cart has no signer field; prompt uses a placeholder for the agent to fill
+  // 6. Cart has no signer field; unsigned plan requires explicit signer confirmation
   assert.equal(await page.locator("#cartSigner").count(), 0);
   assert.ok(
     (await page.locator("#cartPrompt").innerText()).includes(
-      "Authorized Signer Principal: <YOUR_POA1_OR_ED25519_PRINCIPAL>",
+      "Authorized Signer Principal: not selected — confirm the signer",
     ),
   );
 
@@ -492,6 +493,7 @@ async function runAgentRoundtripVerification(
   await page.locator("#addToCartBtn").click();
   assert.equal(await page.locator("#cartCount").innerText(), "2");
 
+  await page.waitForFunction(()=>!(document.querySelector("#copyCartPrompt") as HTMLButtonElement).disabled);
   const promptText = await page.locator("#cartPrompt").innerText();
   assert.match(promptText, /builder\.nexus/);
   assert.match(promptText, /fillChildOffer/);
@@ -667,6 +669,7 @@ async function runStaticReferenceMultiBrowserSmoke(staticUrl: string) {
         /In auction|IN LIVE ASCENDING AUCTION/,
       );
       await page.locator("#addToCartBtn").click();
+      await page.waitForFunction(()=>!(document.querySelector("#copyCartPrompt") as HTMLButtonElement).disabled);
       assert.match(
         await page.locator("#cartPrompt").innerText(),
         /STATIC SYNTHETIC DEMO CART/,

@@ -279,64 +279,8 @@ export function cartParamsForSigner(item, signer) {
   }
   return params;
 }
-export function buildAgentCartPrompt(
-  items,
-  cap,
-  signerPrincipal,
-  endpointUrl,
-  context = "local-reference-only",
-) {
-  if (!Array.isArray(items) || items.length === 0) return "";
-  const signer =
-    signerPrincipal && validPrincipal(signerPrincipal)
-      ? signerPrincipal
-      : "<YOUR_POA1_OR_ED25519_PRINCIPAL>";
-  const endpoint = endpointUrl || "http://127.0.0.1:8787";
-  const header =
-    context === "static-synthetic-demo"
-      ? `STATIC SYNTHETIC DEMO CART — NO LIVE API. Copy this structured prompt to inspect how an agent prepares and submits multi-domain bids and purchases against a local PoA Domains registry.`
-      : `AGENT TASK PROMPT — POA DOMAINS REGISTRY CART (${items.length} ${items.length === 1 ? "ITEM" : "ITEMS"})`;
-  const lines = [
-    header,
-    `Target Registry Endpoint: ${endpoint}`,
-    `Live Interactive Explorer: https://poadomains.grok.me`,
-    `GitHub Pages Mirror: https://maximusmaximus.github.io/poa-domains/`,
-    `Network / Chain ID: ${cap.chainId} (revision: ${cap.revision})`,
-    `Registry ID: ${cap.registryId}`,
-    `Policy Hash: ${cap.policyHash}`,
-    `Normalization Hash: ${cap.normalizationHash}`,
-    `Authorized Signer Principal: ${signer}`,
-    ``,
-    `Agent Quick-Start (Zero-Config Execution):`,
-    `1. If you do not yet have a poa1... Ed25519 keypair, generate one locally:`,
-    `   node dist/src/reference-cli.js keygen --out agent.pem`,
-    `   (In poa-mainnet-v1 mode, new poa1... principals automatically receive a 10,000,000 POA starter allocation on their first signed action.)`,
-    `2. Verify GET ${endpoint}/v1/capabilities matches chainId="${cap.chainId}", registryId="${cap.registryId}", and policyHash="${cap.policyHash}".`,
-    `3. Execute each cart item below using the one-command CLI ('act'), the 3-step CLI ('prepare' + 'sign' + 'submit'), or MCP tool 'submit_intent'. Never exceed the user-approved maxTotal cap.`,
-    ``,
-    `Bid beneficiary defaults to the authorized signer. Resolve that principal before prepare/sign; never submit a placeholder.`,
-    `Cart Items:`,
-  ];
-  items.forEach((item, idx) => {
-    const params = cartParamsForSigner(item, signerPrincipal);
-    lines.push(
-      `--- Item ${idx + 1}: ${item.name} (${item.tier} ${item.isRoot ? "root" : "child"}) ---`,
-      `Action: ${item.action}`,
-      `Summary: ${item.summary}`,
-      `Asset: ${item.asset} | Amount / Max Bid: ${item.amount} base units (maxTotal=${item.amount})`,
-      `Action Parameters JSON: ${JSON.stringify(params)}`,
-      `One-Command Agent Execution:`,
-      `  node dist/src/reference-cli.js act --url ${endpoint} --key-file agent.pem --action ${item.action} --params '${JSON.stringify(params)}' --max-total ${item.amount}`,
-      `Step-by-Step CLI Prepare & Submit Example:`,
-      `  # Save intent input to item-${idx + 1}.json with nonce = N+${idx}, notBefore = NOW, deadline = NOW+3600, maxTotal = "${item.amount}", maxNetworkFee = "0"`,
-      `  node dist/src/reference-cli.js prepare --url ${endpoint} --file item-${idx + 1}.json --out unsigned-${idx + 1}.json`,
-      `  node dist/src/reference-cli.js sign --file unsigned-${idx + 1}.json --key-file agent.pem --out signed-${idx + 1}.json`,
-      `  node dist/src/reference-cli.js submit --url ${endpoint} --file signed-${idx + 1}.json`,
-      ``,
-    );
-  });
-  return lines.join("\n");
-}
+export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
+  validateAgentCartHandoff, AGENT_CART_SCHEMA } from "./agent-cart.js?v=e7a77f3f3644";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -1138,88 +1082,6 @@ export function saveCart(storage, cart) {
   } catch {
     /* quota / private mode — cart stays in-memory only */
   }
-}
-
-/**
- * Machine-readable agent checkout handoff (no keys, secrets, or signatures).
- * Does not submit; documents GET/POST endpoints and CLI/MCP actions only.
- */
-export function buildAgentCheckoutHandoff(
-  items,
-  cap,
-  signerPrincipal,
-  endpointUrl,
-  context = "local-reference-only",
-) {
-  if (!Array.isArray(items) || items.length === 0) return "";
-  const endpoint = endpointUrl || "http://127.0.0.1:8787";
-  const signer =
-    signerPrincipal && validPrincipal(signerPrincipal)
-      ? signerPrincipal
-      : null;
-  const payload = {
-    schema: "poa-domains.agent-checkout.v1",
-    livePoA: false,
-    context,
-    endpoint,
-    reads: {
-      healthz: `${endpoint}/healthz`,
-      capabilities: `${endpoint}/v1/capabilities`,
-      state: `${endpoint}/v1/state`,
-      nonce: `${endpoint}/v1/nonce?signer=<PRINCIPAL>`,
-      receipt: `${endpoint}/v1/receipts/<intentId>`,
-    },
-    writes: {
-      intents: {
-        method: "POST",
-        path: `${endpoint}/v1/intents`,
-        contentType: "application/json",
-        note: "Signed packet only; browser writes are rejected. Never auto-submit from this page.",
-      },
-    },
-    cli: {
-      keygen: "node dist/src/reference-cli.js keygen --out agent.pem",
-      act: "node dist/src/reference-cli.js act --url <ENDPOINT> --key-file agent.pem --action <ACTION> --params '<JSON>' --max-total <AMOUNT>",
-      prepare: "node dist/src/reference-cli.js prepare --url <ENDPOINT> --file item.json --out unsigned.json",
-      sign: "node dist/src/reference-cli.js sign --file unsigned.json --key-file agent.pem --out signed.json",
-      submit: "node dist/src/reference-cli.js submit --url <ENDPOINT> --file signed.json",
-    },
-    mcp: {
-      tool: "submit_intent",
-      note: "Same signed packet shape as POST /v1/intents. No keys in this handoff.",
-    },
-    chainId: cap?.chainId ?? null,
-    registryId: cap?.registryId ?? null,
-    policyHash: cap?.policyHash ?? null,
-    revision: cap?.revision ?? null,
-    signerPrincipal: signer,
-    defaults: { bidBeneficiary: "signer" },
-    itemCount: items.length,
-    items: items.map((item, index) => ({
-      index: index + 1,
-      name: item.name,
-      action: item.action,
-      tier: item.tier,
-      isRoot: item.isRoot,
-      asset: item.asset,
-      amount: item.amount,
-      summary: item.summary,
-      auctionId: item.params?.auctionId ?? null,
-      offerId: item.params?.offerId ?? null,
-      params: cartParamsForSigner(item, signer),
-    })),
-  };
-  const lines = [
-    "POA DOMAINS AGENT CHECKOUT (UNSIGNED — NO KEYS, NO SIGNATURES, NO AUTO-SUBMIT)",
-    `Endpoint: ${endpoint}`,
-    `Items: ${items.length}`,
-    `Verify: GET ${endpoint}/v1/capabilities then GET ${endpoint}/v1/state`,
-    `Submit only via local CLI/MCP after independent review: POST ${endpoint}/v1/intents`,
-    `CLI act example uses --key-file on the agent host; never paste private keys here.`,
-    "",
-    JSON.stringify(payload, null, 2),
-  ];
-  return lines.join("\n");
 }
 
 /** Network banner / hold helpers (UI). Levels match Worker /v1/network-status. */
