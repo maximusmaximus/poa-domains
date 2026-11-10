@@ -114,8 +114,9 @@ export class SQLiteEscrowJournal implements Journal {
   constructor(private storage: DurableObjectStorage, private policy: Policy) {
     storage.sql.exec("CREATE TABLE IF NOT EXISTS escrow_journal (sequence INTEGER PRIMARY KEY, record TEXT NOT NULL); CREATE TABLE IF NOT EXISTS escrow_policy (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL)");
     const saved = storage.sql.exec<{value:string}>("SELECT value FROM escrow_policy WHERE id=1").toArray()[0];
-    if(saved) need(saved.value === canonical(policy),"ESCROW_POLICY_CHANGED");
-    else storage.sql.exec("INSERT INTO escrow_policy(id,value) VALUES (1,?)",canonical(policy));
+    const hasLedger = storage.sql.exec<{n:number}>("SELECT COUNT(*) AS n FROM escrow_journal").one().n > 0;
+    if(saved && hasLedger) need(saved.value === canonical(policy),"ESCROW_POLICY_CHANGED");
+    else storage.sql.exec("INSERT OR REPLACE INTO escrow_policy(id,value) VALUES (1,?)",canonical(policy));
   }
   rows(): Entry[] { return this.storage.sql.exec<{record:string}>("SELECT record FROM escrow_journal ORDER BY sequence").toArray().map(r=>JSON.parse(r.record) as Entry); }
   load(): State { return replay(this.rows(),this.policy); }

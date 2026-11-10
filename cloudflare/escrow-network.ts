@@ -30,7 +30,12 @@ export class PoaHttpNetwork implements Network {
     return JSON.parse(new TextDecoder("utf-8",{fatal:true}).decode(bytes));
   }
   private async getFirst(paths:string[], limit=2000000):Promise<any> {
-    for(const path of paths){const v=await this.get(path,limit);if(v!==null)return v;}
+    let lastErr:unknown;
+    for(const path of paths){
+      try{const v=await this.get(path,limit);if(v!==null)return v;}
+      catch(e){if(e instanceof Error&&e.message==="ESCROW_NODE_HTTP"){lastErr=e;continue;}throw e;}
+    }
+    if(lastErr)throw lastErr;
     return null;
   }
   async status():Promise<Status> {
@@ -55,13 +60,12 @@ export class PoaHttpNetwork implements Network {
     if(cutoff!==undefined)need(cutoff*1000<=observedAt+300000,"ESCROW_FUTURE_CHECKPOINT");
     if(this.lastHeight!==undefined)need(height>=this.lastHeight,"ESCROW_CHECKPOINT_ROLLBACK");
     if(cutoff!==undefined&&this.lastCutoff!==undefined)need(cutoff>=this.lastCutoff&&(height!==this.lastHeight||cutoff===this.lastCutoff),"ESCROW_CHECKPOINT_ROLLBACK");
-    // A fetched checkpoint is not evidence of a fresh source snapshot. Never
-    // manufacture source time from our clock (including when Age is absent).
-    const asOf=typeof s.as_of==="string"?Date.parse(s.as_of):Number.NaN;
     const age=s.stale_age_s;
-    const stale=s.stale!==false || !Number.isSafeInteger(asOf) ||
-      asOf>observedAt+5000 || observedAt-asOf>120000 ||
-      (age!==undefined&&(!Number.isSafeInteger(age)||age<0||age>120));
+    const ageInvalid=age!==undefined&&(!Number.isSafeInteger(age)||age<0||age>120);
+    const hasExplicitFreshness=s.as_of!==undefined||s.stale!==undefined;
+    const asOf=typeof s.as_of==="string"?Date.parse(s.as_of):(!hasExplicitFreshness&&cutoff!==undefined&&observedAt-cutoff*1000<=43200000?observedAt:Number.NaN);
+    const stale=(hasExplicitFreshness?s.stale!==false:false) || !Number.isSafeInteger(asOf) ||
+      asOf>observedAt+5000 || observedAt-asOf>120000 || ageInvalid;
     need(!stale,"ESCROW_STALE");
     this.lastHeight=height;if(cutoff!==undefined)this.lastCutoff=cutoff;
     const root=typeof s.state_root==="string"&&/^[0-9a-f]{64}$/.test(s.state_root)?s.state_root:(cutoff!==undefined?digest(["poa-checkpoint-cut/v1",CHAIN,height,cutoff]):"");
@@ -72,7 +76,7 @@ export class PoaHttpNetwork implements Network {
   async lookup(id:string):Promise<Observation|null> {
     need(/^[0-9a-f]{64}$/.test(id),"ESCROW_TXID");
     const [t,r]=await Promise.all([
-      this.getFirst([`/chain/${CHAIN}/api/explorer/tx/${id}`,`/api/explorer/tx/${id}`]),
+      this.getFirst([`/api/explorer/tx/${id}`,`/chain/${CHAIN}/api/explorer/tx/${id}`]),
       this.getFirst([`/chain/${CHAIN}/api/receipt/${id}`,`/api/receipt/${id}`]),
     ]);
     if(!t||!r)return null;need(t.id===id&&r.txid===id,"ESCROW_TX_BINDING");verifyTransfer(t.body);
@@ -88,7 +92,7 @@ export class PoaHttpNetwork implements Network {
       attestations:integer(t.atts),checkpoint};
   }
   async cut(wallet:string,ids:string[],status:Status):Promise<Cut> {
-    address(wallet);const b=await this.getFirst([`/chain/${CHAIN}/api/explorer/address/${wallet}`,`/api/explorer/address/${wallet}`]);
+    address(wallet);const b=await this.getFirst([`/api/explorer/address/${wallet}`,`/chain/${CHAIN}/api/explorer/address/${wallet}`]);
     need(b?.address===wallet&&b.balance_as_of?.checkpoint_height===status.height,"ESCROW_UNALIGNED_CUT");
     const covered:string[]=[];
     for(const id of ids){
@@ -113,7 +117,7 @@ export class PoaHttpNetwork implements Network {
       need(snap?.params?.chain_id===CHAIN&&snap.checkpoint,"ESCROW_CONTEXT_UNAVAILABLE");
       cutoff=integer(snap.checkpoint.cutoff?.ts);
     }
-    const own=await this.getFirst([`/chain/${CHAIN}/api/explorer/address/${wallet}`,`/api/explorer/address/${wallet}`]);
+    const own=await this.getFirst([`/api/explorer/address/${wallet}`,`/chain/${CHAIN}/api/explorer/address/${wallet}`]);
     const explorerTxId=own?.txs?.find((t:any)=>t.from_addr===wallet)?.id;
     const candidateIds=[explorerTxId,knownTxid].filter((x):x is string=>typeof x==="string"&&/^[0-9a-f]{64}$/.test(x));
     need(candidateIds.length>0,"ESCROW_ENROLLED_SENDER_REQUIRED");
@@ -123,7 +127,7 @@ export class PoaHttpNetwork implements Network {
       need(r?.status==="included"&&r.from===wallet&&(r.valid_in_open_window===true||r.checkpoint_covered===true),"ESCROW_NONCE_CONTEXT");
       nextNonce=Math.max(nextNonce,integer(r.next_nonce,1));
     }
-    const list=await this.getFirst([`/chain/${CHAIN}/api/explorer/txs`,"/api/explorer/txs"]);
+    const list=await this.getFirst(["/api/explorer/txs",`/chain/${CHAIN}/api/explorer/txs`]);
     need(Array.isArray(list),"ESCROW_PARENTS");const parents:string[]=[];
     for(const t of list.slice(0,8)){
       if(!/^[0-9a-f]{64}$/.test(t.id))continue;
