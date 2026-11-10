@@ -9,7 +9,7 @@ export const suites = {
   unit: [
     ["node", "--test", ...readdirSync("dist/test").filter(n => n.endsWith(".test.js")).map(n => `dist/test/${n}`),
       "test/ui-live-shaping.test.mjs", "test/ui-ownership.test.mjs", "test/live-network.test.mjs",
-      "test/emoji-format-checker.test.mjs", "test/ci-contract.test.mjs"],
+      "test/emoji-format-checker.test.mjs", "test/ci-contract.test.mjs", "test/worker-deploy.test.mjs"],
     ["node", "--experimental-strip-types", "--test", "test/network-status-worker.test.mjs", "test/backup-codec.test.mjs"],
   ],
   "browser-smoke": [["node", "dist/test/production-smoke.js"], ["node", "dist/test/smoke.js"],

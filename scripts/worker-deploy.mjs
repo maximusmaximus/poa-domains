@@ -1,0 +1,149 @@
+// Production deployment plumbing only: never read/write a PoA key or call escrow admin routes.
+import assert from "node:assert/strict";
+import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { randomUUID } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { parse } from "jsonc-parser";
+
+export const ACCOUNT = "b1c96174cb665cac086ca06434ded1f2";
+export const WORKER = "poadomains-registry";
+export const REPO = "maximusmaximus/poa-domains";
+export const ADDRESS = "poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf";
+export const POLICY = ["POA_ESCROW_ENABLED", "POA_ESCROW_NETWORK_WRITES", "POA_ESCROW_ADDRESS",
+  "POA_ESCROW_PER_TX", "POA_ESCROW_DAILY", "POA_ESCROW_ENGINE_SHA256", "POA_ESCROW_PARAMS_SHA256"];
+const fail = code => { throw Error(code); };
+export function parseConfig(source) {
+  const errors = [];
+  const config = parse(source, errors, { allowTrailingComma: true });
+  if (errors.length || !config || typeof config !== "object" || Array.isArray(config)) fail("INVALID_WRANGLER_JSONC");
+  return config;
+}
+export function productionConfig(config) {
+  assert.equal(config.name, WORKER); assert.equal(config.account_id, ACCOUNT);
+  assert.equal(config.main, "cloudflare/worker.ts"); assert.equal(config.env, undefined);
+  assert.deepEqual(config.durable_objects.bindings, [{ name: "REGISTRY", class_name: "PoaRegistry" }]);
+  assert.deepEqual(config.migrations, [{ tag: "v1-sqlite", new_sqlite_classes: ["PoaRegistry"] }]);
+  assert.equal(config.vars.POA_ESCROW_ENABLED, "false");
+  assert.equal(config.vars.POA_ESCROW_NETWORK_WRITES, "false");
+  // --keep-vars becomes API keep_bindings:[plain_text,json]. Omitting ALL escrow vars
+  // means the server retains them, rather than re-writing an earlier observed value.
+  // Secrets are retained by Wrangler's normal deployment; no secret value is fetched.
+  return { ...structuredClone(config), keep_vars: true,
+    vars: Object.fromEntries(Object.entries(config.vars).filter(([key]) => !key.startsWith("POA_ESCROW_"))) };
+}
+export function expectedPolicy(env) {
+  const policy = Object.fromEntries(POLICY.map(key => {
+    if (!env[key]) fail("MISSING_PRODUCTION_POLICY:" + key);
+    return [key, env[key]];
+  }));
+  if (policy.POA_ESCROW_ENABLED !== "true" || policy.POA_ESCROW_NETWORK_WRITES !== "approved-v1" ||
+      policy.POA_ESCROW_ADDRESS !== ADDRESS) fail("UNSAFE_PRODUCTION_POLICY");
+  for (const key of ["POA_ESCROW_PER_TX", "POA_ESCROW_DAILY"])
+    if (!/^[1-9][0-9]*\.[0-9]{6}$/.test(policy[key])) fail("INVALID_PRODUCTION_LIMIT");
+  for (const key of ["POA_ESCROW_ENGINE_SHA256", "POA_ESCROW_PARAMS_SHA256"])
+    if (!/^[0-9a-f]{64}$/.test(policy[key])) fail("INVALID_PRODUCTION_PIN");
+  return policy;
+}
+export function assertBindings(bindings, expected) {
+  if (!Array.isArray(bindings)) fail("MISSING_LIVE_BINDINGS");
+  const map = new Map();
+  for (const b of bindings) {
+    if (map.has(b.name)) fail("DUPLICATE_LIVE_BINDING");
+    map.set(b.name, b);
+    if (b.name?.startsWith("POA_ESCROW_") && !POLICY.includes(b.name) && b.name !== "POA_ESCROW_KEY")
+      fail("UNREVIEWED_ESCROW_BINDING");
+  }
+  for (const key of POLICY) {
+    const binding = map.get(key);
+    if (binding?.type !== "plain_text" || binding.text !== expected[key]) fail("LIVE_POLICY_MISMATCH:" + key);
+  }
+  for (const key of ["POA_ESCROW_KEY", "ESCROW_ADMIN_TOKEN"])
+    if (map.get(key)?.type !== "secret_text") fail("MISSING_LIVE_SECRET_BINDING");
+}
+export function assertProductionEnvironment(data) {
+  const reviewers = data.protection_rules?.find(rule => rule.type === "required_reviewers")?.reviewers;
+  if (data.name !== "production" || data.can_admins_bypass !== false || reviewers?.length !== 1 ||
+      reviewers[0].type !== "User" || reviewers[0].reviewer?.id !== 15719015 ||
+      reviewers[0].reviewer?.login !== "maximusmaximus" || data.deployment_branch_policy?.protected_branches !== true)
+    fail("PRODUCTION_REQUIRES_MAX_REVIEW");
+}
+async function get(url, token, fetchImpl) {
+  const response = await fetchImpl(url, { method: "GET", redirect: "error", signal: AbortSignal.timeout(15000),
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
+  if (!response.ok) fail("READ_ONLY_PREFLIGHT_HTTP_ERROR");
+  return response.json(); // Never print provider responses, credentials or secret values.
+}
+export async function assertGitHub(env, fetchImpl) {
+  if (env.WORKER_DEPLOY_ENABLED !== "true" || env.GITHUB_ACTIONS !== "true" ||
+      env.GITHUB_EVENT_NAME !== "workflow_run" || env.GITHUB_REPOSITORY !== REPO ||
+      !/^[0-9a-f]{40}$/.test(env.DEPLOY_SHA ?? "") || !/^\d+$/.test(env.CI_RUN_ID ?? "") ||
+      !env.GITHUB_TOKEN) fail("DEPLOY_REQUIRES_APPROVED_MAIN_WORKFLOW");
+  const base = `https://api.github.com/repos/${REPO}`;
+  const [environment, main, run] = await Promise.all([
+    get(`${base}/environments/production`, env.GITHUB_TOKEN, fetchImpl),
+    get(`${base}/git/ref/heads/main`, env.GITHUB_TOKEN, fetchImpl),
+    get(`${base}/actions/runs/${env.CI_RUN_ID}`, env.GITHUB_TOKEN, fetchImpl),
+  ]);
+  assertProductionEnvironment(environment);
+  if (main.object?.sha !== env.DEPLOY_SHA || run.head_sha !== env.DEPLOY_SHA || run.event !== "push" ||
+      run.head_branch !== "main" || run.name !== "native-and-reference-checks" ||
+      run.repository?.full_name !== REPO || run.status !== "completed" || run.conclusion !== "success")
+    fail("DEPLOY_REQUIRES_CURRENT_GREEN_MAIN");
+}
+export async function liveSnapshot(expected, token, fetchImpl) {
+  const base = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/workers/scripts/${WORKER}`;
+  const cf = async path => {
+    const response = await get(base + path, token, fetchImpl);
+    if (response.success !== true || !response.result) fail("CLOUDFLARE_PREFLIGHT_FAILED");
+    return response.result;
+  };
+  const [deployments, settings] = await Promise.all([cf("/deployments"), cf("/settings")]);
+  const active = deployments.deployments?.[0];
+  if (!active?.id || active.versions?.length !== 1 || active.versions[0].percentage !== 100 ||
+      !/^[0-9a-f-]{36}$/.test(active.versions[0].version_id)) fail("AMBIGUOUS_LIVE_VERSION");
+  const version = await cf(`/versions/${active.versions[0].version_id}`);
+  if (version.id !== active.versions[0].version_id) fail("LIVE_VERSION_MISMATCH");
+  assertBindings(settings.bindings, expected); assertBindings(version.resources?.bindings, expected);
+  return `${active.id}:${version.id}`;
+}
+export function wranglerArgs(configPath, dryRun) {
+  return ["node_modules/wrangler/bin/wrangler.js", "deploy", "--config", configPath, "--keep-vars", "--strict",
+    ...(dryRun ? ["--dry-run", "--outdir", "./.deploy-dry-run"] : [])];
+}
+export async function runDeployment({ dryRun, env = process.env, fetchImpl = fetch, run = spawnSync, root = process.cwd() }) {
+  const config = productionConfig(parseConfig(readFileSync(resolve(root, "wrangler.jsonc"), "utf8")));
+  let expected, before;
+  if (!dryRun) {
+    expected = expectedPolicy(env);
+    if (!env.CLOUDFLARE_API_TOKEN) fail("MISSING_CLOUDFLARE_API_TOKEN");
+    await assertGitHub(env, fetchImpl);
+    before = await liveSnapshot(expected, env.CLOUDFLARE_API_TOKEN, fetchImpl);
+  }
+  const path = resolve(root, `.wrangler-production-${randomUUID()}.json`);
+  writeFileSync(path, JSON.stringify(config, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+  try {
+    const childEnv = { ...env, WRANGLER_SEND_METRICS: "false" };
+    // No PoA private key, policy override, GitHub token, or named Wrangler environment
+    // can leak into the child. GitHub environment production is NOT Wrangler --env.
+    for (const key of Object.keys(childEnv))
+      if (key.startsWith("POA_ESCROW_") || ["GITHUB_TOKEN", "WRANGLER_ENV"].includes(key)) delete childEnv[key];
+    const execute = isDry => {
+      const result = run(process.execPath, wranglerArgs(path, isDry), { cwd: root, env: childEnv, stdio: "inherit" });
+      if (result.error || result.status !== 0) fail("WRANGLER_COMMAND_FAILED");
+    };
+    execute(true);
+    if (!dryRun) {
+      // Approval applies to this exact green SHA. Refuse drift during the local dry-run.
+      await assertGitHub(env, fetchImpl);
+      if (await liveSnapshot(expected, env.CLOUDFLARE_API_TOKEN, fetchImpl) !== before) fail("LIVE_VERSION_CHANGED");
+      execute(false);
+    }
+  } finally { unlinkSync(path); }
+}
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  const mode = process.argv[2];
+  if (process.argv.length !== 3 || !["--dry-run", "--deploy"].includes(mode)) fail("USE_DRY_RUN_OR_DEPLOY");
+  await runDeployment({ dryRun: mode === "--dry-run" });
+}
