@@ -19,11 +19,15 @@ Closing the topmost cart first leaves an underlying detail available to Escape.
 
 Search has a short polite result announcement, updated only when the result
 changes. Cart updates/copy feedback are polite atomic statuses. Ideas have a
-persistent Pause/Play button, stop on keyboard focus or manual scrolling, and
+headerless staggered word/emoji cards, stop on hover, touch, keyboard focus or manual scrolling, and
 honor reduced motion. Inputs, links, buttons, selects and panels have visible
 focus outlines. Hidden elements stay hidden even when a component sets display.
 Links in footer text have underlines; tab color changes are immediate to avoid
 brief low-contrast animation frames. Time wording remains hours/minutes.
+
+The floating left ℹ️ is an aria-pressed info-mode toggle. Feature ℹ️ controls are hidden from visual and keyboard navigation until enabled. They open native nonmodal keyboard/touch popovers; Escape closes a popover without switching off info mode. Toggling off closes popovers and returns focus to the floating control. Required field labels, POA units, privacy warnings and actual errors/statuses remain visible.
+
+Network and service status share a session-dismissible panel with a small color/emoji reopen button. Dismissing it never bypasses the network hold.
 
 ## Read-only Pages
 

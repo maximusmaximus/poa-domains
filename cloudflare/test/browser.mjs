@@ -10,8 +10,8 @@ export async function browserSmoke(base, evidence) {
     await page.goto(base,{waitUntil:"networkidle"});
     await page.waitForFunction(()=>document.querySelectorAll("#action option").length===17);
     for(const id of ["searchInput","searchBtn","cartList","cartPrompt","copyCartPrompt","stats","names","auctions","offers","history","balances","handoff"]) assert.equal(await page.locator(`#${id}`).count(),1,id);
-    await page.waitForFunction(()=>document.querySelectorAll("#ideasStrip .ideas-row").length===3 && document.querySelectorAll("#ideasStrip .idea").length>=12);
-    assert.equal(await page.locator("#ideasStrip .ideas-row").count(),3);
+    await page.waitForFunction(()=>document.querySelectorAll("#ideasStrip .ideas-row").length===1 && document.querySelectorAll("#ideasStrip .idea").length>=12);
+    assert.equal(await page.locator("#ideasStrip .ideas-row").count(),1);
     assert.equal(await page.locator("#siteTitle .title-glyph").count(),10);
     assert.match(await page.locator("#names").innerText(),/nexus/);
     assert.equal(await page.locator("#action option").count(),17);
