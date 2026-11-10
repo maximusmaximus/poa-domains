@@ -32,7 +32,7 @@ export function displayCode(error: unknown): string {
   }
   return "ESCROW_NODE_UNAVAILABLE";
 }
-export const displayReason = (code: string): string => Object.hasOwn(REASONS, code) ? REASONS[code]! : REASONS.ESCROW_NODE_UNAVAILABLE!;
+export const displayReason = (code: string): string => "Network freshness or verification is held. " + (Object.hasOwn(REASONS, code) ? REASONS[code]! : REASONS.ESCROW_NODE_UNAVAILABLE!);
 /** Only this locally-created safe error may carry timing into a public response. */
 export class DisplayReadError extends Error {
   readonly code: string;
