@@ -13,7 +13,7 @@ export const STRING: Schema = { type: "string", maxLength: 256 };
 export const NAME: Schema = {
   type: "string",
   minLength: 1,
-  maxLength: 256,
+  maxLength: 8192,
   examples: ["alpha", "agent.alpha", "👍"],
 };
 export const ID: Schema = { type: "string", pattern: "^[a-f0-9]{64}$" };
@@ -57,7 +57,11 @@ const RECORD: Schema = {
       type: { const: "service" },
       url: { type: "string", format: "uri", maxLength: 2048 },
     }),
-    objectSchema({ type: { const: "wallet" }, chain: STRING, address: STRING }),
+    objectSchema({
+      type: { const: "wallet" },
+      chain: { type: "string", maxLength: 64 },
+      address: STRING,
+    }),
     objectSchema({ type: { const: "ipfs" }, cid: STRING }),
   ],
 };
@@ -119,7 +123,7 @@ export const ACTION_SCHEMAS: Record<string, Schema> = {
   transfer: objectSchema({ ...deed, recipient: PRINCIPAL }),
   setRecords: objectSchema({
     ...deed,
-    records: { type: "array", items: RECORD, maxItems: 32 },
+    records: { type: "array", items: RECORD, maxItems: 16 },
   }),
   setMetadata: objectSchema({ ...deed, metadata: METADATA }),
   revokeChild: objectSchema({ ...deed, parentOwnerVersion: UINT }),

@@ -220,7 +220,7 @@ export class McpCore {
             params(
               objectSchema(
                 {
-                  uri: { type: "string", maxLength: 1024 },
+                  uri: { type: "string", maxLength: 32768 },
                   _meta: { type: "object" },
                 },
                 ["uri"],

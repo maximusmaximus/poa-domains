@@ -279,3 +279,25 @@ test("typed packets match Ajv; simulation, signed submit, exact resend and recei
   assert.equal(missing.isError, true);
   assert.equal(missing.structuredContent.accepted, "unknown");
 });
+
+test("action schema limits preserve valid long emoji names, 256 labels, and the 16-record Engine bound", () => {
+  const longName = "👨‍👩‍👧‍👦".repeat(32);
+  assert.ok(longName.length > 256);
+  assert.equal(
+    matches(ACTION_SCHEMAS.announceAuction.properties.name, longName),
+    true,
+  );
+  const labels = Array.from({ length: 256 }, (_, n) => "a" + n);
+  const schema = ACTION_SCHEMAS.createChildOffer.properties.labels;
+  assert.equal(matches(schema, labels), true);
+  assert.equal(ajv.validate(schema, labels), true);
+  assert.equal(matches(schema, [...labels, "extra"]), false);
+  const records = Array.from({ length: 16 }, () => ({
+    type: "service",
+    url: "https://example.com",
+  }));
+  const recordSchema = ACTION_SCHEMAS.setRecords.properties.records;
+  assert.equal(matches(recordSchema, records), true);
+  assert.equal(ajv.validate(recordSchema, records), true);
+  assert.equal(matches(recordSchema, [...records, records[0]]), false);
+});
