@@ -43,7 +43,8 @@ import {
   cartMinimum,
   cartSummary,
   editCartAmount,
-} from "./shared.js?v=68c6d10f3228";
+  updatedAge, readViewQuery, viewPath, nameErrorReason, cartReview, recheckCartItem, acknowledgeCartItem, registryViewState,
+} from "./shared.js?v=84823a5a7ad2";
 
 const el = (id) => document.getElementById(id);
 let cap,
@@ -68,9 +69,79 @@ let currentOwnerId = null;
 let networkStatus = { level: "checking", hold: false, message: "⚪ Checking PoA network…" };
 let networkTimer = null;
 let escrowUI = null;
+let readState = null, starting = false, refreshing = false, registryReadFailed = true, lastLoadedAt = null, lastSearch = "";
+
 
 const TICKER_MS = 12000;
 const NETWORK_MS = 20000;
+
+function cartCopyBlocked() {
+  return refreshing || lastLoadedAt === null || registryReadFailed || cart.some(item => item.validationError || item.needsReview) || shouldHoldTransactions(networkStatus.level) || !!networkStatus.hold;
+}
+function updateCartCopyState() {
+  for (const id of ["copyCartPrompt", "copyCheckoutBtn"]) el(id).disabled = !cart.length || cartCopyBlocked();
+}
+function updateFreshness() {
+  const text = updatedAge(lastLoadedAt);
+  for (const node of document.querySelectorAll(".tab-age")) node.textContent = text;
+  el("registryAge").textContent = "Registry data " + text + " · My POA refreshes separately.";
+}
+function pageStatus(error = "", loading = false) {
+  el("registryError").hidden = !error;
+  el("registryErrorText").textContent = error;
+  el("registryLoading").hidden = !loading || !!latestState;
+  document.body.dataset.registryStatus = error ? "error" : loading ? "loading" : "ready";
+  el("refresh").disabled = loading;
+  el("registryRetry").disabled = loading;
+  updateCartCopyState();
+}
+// Capture immediately before synchronous redraw, so typing during the fetch is kept too.
+function preserveInputs(draw) {
+  const fields = () => [...document.querySelectorAll("input, textarea, select")].filter(n => !n.closest("#escrowSection, #escrowDomain"));
+  const key = n => n.id || n.dataset.fieldKey || n.getAttribute("aria-label");
+  const active = document.activeElement;
+  const saved = fields().filter(key).map(n => ({ key: key(n), value: n.value, checked: n.checked, focus: n === active, start: n.selectionStart, end: n.selectionEnd }));
+  draw();
+  const current = new Map(fields().map(n => [key(n), n]));
+  for (const old of saved) {
+    const n = current.get(old.key); if (!n) continue;
+    n.value = old.value; if (typeof old.checked === "boolean") n.checked = old.checked;
+    if (old.focus) {
+      if (!active.isConnected) n.focus({ preventScroll: true });
+      if (old.start !== null && old.start !== undefined && n.setSelectionRange) n.setSelectionRange(old.start, old.end);
+    }
+  }
+}
+function writeViewURL(path = location.pathname) {
+  const next = viewPath(path, lastSearch, activeSectionTab);
+  if (next !== location.pathname + location.search) history.pushState(route, "", next);
+}
+function restoreViewFromURL() {
+  const view = readViewQuery(location.search), d = parseDomainPath(location.pathname), o = parseOwnerPath(location.pathname);
+  lastSearch = view.query; el("searchInput").value = view.query;
+  route = d ? { kind: "domain", name: d } : o ? { kind: "owner", ownerId: o } : { kind: "home" };
+  currentDomainName = d || null; currentOwnerId = o || null;
+  setSectionTab(view.tab, false); applyRoute(); runSearch(lastSearch, false);
+}
+async function refreshRegistry() {
+  if (refreshing || !readState) return;
+  refreshing = true; pageStatus("", true);
+  try {
+    const payload = await readState();
+    const viewState = registryViewState(payload);
+    registryReadFailed = false; lastLoadedAt = Date.now();
+    preserveInputs(() => {
+      cart = cart.map(item => recheckCartItem(item, cap, viewState)); persistCart();
+      render(payload); renderCart(); runSearch(lastSearch, false);
+      if (!el("ideasStrip").children.length) renderIdeas();
+    });
+    updateFreshness(); pageStatus();
+  } catch {
+    registryReadFailed = true;
+    pageStatus("⚠️ Could not update registry data. Your last view is kept. Tap Refresh to try again; cart copying is paused.");
+    updatePromptText();
+  } finally { refreshing = false; el("refresh").disabled = false; el("registryRetry").disabled = false; updateCartCopyState(); updatePromptText(); }
+}
 
 function clearHandoff() {
   generation++;
@@ -147,7 +218,7 @@ function navigateHome() {
   route = { kind: "home" };
   currentDomainName = null;
   currentOwnerId = null;
-  history.pushState(route, "", "/");
+  writeViewURL("/");
   applyRoute();
 }
 
@@ -155,7 +226,7 @@ function navigateDomain(name) {
   route = { kind: "domain", name };
   currentDomainName = name;
   currentOwnerId = null;
-  history.pushState(route, "", domainPath(name));
+  writeViewURL(domainPath(name));
   applyRoute();
 }
 
@@ -223,7 +294,7 @@ function applyNetworkHold() {
     }
   }
   // Re-run cart enablement when not held.
-  if (!hold) renderCart();
+  updateCartCopyState();
   let note = el("networkHoldNote");
   if (hold) {
     if (!note) {
@@ -253,7 +324,7 @@ function navigateOwner(ownerId) {
   route = { kind: "owner", ownerId };
   currentOwnerId = ownerId;
   currentDomainName = null;
-  history.pushState(route, "", "/p/" + encodeURIComponent(ownerId));
+  writeViewURL("/p/" + encodeURIComponent(ownerId));
   applyRoute();
 }
 
@@ -285,6 +356,7 @@ function applyRoute() {
 
 function setSectionTab(tabId, markSeen = true) {
   activeSectionTab = tabId;
+  if (markSeen) writeViewURL();
   for (const btn of document.querySelectorAll(".section-tab")) {
     const on = btn.getAttribute("data-tab") === tabId;
     btn.classList.toggle("is-active", on);
@@ -320,7 +392,7 @@ function person(id) {
   const role = Object.keys(details.roles ?? {}).find(
     (x) => details.roles[x] === id,
   );
-  return role ? "Fixture " + role : id.slice(0, 18) + "…";
+  return role ? "Demo " + role : id.slice(0, 18) + "…";
 }
 
 function endpointBase() {
@@ -333,6 +405,7 @@ function persistCart() {
 
 function addToCart(item) {
   item.minimumAmount = cartMinimum(item, cap, latestState);
+  item = recheckCartItem(item, cap, latestState);
   const existingIdx = cart.findIndex(
     (x) => x.name === item.name && x.action === item.action,
   );
@@ -362,8 +435,8 @@ function updatePromptText() {
     }
     return;
   }
-  if (cart.some(item => item.validationError)) {
-    el("cartPrompt").textContent = "⚠️ Fix the cart amount before copying.";
+  if (cartCopyBlocked()) {
+    el("cartPrompt").textContent = refreshing ? "⏳ Checking registry data before copying…" : registryReadFailed ? "⚠️ Refresh registry data before copying." : "⚠️ Review changed cart items and fix any amount before copying.";
     return;
   }
   el("cartPrompt").textContent = buildAgentCartPrompt(
@@ -388,7 +461,7 @@ function renderFloatingCart() {
   );
   clearBtn.disabled = cart.length === 0;
   const held = shouldHoldTransactions(networkStatus.level) || !!networkStatus.hold;
-  copyBtn.disabled = cart.length === 0 || held || cart.some(item => item.validationError);
+  copyBtn.disabled = cart.length === 0 || cartCopyBlocked();
   if (held) copyBtn.classList.add("action-held");
   else copyBtn.classList.remove("action-held");
   list.replaceChildren();
@@ -402,6 +475,7 @@ function renderFloatingCart() {
     nameLink(h, item.name);
     add(card, "p", `${item.action} · ${item.amount} ${item.asset}`, "badge");
     add(card, "p", item.summary);
+    if (item.needsReview) add(card, "p", "⚠️ " + item.reviewMessage + " Open Find to review your cart.", "badge-warn");
     const btn = add(card, "button", "Remove", "secondary small");
     btn.type = "button";
     btn.addEventListener("click", () => removeCartAt(index));
@@ -414,7 +488,7 @@ function renderCart() {
   el("clearCart").disabled = cart.length === 0;
   {
     const held = shouldHoldTransactions(networkStatus.level) || !!networkStatus.hold;
-    el("copyCartPrompt").disabled = cart.length === 0 || held || cart.some(item => item.validationError);
+    el("copyCartPrompt").disabled = cart.length === 0 || cartCopyBlocked();
     if (held) el("copyCartPrompt").classList.add("action-held");
     else el("copyCartPrompt").classList.remove("action-held");
   }
@@ -437,11 +511,22 @@ function renderCart() {
       "badge",
     );
     const summaryNode = add(card, "p", item.summary);
+    if (item.needsReview) add(card, "p", "⚠️ " + item.reviewMessage, "badge-warn");
+    const reviewBtn = item.needsReview ? add(card, "button", "✅ Review changed item", "secondary small") : null;
+    if (reviewBtn) {
+      reviewBtn.type = "button"; reviewBtn.disabled = registryReadFailed || !cartReview(item, cap, latestState).canAcknowledge;
+      reviewBtn.addEventListener("click", () => {
+        if (registryReadFailed) return;
+        try { cart[index] = acknowledgeCartItem(item, cap, latestState); persistCart(); renderCart(); }
+        catch { el("cartStatus").textContent = "⚠️ Fix the amount or remove this item, then check Find again."; }
+      });
+    }
     const errorNode = add(card, "p", item.validationError || "", "badge-warn");
     errorNode.setAttribute("role", "alert");
     const controls = add(card, "div", "", "inline-controls");
     const amountInput = document.createElement("input");
     amountInput.value = item.amount;
+    amountInput.dataset.fieldKey = item.action + ":" + item.name;
     amountInput.setAttribute("inputmode", "numeric");
     amountInput.setAttribute(
       "aria-label",
@@ -459,7 +544,8 @@ function renderCart() {
       }
       errorNode.textContent = item.validationError || "";
       amountInput.setAttribute("aria-invalid", item.validationError ? "true" : "false");
-      el("copyCartPrompt").disabled = !!item.validationError || cart.some(x => x.validationError) || shouldHoldTransactions(networkStatus.level) || !!networkStatus.hold;
+      persistCart(); updateCartCopyState();
+      if (reviewBtn) reviewBtn.disabled = registryReadFailed || !cartReview(item, cap, latestState).canAcknowledge;
       updatePromptText();
       renderFloatingCart();
     });
@@ -748,18 +834,20 @@ function addDetailToCart(item) {
   }
 }
 
-function runSearch(rawQuery) {
+function runSearch(rawQuery, remember = true) {
+  if (remember) { lastSearch = (rawQuery ?? "").trim().slice(0, 2048); writeViewURL(); }
   const container = el("searchResult");
   container.replaceChildren();
   const q = (rawQuery ?? "").trim();
-  if (!q || !cap || !latestState) return;
+  if (!q) return;
+  if (!cap || !latestState) { add(container, "p", "⏳ Loading registry data. Your search will run when it is ready."); return; }
   let info;
   try {
     info = inspectName(q, cap.emojiManifest);
-  } catch {
+  } catch (error) {
     const card = add(container, "div", "", "card");
     add(card, "h4", q);
-    add(card, "p", "INVALID DOMAIN FORMAT", "badge-warn");
+    add(card, "p", nameErrorReason(error), "badge-warn");
     return;
   }
   const s = latestState;
@@ -1280,6 +1368,7 @@ function renderOwnerPage(ownerId) {
 }
 
 function copyDomainListingPrompt(kind) {
+  if (registryReadFailed) { el("listingPromptStatus").textContent = "⚠️ Refresh registry data before copying."; return; }
   if (shouldHoldTransactions(networkStatus.level) || networkStatus.hold) {
     el("listingPromptStatus").textContent = "Held ⏸️ until the PoA network is back";
     return;
@@ -1332,11 +1421,11 @@ function copyDomainListingPrompt(kind) {
 }
 
 function render(payload) {
-  const s = payload.state;
+  const s = registryViewState(payload);
   latestState = s;
   el("state").textContent = JSON.stringify(payload, null, 2);
   el("freshness").textContent =
-    (demo ? "STATIC SYNTHETIC DEMO · " : "LIVE REGISTRY · ") +
+    (demo ? "SYNTHETIC DEMO · " : configMode === "live-registry" ? "HOSTED REGISTRY DATA · " : "LOCAL REGISTRY DATA · ") +
     `as of ${formatClock(s.time)}, sequence ${s.sequence}. ${payload.finality}.`;
   if (demo && details.generatedAt)
     el("freshness").textContent +=
@@ -1370,10 +1459,10 @@ function render(payload) {
 
   el("stats").replaceChildren();
   for (const [value, label] of [
-    [names.length, "owned fixture names"],
+    [names.length, "owned names"],
     [
       auctions.filter((a) => a.status === "live").length,
-      "unsettled fixture auctions",
+      "unsettled auctions",
     ],
     [Object.keys(cap.actions).length, "implemented handoff actions"],
     [`${rootDeeds} / ${childDeeds}`, "root / child active deeds"],
@@ -1600,27 +1689,13 @@ function render(payload) {
   }
 }
 
-try {
-  applySiteTitle();
-  cart = loadCart(globalThis.localStorage);
-  tabSeen = loadTabSeen(globalThis.localStorage);
-
-  const pathDomain = parseDomainPath(location.pathname);
-  const pathOwner = parseOwnerPath(location.pathname);
-  if (pathDomain) {
-    route = { kind: "domain", name: pathDomain };
-    currentDomainName = pathDomain;
-  } else if (pathOwner) {
-    route = { kind: "owner", ownerId: pathOwner };
-    currentOwnerId = pathOwner;
-  } else {
-    route = { kind: "home" };
-  }
-
+async function loadRegistry() {
+  if (starting) return;
+  starting = true; pageStatus("", true);
+  try {
   const config = await json(new URL("config.json", import.meta.url));
   configMode = config.mode;
   demo = config.mode === "static-synthetic-demo";
-  let read;
   if (demo) {
     if (config.publicApiBase !== null) throw Error("Demo has no backend");
     const files = config.files;
@@ -1629,16 +1704,16 @@ try {
       json(staticURL(files.details)),
       json(staticURL(files.examples)),
     ]);
-    read = () => json(staticURL(files.state));
+    readState = () => json(staticURL(files.state));
     el("mode").textContent =
-      "TEST-ONLY SYNTHETIC DEMO · Temporary reference fixture. Not live PoA ownership, assets or transactions. No backend, wallet connection, signing or browser writes. All balances and principals are throwaway fixtures; signing keys were discarded.";
+      "🧪 SYNTHETIC DEMO · No backend, wallet connection, signing or browser writes. Names, balances and principals are test data, not native PoA ownership or assets; fixture signing keys were discarded.";
     el("example").hidden = false;
     el("exampleNotice").textContent =
       "Synthetic examples only. Do not sign or submit.";
   } else {
     if (config.mode !== "local-reference-only" && config.mode !== "live-registry")
       throw Error("Unknown mode");
-    el("mode").textContent = "🟢 Live PoA Domains registry";
+    el("mode").textContent = configMode === "live-registry" ? "🟢 Hosted registry data · Native naming is not enabled." : "🧪 Local registry data · Not native PoA ownership.";
     if (config.publicApiBase) {
       const u = new URL(config.publicApiBase);
       if (
@@ -1653,7 +1728,7 @@ try {
       base = u.origin;
     }
     cap = await json(base + "/v1/capabilities");
-    read = () => json(base + "/v1/state");
+    readState = () => json(base + "/v1/state");
   }
   for (const [id, tier, label] of [["premiumPolicy", "premium", "Single emoji"], ["standardPolicy", "standard", "Standard roots"]]) {
     try {
@@ -1663,8 +1738,9 @@ try {
   }
   for (const item of cart) {
     // Repair old saved carts affected by the amount/maxBid mismatch, without raising any cap.
-    if (item.action === "announceAuction+bid") item.params.maxBid = item.amount;
     try {
+      if (!item.params || typeof item.params !== "object") throw Error("⚠️ Remove this invalid saved item and check Find again.");
+      if (item.action === "announceAuction+bid") item.params.maxBid = item.amount;
       item.minimumAmount = cartMinimum(item, cap, null);
       if (item.action === "announceAuction+bid") item.params.reserve = item.minimumAmount;
       if (BigInt(item.amount) < BigInt(item.minimumAmount) ||
@@ -1677,33 +1753,42 @@ try {
   if (typeof cap.reservedCatalog === "string" && cap.reservedCatalog.length) {
     reservedSet = new Set(cap.reservedCatalog.split(",").filter(Boolean));
   }
+  el("action").replaceChildren();
   for (const action of Object.keys(cap.actions)) {
     const option = document.createElement("option");
     option.value = action;
     option.textContent = action;
     el("action").append(option);
   }
-  const keys = () => {
     el("keys").textContent = JSON.stringify(cap.actions[el("action").value]);
+    if (!escrowUI) escrowUI = mountEscrow({ base, capability: cap.escrow, registryId: cap.registryId,
+      section: el("escrowSection"), domain: el("escrowDomain"), selectTab: () => { navigateHome(); setSectionTab("escrow"); } });
+    applyRoute(); renderCart();
+    if (!demo && !tickerTimer) {
+      tickerTimer = setInterval(refreshRegistry, TICKER_MS);
+      refreshNetworkStatus(); networkTimer = setInterval(refreshNetworkStatus, NETWORK_MS);
+    } else if (demo) renderNetworkStatus();
+    await refreshRegistry();
+  } catch {
+    readState = null; registryReadFailed = true;
+    pageStatus("⚠️ Registry data could not load. Tap Refresh to try again. Nothing was submitted.");
+  } finally { starting = false; el("refresh").disabled = false; el("registryRetry").disabled = false; }
+}
+
+try {
+  applySiteTitle();
+  cart = loadCart(globalThis.localStorage);
+  tabSeen = loadTabSeen(globalThis.localStorage);
+
+  restoreViewFromURL();
+  const keys = () => {
+    el("keys").textContent = JSON.stringify(cap?.actions?.[el("action").value] ?? {});
   };
   el("action").addEventListener("change", keys);
   el("handoff").addEventListener("input", clearHandoff);
   el("handoff").addEventListener("change", clearHandoff);
   keys();
-  const refresh = async () => render(await read());
-  el("refresh").addEventListener("click", () =>
-    refresh().catch(() => {
-      el("error").textContent = "Read failed";
-    }),
-  );
-  await refresh();
-  escrowUI=mountEscrow({base,capability:cap.escrow,registryId:cap.registryId,
-    section:el("escrowSection"),domain:el("escrowDomain"),selectTab:()=>{navigateHome();setSectionTab("escrow");}});
-  renderCart();
-  applyRoute();
-  setSectionTab(activeSectionTab, false);
-  updateTabDots(latestState);
-
+  for (const id of ["refresh", "registryRetry"]) el(id).addEventListener("click", () => readState ? refreshRegistry() : loadRegistry());
   for (const btn of document.querySelectorAll(".section-tab")) {
     btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-tab") || "find";
@@ -1726,24 +1811,7 @@ try {
   el("copyListPromptBtn")?.addEventListener("click", () => copyDomainListingPrompt("list"));
   el("copyChangePromptBtn")?.addEventListener("click", () => copyDomainListingPrompt("change"));
   el("copyUnlistPromptBtn")?.addEventListener("click", () => copyDomainListingPrompt("unlist"));
-  window.addEventListener("popstate", () => {
-    const d = parseDomainPath(location.pathname);
-    const o = parseOwnerPath(location.pathname);
-    if (d) {
-      route = { kind: "domain", name: d };
-      currentDomainName = d;
-      currentOwnerId = null;
-    } else if (o) {
-      route = { kind: "owner", ownerId: o };
-      currentOwnerId = o;
-      currentDomainName = null;
-    } else {
-      route = { kind: "home" };
-      currentDomainName = null;
-      currentOwnerId = null;
-    }
-    applyRoute();
-  });
+  window.addEventListener("popstate", restoreViewFromURL);
 
   el("searchBtn").addEventListener("click", () =>
     runSearch(el("searchInput").value),
@@ -1754,7 +1822,6 @@ try {
       runSearch(el("searchInput").value);
     }
   });
-  renderIdeas();
   el("ideasShuffle")?.addEventListener("click", () => {
     renderIdeas();
     el("ideasStatus").textContent = "🔀 Fresh ideas";
@@ -1768,7 +1835,7 @@ try {
       return;
     }
     const text = el("cartPrompt").textContent;
-    if (!text || !cart.length || cart.some(item => item.validationError)) return;
+    if (!text || !cart.length || cartCopyBlocked()) return;
     try {
       await navigator.clipboard.writeText(text);
       el("cartStatus").textContent = "Copied";
@@ -1805,7 +1872,7 @@ try {
       el("floatingCartStatus").textContent = "Held ⏸️ until the PoA network is back";
       return;
     }
-    if (!cart.length || !cap || cart.some(item => item.validationError)) return;
+    if (!cart.length || !cap || cartCopyBlocked()) return;
     const text = buildAgentCheckoutHandoff(
       cart,
       cap,
@@ -1833,18 +1900,6 @@ try {
       dismissNetworkBanner(globalThis.sessionStorage, level);
       renderNetworkStatus();
     });
-  }
-
-  if (!demo) {
-    tickerTimer = setInterval(() => {
-      refresh().catch(() => {});
-    }, TICKER_MS);
-    refreshNetworkStatus().catch(() => {});
-    networkTimer = setInterval(() => {
-      refreshNetworkStatus().catch(() => {});
-    }, NETWORK_MS);
-  } else {
-    renderNetworkStatus();
   }
 
   el("example").addEventListener("click", () => {
@@ -1890,7 +1945,7 @@ try {
       input.params = parsePublicJSON(el("params").value);
       const body = makeBody(input, cap),
         id = await digest(body),
-        note = instructions(body, id, config.mode);
+        note = instructions(body, id, configMode);
       if (selectedGeneration !== generation) return;
       el("copy").disabled = false;
       el("body").textContent = canonical(body);
@@ -1903,7 +1958,7 @@ try {
     }
   });
   el("copy").addEventListener("click", async () => {
-    if (copy)
+    if (copy && !registryReadFailed && !shouldHoldTransactions(networkStatus.level) && !networkStatus.hold)
       try {
         await navigator.clipboard.writeText(copy);
       } catch {
@@ -1911,7 +1966,8 @@ try {
           "Clipboard unavailable; copy the inert text manually.";
       }
   });
+  setInterval(updateFreshness, 60000);
+  await loadRegistry();
 } catch {
-  el("error").textContent =
-    "Reference data unavailable or unsupported. Nothing can be submitted here.";
+  pageStatus("⚠️ Registry data unavailable. Tap Refresh to try again. Nothing was submitted.");
 }

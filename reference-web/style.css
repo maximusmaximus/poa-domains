@@ -1044,3 +1044,9 @@ header { padding-bottom: 0.75rem; }
 .escrow-mock { background:#382700; color:#ffe49a; border:2px solid #dfae42; padding:0.7rem; border-radius:0.6rem; font-weight:700; }
 .escrow-mock[hidden] { display:none; }
 .escrow-message { min-height:1.5em; }
+
+/* Data age is readable on every tab without adding six live announcements. */
+.registry-read-status { max-width: 1180px; margin: 0 auto; padding: 0 1rem; }
+#registryError { padding: .7rem; border: 1px solid #bf964f; border-radius: .6rem; color: #ffe2a5; }
+#registryAge, .tab-age { color: #a4b8c7; font-size: .68rem; }
+.tab-age { display: block; font-weight: normal; white-space: nowrap; }
