@@ -6,8 +6,9 @@ import {ACTIONS} from "../src/actions.js";
 import {mainnetConfig} from "../src/config.js";
 import {ManualClock} from "../src/clock.js";
 import {quote,readPage,readName,readAuction,readOffer} from "../src/registry-reads.js";
+import {capabilities,prepare} from "../src/interface.js";
 import {registryRoute} from "../src/registry-routes.js";
-import {nativePrincipal,intentId} from "../src/auth.js";
+import {nativePrincipal,intentId,signBody} from "../src/auth.js";
 
 const exercised=new Set<string>();
 function submitQuote(t:ReturnType<typeof setup>,action:string,name:string,input:Record<string,any>={},who=t.alice,co:typeof t.alice[]=[]) {
@@ -133,4 +134,32 @@ test("quotes expose conflicts and seller choices without guessing; ambiguity and
   assert.ok(Object.keys(full.emojiManifest.sequences).length===5216);assert.ok(full.emojiOwnership.multiMemberClasses.length>0);
   assert.equal(slim.normalizationHash,full.normalizationHash);assert.deepEqual(slim.assets,full.assets);
   assert.ok(JSON.stringify(slim).length<JSON.stringify(full).length/10);
+});
+
+
+test("earliest-policy quote has no absolute clock race; explicit schedules and integer/delay guards remain strict", () => {
+  for (const mainnet of [false,true]) {
+    const t=setup();
+    const who=mainnet?nativePrincipal(t.issuer.key):t.issuer.id;
+    const e=mainnet?new Engine(mainnetConfig(who,nativePrincipal(t.treasury.key)),t.clock):t.e;
+    const q=quote(e,{name:"clockpolicy",action:"announceAuction",signer:who});
+    assert.ok(q.params);assert.equal(q.params.openAt,0);
+    t.clock.advance(1);
+    const body=prepare({signer:who,coSigners:[],requestId:"clock-initial",nonce:0,notBefore:0,deadline:t.clock.now()+300000,maxTotal:"10000000",maxNetworkFee:"0",action:"announceAuction",params:q.params},capabilities(e));
+    const packet=signBody(body,[t.issuer.key]);
+    const result=e.submit(packet);assert.equal(result.status,"succeeded");
+    const auction=e.snapshot().auctions[result.result.auctionId]!;
+    assert.equal(auction.openAt,t.clock.now()+(mainnet?0:86400),"reference policy still requires a full day at execution");
+    const snap=e.snapshot();assert.deepEqual(e.submit(packet),result);assert.deepEqual(e.snapshot(),snap,"same signed packet replays without moving start");
+    for(const openAt of [-1,0.5,"0",t.clock.now()-1]) {
+      const next=quote(e,{name:"invalidschedule",action:"announceAuction",signer:who});
+      const invalid={...body,nonce:e.nextNonce(who),requestId:"invalid-clock-"+String(openAt),params:{...next.params,openAt}};
+      if(typeof openAt==="number"&&(openAt<0||!Number.isInteger(openAt)))assert.throws(()=>signBody(invalid,[t.issuer.key]),/INTEGER/);
+      else assert.equal(e.submit(signBody(invalid,[t.issuer.key])).code,"INTEGER");
+    }
+    const next=quote(e,{name:"scheduled",action:"announceAuction",signer:who});
+    const future=t.clock.now()+86400+600;
+    const scheduled=signBody({...body,nonce:e.nextNonce(who),requestId:"explicit-future-clock",params:{...next.params,openAt:future}},[t.issuer.key]);
+    const accepted=e.submit(scheduled);assert.equal(accepted.status,"succeeded");assert.equal(e.snapshot().auctions[accepted.result.auctionId]!.openAt,future);
+  }
 });

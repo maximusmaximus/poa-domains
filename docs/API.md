@@ -240,3 +240,16 @@ The Worker publishes [OpenAPI 3.1](https://poadomains.grok.me/openapi.json),
 [agent card](https://poadomains.grok.me/.well-known/agent.json) and
 [llms.txt](https://poadomains.grok.me/llms.txt). See [schemas, limits and safety](DISCOVERY.md).
 Pages mirrors these documents but does not host their API.
+
+
+### Immediate / earliest-policy auction start
+
+An `announceAuction` quote uses integer `openAt: 0` to mean the earliest start
+permitted **at execution time**: now in `poa-mainnet-v1`, or a full 24 hours after
+execution in the delayed local-reference profile. The committed auction records
+that resolved integer start; replaying the exact signed packet cannot move it.
+Explicit nonzero timestamps retain the existing minimum-start checks. Negative,
+fractional and string timestamps are rejected. This avoids quoting an absolute
+“now” that becomes invalid while a signed announcement is in transit; no retry,
+amount rounding or grace period is involved. Reserve, amount and spending-cap
+rules are unchanged.

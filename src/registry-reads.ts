@@ -99,7 +99,7 @@ export function quote(e: Engine, q:Record<string,string>) {
       const policy=e.config.assets[asset];need(policy,"ASSET");
       if(deed) {params=identity();reserve=required("reserve");}
       else {expectedVersion=0;reserve=normalized.tier==="premium"?policy.premiumReserve:policy.standardReserve;params={name,expectedDeedId:null,expectedVersion:0};}
-      params={...params,asset,reserve,openAt:now+(e.config.revision==="poa-mainnet-v1"?0:86400),metadata:deed?deed.metadata.at(-1):buildMetadataWitness(name)};
+      params={...params,asset,reserve,openAt:0,metadata:deed?deed.metadata.at(-1):buildMetadataWitness(name)};
       break;
     }
     case "bid": {

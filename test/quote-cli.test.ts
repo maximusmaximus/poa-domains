@@ -58,3 +58,31 @@ test("emoji alias ownership conflicts are returned explicitly without a misleadi
   assert.equal(conflict.ownershipConflict,"👍");assert.equal(conflict.blockedBy,"OWNERSHIP_CLASS_TAKEN");
   assert.equal(conflict.params,null);assert.equal(conflict.requiredMaxTotal,null);
 });
+
+
+test("CLI quoted immediate announcement survives a deterministic server-second boundary without a retry", async () => {
+  const issuer = actor(), treasury = actor(), who = nativePrincipal(issuer.key);
+  const clock = new ManualClock(1000000), e = new Engine(mainnetConfig(who, nativePrincipal(treasury.key)), clock);
+  const dir = mkdtempSync(join(tmpdir(), "poa-boundary-cli-")), key = join(dir, "fixture.pem");
+  writeFileSync(key, issuer.key.export({type:"pkcs8",format:"pem"}), {mode:0o600});
+  const packets:any[] = [];
+  const server = createServer(async (req,res) => {
+    const u = new URL(req.url!,"http://127.0.0.1"); let raw=""; for await (const chunk of req) raw += chunk;
+    if(req.method==="POST") {
+      const packet = JSON.parse(raw); packets.push(packet);
+      assert.equal(Number.isSafeInteger(packet.body.params.openAt ?? clock.now()), true);
+      assert.equal(Number.isSafeInteger(packet.body.deadline), true);
+      if(packets.length===1) clock.advance(1); // quote and submit straddle a second, no sleep or retry
+    }
+    const result = registryRoute(e,{method:req.method!,path:u.pathname,query:Object.fromEntries(u.searchParams),packet:raw});
+    res.writeHead(result.status,{"content-type":"application/json"});res.end(result.jsonText);
+  });
+  await new Promise<void>(resolve=>server.listen(0,"127.0.0.1",resolve));
+  try {
+    const port=(server.address() as {port:number}).port;
+    const {stdout}=await promisify(execFile)(process.execPath,["dist/src/reference-cli.js","act","--url",`http://127.0.0.1:${port}`,"--key-file",key,"--action","announceAuction+bid","--params",JSON.stringify({name:"boundary",maxBid:"1000"}),"--max-total","1000"],{timeout:15000});
+    const receipt=JSON.parse(stdout);assert.equal(receipt.status,"succeeded");assert.equal(packets.length,2,"one announcement and one bid, no retry");
+    assert.equal(packets[0].body.params.reserve,e.config.assets.POA!.standardReserve);
+    assert.equal(packets[1].body.params.amount,"1000");assert.equal(e.snapshot().auctions[receipt.auctionId]!.openAt,1000001);
+  } finally { await new Promise<void>(resolve=>{server.close(()=>resolve());server.closeAllConnections();});rmSync(dir,{recursive:true,force:true}); }
+});
