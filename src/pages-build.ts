@@ -13,7 +13,7 @@ import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { canonical, need, noSecrets } from "./core.js";
-import { NativeMonitor, nativeFailure, validateNetworkDocument } from "./native.js";
+import { nativeFailure, validateNetworkDocument } from "./native.js";
 import { Fault } from "./core.js";
 import { productionStatus } from "./production.js";
 
@@ -173,4 +173,4 @@ if (
   process.argv[1] &&
   fileURLToPath(import.meta.url) === resolve(process.argv[1])
 )
-  console.log(JSON.stringify(buildProductionBundle(undefined, await new NativeMonitor().observe().catch(nativeFailure)), null, 2));
+  console.log(JSON.stringify(buildProductionBundle(), null, 2));

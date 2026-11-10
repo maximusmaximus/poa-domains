@@ -1,0 +1,41 @@
+{
+  "all": true,
+  "src": [
+    "src",
+    "cloudflare",
+    "web",
+    "reference-web"
+  ],
+  "include": [
+    "src/**/*.ts",
+    "cloudflare/**/*.ts",
+    "web/**/*.js",
+    "web/**/*.mjs",
+    "reference-web/**/*.js",
+    "dist/**/*.js",
+    "dist/escrow-tests/*.mjs"
+  ],
+  "exclude": [
+    "**/*.d.ts",
+    "cloudflare/test/**",
+    "**/unicode-data.ts",
+    "**/emoji17-data.mjs"
+  ],
+  "exclude-after-remap": true,
+  "extension": [
+    ".ts",
+    ".js",
+    ".mjs"
+  ],
+  "reporter": [
+    "text",
+    "json",
+    "json-summary",
+    "lcov"
+  ],
+  "reports-dir": "coverage",
+  "temp-directory": ".coverage/merged",
+  "check-coverage": true,
+  "lines": 70,
+  "branches": 80
+}

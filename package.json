@@ -15,11 +15,11 @@
     "build": "npm run clean && tsc",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test dist/test/*.test.js test/ui-live-shaping.test.mjs test/ui-ownership.test.mjs && node --experimental-strip-types --test test/network-status-worker.test.mjs test/backup-codec.test.mjs",
-    "test:coverage": "npm run build && node --test --experimental-test-coverage dist/test/*.test.js",
+    "test:coverage": "npm run ci:build && node scripts/ci.mjs coverage-local",
     "smoke": "npm run build && node dist/test/smoke.js",
     "unicode:audit": "node scripts/unicode-audit.mjs",
     "security": "node scripts/security-scan.mjs && npm audit --audit-level=high",
-    "check": "npm run typecheck && npm test && npm run production:smoke && npm run smoke && npm run reference:pages:smoke && npm run pages:smoke && npm run unicode:audit && npm run security && npm run metadata:check && npm run test:live-network && npm run test:emoji-format && npm run test:emoji-format:browser",
+    "check": "npm run ci:build && node scripts/ci.mjs check",
     "pages:build": "npm run build && node dist/src/pages-build.js",
     "pages:smoke": "npm run pages:build && node dist/test/pages-smoke.js",
     "app": "npm run build && node dist/src/app.js",
@@ -46,19 +46,29 @@
     "backup:restore": "node --experimental-strip-types scripts/registry-restore.mjs",
     "escrow:ui": "npm run build && node cloudflare/test/escrow-ui.mjs",
     "escrow:test": "node scripts/test-escrow.mjs",
-    "escrow:test:unit": "node scripts/test-escrow.mjs --unit"
+    "escrow:test:unit": "node scripts/test-escrow.mjs --unit",
+    "ci:build": "npm run build && node dist/src/pages-build.js && npm run cf:typecheck && node scripts/ci-bundles.mjs",
+    "ci:coverage": "node scripts/ci-coverage.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
     "@types/node": "26.6.6",
+    "c8": "12.0.0",
     "esbuild": "0.28.2",
     "typescript": "7.0.2",
-    "wrangler": "4.158.0"
+    "wrangler": "4.158.0",
+    "yaml": "2.9.1"
   },
   "imports": {
     "#poa-unicode-data": {
       "types": "./src/unicode-data.ts",
       "default": "./dist/src/unicode-data.js"
+    }
+  },
+  "overrides": {
+    "test-exclude": {
+      "glob": "14.0.4",
+      "minimatch": "11.0.5"
     }
   }
 }
