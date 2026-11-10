@@ -1,9 +1,9 @@
-import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=2c61fff70fb8";
-import { ui } from "./ui-state.js?v=2c61fff70fb8";
-import { add, el } from "./ui-core.js?v=2c61fff70fb8";
-import { runSearch } from "./ui-search.js?v=2c61fff70fb8";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=2c61fff70fb8";
-import { updateTabDots } from "./ui-render.js?v=2c61fff70fb8";
+import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=94d33d638672";
+import { ui } from "./ui-state.js?v=94d33d638672";
+import { add, el } from "./ui-core.js?v=94d33d638672";
+import { runSearch } from "./ui-search.js?v=94d33d638672";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=94d33d638672";
+import { updateTabDots } from "./ui-render.js?v=94d33d638672";
 
 export function writeViewURL(path = location.pathname) {
     const next = viewPath(path, ui.lastSearch, ui.activeSectionTab);

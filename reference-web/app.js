@@ -1,17 +1,17 @@
-import { installHelp } from "./ui-help.js?v=2c61fff70fb8";
-import { wireManagement } from "./ui-manage.js?v=2c61fff70fb8";
-import { logSubmittedSearch } from "./ui-search-log.js?v=2c61fff70fb8";
-import { bindTabKeys } from "./ui-a11y.js?v=2c61fff70fb8";
-import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=2c61fff70fb8";
-import { ui } from "./ui-state.js?v=2c61fff70fb8";
-import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=2c61fff70fb8";
-import { navigateHome, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=2c61fff70fb8";
-import { el, endpointBase } from "./ui-core.js?v=2c61fff70fb8";
-import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=2c61fff70fb8";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=2c61fff70fb8";
-import { runSearch } from "./ui-search.js?v=2c61fff70fb8";
-import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=2c61fff70fb8";
-import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=2c61fff70fb8";
+import { installHelp } from "./ui-help.js?v=94d33d638672";
+import { wireManagement } from "./ui-manage.js?v=94d33d638672";
+import { logSubmittedSearch } from "./ui-search-log.js?v=94d33d638672";
+import { bindTabKeys } from "./ui-a11y.js?v=94d33d638672";
+import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=94d33d638672";
+import { ui } from "./ui-state.js?v=94d33d638672";
+import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=94d33d638672";
+import { navigateHome, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=94d33d638672";
+import { el, endpointBase } from "./ui-core.js?v=94d33d638672";
+import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=94d33d638672";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=94d33d638672";
+import { runSearch } from "./ui-search.js?v=94d33d638672";
+import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=94d33d638672";
+import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=94d33d638672";
 
 try {
     ui.statusPanelDismissed = false; // New page visits show status; closing lasts for this page only.

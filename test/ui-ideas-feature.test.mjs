@@ -27,7 +27,7 @@ test('v3 keeps headerless masonry, flat closable status and always-visible corne
  assert.equal((html.match(/id="networkStatusBar"/g)??[]).length,1);assert.match(help,/escrowAmount/);assert.match(help,/input.before\(wrap\)/);assert.match(help,/dismiss.after\(b\)/);assert.match(help,/module.append\(p\)/);assert.doesNotMatch(help,/fetch\(|request\(|sign\(/);
 });
 test('emoji actions retain exact accessible purpose and leave technical payment/signing controls alone',()=>{
- for(const [label,icon]of [['Check','🔍'],['Add to cart','🛒'],['Copy prompt','📋'],['Clear','🗑️'],['Close','❌']]){
+ for(const [label,icon]of [['Check','🔍'],['Add to cart','🛒'],['Copy prompt','📋'],['Clear','🗑️'],['Close','❌'],['History','📜'],['✅ Review changed item','🔎']]){
   assert.equal(buttonIcon(label),icon);const attrs=new Map(),classes=[];
   const b={textContent:label,closest:()=>false,hasAttribute:k=>attrs.has(k),setAttribute:(k,v)=>attrs.set(k,v),getAttribute:k=>attrs.get(k),classList:{add:c=>classes.push(c)}};
   decorateEmojiButton(b);assert.equal(b.textContent,icon);assert.equal(attrs.get('aria-label'),label);assert.equal(b.title,label);assert.ok(classes.includes('emoji-control'));

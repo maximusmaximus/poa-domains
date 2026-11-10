@@ -1,7 +1,7 @@
-import { ui } from "./ui-state.js?v=2c61fff70fb8";
-import { add, el, endpointBase } from "./ui-core.js?v=2c61fff70fb8";
-import { nameLink } from "./ui-router.js?v=2c61fff70fb8";
-import { actionLabel } from "./ui-copy.js?v=2c61fff70fb8";
+import { ui } from "./ui-state.js?v=94d33d638672";
+import { add, el, endpointBase } from "./ui-core.js?v=94d33d638672";
+import { nameLink } from "./ui-router.js?v=94d33d638672";
+import { actionLabel } from "./ui-copy.js?v=94d33d638672";
 export function managedNames(state,owner){return Object.values(state?.names??{}).map(n=>state.deeds?.[n.activeId]).filter(d=>d&&!d.retired&&d.owner===owner);}
 export function managementPlan(action,deed,state,owner,price="100",hours="168"){
  if(deed.owner!==owner||deed.retired)throw Error("This address is not the active registry holder.");

@@ -1175,9 +1175,15 @@ header { border:0; padding-bottom:0; }
  .cart-item { padding-right:6rem; }
 }
 
-.ticker-shell { position:relative; width:100vw; margin-left:calc(50% - 50vw); }
+.ticker-shell { position:relative; width:100vw; margin-inline:calc(50% - 50vw); }
 .ticker-shell > .live-ticker { width:100%; margin-inline:0; }
 .ticker-shell > .module-info { z-index:3; }
 
 /* Reset inherited small-button margins so corner info and close share one baseline. */
 button.box-close { margin:0; }
+
+@media(max-width:600px){
+ /* Full bleed belongs on the body-level box, not an overflowing child of the padded header. */
+ header { width:100vw; margin-inline:calc(50% - 50vw); }
+ header .site-title { width:100%; margin-inline:0; }
+}

@@ -10,7 +10,7 @@ const icons = new Map([
  ["Refresh","🔄"],["🔄 Refresh","🔄"],["Close","❌"],["✕","❌"],
  ["View names","🔍"],["Current","📍"],["Upcoming","⏳"],["Past","📜"],
  ["Copy listing prompt","📋🏷️"],["Copy change-price prompt","📋💰"],["Copy unlist prompt","📋🚫"],
- ["Review changed item","🔎"],
+ ["Review changed item","🔎"],["✅ Review changed item","🔎"],["History","📜"],["🟢 Start auction (add to cart)","🏁🛒"],
 ]);
 export function buttonIcon(label) { return icons.get(String(label).trim()) ?? null; }
 export function decorateEmojiButton(button) {
