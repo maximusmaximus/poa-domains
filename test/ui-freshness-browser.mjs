@@ -32,7 +32,7 @@ try {
   await p.locator('#tabEscrow').click(); await expect(p.locator('#registryError')).toBeVisible();
   await expect(p.locator('#escrowSection h2')).toHaveText('🪙 My POA');
   h.stateStatus=200; await p.locator('#registryRetry').click(); await ready(p);
-  await expect(p.locator('#registryError')).toBeHidden(); await expect(p.locator('#registryAge')).toHaveText('updated 0m ago');
+  await expect(p.locator('#registryError')).toBeHidden(); await expect(p.locator('#registryAge')).toContainText('Registry data updated 0m ago');
  },h=>h.stateStatus=500);
  await scenario('q/tab links, history, fresh search and age on every mobile tab',async(h,p)=>{
   await p.goto(h.url+'/?q=alpha&tab=market'); await ready(p);

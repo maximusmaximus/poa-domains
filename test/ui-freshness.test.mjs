@@ -42,13 +42,13 @@ test('owned roots, missing/changed offers and child generation changes require r
  s.names.alpha={activeId:'deed'}; assert.equal(cartReview(item,cap,s).canAcknowledge,false);
  assert.equal(cartReview({...root(),action:'unknown'},cap,state()).canAcknowledge,false); assert.equal(cartReview(root(),cap,null).canAcknowledge,false);
  const o=offerState(); item=recheckCartItem(purchase(),cap,o); assert.equal(item.needsReview,false);
- o.offers['b'.repeat(64)].version=2; item=recheckCartItem(item,cap,o); assert.equal(item.needsReview,true); item=acknowledgeCartItem(item,cap,o); assert.equal(item.params.expectedVersion,2);
+ o.offers['b'.repeat(64)].version=2; item=recheckCartItem(item,cap,o); assert.equal(item.needsReview,true); item=acknowledgeCartItem(item,cap,o); assert.equal(item.params.expectedVersion,2); assert.match(item.summary,/expectedVersion=2/);
  o.offers['b'.repeat(64)].price='2000'; assert.equal(cartReview(item,cap,o).canAcknowledge,false); assert.equal(item.amount,'1000');
  delete o.offers['b'.repeat(64)]; assert.equal(cartReview(item,cap,o).canAcknowledge,false);
  const c=offerState(), offer=c.offers['b'.repeat(64)]; offer.kind='child'; offer.labels=['shop'];
  const child={...purchase(),name:'shop.alpha',action:'fillChildOffer',params:{...purchase().params,label:'shop',expectedGeneration:1}};
  c.names['shop.alpha']={activeId:null,generation:1}; const review=cartReview(child,cap,c); assert.equal(review.params.expectedGeneration,2); assert.ok(review.issues.length);
- assert.equal(acknowledgeCartItem(child,cap,c).params.expectedGeneration,2); offer.labels=['other']; assert.equal(cartReview(child,cap,c).canAcknowledge,false);
+ assert.equal(acknowledgeCartItem(child,cap,c).params.expectedGeneration,2); assert.match(acknowledgeCartItem(child,cap,c).summary,/expectedGeneration=2/); offer.labels=['other']; assert.equal(cartReview(child,cap,c).canAcknowledge,false);
 });
 
 test('poll uses authoritative observed time for expiry without changing the hashed snapshot',()=>{

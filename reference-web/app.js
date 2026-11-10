@@ -44,7 +44,7 @@ import {
   cartSummary,
   editCartAmount,
   updatedAge, readViewQuery, viewPath, nameErrorReason, cartReview, recheckCartItem, acknowledgeCartItem, registryViewState,
-} from "./shared.js?v=feb6c0e6085d";
+} from "./shared.js?v=84823a5a7ad2";
 
 const el = (id) => document.getElementById(id);
 let cap,
@@ -83,7 +83,8 @@ function updateCartCopyState() {
 }
 function updateFreshness() {
   const text = updatedAge(lastLoadedAt);
-  for (const node of document.querySelectorAll(".tab-age, #registryAge")) node.textContent = text;
+  for (const node of document.querySelectorAll(".tab-age")) node.textContent = text;
+  el("registryAge").textContent = "Registry data " + text + " · My POA refreshes separately.";
 }
 function pageStatus(error = "", loading = false) {
   el("registryError").hidden = !error;
@@ -1737,8 +1738,9 @@ async function loadRegistry() {
   }
   for (const item of cart) {
     // Repair old saved carts affected by the amount/maxBid mismatch, without raising any cap.
-    if (item.action === "announceAuction+bid") item.params.maxBid = item.amount;
     try {
+      if (!item.params || typeof item.params !== "object") throw Error("⚠️ Remove this invalid saved item and check Find again.");
+      if (item.action === "announceAuction+bid") item.params.maxBid = item.amount;
       item.minimumAmount = cartMinimum(item, cap, null);
       if (item.action === "announceAuction+bid") item.params.reserve = item.minimumAmount;
       if (BigInt(item.amount) < BigInt(item.minimumAmount) ||

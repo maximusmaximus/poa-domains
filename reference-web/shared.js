@@ -247,6 +247,10 @@ export function cartSummary(item) {
     return `Request root auction announcement for "${item.name}" (reserve=${p.reserve} ${item.asset}) and place opening bid up to maxTotal=${item.amount} ${item.asset}.`;
   if (item.action === "bid")
     return `Place ascending bid of ${item.amount} ${item.asset} on live auction ${p.auctionId.slice(0, 16)}… (expectedVersion=${p.expectedVersion}, minValidBid=${item.minimumAmount ?? item.amount}).`;
+  if (item.action === "buyFixed")
+    return `Buy "${item.name}" for ${item.amount} ${item.asset} via offer ${p.offerId.slice(0, 16)}… (expectedVersion=${p.expectedVersion}).`;
+  if (item.action === "fillChildOffer")
+    return `Mint child domain ${item.name} via offer ${p.offerId.slice(0, 16)}… for ${item.amount} ${item.asset} (expectedVersion=${p.expectedVersion}, expectedGeneration=${p.expectedGeneration}).`;
   return item.summary;
 }
 export function editCartAmount(item, raw, cap, state) {
