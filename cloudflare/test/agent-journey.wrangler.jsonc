@@ -1,0 +1,37 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "poa-agent-journey-local-only",
+  "main": "agent-journey-worker.ts",
+  "compatibility_date": "2026-11-08",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "../../reference-web",
+    "binding": "ASSETS",
+    "run_worker_first": ["/healthz", "/v1/*", "/d/*", "/p/*", "/mcp"],
+  },
+  "alias": {
+    "#poa-unicode-data": "../unicode-data.ts",
+  },
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.txt"],
+      "fallthrough": true,
+    },
+  ],
+  "vars": {
+    "PUBLIC_EXPLORER_URL": "https://poadomains.grok.me",
+    "BACKEND_HOST": "poadomains-registry.maxinfeld-artshow.workers.dev",
+    "CONTRACT_CONFIG": "",
+  },
+  "ratelimits": [
+    {
+      "name": "MCP_RATE_LIMITER",
+      "namespace_id": "2026110914",
+      "simple": {
+        "limit": 60,
+        "period": 60,
+      },
+    },
+  ],
+}
