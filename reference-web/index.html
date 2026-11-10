@@ -5,24 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=fcd5a70e4d48" />
+    <link rel="stylesheet" href="/style.css?v=eead5361be50" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
     <header>
       <h1 id="siteTitle" class="site-title" aria-label="poadomains"><span class="title-fallback">poadomains</span></h1>
-      <p id="mode">⏳ Loading registry data…</p>
+      <button id="statusReopen" class="secondary small status-indicator" type="button" aria-controls="networkStatusBar" aria-expanded="true">⚪ Status</button>
     </header>
 
-    <div class="registry-read-status" role="region" aria-label="Registry updates">
-      <p id="registryLoading" role="status">⏳ Loading registry data… You can use the tabs and type a search now.</p>
-      <p id="registryAge" title="Registry data only. POA payments refresh separately.">Registry data not loaded yet · POA payments refresh separately.</p>
-      <div id="registryError" role="alert" hidden><span id="registryErrorText"></span> <button id="registryRetry" type="button" class="secondary small">🔄 Refresh</button></div>
-    </div>
-    <div id="networkStatusBar" class="network-status-bar" data-level="checking" role="status" aria-live="polite" hidden>
-      <span id="networkStatusIcon" class="network-status-icon" aria-hidden="true">⚪</span>
-      <span id="networkStatusText" class="network-status-text">Checking PoA network…</span>
-      <button type="button" id="networkStatusDismiss" class="network-status-dismiss" aria-label="Dismiss network status">✕</button>
+    <div id="networkStatusBar" class="network-status-bar combined-status" data-level="checking" role="region" aria-label="Network and site status">
+      <button type="button" id="networkStatusDismiss" class="network-status-dismiss" aria-label="Close network and site status">✕</button>
+      <div class="status-network"><span id="networkStatusIcon" class="network-status-icon" aria-hidden="true">⚪</span><span id="networkStatusText" class="network-status-text" role="status" aria-live="polite">Checking PoA network…</span></div>
+      <div class="registry-read-status">
+        <p id="mode">⏳ Loading registry data…</p>
+        <p id="registryLoading" role="status">⏳ Loading registry data… You can use the tabs and type a search now.</p>
+        <p id="registryAge" title="Registry data only. POA payments refresh separately.">Registry data not loaded yet · POA payments refresh separately.</p>
+        <div id="registryError" role="alert" hidden><span id="registryErrorText"></span> <button id="registryRetry" type="button" class="secondary small">🔄 Refresh</button></div>
+      </div>
     </div>
 
     <div id="liveTicker" class="live-ticker" role="region" aria-label="Recent registry actions" tabindex="0">
@@ -68,7 +68,7 @@
         <p class="howto">Type a name → Check → Add to cart or open its page.</p>
         <div class="ideas" aria-labelledby="ideasHeading">
           <div class="ideas-head">
-            <h3 id="ideasHeading">💡 Ideas</h3>
+            <div id="ideasHeading" role="group" aria-label="Name ideas"></div>
           </div>
           <p class="ideas-hint">Tap a name to check it and add it to your planning cart. No payment is sent.</p>
           <p id="ideasContext" class="muted">Ideas load after registry data.</p>
@@ -302,8 +302,8 @@
       <p id="floatingCartStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
 
-    <button id="floatingInfo" class="floating-info" type="button" popovertarget="infoHint" aria-controls="infoHint" aria-expanded="false" aria-label="How to use module information">ℹ️</button>
-    <div id="infoHint" class="info-popover info-hint" popover="auto" role="dialog" aria-labelledby="infoHintTitle"><h2 id="infoHintTitle">ℹ️ Need a hand?</h2><p>Tap the small ℹ️ on a module to learn what it does and what it does not do. You can also reach each one with Tab and open it with Enter. Tap outside or press Escape to close.</p><button type="button" popovertarget="infoHint" popovertargetaction="hide">Close</button></div>
-    <script type="module" src="/app.js?v=cd436ac0ca0a"></script>
+    <button id="floatingInfo" class="floating-info" type="button" aria-controls="infoHint" aria-expanded="false" aria-pressed="false" aria-label="Toggle feature information">ℹ️</button>
+    <div id="infoHint" class="info-popover info-hint" popover="auto" role="dialog" aria-labelledby="infoHintTitle"><h2 id="infoHintTitle">ℹ️ Need a hand?</h2><p>Info mode is on. Tap the small ℹ️ next to a feature to learn what it does and what it does not do. Tap the floating ℹ️ again to hide these buttons. You can also reach each one with Tab and open it with Enter. Tap outside or press Escape to close.</p><button type="button" popovertarget="infoHint" popovertargetaction="hide">Close</button></div>
+    <script type="module" src="/app.js?v=f94114d2def0"></script>
   </body>
 </html>

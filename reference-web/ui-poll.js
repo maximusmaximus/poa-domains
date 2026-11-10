@@ -1,15 +1,15 @@
-import { installHelp } from "./ui-help.js?v=cd436ac0ca0a";
-import { renderManagement } from "./ui-manage.js?v=cd436ac0ca0a";
-import { actionLabel } from "./ui-copy.js?v=cd436ac0ca0a";
-import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=cd436ac0ca0a";
-import { ui } from "./ui-state.js?v=cd436ac0ca0a";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=cd436ac0ca0a";
-import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=cd436ac0ca0a";
-import { render } from "./ui-render.js?v=cd436ac0ca0a";
-import { runSearch } from "./ui-search.js?v=cd436ac0ca0a";
-import { renderIdeas } from "./ui-ideas.js?v=cd436ac0ca0a";
-import { mountEscrow } from "./escrow.js?v=cd436ac0ca0a";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=cd436ac0ca0a";
+import { installHelp } from "./ui-help.js?v=f94114d2def0";
+import { renderManagement } from "./ui-manage.js?v=f94114d2def0";
+import { actionLabel } from "./ui-copy.js?v=f94114d2def0";
+import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=f94114d2def0";
+import { ui } from "./ui-state.js?v=f94114d2def0";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=f94114d2def0";
+import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=f94114d2def0";
+import { render } from "./ui-render.js?v=f94114d2def0";
+import { runSearch } from "./ui-search.js?v=f94114d2def0";
+import { renderIdeas } from "./ui-ideas.js?v=f94114d2def0";
+import { mountEscrow } from "./escrow.js?v=f94114d2def0";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=f94114d2def0";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -27,6 +27,7 @@ export function pageStatus(error = "", loading = false) {
     el("refresh").disabled = loading;
     el("registryRetry").disabled = loading;
     updateCartCopyState();
+    renderNetworkStatus();
 }
 
 // Capture immediately before synchronous redraw, so typing during the fetch is kept too.
@@ -133,8 +134,11 @@ export function renderNetworkStatus() {
         icon.textContent = "";
     if (label)
         label.textContent = text;
-    const dismissed = isNetworkBannerDismissed(globalThis.sessionStorage, level);
-    bar.hidden = !!dismissed;
+    let dismissed=!!ui.statusPanelDismissed;try{dismissed=globalThis.sessionStorage.getItem("poa-status-dismissed-v1")==="1";}catch{}
+    bar.hidden = dismissed;
+    const serviceError=document.body.dataset.registryStatus==="error",slow=level==="degraded"||document.body.dataset.registryStatus==="loading";
+    bar.dataset.color=serviceError?"red":slow?"yellow":bar.dataset.color;
+    const indicator=el("statusReopen");if(indicator){indicator.textContent=(serviceError||level==="down"?"🔴":slow?"🟡":level==="online"?"🟢":"⚪")+" Status";indicator.setAttribute("aria-expanded",String(!dismissed));indicator.setAttribute("aria-label",(dismissed?"Open":"Close")+" network and site status");}
 }
 
 export function applyNetworkHold() {
@@ -165,6 +169,8 @@ export function applyNetworkHold() {
     }
     // Re-run cart enablement when not held.
     updateCartCopyState();
+    // A down-state refresh clears the unsigned handoff. Rebuild it after recovery, not only on the next poll.
+    if(!hold&&ui.cart.length&&!ui.handoffData&&!ui.handoffPending&&!ui.refreshing&&!ui.registryReadFailed)void updatePromptText();
     let note = el("networkHoldNote");
     if (hold) {
         if (!note) {

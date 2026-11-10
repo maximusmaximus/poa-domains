@@ -1,9 +1,9 @@
-import { actionLabel } from "./ui-copy.js?v=cd436ac0ca0a";
-import { ui } from "./ui-state.js?v=cd436ac0ca0a";
-import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=cd436ac0ca0a";
-import { add, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=cd436ac0ca0a";
-import { nameLink, ownerLink } from "./ui-router.js?v=cd436ac0ca0a";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=cd436ac0ca0a";
+import { actionLabel } from "./ui-copy.js?v=f94114d2def0";
+import { ui } from "./ui-state.js?v=f94114d2def0";
+import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=f94114d2def0";
+import { add, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=f94114d2def0";
+import { nameLink, ownerLink } from "./ui-router.js?v=f94114d2def0";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=f94114d2def0";
 
 export function renderDomainPage(name) {
     if (!ui.latestState || !name)

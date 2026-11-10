@@ -1115,3 +1115,29 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .section-tab { flex:1 0 auto; flex-direction:column; min-width:7rem; padding:.4rem .65rem; }
 .section-tab > .tab-icon,.section-tab > .tab-label,.section-tab > .tab-age { flex-shrink:0; }
 @media(max-width:600px) { .section-tab { min-width:5.6rem; } }
+
+/* Max v2: unboxed recent actions, staggered masonry ideas and opt-in help. */
+.live-ticker { border:0; background:transparent; box-shadow:none; }
+.ideas-head { min-height:0; justify-content:flex-end; }
+.ideas-head h3 { display:none; }
+.ideas-masonry { height:226px; align-items:flex-start; padding:8px 20px!important; }
+.idea-column { display:flex; flex:0 0 auto; flex-direction:column; gap:10px; width:max-content; }
+.idea-column .idea { min-width:76px; max-width:190px; min-height:38px; white-space:nowrap; }
+.idea-offset-0 { padding-top:0; }
+.idea-offset-1 { padding-top:24px; }
+.idea-offset-2 { padding-top:9px; }
+.idea-offset-3 { padding-top:34px; }
+.idea-column:nth-child(3n) .idea:first-child { min-height:54px; font-size:1.15rem; }
+.idea-column:nth-child(3n + 1) .idea:nth-child(2) { min-height:46px; padding-top:.8rem; }
+.idea-column:nth-child(2n) .idea { min-width:108px; }
+.module-info { display:none; }
+.show-module-info .module-info { display:inline-flex; align-items:center; justify-content:center; }
+.amount-label > small { display:none; }
+.amount-unit { width:100%; min-width:0; box-sizing:border-box; }
+.combined-status { display:block; position:relative; padding:.65rem 3rem .65rem 1rem; }
+.combined-status .registry-read-status { padding:0; }
+.combined-status .registry-read-status p { margin:.4rem 0; }
+.combined-status .network-status-dismiss { position:absolute; top:.35rem; right:.4rem; }
+.combined-status[data-color="red"] { border-color:#e47777; background:#38232a; }
+.combined-status[data-color="yellow"] { border-color:#cba957; background:#332f21; }
+.status-indicator { margin-top:.4rem; }

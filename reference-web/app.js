@@ -1,17 +1,17 @@
-import { installHelp } from "./ui-help.js?v=cd436ac0ca0a";
-import { wireManagement } from "./ui-manage.js?v=cd436ac0ca0a";
-import { logSubmittedSearch } from "./ui-search-log.js?v=cd436ac0ca0a";
-import { bindTabKeys } from "./ui-a11y.js?v=cd436ac0ca0a";
-import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=cd436ac0ca0a";
-import { ui } from "./ui-state.js?v=cd436ac0ca0a";
-import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=cd436ac0ca0a";
-import { navigateHome, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=cd436ac0ca0a";
-import { el, endpointBase } from "./ui-core.js?v=cd436ac0ca0a";
-import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=cd436ac0ca0a";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=cd436ac0ca0a";
-import { runSearch } from "./ui-search.js?v=cd436ac0ca0a";
-import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=cd436ac0ca0a";
-import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=cd436ac0ca0a";
+import { installHelp } from "./ui-help.js?v=f94114d2def0";
+import { wireManagement } from "./ui-manage.js?v=f94114d2def0";
+import { logSubmittedSearch } from "./ui-search-log.js?v=f94114d2def0";
+import { bindTabKeys } from "./ui-a11y.js?v=f94114d2def0";
+import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=f94114d2def0";
+import { ui } from "./ui-state.js?v=f94114d2def0";
+import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=f94114d2def0";
+import { navigateHome, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=f94114d2def0";
+import { el, endpointBase } from "./ui-core.js?v=f94114d2def0";
+import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=f94114d2def0";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=f94114d2def0";
+import { runSearch } from "./ui-search.js?v=f94114d2def0";
+import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=f94114d2def0";
+import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=f94114d2def0";
 
 try {
     applySiteTitle();
@@ -125,10 +125,11 @@ try {
     if (dismissBtn) {
         dismissBtn.addEventListener("click", () => {
             const level = ui.networkStatus.level || "checking";
-            dismissNetworkBanner(globalThis.sessionStorage, level);
+            ui.statusPanelDismissed=true;try{globalThis.sessionStorage.setItem("poa-status-dismissed-v1","1");}catch{}
             renderNetworkStatus();
         });
     }
+    el("statusReopen")?.addEventListener("click",()=>{const hidden=el("networkStatusBar").hidden;ui.statusPanelDismissed=!hidden;try{if(hidden)globalThis.sessionStorage.removeItem("poa-status-dismissed-v1");else globalThis.sessionStorage.setItem("poa-status-dismissed-v1","1");}catch{}renderNetworkStatus();});
     el("example").addEventListener("click", () => {
         const x = ui.examples[el("action").value];
         if (!x)
