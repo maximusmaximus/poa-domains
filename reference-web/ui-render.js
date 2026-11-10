@@ -1,10 +1,10 @@
-import { returnFocus } from "./ui-a11y.js?v=5c150edb6e15";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=5c150edb6e15";
-import { ui } from "./ui-state.js?v=5c150edb6e15";
-import { add, el, person } from "./ui-core.js?v=5c150edb6e15";
-import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=5c150edb6e15";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=5c150edb6e15";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=5c150edb6e15";
+import { returnFocus } from "./ui-a11y.js?v=9f3d6420d4eb";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=9f3d6420d4eb";
+import { ui } from "./ui-state.js?v=9f3d6420d4eb";
+import { add, el, person } from "./ui-core.js?v=9f3d6420d4eb";
+import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=9f3d6420d4eb";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=9f3d6420d4eb";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=9f3d6420d4eb";
 
 export function updateTabDots(state) {
     const marks = tabWatermarks(state);
@@ -32,7 +32,6 @@ export function applySiteTitle() {
     title.glyphs.forEach((g, i) => {
         const span = document.createElement("span");
         span.className = g.kind === "tile" ? "title-glyph title-tile" : "title-glyph";
-        span.style.setProperty("--i", String(i));
         span.setAttribute("aria-hidden", "true");
         span.textContent = g.text;
         h1.append(span);
@@ -52,7 +51,13 @@ export function renderTicker(state) {
         const chip = document.createElement("button");
         chip.type = "button";
         chip.className = "ticker-chip";
-        chip.textContent = item.label;
+        const at = item.name ? item.label.indexOf(item.name) : -1;
+        if(at < 0) chip.textContent = item.label;
+        else {
+            chip.append(document.createTextNode(item.label.slice(0,at)));
+            add(chip,"span",item.name,"domain-name");
+            chip.append(document.createTextNode(item.label.slice(at+item.name.length)));
+        }
         chip.setAttribute("aria-label", `Open ${item.label}`);
         chip.addEventListener("click", () => {
             if (item.name)
@@ -81,6 +86,7 @@ export function openDetail(item) {
     const view = el("detailView");
     view.hidden = false;
     el("detailTitle").textContent = item.name || item.label || "Detail";
+    el("detailTitle").classList.toggle("domain-name", !!item.name);
     el("detailSummary").textContent = item.label || item.kind || "";
     const hist = el("detailHistory");
     hist.replaceChildren();

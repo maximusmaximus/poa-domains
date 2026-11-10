@@ -1,3 +1,4 @@
+import { UI_SECURITY, DOMAIN_FONT_FILE, IMMUTABLE_FONT_CACHE } from "../../dist/src/ui-policy.js";
 // End-to-end tests against real local workerd + SQLite, including a full CLI restart.
 // Private signing keys stay in this process's memory and are never written or logged.
 import assert from "node:assert/strict";
@@ -67,7 +68,11 @@ try {
   });
   const font = await fetch(base + "/XeroEmoji-COLRv1.woff2"), fontBytes = new Uint8Array(await font.arrayBuffer());
   check("font MIME and exact font bytes", () => { assert.equal(font.status, 200); assert.equal(font.headers.get("content-type"), "font/woff2"); assert.equal(createHash("sha256").update(fontBytes).digest("hex"), createHash("sha256").update(readFileSync(resolve(root,"reference-web/XeroEmoji-COLRv1.woff2"))).digest("hex")); });
+  const hashedFont = await fetch(base + "/" + DOMAIN_FONT_FILE);
+  check("content-hashed font is immutable with unchanged bytes", () => { assert.equal(hashedFont.status,200); assert.equal(hashedFont.headers.get("cache-control"),IMMUTABLE_FONT_CACHE); });
+  assert.equal(createHash("sha256").update(new Uint8Array(await hashedFont.arrayBuffer())).digest("hex"), createHash("sha256").update(fontBytes).digest("hex"));
   const home = await fetch(base + "/"), html = await home.text();
+  check("real asset-first HTML has strict browser headers and no wildcard CORS", () => { for(const [key,value] of Object.entries(UI_SECURITY)) assert.equal(home.headers.get(key),value,key); assert.equal(home.headers.get("access-control-allow-origin"),null); });
   check("home UI ids, ideas strip, footer links and reference disclosure", () => {
     assert.equal(home.status, 200);
     for (const id of ["searchInput","searchBtn","cartList","cartPrompt","copyCartPrompt","stats","names","auctions","offers","history","balances","handoff"]) assert.ok(html.includes(`id="${id}"`), id);

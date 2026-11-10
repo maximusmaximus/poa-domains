@@ -4,6 +4,10 @@ import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 const PINNED_BINARIES = new Map([
   [
+    "reference-web/domain-emoji.a5ec1ef950064a71.woff2",
+    "a5ec1ef950064a71a858b3844ed01e4b4fb6f4e0d286fbbc6dc39878d08d3b19",
+  ],
+  [
     "reference-web/XeroEmoji-COLRv1.woff2",
     "a5ec1ef950064a71a858b3844ed01e4b4fb6f4e0d286fbbc6dc39878d08d3b19",
   ],

@@ -1,3 +1,4 @@
+import { DOMAIN_FONT_FILE, IMMUTABLE_FONT_CACHE, UI_SECURITY } from "./ui-policy.js";
 import { discoveryDocument } from "./discovery.js";
 import { correlationId, errorReply } from './errors.js';
 import { createServer, Server } from "node:http";
@@ -14,6 +15,7 @@ const files: Record<string, [string, string]> = {
   "/shared.js": ["shared.js", "text/javascript; charset=utf-8"],
   "/config.json": ["config.json", "application/json; charset=utf-8"],
   "/style.css": ["style.css", "text/css; charset=utf-8"],
+  ["/" + DOMAIN_FONT_FILE]: [DOMAIN_FONT_FILE, "font/woff2"],
   "/XeroEmoji-COLRv1.woff2": ["XeroEmoji-COLRv1.woff2", "font/woff2"],
 };
 // Explicit module allowlist, never arbitrary filesystem paths.
@@ -52,12 +54,7 @@ export async function startReferenceServer(
       res.end(JSON.stringify(data));
     };
     res.setHeader("cache-control", "no-store");
-    res.setHeader("x-content-type-options", "nosniff");
-    res.setHeader("referrer-policy", "no-referrer");
-    res.setHeader(
-      "content-security-policy",
-      "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self' https: http://127.0.0.1:* http://localhost:*; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
-    );
+    for (const [name,value] of Object.entries(UI_SECURITY)) res.setHeader(name,value);
     try {
       need((req.url?.length ?? 0) <= 4096, "URL_SIZE");
       const rawHost = (req.headers.host ?? "").toLowerCase();
@@ -81,6 +78,8 @@ export async function startReferenceServer(
         if (files[assetPath]) {
           const [path, type] = files[assetPath]!;
           res.setHeader("content-type", type);
+          if (type.startsWith("text/html")) res.removeHeader("access-control-allow-origin");
+          if (path === DOMAIN_FONT_FILE) res.setHeader("cache-control", IMMUTABLE_FONT_CACHE);
           return void res.end(
             readFileSync(
               new URL("../../reference-web/" + path, import.meta.url),

@@ -1,3 +1,4 @@
+import { UI_SECURITY, secureUiResponse } from "../src/ui-policy.js";
 import { discoveryDocument } from "../src/discovery.js";
 import {mcpHttp} from "./mcp-http.js";
 import { correlationId, errorReply, envelopeResponse } from '../src/errors.js';
@@ -9,10 +10,7 @@ import { networkStatusMonitor } from "./network-status.js";
 import { BackupKind, RETENTION_DAYS, backupObjectKey, kindForCron } from "./backup-codec.js";
 export { PoaRegistry } from "./registry.js";
 
-const SECURITY: Record<string, string> = {
-  "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer",
-  "content-security-policy": "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self' https: http://127.0.0.1:* http://localhost:*; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
-};
+const SECURITY: Record<string, string> = { "cache-control": "no-store", ...UI_SECURITY };
 function json(status: number, body: unknown, read = false): Response {
   return Response.json(body, { status, headers: { ...SECURITY, ...(read ? { "access-control-allow-origin": "*" } : {}) } });
 }
@@ -115,7 +113,7 @@ async function admin(request: Request, env: Env, u: URL): Promise<Response> {
   }
   return json(404, { code: "NOT_FOUND" });
 }
-export default {
+const gateway = {
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(runBackup(env, kindForCron(controller.cron)).then(() => undefined, (error: unknown) => {
       const code = error instanceof Error && /^[A-Z0-9_]{1,64}$/.test(error.message) ? error.message : "BACKUP_FAILED";
@@ -199,5 +197,14 @@ export default {
       if (submitting) return fail(503, { code: "DURABILITY_UNKNOWN_RESTART_AND_QUERY", accepted: "unknown" });
       return fail(503, { code: "REGISTRY_UNAVAILABLE", accepted: false });
     }
+  },
+} satisfies ExportedHandler<Env>;
+
+// A header-only boundary covers generated API/MCP/escrow/error responses as well as
+// Worker-first deep links. Assets served before the Worker use matching _headers.
+export default {
+  scheduled: gateway.scheduled,
+  async fetch(request: Request, env: Env): Promise<Response> {
+    return secureUiResponse(await gateway.fetch(request,env), new URL(request.url));
   },
 } satisfies ExportedHandler<Env>;

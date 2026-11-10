@@ -339,3 +339,10 @@ This utility supports only canonical base32 CIDv1 raw sha2-256 metadata and its 
 ### Local Emoji Spelling Check
 
 The read-only web checker recognizes exact emoji-only Unicode 17 spellings and counts 1–32 whole emoji sequences. It runs locally with fixed options and does not transmit, persist, trim or normalize the entered spelling. Results describe format only, not name availability, ownership, pricing or registration. Native registry operations remain disabled. The bundle contains only the pinned public Unicode runtime, data, license and source provenance plus the checker module and external stylesheet; candidate equivalence data is not included.
+
+### Domain fonts and security
+
+Domain glyphs load on demand from a content-hashed, immutable font URL; ordinary
+controls use system fonts. The Worker and front-door proxy use same-origin CSP
+and hardened headers without changing escrow or MCP request shapes. See
+[font budgets, cache and header tests](docs/FONT-AND-HEADERS.md).
