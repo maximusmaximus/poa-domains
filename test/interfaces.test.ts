@@ -311,7 +311,7 @@ test("MCP stdio handshake and exact signed intent share HTTP receipt/idempotency
       rpc(11, "unknown/method"),
     ]);
     assert.equal(replies[0].result.protocolVersion, "2025-11-25");
-    assert.equal(replies[1].result.tools.length, 3);
+    assert.equal(replies[1].result.tools.length, 9);
     const a = JSON.parse(replies[3].result.content[0].text),
       b = JSON.parse(replies[4].result.content[0].text);
     assert.equal(a.status, "succeeded");
@@ -325,9 +325,9 @@ test("MCP stdio handshake and exact signed intent share HTTP receipt/idempotency
       ].owner,
       c.carol.id,
     );
-    assert.deepEqual(replies[7].result, { resources: [] });
-    assert.deepEqual(replies[8].result, { prompts: [] });
-    assert.equal(replies[9].result.isError, true);
+    assert.equal(replies[7].result.resources[0].uri, "poa://capabilities");
+    assert.deepEqual(replies[8].result.prompts.map((p:any)=>p.name), ["buy_a_domain","accept_cart_handoff"]);
+    assert.equal(replies[9].error.code, -32602);
     assert.equal(replies[10].error.message, "METHOD_NOT_FOUND");
   } finally {
     await s.close();

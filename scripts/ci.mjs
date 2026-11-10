@@ -9,7 +9,7 @@ export const suites = {
   unit: [
     ["node", "--test", ...readdirSync("dist/test").filter(n => n.endsWith(".test.js")).map(n => `dist/test/${n}`),
       "test/ui-live-shaping.test.mjs", "test/ui-ownership.test.mjs", "test/live-network.test.mjs",
-      "test/emoji-format-checker.test.mjs", "test/ci-contract.test.mjs", "test/worker-deploy.test.mjs", "test/ui-cart-correctness.test.mjs", "test/ui-freshness.test.mjs", "test/ui-modules.test.mjs", "test/network-schema.test.mjs", "test/errors.test.mjs"],
+      "test/emoji-format-checker.test.mjs", "test/ci-contract.test.mjs", "test/worker-deploy.test.mjs", "test/ui-cart-correctness.test.mjs", "test/ui-freshness.test.mjs", "test/ui-modules.test.mjs", "test/network-schema.test.mjs", "test/errors.test.mjs", "test/mcp-core.test.mjs", "test/mcp-deploy.test.mjs"],
     ["node", "--experimental-strip-types", "--test", "test/network-status-worker.test.mjs", "test/backup-codec.test.mjs"],
   ],
   "browser-smoke": [["node", "dist/test/production-smoke.js"], ["node", "dist/test/smoke.js"],
@@ -17,7 +17,7 @@ export const suites = {
     ["node", "node_modules/@playwright/test/cli.js", "test", "--config=test/playwright.emoji-format.config.mjs"]],
   "browser-e2e": [["node", "dist/test/ui-ux-e2e-smoke.js"], ["node", "test/ui-cart-browser.mjs"], ["node", "test/ui-freshness-browser.mjs"]],
   "browser-escrow": [["node", "cloudflare/test/escrow-ui.mjs"]],
-  "cloudflare-registry": [["node", "cloudflare/test/integration.mjs"], ["node", "cloudflare/test/routes-contract.mjs"], ["node", "cloudflare/test/error-contract.mjs"]],
+  "cloudflare-registry": [["node", "cloudflare/test/integration.mjs"], ["node", "cloudflare/test/routes-contract.mjs"], ["node", "cloudflare/test/error-contract.mjs"], ["node", "cloudflare/test/mcp-http.mjs"]],
   "cloudflare-recovery": [["node", "--experimental-strip-types", "cloudflare/test/backup-restore.mjs"]],
   "escrow-unit": [["node", "--test", "dist/escrow-tests/unit.mjs", "dist/escrow-tests/public.mjs"]],
   "escrow-local": [["node", "--test", "dist/escrow-tests/unit.mjs", "dist/escrow-tests/public.mjs"],

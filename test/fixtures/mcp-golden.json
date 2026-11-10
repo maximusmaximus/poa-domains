@@ -1,0 +1,9 @@
+{
+  "protocolVersion": "2025-11-25",
+  "tools": ["read_state", "read_capabilities", "resolve_domain", "build_metadata_witness", "quote_domain", "simulate_intent", "submit_intent", "get_receipt", "get_nonce"],
+  "actions": ["announceAuction", "bid", "finalize", "closeNoBid", "cancelAuction", "withdrawRefund", "createChildOffer", "fillChildOffer", "cancelOffer", "sellFixed", "buyFixed", "transfer", "setRecords", "setMetadata", "revokeChild"],
+  "resources": ["poa://capabilities"],
+  "templates": ["poa://names/{name}", "poa://receipts/{id}"],
+  "prompts": ["buy_a_domain", "accept_cart_handoff"],
+  "errors": {"parse": -32700, "method": -32601, "params": -32602}
+}

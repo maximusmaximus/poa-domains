@@ -1281,3 +1281,35 @@ HTTP 400; retryable: false. Params. Check the documented inputs and current stat
 ## KEYS
 
 HTTP 400; retryable: false. Keys. Check the documented inputs and current state.
+
+## MCP_PARSE_ERROR
+
+HTTP 400; retryable: false. Mcp parse error. Check the documented inputs and current state.
+
+## MCP_BAD_PARAMS
+
+HTTP 400; retryable: false. Mcp bad params. Check the documented inputs and current state.
+
+## MCP_RESOURCE
+
+HTTP 400; retryable: false. Mcp resource. Check the documented inputs and current state.
+
+## MCP_ORIGIN
+
+HTTP 403; retryable: false. Mcp origin. Check the documented inputs and current state.
+
+## MCP_PROTOCOL_VERSION
+
+HTTP 400; retryable: false. Mcp protocol version. Check the documented inputs and current state.
+
+## MCP_ACCEPT
+
+HTTP 406; retryable: false. Mcp accept. Check the documented inputs and current state.
+
+## MCP_RATE_UNAVAILABLE
+
+HTTP 503; retryable: false. Mcp rate unavailable. Check the documented inputs and current state.
+
+## MCP_RATE_LIMITED
+
+HTTP 429; retryable: false. Mcp rate limited. Check the documented inputs and current state.

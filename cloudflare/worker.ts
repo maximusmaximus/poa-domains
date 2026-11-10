@@ -1,3 +1,4 @@
+import {mcpHttp} from "./mcp-http.js";
 import { correlationId, errorReply, envelopeResponse } from '../src/errors.js';
 import { escrowHttp } from "./escrow-http.js";
 import { Fault, need, parseJSON } from "../src/core.js";
@@ -132,6 +133,8 @@ export default {
       const host = u.hostname.toLowerCase();
       need(host === "localhost" || host === "127.0.0.1" || host === env.BACKEND_HOST || host === "poadomains.grok.me" ||
         host === new URL(env.PUBLIC_EXPLORER_URL).hostname || host.endsWith(".grok.me"), "HOST");
+
+      if(u.pathname === "/mcp") return mcpHttp(request,env);
 
       // Same-origin network status: Worker probes minepoa.com; browser never needs a PoA key.
       if (u.pathname === "/v1/network-status") {

@@ -62,6 +62,9 @@
     // matching private key is held offline by the operator, never in R2 or the Worker.
     "BACKUP_PUBLIC_KEY_SPKI": "MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAwgwj/MAFkB8A3ycX5xB9VI77nuTmZUAIajhWKzTGaxyiAx5Az4fCjV9xY3S6D80Bn1SH6APIDhqmHdb9R5VMh34qTJHsfvf1G6Q9uRVOH3utXgsxUYOjM1SwuKPHJpaIPEdtxtFrK/9ooXExGtGQ/T2OCVohUEPTmBMYyJonjPdnWIounhNXWZqTCO9paij6hhS36PNuohf/+ln+n1w3GPWt+3UeQCI38omcLMgoXOpAMReBgQV2GIWqXJA73hELHMF4TsndXiT2C4H0KpbUC/oaeSfyquw1c241pSsxJ1HuU7ZPkJfe6ws2pgu/Yf+j1QxkMIh0+cGCSfSZXKMbVzINXEgC3yDBG9N2Zu4Qlqii9WlShLuLGTUFMTpq4EB8iY60g0bVFvLV+5h/RYzR+4nMyoKmAG0FGZZEVkk4yKWyq6wEA0Tp6K+IwFyJR43x6r7AIC8zDuLs1Uwwnps12k9NtyOnfHhtYsQelPynDB9JCxbqPnlkblryBseNbcTzKE1oGtwVFLxpCP7WufGIXwp0Tgp31RTYmmsXRnqQZ4vUTqUyYK4ZlyC56PSWb6deQdrAZ/4SJvptt8Op5mhAjnv2lrE8zyVlnvnrJ2J8YMsUM+KFKH8NYGLCUQuOdAgfDiW66jCD3WIgOYAqQUQmfA9XvwoN//iW/OOxrGagL9MCAwEAAQ=="
   },
+  "ratelimits": [
+    { "name": "MCP_RATE_LIMITER", "namespace_id": "2026110908", "simple": { "limit": 60, "period": 60 } }
+  ],
   "r2_buckets": [
     {
       "binding": "BACKUPS",

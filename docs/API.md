@@ -112,7 +112,7 @@ Business receipt: `intentId,requestId,signer,sequence,time,status,code,result`, 
 
 `node dist/src/reference-cli.js prepare --url ORIGIN --file PUBLIC_INPUT.json` requires all non-capability body fields explicitly; it fills only pinned capability identity and canonicalizes names. `handoff --file unsigned.json` returns inert instructions, body/digest and API/CLI/MCP material. `sign --file unsigned.json --key-file /private/runtime/signer.pem --out signed.json` is a local signer utility; repeat `--key-file` for co-signers. Output files are created exclusively, mode 0600. `submit --url ORIGIN --file signed.json` sends the exact packet; `receipt`, `nonce`, `state`, `export`, `resolve`, `capabilities` are read-only. No automatic retry or spend escalation.
 
-The isolated `reference-cli.js mcp --url ORIGIN` stdio MCP adapter implements the **2025-11-25** initialization handshake, `tools/list`, `read_state`, `read_capabilities` and `submit_intent`. Every implemented action uses the same packet under `submit_intent`. This is a bounded adapter, not a claim of full protocol-version compatibility. No HTTP MCP transport or signing service is exposed.
+The isolated `reference-cli.js mcp --url ORIGIN` stdio MCP adapter uses the shared **2025-11-25** core: nine typed registry tools, capability/name/receipt resources, and buy-domain/cart-handoff prompts. Enabled actions use one action-tagged packet schema under `simulate_intent` and `submit_intent`; disabled lease actions are not advertised. See [MCP](MCP.md) for discovery and the bounded JSON-only transport contract. The Worker source now also includes stateless Streamable HTTP `/mcp`, pending Max’s separate production-deploy approval; see [MCP](MCP.md). No signing service is exposed.
 
 The isolated reference UI lists all 17 reference actions and builds unsigned local test handoffs. It lives in `reference-web/`, not in the production Pages artifact. Its static fixture variant is exercised only in a temporary test directory. Production CLI/MCP/API do not consume these bodies, states, receipts or fixture capabilities.
 
@@ -231,4 +231,5 @@ their full in-process manifest. CLI `quote --name NAME --action ACTION` and
 preserves explicit spending choices and uses targeted offer reads for child
 metadata. The second half of `announceAuction+bid` is quoted again, including
 when another bid has advanced the auction beyond version 1. There is still no
-automatic retry, signing service or HTTP MCP endpoint.
+automatic retry or signing service. HTTP MCP is source-ready but requires a
+separately approved production deployment; see [MCP](MCP.md).

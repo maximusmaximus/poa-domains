@@ -102,3 +102,41 @@ unchanged, including runtime/admin/UI and escrow-local coverage.
 Sources:
 - https://developers.cloudflare.com/workers/wrangler/commands/workers/
 - https://developers.cloudflare.com/workers/configuration/routing/custom-domains/
+
+
+## First gated MCP deploy: non-secret expected policy
+
+MCP source was added without deployment. Max's separate approval is still
+required to make `/mcp` live. The repository `WORKER_DEPLOY_ENABLED` remains
+unset, and the workflow is unchanged. Before enabling it, provide the environment
+API-token secret separately (never paste its value into a PR or inbox), keep the
+Max-only production review gate, and use the latest green main SHA.
+
+Read-only reinspection on November 9, 2026 (PST) found the same active deployment
+`1528f497-589a-46f5-a61d-8db7a690bcf5` and version
+`46459dd0-989d-46dc-ad79-c8b24a867595`, source `wrangler`. Both version plaintext
+bindings and Worker settings match these **production-environment expected-policy
+variables** (these are not secrets or deployment overrides):
+
+| Variable | Expected value |
+| --- | --- |
+| `POA_ESCROW_ENABLED` | `true` |
+| `POA_ESCROW_NETWORK_WRITES` | `approved-v1` |
+| `POA_ESCROW_ADDRESS` | `poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf` |
+| `POA_ESCROW_PER_TX` | `250000.000000` |
+| `POA_ESCROW_DAILY` | `1000000.000000` |
+| `POA_ESCROW_ENGINE_SHA256` | `4e1f5c41dda9fda8939d92ffd6e9c2f05b66b4b8f1c5ff271960ea18b7bc6aa5` |
+| `POA_ESCROW_PARAMS_SHA256` | `82f994768b0bd7d430226147bfe90aad5aff1d4a50eae0400e8a950cb4416348` |
+
+Re-read live policy at approval time; do not replay this observation over a later
+operator change. The existing runner refuses missing/mismatched values, preserves
+all live `POA_ESCROW_*` bindings server-side and never sends committed false
+defaults. It does not alter the Durable Object's pause/state or escrow wallet.
+Only the existing secret binding **types** are checked; no secret value is read.
+
+The first MCP deploy also adds `MCP_RATE_LIMITER` (namespace `2026110908`,
+60 requests per minute per connecting IP). Keep the existing Grok Build front
+door (there is no grok.me zone/custom-domain binding here), confirm it passes
+POST/body/protocol/Accept headers and trusted client-IP behavior, and verify the
+remote handshake/security guards **after** the separately approved deployment.
+Merging this source does not configure the proxy, arm the switch or deploy it.
