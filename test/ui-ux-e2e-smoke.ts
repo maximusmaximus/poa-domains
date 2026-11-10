@@ -293,7 +293,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   assert.match(await searchDetails(page), /655-name/);
   assert.equal(await page.locator("#addToCartBtn").count(), 0);
 
-  // (c) Available single-emoji root via poa: prefix (100k POA minimum bid)
+  // (c) Available single-emoji root via poa: prefix (100k registry-unit minimum bid)
   await page.locator("#searchInput").fill("poa:🚀");
   await page.locator("#searchInput").press("Enter");
   assert.match(
@@ -306,14 +306,14 @@ async function runFullUiUxFlowsOnRegistryApp(
   );
   assert.match(
     await searchDetails(page),
-    /100k POA single-emoji minimum bid/,
+    /100k registry units single-emoji minimum bid/,
   );
   assert.match(
     await searchDetails(page),
-    /Opening auction reserve: 100000 POA/,
+    /Opening auction reserve: 100000 registry units/,
   );
 
-  // (c2) Available multi-emoji root (more than 1 emoji -> 1k POA minimum bid)
+  // (c2) Available multi-emoji root (more than 1 emoji -> 1k registry-unit minimum bid)
   await page.locator("#searchInput").fill("🔥🔥");
   await page.locator("#searchInput").press("Enter");
   assert.match(
@@ -326,11 +326,11 @@ async function runFullUiUxFlowsOnRegistryApp(
   );
   assert.match(
     await searchDetails(page),
-    /1k POA multi-emoji minimum bid/,
+    /1k registry units multi-emoji minimum bid/,
   );
   assert.match(
     await searchDetails(page),
-    /Opening auction reserve: 1000 POA/,
+    /Opening auction reserve: 1000 registry units/,
   );
 
   // (d) Available standard ASCII root -> add to cart from search result
@@ -356,7 +356,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   );
   assert.match(
     await searchDetails(page),
-    /Minimum next valid bid: 110001 POA/,
+    /Minimum next valid bid: 110001 registry units/,
   );
 
   // (f) Available child domain via standing parent offer
@@ -376,7 +376,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   );
   assert.match(
     await searchDetails(page),
-    /Active fixed-price resale listing: 2500 POA/,
+    /Active fixed-price resale listing: 2500 registry units/,
   );
 
   // 4. Add items to cart directly from #auctions and #offers cards
@@ -504,7 +504,7 @@ async function runAgentRoundtripVerification(
   );
   await page.locator("#addToCartBtn").click();
 
-  // Human also searches for live auction "🌐" and queues a 125000 POA bid
+  // Human also searches for live auction "🌐" and queues a 125000 registry units bid
   await page.locator("#searchInput").fill("🌐");
   await page.locator("#searchBtn").click();
   await page.locator("#searchResult input").fill("125000");
@@ -571,7 +571,7 @@ async function runAgentRoundtripVerification(
   const fillReceipt: any = await fillRes.json();
   assert.equal(fillReceipt.status, "succeeded");
 
-  // Agent Intent 2: bob places a 125000 POA bid on "🌐", displacing carol's 100000 bid
+  // Agent Intent 2: bob places a 125000 registry units bid on "🌐", displacing carol's 100000 bid
   const bidBody = prepare(
     {
       signer: app.principals.bob!,
@@ -625,7 +625,7 @@ async function runAgentRoundtripVerification(
   // Verify #auctions reflects bob's 125000 high bid and new 137501 minimum next bid
   const auctionsText = await page.locator("#auctions").innerText();
   assert.match(auctionsText, /High bid 125000 by/);
-  assert.match(auctionsText, /137501 POA/);
+  assert.match(auctionsText, /137501 registry units/);
 
   await page.locator("#tabExplore").click();
   // Verify #history shows the new child purchase and carol's displaced bid as OUTBID
@@ -634,10 +634,10 @@ async function runAgentRoundtripVerification(
   assert.match(historyText, /agent-e2e-fill-builder-nexus/);
   assert.match(historyText, /OUTBID/);
 
-  // Verify #balances now shows carol's 100000 POA withdrawable outbid escrow refund
+  // Verify #balances now shows carol's 100000 registry units withdrawable outbid escrow refund
   const balancesText = await page.locator("#balances").innerText();
-  assert.match(balancesText, /Refund: 100000 POA/);
-  const refund=page.locator("#balances .card").filter({has:page.getByRole("heading",{name:"Refund: 100000 POA",exact:true})});
+  assert.match(balancesText, /Refund: 100000 registry units/);
+  const refund=page.locator("#balances .card").filter({has:page.getByRole("heading",{name:"Refund: 100000 registry units",exact:true})});
   assert.equal(await refund.count(),1);
   assert.ok((await refund.innerText()).includes(app.principals.carol!.slice(0,18)),"refund belongs to displaced payer");
   assert.match(await refund.innerText(),/🌐 · v1/);
