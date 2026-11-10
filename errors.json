@@ -1908,6 +1908,54 @@
       "httpStatus": 400,
       "message": "Keys. Check the documented inputs and current state.",
       "retryable": false
+    },
+    {
+      "code": "MCP_PARSE_ERROR",
+      "httpStatus": 400,
+      "message": "Mcp parse error. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MCP_BAD_PARAMS",
+      "httpStatus": 400,
+      "message": "Mcp bad params. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MCP_RESOURCE",
+      "httpStatus": 400,
+      "message": "Mcp resource. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MCP_ORIGIN",
+      "httpStatus": 403,
+      "message": "Mcp origin. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MCP_PROTOCOL_VERSION",
+      "httpStatus": 400,
+      "message": "Mcp protocol version. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MCP_ACCEPT",
+      "httpStatus": 406,
+      "message": "Mcp accept. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MCP_RATE_UNAVAILABLE",
+      "httpStatus": 503,
+      "message": "Mcp rate unavailable. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MCP_RATE_LIMITED",
+      "httpStatus": 429,
+      "message": "Mcp rate limited. Check the documented inputs and current state.",
+      "retryable": false
     }
   ]
 }

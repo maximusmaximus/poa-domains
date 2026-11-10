@@ -190,6 +190,13 @@ All **17 state-mutating actions** in [`src/engine.ts`](src/engine.ts) execute at
 
 ---
 
+### MCP for hosted agents (prepared, not yet deployed)
+
+The shared MCP core now supports nine typed registry tools, resources and prompts
+over local stdio and stateless Streamable HTTP `/mcp`. **Production `/mcp` still
+needs Max’s separate gated-deploy approval; merging does not make it live.**
+See [MCP contracts and tests](docs/MCP.md) and the [non-secret first-deploy checklist](docs/worker-deploy.md#first-gated-mcp-deploy-non-secret-expected-policy).
+
 ### Read → quote → preview → submit
 
 The Worker and local registry share `GET /v1/quote?name=NAME&action=ACTION`,

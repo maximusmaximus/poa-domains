@@ -157,7 +157,7 @@ test("production CLI cannot read supplied files, sign, contact fixture endpoints
 
 test("production MCP advertises only status and public-node reads and refuses reference tools or supplied synthetic settlement", async () => {
   const messages = [
-    { id: 1, method: "initialize", params: {} },
+    { id: 1, method: "initialize", params: {protocolVersion:"2025-11-25",capabilities:{},clientInfo:{name:"native-guard-test",version:"1"}} },
     { method: "notifications/initialized" },
     { id: 2, method: "tools/list" },
     {
