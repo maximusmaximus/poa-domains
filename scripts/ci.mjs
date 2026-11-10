@@ -15,7 +15,7 @@ export const suites = {
   "browser-smoke": [["node", "dist/test/production-smoke.js"], ["node", "dist/test/smoke.js"],
     ["node", "dist/test/reference-pages-smoke.js"], ["node", "dist/test/pages-smoke.js"],
     ["node", "node_modules/@playwright/test/cli.js", "test", "--config=test/playwright.emoji-format.config.mjs"]],
-  "browser-e2e": [["node", "dist/test/ui-ux-e2e-smoke.js"], ["node", "test/ui-cart-browser.mjs"], ["node", "test/ui-freshness-browser.mjs"], ["node", "test/ui-agent-cart-browser.mjs"]],
+  "browser-e2e": [["node", "dist/test/ui-ux-e2e-smoke.js"], ["node", "test/ui-cart-browser.mjs"], ["node", "test/ui-freshness-browser.mjs"], ["node", "test/ui-agent-cart-browser.mjs"], ["node", "cloudflare/test/agent-journey.mjs"]],
   "browser-a11y": [["node", "test/ui-a11y-browser.mjs"], ["node", "test/ui-perf-browser.mjs"]],
   "browser-escrow": [["node", "cloudflare/test/escrow-ui.mjs"]],
   "cloudflare-registry": [["node", "cloudflare/test/integration.mjs"], ["node", "cloudflare/test/routes-contract.mjs"], ["node", "cloudflare/test/error-contract.mjs"], ["node", "cloudflare/test/mcp-http.mjs"], ["node", "cloudflare/test/discovery.mjs"], ["node", "cloudflare/test/ui-policy.mjs"]],
