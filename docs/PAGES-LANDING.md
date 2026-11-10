@@ -46,3 +46,10 @@ The archive uses `./`-prefixed member paths, as required by the Pages server
 validator (actions/deploy-pages#203). A regression checks the actual TAR paths,
 not just successful local extraction; unprefixed archives extract locally but
 are rejected during publication.
+
+The server also requires a supported archive, not merely extractable content.
+Use the official uploader's GNU directory archive structure, with only regular
+files/directories and minimum public read/traverse permissions. The helper first
+validates every file AND directory, rejects links, then archives that sealed root.
+The regression walks physical 512-byte headers, including metadata records that
+`tar --list` suppresses; POSIX PAX extension records are not emitted.
