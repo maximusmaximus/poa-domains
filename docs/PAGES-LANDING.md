@@ -41,3 +41,8 @@ with the standard pinned artifact uploader. The pinned Pages wrapper's generic
 dot-file exclusion is deliberately not used. Unknown files, symlinks and
 hardlinks fail closed; this does not enable arbitrary hidden files. Tests inspect
 the actual tar entries and bytes, not just the staging directory.
+
+The archive uses `./`-prefixed member paths, as required by the Pages server
+validator (actions/deploy-pages#203). A regression checks the actual TAR paths,
+not just successful local extraction; unprefixed archives extract locally but
+are rejected during publication.

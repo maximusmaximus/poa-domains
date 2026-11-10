@@ -97,8 +97,9 @@ test("Pages deployment archive retains exactly the tested public discovery files
     buildProductionBundle(dir);const archive=join(work,"artifact.tar");
     execFileSync(process.execPath,["scripts/pages-archive.mjs",dir,archive]);
     const entries=execFileSync("tar",["--list","--file",archive],{encoding:"utf8"}).trim().split("\n").sort();
-    assert.deepEqual(entries,[...PUBLIC_FILES].sort());
-    for(const file of [".well-known/agent.json",".nojekyll"])assert.equal(execFileSync("tar",["--extract","--to-stdout","--file",archive,"--",file],{encoding:"utf8"}),readFileSync(join(dir,file),"utf8"));
+    assert.ok(entries.every(file=>file.startsWith("./")&&!file.includes("..")),"PAGES_TAR_RELATIVE_PREFIX");
+    assert.deepEqual(entries,[...PUBLIC_FILES].map(file=>"./"+file).sort());
+    for(const file of [".well-known/agent.json",".nojekyll"])assert.equal(execFileSync("tar",["--extract","--to-stdout","--file",archive,"--","./"+file],{encoding:"utf8"}),readFileSync(join(dir,file),"utf8"));
     writeFileSync(join(dir,".private-note"),"not public");
     assert.throws(()=>execFileSync(process.execPath,["scripts/pages-archive.mjs",dir,join(work,"bad.tar")],{stdio:"pipe"}));
     assert.equal(existsSync(join(work,"bad.tar")),false);

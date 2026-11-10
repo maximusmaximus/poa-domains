@@ -13,6 +13,6 @@ const files=publicArtifactFiles(root);
 assert.deepEqual(files,[...PUBLIC_FILES].sort(),'UNEXPECTED_BUILD_ARTIFACT');
 for(const file of files) assert.equal(lstatSync(resolve(root,file)).nlink,1,'ARTIFACT_HARDLINK');
 const fd=openSync(resolve(archive),'wx',0o600);
-try { execFileSync('tar',['--format=posix','--directory',root,'--create','--file','-','--',...files],{stdio:['ignore',fd,'pipe']}); }
+try { execFileSync('tar',['--format=posix','--directory',root,'--create','--file','-','--',...files.map(file=>'./'+file)],{stdio:['ignore',fd,'pipe']}); }
 finally { closeSync(fd); }
 console.log('Archived exactly '+files.length+' tested public files, including .well-known/agent.json and .nojekyll');
