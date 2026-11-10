@@ -30,3 +30,7 @@ cloudflare/generated/
 cloudflare/test/evidence/
 .local-cf-state-*/
 cloudflare/test/evidence-v*/
+
+# CI coverage data (never publish raw execution data)
+coverage/
+.coverage/

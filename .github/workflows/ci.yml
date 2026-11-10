@@ -1,68 +1,254 @@
 name: native-and-reference-checks
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
-  check:
+  build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version: "24"
+          node-version: '22.15.0'
           cache: npm
       - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm ci --ignore-scripts
-      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npx playwright install --with-deps chromium
-      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm run check
-      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 GITHUB_TOKEN="$GITHUB_TOKEN" bash scripts/gitleaks.sh
-      - name: Retain emoji format CI failure diagnostics
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 WRANGLER_SEND_METRICS=false npm run ci:build
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: emoji-format-ci-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          name: compiled
+          retention-days: 1
+          if-no-files-found: error
+          path: |
+            dist/
+            _site/
+            cloudflare/generated/
+  unit:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.15.0', '24']
+        suite: ['unit']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm ci --ignore-scripts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: compiled
+      - name: Run covered suite without rebuilding
+        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 node scripts/ci.mjs ${{ matrix.suite }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: coverage-${{ matrix.suite }}-${{ matrix.node }}
+          retention-days: 1
+          include-hidden-files: true
+          if-no-files-found: error
+          path: .coverage/
+  browser:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.15.0', '24']
+        suite: ['browser-smoke', 'browser-e2e', 'browser-escrow']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm ci --ignore-scripts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: compiled
+      - uses: actions/cache@3edfce9056124e459a23f683a21433670d47daca
+        id: playwright
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-browser-${{ hashFiles('package-lock.json') }}
+      - name: Install browser system dependencies (also needed on cache hits)
+        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npx playwright install-deps chromium firefox webkit
+      - name: Install cached browser binaries
+        if: steps.playwright.outputs.cache-hit != 'true'
+        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npx playwright install chromium firefox webkit
+      - name: Run covered suite without rebuilding
+        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 node scripts/ci.mjs ${{ matrix.suite }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: coverage-${{ matrix.suite }}-${{ matrix.node }}
+          retention-days: 1
+          include-hidden-files: true
+          if-no-files-found: error
+          path: .coverage/
+      - name: Retain emoji format failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: browser-failure-${{ matrix.suite }}-${{ matrix.node }}
           retention-days: 3
-          if-no-files-found: warn
-          include-hidden-files: false
+          if-no-files-found: ignore
           path: |
             test-results/emoji-format-product-results.json
             test-results/emoji-format-product/*/error-context.md
             test-results/emoji-format-product/*/attachments/*.json
-
-  escrow-local:
+  cloudflare:
+    needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.15.0', '24']
+        suite: ['cloudflare-registry', 'cloudflare-recovery']
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: "24"
-          cache: npm
-      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm ci --ignore-scripts
-      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm run cf:typecheck
-      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm run escrow:test
-
-  local-recovery-and-ui:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version: "24"
+          node-version: ${{ matrix.node }}
           cache: npm
       - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm ci --ignore-scripts
-      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npx playwright install --with-deps chromium firefox webkit
-      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 WRANGLER_SEND_METRICS=false npm run cf:typecheck
-      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 WRANGLER_SEND_METRICS=false CF_EXPECT_FRESH=1 npm run cf:test
-      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 WRANGLER_SEND_METRICS=false npm run cf:test:backup
-      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm run ui:e2e
-      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 WRANGLER_SEND_METRICS=false npm run escrow:ui
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: compiled
+      - uses: actions/cache@3edfce9056124e459a23f683a21433670d47daca
+        id: playwright
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-cloudflare-${{ hashFiles('package-lock.json') }}
+      - name: Install browser system dependencies (also needed on cache hits)
+        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npx playwright install-deps chromium
+      - name: Install cached browser binaries
+        if: steps.playwright.outputs.cache-hit != 'true'
+        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npx playwright install chromium
+      - name: Run covered suite without rebuilding
+        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 node scripts/ci.mjs ${{ matrix.suite }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: coverage-${{ matrix.suite }}-${{ matrix.node }}
+          retention-days: 1
+          include-hidden-files: true
+          if-no-files-found: error
+          path: .coverage/
+  escrow-local:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.15.0', '24']
+        suite: ['escrow-local']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm ci --ignore-scripts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: compiled
+      - name: Run covered suite without rebuilding
+        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 node scripts/ci.mjs ${{ matrix.suite }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: coverage-${{ matrix.suite }}-${{ matrix.node }}
+          retention-days: 1
+          include-hidden-files: true
+          if-no-files-found: error
+          path: .coverage/
+  security:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.15.0', '24']
+        suite: ['security']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm ci --ignore-scripts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: compiled
+      - name: Run covered suite without rebuilding
+        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 node scripts/ci.mjs ${{ matrix.suite }}
+      - name: Redacted history and artifact scan
+        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 GITHUB_TOKEN="$GITHUB_TOKEN" bash scripts/gitleaks.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: coverage-${{ matrix.suite }}-${{ matrix.node }}
+          retention-days: 1
+          include-hidden-files: true
+          if-no-files-found: error
+          path: .coverage/
+  # Keep this exact required context: the main ruleset requires "check".
+  check:
+    if: always()
+    needs: [build, unit, browser, cloudflare, escrow-local, security]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: All prerequisite jobs must succeed (no skipped or cancelled lanes)
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: node -e 'const r=JSON.parse(process.env.RESULTS); if(r.length!==6 || r.some(s=>s!=="success")) process.exit(1)'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+          cache: npm
+      - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm ci --ignore-scripts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: compiled
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: coverage-*
+          path: .coverage
+          merge-multiple: true
+      - name: Enforce and summarize combined line and branch coverage
+        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" npm run ci:coverage
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: coverage-report
+          retention-days: 7
+          if-no-files-found: warn
+          path: coverage/

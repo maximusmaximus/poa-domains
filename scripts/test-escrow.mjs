@@ -1,14 +1,15 @@
 // All escrow signatures use deterministic public test seeds against a local mock, never mainnet.
 import { build } from "esbuild";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
-const root=resolve(import.meta.dirname,".."),work=mkdtempSync(join(tmpdir(),"poa-escrow-tests-"));
-for(const [source,file] of [["escrow.test.ts","unit.mjs"],["escrow-public.test.ts","public.mjs"],["escrow-runtime-fixture.ts","fixture.mjs"]]){
- await build({entryPoints:[join(root,"cloudflare/test",source)],bundle:true,platform:"node",format:"esm",alias:{"#poa-unicode-data":join(root,"cloudflare/unicode-data.ts")},outfile:join(work,file)});
+const root=resolve(import.meta.dirname,".."),work=join(root,"dist/escrow-tests");
+mkdirSync(work,{recursive:true});
+if(!process.argv.includes("--no-build"))for(const [source,file] of [["escrow.test.ts","unit.mjs"],["escrow-public.test.ts","public.mjs"],["escrow-runtime-fixture.ts","fixture.mjs"]]){
+ await build({entryPoints:[join(root,"cloudflare/test",source)],bundle:true,sourcemap:"inline",platform:"node",format:"esm",alias:{"#poa-unicode-data":join(root,"cloudflare/unicode-data.ts")},outfile:join(work,file)});
 }
+if(process.argv.includes("--prepare-only"))process.exit(0);
 const unit=spawnSync(process.execPath,["--test",join(work,"unit.mjs"),join(work,"public.mjs")],{cwd:root,stdio:"inherit"});
 if(unit.status!==0)process.exit(unit.status??1);
 if(!process.argv.includes("--unit")){
