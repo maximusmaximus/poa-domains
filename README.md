@@ -5,10 +5,11 @@
 - **Proof of Agent Mainnet**: https://minepoa.com · **Proof Floor**: https://poa.grok.me
 - **Xero Emoji COLRv1 Font**: https://github.com/maximusmaximus/xeroemoji
 
-> **Dual-Surface Architecture Notice:**
+> **Production hosting and local development:**
 >
-> - **Public GitHub Pages & Default Production Guard (`src/cli.ts`, `src/server.ts`, `src/mcp.ts`, `web/`)**: Strictly read-only status monitor and local Unicode 17 emoji spelling checker. **The upstream native naming registry is not yet enabled on the public chain; default production entry points never simulate ownership or accept writes.**
-> - **Full-Stack Persistent Registry Application (`src/app.ts`, `src/reference-server.ts`, `src/reference-cli.ts`, `src/reference-mcp.ts`, `reference-web/`)**: Complete, deterministic, single-writer PoA Domains registry engine (`poa-mainnet-v1` profile) with fsynced journal persistence, `poa1...` Base58 Ed25519 principals, all **5,216 official Unicode 17 emoji sequences** rendered with the bundled **Xero Emoji** OpenType COLRv1 web font (`XeroEmoji-COLRv1.woff2`), **655 reserved root domains**, **`100,000 POA` (`100k POA`) single-emoji / `1,000 POA` (`1k POA`) multi-emoji minimum bid policy**, human domain availability search, multi-domain **Agent Bid & Purchase Cart** with copy-paste agent prompts, purchase/bid/settlement history, standing child & fixed-price resale offers, and an interactive 17-action handoff explorer.
+> - **Public GitHub Pages & Default Native-Chain Read Guard (`src/cli.ts`, `src/server.ts`, `src/mcp.ts`, `web/`)**: Strictly read-only status monitor and local Unicode 17 emoji spelling checker. **The upstream native naming registry is not yet enabled on the public chain; these native-chain guard entry points never simulate ownership or accept writes.**
+> - **Production Worker**: `poadomains-registry` serves the explorer and Durable Object registry at https://poadomains.grok.me through the existing Grok Build proxy. Worker = production; Node/Docker = local development only. See [hosting](docs/cloudflare-hosting.md) and the [reviewed, escrow-preserving deployment gate](docs/worker-deploy.md). The registry retains `livePoA:false`; this is distinct from the separately enabled escrow service.
+> - **Local Full-Stack Persistent Registry Application (`src/app.ts`, `src/reference-server.ts`, `src/reference-cli.ts`, `src/reference-mcp.ts`, `reference-web/`)**: Complete, deterministic, single-writer PoA Domains registry engine (`poa-mainnet-v1` profile) with fsynced journal persistence, `poa1...` Base58 Ed25519 principals, all **5,216 official Unicode 17 emoji sequences** rendered with the bundled **Xero Emoji** OpenType COLRv1 web font (`XeroEmoji-COLRv1.woff2`), **655 reserved root domains**, **`100,000 POA` (`100k POA`) single-emoji / `1,000 POA` (`1k POA`) multi-emoji minimum bid policy**, human domain availability search, multi-domain **Agent Bid & Purchase Cart** with copy-paste agent prompts, purchase/bid/settlement history, standing child & fixed-price resale offers, and an interactive 17-action handoff explorer.
 
 ---
 
@@ -29,6 +30,8 @@
 ---
 
 ## 1. Quick Start — Launch the Full-Stack Registry Application
+
+The commands in this section run a **local development instance**, not the production Worker.
 
 **Requirements:** Node.js `22.15+` (tested with Node 24) and a standard `curl` executable.
 
@@ -68,13 +71,13 @@ npm run app:cli -- resolve --url http://127.0.0.1:8787 --name "🫪.👩‍🦰"
 npm run app:cli -- state --url http://127.0.0.1:8787
 ```
 
-### Production Container Deployment (`poadomains.grok.me`)
+### Local Development Container (not production)
 
 ```sh
 docker compose up -d --build
 ```
 
-The included [`Dockerfile`](Dockerfile) and [`docker-compose.yml`](docker-compose.yml) run `node dist/src/app.js` bound to port `8787` with `/data/registry` mounted on a persistent Docker volume, `POA_DOMAINS_PUBLIC_URL=https://poadomains.grok.me`, and a built-in `/healthz` container healthcheck.
+For local development only, the included [`Dockerfile`](Dockerfile) and [`docker-compose.yml`](docker-compose.yml) run `node dist/src/app.js` bound to port `8787` with `/data/registry` mounted on a persistent Docker volume, `POA_DOMAINS_PUBLIC_URL=https://poadomains.grok.me`, and a built-in `/healthz` container healthcheck. That legacy public-URL label does not bind the production domain: do not expose this container as `poadomains.grok.me`. Production uses the Worker and its existing Durable Object, not this filesystem journal.
 
 You can also launch an ephemeral in-memory demo instance with `npm run reference:demo` or run a custom persistent directory with `node dist/src/reference-cli.js serve --config PUBLIC_CONFIG.json --data /path/to/data --port 8787`.
 
@@ -199,7 +202,7 @@ Every signed intent binds `chainId`, `genesisHash`, `registryId`, `policyVersion
 
 ## 7. Production Read-Only Entry Points & Public Pages Bundle
 
-**The upstream native naming registry is unavailable on the public chain. Default production entry points (`src/cli.ts`, `src/server.ts`, `src/mcp.ts`) are strictly read-only guards.** The public site displays application availability and, when obtainable, an explicit current read-only observation of the official native node. It does not display simulated ownership, balances, auctions, records or transaction receipts, and has no signing or transaction handoff form.
+**The upstream native naming registry is unavailable on the public chain. Default native-chain read-guard entry points (`src/cli.ts`, `src/server.ts`, `src/mcp.ts`) are strictly read-only guards.** The public site displays application availability and, when obtainable, an explicit current read-only observation of the official native node. It does not display simulated ownership, balances, auctions, records or transaction receipts, and has no signing or transaction handoff form.
 
 The default CLI, API and MCP never initialize a reference ledger, read supplied key/configuration files, accept a caller-selected provider, or fall back to test data. Explicit native reads contact only the documented public node; they do not enable naming. There is no flag, credential, environment switch or endpoint override that enables registry operations on the read-only guard surface.
 
@@ -280,7 +283,7 @@ Unicode coverage and CID codec support are intentionally explicit. Ownership is 
 
 ### Publication and Security
 
-CI has contents-read permission. The main-only Pages workflow checks production guards and all reference tests in a sanitized environment, uploads only `_site/`, and grants Pages-write/OIDC-write only to the separate official deployment action. No workflow, production entry point or frontend uses repository secrets or treasury configuration. No real account, signer, funds, IPFS upload or protocol deployment is involved.
+CI has contents-read permission. The main-only Pages workflow checks production guards and all reference tests in a sanitized environment, uploads only `_site/`, and grants Pages-write/OIDC-write only to the separate official deployment action. Those read-only guard and Pages checks use no treasury configuration or signing credentials. The separate Worker deployment workflow is disarmed by default; it requires green main CI, Max’s production-environment review, a Cloudflare API token and exact public live-policy validation. Existing Cloudflare secret bindings are preserved, never downloaded. See [the deployment gate](docs/worker-deploy.md).
 
 [API boundaries](docs/API.md) · [Security](SECURITY.md) · [Unicode subset](docs/UNICODE.md)
 

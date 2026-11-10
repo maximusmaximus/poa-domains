@@ -1,0 +1,75 @@
+name: worker-gated-production
+
+on:
+  pull_request:
+  workflow_run:
+    workflows: [native-and-reference-checks]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worker-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  dry-run:
+    if: github.event_name == 'pull_request' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Offline Worker dry-run with server-side escrow binding preservation
+        run: npm run cf:dry-run
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+
+  deploy:
+    needs: dry-run
+    # Intentionally DISARMED until Max configures policy/token and explicitly enables it.
+    # The environment then requires Max's review on EVERY eligible main deployment.
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository && vars.WORKER_DEPLOY_ENABLED == 'true'
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    concurrency:
+      group: worker-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify Max gate, green current main and unchanged live escrow; dry-run then deploy
+        run: node scripts/worker-deploy.mjs --deploy
+        env:
+          WORKER_DEPLOY_ENABLED: ${{ vars.WORKER_DEPLOY_ENABLED }}
+          GITHUB_TOKEN: ${{ github.token }}
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+          CI_RUN_ID: ${{ github.event.workflow_run.id }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          POA_ESCROW_ENABLED: ${{ vars.POA_ESCROW_ENABLED }}
+          POA_ESCROW_NETWORK_WRITES: ${{ vars.POA_ESCROW_NETWORK_WRITES }}
+          POA_ESCROW_ADDRESS: ${{ vars.POA_ESCROW_ADDRESS }}
+          POA_ESCROW_PER_TX: ${{ vars.POA_ESCROW_PER_TX }}
+          POA_ESCROW_DAILY: ${{ vars.POA_ESCROW_DAILY }}
+          POA_ESCROW_ENGINE_SHA256: ${{ vars.POA_ESCROW_ENGINE_SHA256 }}
+          POA_ESCROW_PARAMS_SHA256: ${{ vars.POA_ESCROW_PARAMS_SHA256 }}

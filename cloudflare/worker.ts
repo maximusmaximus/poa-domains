@@ -127,7 +127,7 @@ export default {
       const u = new URL(request.url);
       need((u.pathname + u.search).length <= 4096, "URL_SIZE");
       const host = u.hostname.toLowerCase();
-      need(host === "localhost" || host === "127.0.0.1" || host === env.BACKEND_HOST ||
+      need(host === "localhost" || host === "127.0.0.1" || host === env.BACKEND_HOST || host === "poadomains.grok.me" ||
         host === new URL(env.PUBLIC_EXPLORER_URL).hostname || host.endsWith(".grok.me"), "HOST");
 
       // Same-origin network status: Worker probes minepoa.com; browser never needs a PoA key.

@@ -4,7 +4,8 @@
     "src",
     "cloudflare",
     "web",
-    "reference-web"
+    "reference-web",
+    "scripts"
   ],
   "include": [
     "src/**/*.ts",
@@ -13,7 +14,8 @@
     "web/**/*.mjs",
     "reference-web/**/*.js",
     "dist/**/*.js",
-    "dist/escrow-tests/*.mjs"
+    "dist/escrow-tests/*.mjs",
+    "scripts/worker-deploy.mjs"
   ],
   "exclude": [
     "**/*.d.ts",

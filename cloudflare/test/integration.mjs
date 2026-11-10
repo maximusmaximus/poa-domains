@@ -28,7 +28,7 @@ const post = packet => api("/v1/intents", { method: "POST", headers: { "content-
 async function start(label) {
   mkdirSync(resolve(root,persist), {recursive:true,mode:0o700}); chmodSync(resolve(root,persist),0o700);
   const log = openSync(resolve(ev, `${label}.log`), "w", 0o600);
-  server = spawn(process.execPath, ["node_modules/wrangler/bin/wrangler.js", "dev", "--local", "--ip", "127.0.0.1", "--port", String(port), "--persist-to", persist],
+  server = spawn(process.execPath, ["node_modules/wrangler/bin/wrangler.js", "dev", "--local", "--local-upstream", "poadomains.grok.me", "--ip", "127.0.0.1", "--port", String(port), "--persist-to", persist],
     { cwd: root, env: { ...process.env, WRANGLER_SEND_METRICS: "false" }, detached: true, stdio: ["ignore", log, log] });
   closeSync(log);
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -99,6 +99,22 @@ try {
   const domainPage = await fetch(base + "/d/nexus"); const domainHtml = await domainPage.text();
   check("SPA domain page serves HTML shell", () => { assert.equal(domainPage.status, 200); assert.ok(domainHtml.includes('id="domainMain"')); assert.ok(domainHtml.includes('id="siteTitle"')); });
     for (const asset of ["/app.js","/shared.js","/style.css","/config.json","/icon.svg"]) { const status=(await fetch(base+asset)).status; check(`asset ${asset}`,()=>assert.equal(status,200)); }
+  // --local-upstream makes request.url use the production Host inside LOCAL workerd.
+  // Merely sending a Host header is insufficient: the dev proxy rewrites it.
+  for (const path of ["/d/nexus", "/p/test-principal"]) {
+    const response = await fetch(base + path, { redirect: "manual" });
+    const shell = await response.text();
+    check(`production host deep link ${path}`, () => {
+      assert.equal(response.status, 200); assert.equal(response.headers.get("location"), null);
+      assert.ok(shell.includes('id="domainMain"')); assert.ok(shell.includes('id="siteTitle"'));
+      assert.match(response.headers.get("cache-control"), /no-store/);
+    });
+  }
+  const productionHost = await api("/v1/capabilities");
+  check("production host capabilities retain non-native registry disclosure", () => {
+    assert.equal(productionHost.status, 200); assert.equal(productionHost.body.livePoA, false);
+    assert.equal(productionHost.body.publicExplorerUrl, "https://poadomains.grok.me");
+  });
   const initial = (await api("/v1/state")).body; save("state-initial.json", initial);
   check("seeded showcase domains, auctions, standing child offer, resale and records", () => {
     const s = initial.state;
