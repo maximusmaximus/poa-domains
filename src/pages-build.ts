@@ -56,6 +56,8 @@ export const PUBLIC_FILES = [
   "PUBLIC-PROVENANCE.json",
   "style.css",
   "icon.svg",
+  "robots.txt",
+  "sitemap.xml",
   "config.json",
   "status.json",
   ...discoveryFiles,
@@ -93,7 +95,7 @@ export function buildProductionBundle(directory = resolve("_site"), _unusedObser
     rmSync(output, { recursive: true });
   }
   mkdirSync(output);
-  for (const file of ["index.html", "app.js", "live-network.js", "network-schema.js", "style.css", "icon.svg", ...Object.keys(unicodePublicPins)])
+  for (const file of ["index.html", "app.js", "live-network.js", "network-schema.js", "style.css", "icon.svg", "robots.txt", "sitemap.xml", ...Object.keys(unicodePublicPins)])
     copyFileSync(join("web", file), join(output, file));
   const config = JSON.parse(readFileSync("web/config.json", "utf8"));
   need(

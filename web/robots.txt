@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /poa-domains/
+Sitemap: https://maximusmaximus.github.io/poa-domains/sitemap.xml

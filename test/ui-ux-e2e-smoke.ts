@@ -772,9 +772,8 @@ async function runPublicProductionPagesMultiBrowserSmoke(prodUrl: string) {
       await page.goto(prodUrl);
       await page.waitForFunction(
         () =>
-          document
-            .getElementById("network-details")
-            ?.textContent?.includes("Reported checkpoint: 12345") &&
+          [...document.querySelectorAll("#network-details dt")].some(term =>
+            term.textContent === "Reported checkpoint" && term.nextElementSibling?.textContent === "12345") &&
           Boolean((window as any).__e2eShadowRoot) &&
           !(window as any).__e2eShadowRoot
             .querySelector("textarea")
@@ -786,7 +785,7 @@ async function runPublicProductionPagesMultiBrowserSmoke(prodUrl: string) {
           page,
           vp,
           [
-            "explorer-mirror-title",
+            "landing-title",
             "availability",
             "operations",
             "status",
@@ -800,13 +799,13 @@ async function runPublicProductionPagesMultiBrowserSmoke(prodUrl: string) {
       }
 
       // Ubuntu's system-ui resolves to wider metrics than this box's default.
-      // Reproduce the original 356px overflow from the unbreakable explorer URL.
+      // Reproduce long agent URLs and SHA digests with wider font metrics.
       await page.evaluate(()=>{document.documentElement.style.fontFamily='"DejaVu Sans", monospace';});
       await assertResponsiveGeometry(page,{name:"mobile-xs-wide-font",width:320,height:568},
-        ["explorer-mirror-title","availability","operations","status","emoji-format-checker","network-details"],
+        ["landing-title","live-tools","availability","operations","status","emoji-format-checker","network-details"],
         `${name}:public-pages-wide-font`);
-      assert.ok(await page.locator(".resource-panel").evaluate(el=>el.scrollWidth<=el.clientWidth+1),
-        `${name}: long explorer URLs stay within their panel, without clipping`);
+      assert.ok(await page.locator(".availability-table").evaluate(el=>el.scrollWidth<=el.clientWidth+1),
+        `${name}: long agent URLs stay within their table, without clipping`);
       await page.evaluate(()=>{document.documentElement.style.removeProperty("font-family");});
 
       // Test the Shadow-DOM Unicode 17 emoji format checker across Chromium, Firefox, and WebKit
@@ -842,6 +841,8 @@ async function runPublicProductionPagesMultiBrowserSmoke(prodUrl: string) {
           .count()) >= 1,
         `${name}: public GitHub Pages mirror links to poadomains.grok.me`,
       );
+      assert.equal((await page.locator("footer").innerText()).replace(/\s+/g," ").trim(),
+        "made with ❤️ in SF by Tesselate Army | maxi.grok.me", `${name}: current landing footer`);
       assert.deepEqual(errors, [], `${name}: public pages zero errors`);
     } finally {
       await browser.close();
@@ -872,7 +873,7 @@ const summary: {
   surfacesTested: [
     "full-stack-registry-app (poa-mainnet-v1, 5216 emoji17 sequences, 655 reserved roots)",
     "static-reference-snapshot (/poa-domains/ demo bundle)",
-    "public-production-pages (_site/ 15-file read-only guard + Shadow-DOM emoji checker)",
+    "public-production-pages (_site/ 22-file static landing + read-only guard + Shadow-DOM emoji checker)",
   ],
   browserResults: {},
   agentRoundtripVerified: false,

@@ -14,7 +14,7 @@ Production-only does not mean omitting test fixtures. All synthetic execution is
 - `npm run security`: tracked/unignored credential/material checks, LF/action-SHA checks, npm advisory audit. Values are never printed.
 - `bash scripts/gitleaks.sh`: official checksum-verified pinned scanner; default rules plus PoA bearer detection on working tree, complete Git history and the public bundle, always redacted. No snapshot-hash allowlist is needed for the production artifact.
 
-`npm run check` runs all of these except opt-in live smoke and the separate Gitleaks installer, which CI executes afterward. Builds clean stale compiled output first. CI uses Ubuntu 24.04, Node 24 and the dependency lockfile. Public dependencies and the browser must be installed before offline tests; Pages build attempts documented public reads but can publish an unavailable observation; npm advisory/scanner installation separately use public network services.
+`npm run check` runs all of these except opt-in live smoke and the separate Gitleaks installer, which CI executes afterward. Builds clean stale compiled output first. CI uses Ubuntu 24.04, Node 24 and the dependency lockfile. Public dependencies and the browser must be installed before offline tests; the Pages build is network-independent and the browser alone can make the existing two fixed read-only public-node checks; npm advisory/scanner installation separately use public network services.
 
 These checks verify implemented isolation and the reference state machine. They do not establish native protocol adoption, wallet compatibility, real settlement, consensus finality, production economics, security audit, scalability or pin persistence. Passing tests must not be reported as an operational native naming registry.
 

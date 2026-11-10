@@ -94,7 +94,7 @@ test("Pages has one coordinated refresh live region, a keyboard skip target, and
   assert.equal((html.match(/role="alert"/g) ?? []).length, 0);
   assert.match(html, /<a class="skip-link" href="#pagesMain">/);
   assert.match(html, /<main id="pagesMain" tabindex="-1">/);
-  for (const emoji of ["🌐", "⛏️", "📡", "📦", "💎", "📚"])
+  for (const emoji of ["🌐", "⛏️", "📡", "🔎", "✅", "🪙", "⛔", "🔤", "📚", "❤️"])
     assert.ok(html.includes(`<span aria-hidden="true">${emoji}</span>`));
   const css = readFileSync("reference-web/style.css", "utf8");
   assert.match(css, /\[hidden\]\s*\{\s*display:\s*none\s*!important/);

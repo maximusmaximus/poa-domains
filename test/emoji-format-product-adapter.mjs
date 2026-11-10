@@ -7,7 +7,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 export const PRODUCT_CSP="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https://minepoa.com/chain/poa-mainnet-1/api/status https://minepoa.com/chain/poa-mainnet-1/api/network-facts; img-src 'self'; base-uri 'none'; form-action 'none'";
 export const OFFICIAL_READ_URLS=Object.freeze(['https://minepoa.com/chain/poa-mainnet-1/api/status','https://minepoa.com/chain/poa-mainnet-1/api/network-facts']);
-export const BUILD_FILES=Object.freeze(['.nojekyll','LICENSE-UNICODE.txt','PUBLIC-PROVENANCE.json','app.js','config.json','emoji-format-checker.css','emoji-format-checker.mjs','emoji17-data.mjs','emoji17.mjs','icon.svg','index.html','live-network.js','network-schema.js','llms.txt','.well-known/agent.json','openapi.json','schemas/signed-packet.json','schemas/mcp-tools.json','status.json','style.css']);
+export const BUILD_FILES=Object.freeze(['.nojekyll','LICENSE-UNICODE.txt','PUBLIC-PROVENANCE.json','app.js','config.json','emoji-format-checker.css','emoji-format-checker.mjs','emoji17-data.mjs','emoji17.mjs','icon.svg','index.html','live-network.js','network-schema.js','llms.txt','.well-known/agent.json','openapi.json','schemas/signed-packet.json','schemas/mcp-tools.json','status.json','style.css','robots.txt','sitemap.xml']);
 export const PUBLIC_PINS=Object.freeze({
  'emoji-format-checker.mjs':'f7c6e412c63951c6a617ff79e59ddd7b36cceba2be39b57c882a131a4783869b',
  'emoji-format-checker.css':'32d2c62e558ee2997b0c37d7a42f104fd334240e16afb5b772868f88737bb120',
@@ -64,7 +64,7 @@ export async function installFetchMetadataProbe(page){
 export async function waitForIntegratedChecker(page){
  await page.waitForFunction(()=>{const root=window.__POA_FORMAT_REVIEW__?.root(),input=root?.querySelector('textarea'),status=root?.querySelector('[role="status"]')?.textContent;return !!input&&(!input.matches(':disabled')||/could not initialize/.test(status));},{},{timeout:8000});
  const ready=await page.evaluate(()=>!window.__POA_FORMAT_REVIEW__.root().querySelector('textarea').matches(':disabled'));
- await page.waitForFunction(()=>document.getElementById('status')?.textContent==='Verified application guard: native registry unavailable; all operations disabled.'&&document.getElementById('network-status')?.textContent.includes('(unverified)')&&document.getElementById('refresh')?.disabled===false,{},{timeout:8000});
+ await page.waitForFunction(()=>document.getElementById('status')?.textContent==='Verified application guard: this page is read-only. Native registry unavailable.'&&document.getElementById('network-status')?.textContent.includes('(unverified)')&&document.getElementById('refresh')?.disabled===false,{},{timeout:8000});
  return ready;
 }
 export async function readNativeGuard(page){return page.evaluate(()=>({availability:document.getElementById('availability').textContent,operations:document.getElementById('operations').textContent,status:document.getElementById('status').textContent,error:document.getElementById('error').textContent,refreshDisabled:document.getElementById('refresh').disabled,explanation:document.getElementById('explanation').textContent,source:document.getElementById('source').textContent}));}
