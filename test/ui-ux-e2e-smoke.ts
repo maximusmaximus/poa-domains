@@ -873,7 +873,7 @@ const summary: {
   surfacesTested: [
     "full-stack-registry-app (poa-mainnet-v1, 5216 emoji17 sequences, 655 reserved roots)",
     "static-reference-snapshot (/poa-domains/ demo bundle)",
-    "public-production-pages (_site/ 15-file read-only guard + Shadow-DOM emoji checker)",
+    "public-production-pages (_site/ 22-file static landing + read-only guard + Shadow-DOM emoji checker)",
   ],
   browserResults: {},
   agentRoundtripVerified: false,
