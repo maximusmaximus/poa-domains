@@ -27,7 +27,7 @@ Existing escrow source, tests, config, and `scripts/test-escrow.mjs` are unchang
 
 - `npm run check`: build once, then run the existing unit, smoke, browser,
   metadata, Unicode, and security checks without repeated TypeScript builds.
-- `npm run test:coverage`: build once, run all eight CI suites (including local
+- `npm run test:coverage`: build once, run all CI suites (including local
   workerd/recovery and the complete mock escrow/browser suites), combine coverage
   and enforce the same thresholds. Install all three Playwright engines first.
 - `node scripts/ci.mjs <suite>`: run a lane against an existing build, recording
@@ -75,3 +75,13 @@ Coverage manifests record the workspace root. Aggregation normalizes container
 `/__w/` prefixes to the report job's root, including source-map cache keys and
 URLs, without changing counters or source content. Relocation and matrix
 completeness are regression-tested. Missing suite/version data still fails shut.
+
+Container image pulls and setup start concurrently with compilation. Before
+downloading, a pinned official github-script step waits only for this run's
+nonexpired `compiled` artifact using read-only Actions metadata permission,
+with a bounded timeout and explicit build-failure check. The final `check`
+still requires the build and every test lane to succeed. No artifact from a
+previous run is accepted. Browser commands use the root-owned container HOME
+so Firefox can launch without adding privileges or dropping browser cases.
+Core and escrow unit tests on Node 22 are separate parallel jobs, avoiding
+serialization while retaining both coverage manifests.

@@ -24,8 +24,16 @@ test("only main pushes and PRs run CI; superseded runs cancel; exact required ch
     for (const step of job.steps.filter(s => s.uses?.startsWith("actions/checkout@")))
       assert.equal(step.with["persist-credentials"], false, name);
     if (!["build", "check"].includes(name)) {
-      assert.deepEqual(job.strategy.matrix.node, name === "unit" ? ["22.15.0", "24"] : ["24"]);
-      assert.equal(job.needs, "build");
+      assert.deepEqual(job.strategy.matrix.node, name === "unit" ? ["22.15.0", "24"] : name === "escrow-unit" ? ["22.15.0"] : ["24"]);
+      if (["browser", "cloudflare"].includes(name)) {
+        assert.equal(job.needs, undefined, "container pulls overlap compilation");
+        assert.equal(job.permissions.actions, "read");
+        const wait = job.steps.find(s => s.name === "Wait for this run's build artifact");
+        assert.match(wait.uses, /^actions\/github-script@[0-9a-f]{40}$/);
+        assert.match(wait.with.script, /run_id: context.runId/);
+        assert.match(wait.with.script, /Build failed; no test artifact/);
+        assert.match(wait.with.script, /Timed out waiting/);
+      } else assert.equal(job.needs, "build");
       assert.ok(job.steps.some(s => s.uses?.startsWith("actions/download-artifact@") && s.with.name === "compiled"));
       assert.ok(!job.steps.some(s => /npm run (build|check|pages:build|cf:test)/.test(s.run ?? "")), name);
       assert.ok(job.steps.some(s => s.with?.["include-hidden-files"] === true));
@@ -40,7 +48,7 @@ test("only main pushes and PRs run CI; superseded runs cancel; exact required ch
     assert.ok(jobs[name].container.image.startsWith(`mcr.microsoft.com/playwright:v${version}-noble@sha256:`));
     assert.match(jobs[name].container.image, /@sha256:[0-9a-f]{64}$/);
     assert.ok(steps.every(s => !s.run?.includes("playwright install") && !s.run?.includes("apt")));
-    assert.ok(steps.some(s => s.run?.includes("PLAYWRIGHT_BROWSERS_PATH=/ms-playwright")));
+    assert.ok(steps.some(s => s.run?.includes("PLAYWRIGHT_BROWSERS_PATH=/ms-playwright") && s.run.includes("HOME=/root")), "Firefox HOME must match the container user");
   }
 });
 
@@ -88,15 +96,15 @@ test("coverage matrix matches every configured suite/version; Node 22 includes e
     j.strategy.matrix.suite.flatMap(suite => j.strategy.matrix.node.map(node => [suite, node.split(".")[0]])));
   const key = x => x.join(":");
   assert.deepEqual(actual.map(key).sort(), coverageMatrix.map(key).sort());
-  assert.equal(actual.length, 9);
-  assert.deepEqual(commandsFor("unit", "22").at(-1), ["node", "--test", "dist/escrow-tests/unit.mjs", "dist/escrow-tests/public.mjs"]);
+  assert.equal(actual.length, 10);
+  assert.deepEqual(commandsFor("escrow-unit", "22").at(-1), ["node", "--test", "dist/escrow-tests/unit.mjs", "dist/escrow-tests/public.mjs"]);
 });
 
 test("container coverage relocation preserves counters, source contents, and root boundaries", () => {
   const old = "/__w/repo/repo", next = "/home/runner/work/repo/repo";
   const input = { result: [{ url: `file://${old}/dist/src/core.js`, functions: [{ ranges: [{ startOffset: 1, endOffset: 4, count: 3 }] }] },
     { url: `file://${old}-other/unrelated.js`, functions: [] }], "source-map-cache": {
-      [`file://${old}/dist/src/core.js`]: { url: `${old}/dist/src/core.js.map`, data: { sources: ["../../src/core.ts"], sourcesContent: ["export const value = 3;\n"] } }
+      [`file://${old}/dist/src/core.js`]: { url: `${old}/dist/src/core.js.map`, data: { sources: ["../../src/core.ts"], sourcesContent: ["export const value = 3;\n", `${old}/source text must not change`] } }
     } };
   const out = relocateCoverage(input, old, next);
   assert.equal(out.result[0].url, `file://${next}/dist/src/core.js`);

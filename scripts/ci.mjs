@@ -19,17 +19,15 @@ export const suites = {
   "browser-escrow": [["node", "cloudflare/test/escrow-ui.mjs"]],
   "cloudflare-registry": [["node", "cloudflare/test/integration.mjs"]],
   "cloudflare-recovery": [["node", "--experimental-strip-types", "cloudflare/test/backup-restore.mjs"]],
+  "escrow-unit": [["node", "--test", "dist/escrow-tests/unit.mjs", "dist/escrow-tests/public.mjs"]],
   "escrow-local": [["node", "--test", "dist/escrow-tests/unit.mjs", "dist/escrow-tests/public.mjs"],
     ["node", "cloudflare/test/escrow-runtime.mjs"], ["node", "cloudflare/test/escrow-admin-runtime.mjs"]],
   security: [["npm", "run", "unicode:audit"], ["npm", "run", "security"], ["npm", "run", "metadata:check"]],
 };
 
-export const coverageMatrix = Object.keys(suites).flatMap(suite => suite === "unit" ? [[suite, "22"], [suite, "24"]] : [[suite, "24"]]);
-export function commandsFor(suite, node) {
-  // Node 22 is the unit-only compatibility leg, including escrow unit/public tests.
-  return suite === "unit" && node === "22" ? [...suites.unit,
-    ["node", "--test", "dist/escrow-tests/unit.mjs", "dist/escrow-tests/public.mjs"]] : suites[suite];
-}
+export const coverageMatrix = Object.keys(suites).flatMap(suite => suite === "escrow-unit" ? [[suite, "22"]] :
+  suite === "unit" ? [[suite, "22"], [suite, "24"]] : [[suite, "24"]]);
+export function commandsFor(suite, node) { return suites[suite]; }
 function run(suite, coverage = true) {
   if (!suites[suite]) throw Error(`Unknown suite: ${suite}`);
   const dir = resolve(".coverage", `${suite}-${process.versions.node.split(".")[0]}`);

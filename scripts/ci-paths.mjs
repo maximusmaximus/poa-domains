@@ -9,7 +9,9 @@ export function relocateCoverage(value, from, to) {
     const pair = pairs.find(([prefix]) => text.startsWith(prefix));
     return pair ? pair[1] + text.slice(pair[0].length) : text;
   };
-  const walk = v => typeof v === "string" ? rename(v) : Array.isArray(v) ? v.map(walk) :
-    v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [rename(k), walk(x)])) : v;
+  const pathFields = new Set(["url", "file", "sourceRoot", "sources"]);
+  const walk = (v, field = "") => typeof v === "string" ? (pathFields.has(field) ? rename(v) : v) :
+    Array.isArray(v) ? v.map(x => walk(x, field)) : v && typeof v === "object" ?
+      Object.fromEntries(Object.entries(v).map(([k, x]) => [rename(k), walk(x, k)])) : v;
   return walk(value);
 }
