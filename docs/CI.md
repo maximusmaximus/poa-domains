@@ -8,11 +8,13 @@ or skipped dependencies before combining coverage.
 The build job compiles once on Node 22.15.0, emits source maps, builds the public
 Pages allowlist and prepares local Cloudflare test bundles. `dist/`, `_site/`
 and `cloudflare/generated/` travel together in the short-lived `compiled`
-artifact. Unit, browser, Cloudflare, escrow-local, and security lanes consume
+artifact (including the allowlisted `.nojekyll` file). Unit, browser, Cloudflare, escrow-local, and security lanes consume
 that artifact, each tested on Node 22.15.0 and Node 24. No lane recompiles it.
 Playwright binaries are cached by OS, job family and lockfile; system packages
 are installed even on cache hits. Every checkout disables persisted credentials.
 No CI job deploys a Worker or uses Cloudflare credentials.
+Existing escrow source, tests, config, and `scripts/test-escrow.mjs` are unchanged;
+`scripts/ci-bundles.mjs` only prepares source-mapped test bundles for CI.
 
 ## Local commands
 

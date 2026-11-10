@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { parse } from "yaml";
+import { suites } from "../scripts/ci.mjs";
 const workflow = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
 
 test("only main pushes and PRs run CI; superseded runs cancel; exact required check gates all lanes", () => {
@@ -30,6 +31,7 @@ test("only main pushes and PRs run CI; superseded runs cancel; exact required ch
     }
   }
   const artifact = jobs.build.steps.find(s => s.uses?.startsWith("actions/upload-artifact@"));
+  assert.equal(artifact.with["include-hidden-files"], true, "retain _site/.nojekyll");
   for (const dir of ["dist/", "_site/", "cloudflare/generated/"]) assert.ok(artifact.with.path.includes(dir));
   for (const name of ["browser", "cloudflare"]) {
     const steps = jobs[name].steps;
@@ -64,4 +66,15 @@ test("coverage gate actually rejects an uncovered branch and low line coverage",
     assert.ok(summary.lines.pct < 100); assert.ok(summary.branches.pct < 100);
     assert.match(result.stderr, /Coverage for lines/); assert.match(result.stderr, /Coverage for branches/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("CI escrow wiring retains the complete unchanged unit, public, runtime and admin suites", () => {
+  const old = readFileSync("scripts/test-escrow.mjs", "utf8"), bundles = readFileSync("scripts/ci-bundles.mjs", "utf8");
+  for (const source of ["escrow.test.ts", "escrow-public.test.ts", "escrow-runtime-fixture.ts"])
+    { assert.ok(old.includes(source)); assert.ok(bundles.includes(source)); }
+  assert.deepEqual(suites["escrow-local"], [
+    ["node", "--test", "dist/escrow-tests/unit.mjs", "dist/escrow-tests/public.mjs"],
+    ["node", "cloudflare/test/escrow-runtime.mjs"], ["node", "cloudflare/test/escrow-admin-runtime.mjs"],
+  ]);
+  assert.deepEqual(suites["browser-escrow"], [["node", "cloudflare/test/escrow-ui.mjs"]]);
 });

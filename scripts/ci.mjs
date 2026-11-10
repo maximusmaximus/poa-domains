@@ -3,6 +3,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 export const suites = {
   unit: [
@@ -18,7 +19,8 @@ export const suites = {
   "browser-escrow": [["node", "cloudflare/test/escrow-ui.mjs"]],
   "cloudflare-registry": [["node", "cloudflare/test/integration.mjs"]],
   "cloudflare-recovery": [["node", "--experimental-strip-types", "cloudflare/test/backup-restore.mjs"]],
-  "escrow-local": [["node", "scripts/test-escrow.mjs", "--no-build"]],
+  "escrow-local": [["node", "--test", "dist/escrow-tests/unit.mjs", "dist/escrow-tests/public.mjs"],
+    ["node", "cloudflare/test/escrow-runtime.mjs"], ["node", "cloudflare/test/escrow-admin-runtime.mjs"]],
   security: [["npm", "run", "unicode:audit"], ["npm", "run", "security"], ["npm", "run", "metadata:check"]],
 };
 
@@ -28,7 +30,7 @@ function run(suite, coverage = true) {
   if (coverage) { rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true }); }
   for (const [command, ...args] of suites[suite]) {
     const result = spawnSync(command, args, { stdio: "inherit", env: {
-      ...process.env, WRANGLER_SEND_METRICS: "false", CF_EXPECT_FRESH: "1",
+      ...process.env, ESCROW_FIXTURE_MODULE: pathToFileURL(resolve("dist/escrow-tests/fixture.mjs")).href, WRANGLER_SEND_METRICS: "false", CF_EXPECT_FRESH: "1",
       ...(coverage ? { NODE_V8_COVERAGE: resolve(dir, "raw"), NODE_OPTIONS: "--enable-source-maps" } : {}),
     }});
     if (result.error) throw result.error;

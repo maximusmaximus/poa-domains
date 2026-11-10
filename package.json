@@ -47,7 +47,7 @@
     "escrow:ui": "npm run build && node cloudflare/test/escrow-ui.mjs",
     "escrow:test": "node scripts/test-escrow.mjs",
     "escrow:test:unit": "node scripts/test-escrow.mjs --unit",
-    "ci:build": "npm run typecheck && npm run build && node dist/src/pages-build.js && npm run cf:typecheck && node scripts/test-escrow.mjs --prepare-only",
+    "ci:build": "npm run typecheck && npm run build && node dist/src/pages-build.js && npm run cf:typecheck && node scripts/ci-bundles.mjs",
     "ci:coverage": "node scripts/ci-coverage.mjs"
   },
   "devDependencies": {
