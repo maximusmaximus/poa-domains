@@ -1,8 +1,8 @@
-import { ui } from "./ui-state.js?v=9f3d6420d4eb";
-import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=9f3d6420d4eb";
-import { add, el, person, variantOwner } from "./ui-core.js?v=9f3d6420d4eb";
-import { compactAmount, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=9f3d6420d4eb";
-import { addToCart } from "./ui-cart.js?v=9f3d6420d4eb";
+import { ui } from "./ui-state.js?v=cd436ac0ca0a";
+import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=cd436ac0ca0a";
+import { add, el, person, variantOwner } from "./ui-core.js?v=cd436ac0ca0a";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=cd436ac0ca0a";
+import { addToCart } from "./ui-cart.js?v=cd436ac0ca0a";
 
 export function runSearch(rawQuery, remember = true) {
     if (remember) {
@@ -36,7 +36,7 @@ export function runSearch(rawQuery, remember = true) {
     const openPage = add(card, "button", "Open page", "secondary small");
     openPage.type = "button";
     openPage.addEventListener("click", () => navigateDomain(name));
-    add(card, "p", `${info.isRoot ? "Root" : "Child of " + info.parent} · ${info.tier.toUpperCase()}`);
+    const kind=add(card,"p",info.isRoot?"Root":"Child of ");if(!info.isRoot)nameLink(kind,info.parent);kind.append(" · "+info.tier.toUpperCase());
     if (info.isRoot && ui.reservedSet.has(name)) {
         add(card, "p", "🔒 Reserved — not for sale", "badge-warn");
         add(card, "p", `${ui.reservedSet.size}-name reservation catalog`);
@@ -65,8 +65,8 @@ export function runSearch(rawQuery, remember = true) {
         const bidInput = document.createElement("input");
         bidInput.value = minBid;
         bidInput.setAttribute("inputmode", "numeric");
-        bidInput.setAttribute("aria-label", "Bid amount for " + name);
-        controls.append(bidInput);
+        bidInput.setAttribute("aria-label", "Bid amount in POA for " + name);
+        const amountLabel=add(controls,"label","Bid amount (POA)","amount-label"),unitBox=add(amountLabel,"span","","amount-unit");unitBox.append(bidInput);add(unitBox,"span","POA","input-unit");bidInput.placeholder="Whole-number POA amount";add(amountLabel,"small","Your bid for this name, at least the current minimum. Nothing is paid here.","muted");
         const btn = add(controls, "button", "Add to cart", "small");
         btn.id = "addToCartBtn";
         btn.type = "button";
@@ -100,7 +100,7 @@ export function runSearch(rawQuery, remember = true) {
             o.uses < o.maxUses &&
             s.time < o.validUntil);
         if (resaleOffer) {
-            add(card, "p", `💰 For sale: ${resaleOffer.price} ${resaleOffer.asset} (until ${resaleOffer.validUntil}) — Active fixed-price resale listing: ${resaleOffer.price} ${resaleOffer.asset}`, "badge-ok");
+            add(card, "p", `💰 For sale: ${resaleOffer.price} ${resaleOffer.asset} (until ${formatClock(resaleOffer.validUntil)}) — Active fixed-price resale listing: ${resaleOffer.price} ${resaleOffer.asset}`, "badge-ok");
             const btn = add(card, "button", "Add to cart", "small");
             btn.id = "addToCartBtn";
             btn.type = "button";
@@ -158,14 +158,14 @@ export function runSearch(rawQuery, remember = true) {
     }
     const { reserve } = pricing;
     const tierNote = `${compactAmount(reserve)} POA ${info.isSingleEmoji ? "single-emoji" : info.isMultiEmoji ? "multi-emoji" : "root"} minimum bid`;
-    add(card, "p", "🟢 Available", "badge-ok");
+    add(card, "p", "🟢 Available in the registry snapshot", "badge-ok");
     add(card, "p", `Unclaimed ${info.tier} root domain (${tierNote}). Opening auction reserve: ${reserve} POA (${formatDuration(pricing.window)} minimum window + ${formatDuration(pricing.quiet)} quiet period).`);
     const controls = add(card, "div", "", "inline-controls");
     const maxBidInput = document.createElement("input");
     maxBidInput.value = reserve;
     maxBidInput.setAttribute("inputmode", "numeric");
-    maxBidInput.setAttribute("aria-label", "Max bid for " + name);
-    controls.append(maxBidInput);
+    maxBidInput.setAttribute("aria-label", "Maximum bid in POA for " + name);
+    const amountLabel=add(controls,"label","Maximum opening bid (POA)","amount-label"),unitBox=add(amountLabel,"span","","amount-unit");unitBox.append(maxBidInput);add(unitBox,"span","POA","input-unit");maxBidInput.placeholder="Whole-number POA amount";add(amountLabel,"small","Bid cap for this name. The capability reserve stays fixed. Adding to cart sends no POA.","muted");
     const btn = add(controls, "button", "Add to cart", "small");
     btn.id = "addToCartBtn";
     btn.type = "button";

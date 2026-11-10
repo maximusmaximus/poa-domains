@@ -1544,6 +1544,36 @@
       "retryable": true
     },
     {
+      "code": "SEARCH_LOG_DISABLED",
+      "httpStatus": 503,
+      "message": "Search saving is not configured. Name checks still work.",
+      "retryable": true
+    },
+    {
+      "code": "SEARCH_LOG_FAILED",
+      "httpStatus": 503,
+      "message": "Search could not be saved. Name checks still work.",
+      "retryable": true
+    },
+    {
+      "code": "SEARCH_LOG_RATE_LIMITED",
+      "httpStatus": 429,
+      "message": "Search saving is busy. Name checking still works.",
+      "retryable": true
+    },
+    {
+      "code": "SEARCH_LOG_LIMITER_UNAVAILABLE",
+      "httpStatus": 503,
+      "message": "Search saving is temporarily unavailable. Name checking still works.",
+      "retryable": true
+    },
+    {
+      "code": "SEARCH_QUERY_PRIVATE",
+      "httpStatus": 400,
+      "message": "Only name queries without contact, wallet or key-like text can be saved.",
+      "retryable": false
+    },
+    {
       "code": "RENEWAL_TERMS",
       "httpStatus": 400,
       "message": "Renewal terms. Check the documented inputs and current state.",

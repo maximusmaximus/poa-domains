@@ -1,10 +1,11 @@
+import { actionLabel } from "./ui-copy.js?v=cd436ac0ca0a";
 /** One unsigned Cart Handoff v2 object; text, clipboard and download derive from it. */
 import {
   canonical,
   safeObject,
   validPrincipal,
   cartParamsForSigner,
-} from "./shared.js?v=9f3d6420d4eb";
+} from "./shared.js?v=cd436ac0ca0a";
 export const CART_SCHEMA_VERSION = "poa-domains.agent-cart.v2";
 const HASH = { type: "string", pattern: "^[a-f0-9]{64}$" },
   UINT = { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER };
@@ -532,7 +533,7 @@ export function renderAgentCartHandoff(data) {
     "Unsigned plan, not spending approval. Quote → check versions → simulate → approved signed submit → poll receipt. No receipt means UNKNOWN; resend only identical signed bytes, never a new requestId or nonce.",
     ...data.items.map(
       (i) =>
-        `${i.index}. ${i.name}: ${i.action}, maxTotal=${i.maxTotal} ${i.asset}. ${i.summary}`,
+        `${i.index}. ${i.name}: ${actionLabel(i.action)}, maxTotal=${i.maxTotal} ${i.asset}. ${i.summary}`,
     ),
     "",
     "```json",

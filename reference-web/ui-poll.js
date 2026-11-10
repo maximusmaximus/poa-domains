@@ -1,19 +1,22 @@
-import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=9f3d6420d4eb";
-import { ui } from "./ui-state.js?v=9f3d6420d4eb";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=9f3d6420d4eb";
-import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=9f3d6420d4eb";
-import { render } from "./ui-render.js?v=9f3d6420d4eb";
-import { runSearch } from "./ui-search.js?v=9f3d6420d4eb";
-import { renderIdeas } from "./ui-ideas.js?v=9f3d6420d4eb";
-import { mountEscrow } from "./escrow.js?v=9f3d6420d4eb";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=9f3d6420d4eb";
+import { installHelp } from "./ui-help.js?v=cd436ac0ca0a";
+import { renderManagement } from "./ui-manage.js?v=cd436ac0ca0a";
+import { actionLabel } from "./ui-copy.js?v=cd436ac0ca0a";
+import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=cd436ac0ca0a";
+import { ui } from "./ui-state.js?v=cd436ac0ca0a";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=cd436ac0ca0a";
+import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=cd436ac0ca0a";
+import { render } from "./ui-render.js?v=cd436ac0ca0a";
+import { runSearch } from "./ui-search.js?v=cd436ac0ca0a";
+import { renderIdeas } from "./ui-ideas.js?v=cd436ac0ca0a";
+import { mountEscrow } from "./escrow.js?v=cd436ac0ca0a";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=cd436ac0ca0a";
 
 export function updateFreshness() {
     updateHandoffAge();
     const text = updatedAge(ui.lastLoadedAt);
     for (const node of document.querySelectorAll(".tab-age"))
         node.textContent = text;
-    el("registryAge").textContent = "Registry data " + text + " · My POA refreshes separately.";
+    el("registryAge").textContent = "Registry data " + text + " · POA payments refresh separately.";
 }
 
 export function pageStatus(error = "", loading = false) {
@@ -66,6 +69,8 @@ export async function refreshRegistry() {
             render(payload);
             renderCart();
             runSearch(ui.lastSearch, false);
+            renderManagement();
+            installHelp();
             if (!el("ideasStrip").children.length)
                 renderIdeas();
         });
@@ -268,13 +273,14 @@ export async function loadRegistry() {
         for (const action of Object.keys(ui.cap.actions)) {
             const option = document.createElement("option");
             option.value = action;
-            option.textContent = action;
+            option.textContent = actionLabel(action);
+            option.disabled = ui.configMode === "live-registry" && (ui.cap.ownership?.disabledActions?.includes(action) ?? false);
             el("action").append(option);
         }
         el("keys").textContent = JSON.stringify(ui.cap.actions[el("action").value]);
         if (!ui.escrowUI)
             ui.escrowUI = mountEscrow({ base: ui.base, capability: ui.cap.escrow, registryId: ui.cap.registryId,
-                section: el("escrowSection"), domain: el("escrowDomain"), selectTab: () => { navigateHome(); setSectionTab("escrow"); } });
+                section: el("escrowPayments"), domain: el("escrowDomain"), selectTab: () => { navigateHome(); setSectionTab("escrow"); } });
         applyRoute();
         renderCart();
         if (!ui.demo && !ui.tickerTimer) {

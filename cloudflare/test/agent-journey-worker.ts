@@ -14,6 +14,8 @@ export default {
   engine??=new Engine(JSON.parse(env.CONTRACT_CONFIG),clock);
   const path=new URL(request.url).pathname;
   if(path.startsWith("/v1/escrow/"))throw Error("TEST_ESCROW_FORBIDDEN");
+  // Keep the original GET-only human journey guard; telemetry has its own isolated R2/browser suites.
+  if(path==="/config.json")return Response.json({mode:"local-reference-only",publicApiBase:""});
   if(path==="/v1/network-status")return Response.json({level:"online",hold:false,message:"🟢 Local test network",livePoA:false});
   const input=request.method==="POST"?await request.clone().json() as any:null;
   // Advance dependency-injected fixture time, never the production clock or an admin endpoint.

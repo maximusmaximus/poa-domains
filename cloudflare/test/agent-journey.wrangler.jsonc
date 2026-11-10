@@ -7,7 +7,7 @@
   "assets": {
     "directory": "../../reference-web",
     "binding": "ASSETS",
-    "run_worker_first": ["/healthz", "/v1/*", "/d/*", "/p/*", "/mcp"],
+    "run_worker_first": ["/config.json", "/healthz", "/v1/*", "/d/*", "/p/*", "/mcp"],
   },
   "alias": {
     "#poa-unicode-data": "../unicode-data.ts",

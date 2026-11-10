@@ -1,17 +1,23 @@
-import { bindTabKeys } from "./ui-a11y.js?v=9f3d6420d4eb";
-import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=9f3d6420d4eb";
-import { ui } from "./ui-state.js?v=9f3d6420d4eb";
-import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=9f3d6420d4eb";
-import { navigateHome, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=9f3d6420d4eb";
-import { el, endpointBase } from "./ui-core.js?v=9f3d6420d4eb";
-import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=9f3d6420d4eb";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=9f3d6420d4eb";
-import { runSearch } from "./ui-search.js?v=9f3d6420d4eb";
-import { renderIdeas, toggleIdeasMotion } from "./ui-ideas.js?v=9f3d6420d4eb";
-import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=9f3d6420d4eb";
+import { installHelp } from "./ui-help.js?v=cd436ac0ca0a";
+import { wireManagement } from "./ui-manage.js?v=cd436ac0ca0a";
+import { logSubmittedSearch } from "./ui-search-log.js?v=cd436ac0ca0a";
+import { bindTabKeys } from "./ui-a11y.js?v=cd436ac0ca0a";
+import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=cd436ac0ca0a";
+import { ui } from "./ui-state.js?v=cd436ac0ca0a";
+import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=cd436ac0ca0a";
+import { navigateHome, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=cd436ac0ca0a";
+import { el, endpointBase } from "./ui-core.js?v=cd436ac0ca0a";
+import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=cd436ac0ca0a";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=cd436ac0ca0a";
+import { runSearch } from "./ui-search.js?v=cd436ac0ca0a";
+import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=cd436ac0ca0a";
+import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=cd436ac0ca0a";
 
 try {
     applySiteTitle();
+    installHelp();
+    wireManagement();
+    el("searchInput").addEventListener("input", updateIdeaContext);
     ui.cart = loadCart(globalThis.localStorage);
     ui.tabSeen = loadTabSeen(globalThis.localStorage);
     restoreViewFromURL();
@@ -26,7 +32,6 @@ try {
         el(id).addEventListener("click", () => ui.readState ? refreshRegistry() : loadRegistry());
     bindTabKeys(el("sectionTabs"), tab => tab.click());
     bindTabKeys(document.querySelector(".auction-tabs"), tab => tab.click());
-    el("ideasPause")?.addEventListener("click", toggleIdeasMotion);
     for (const btn of document.querySelectorAll(".section-tab")) {
         btn.addEventListener("click", () => {
             const id = btn.getAttribute("data-tab") || "find";
@@ -47,18 +52,13 @@ try {
     el("copyChangePromptBtn")?.addEventListener("click", () => copyDomainListingPrompt("change"));
     el("copyUnlistPromptBtn")?.addEventListener("click", () => copyDomainListingPrompt("unlist"));
     window.addEventListener("popstate", restoreViewFromURL);
-    el("searchBtn").addEventListener("click", () => runSearch(el("searchInput").value));
+    el("searchBtn").addEventListener("click", () => { runSearch(el("searchInput").value); logSubmittedSearch(el("searchInput").value); });
     el("searchInput").addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
             event.preventDefault();
             runSearch(el("searchInput").value);
+            logSubmittedSearch(el("searchInput").value);
         }
-    });
-    el("ideasShuffle")?.addEventListener("click", () => {
-        renderIdeas();
-        el("ideasStatus").textContent = "🔀 Fresh ideas";
-        el("ideasStatus").dataset.tone = "";
-        el("ideasStrip").scrollLeft = 0;
     });
     el("clearCart").addEventListener("click", clearAllCart);
     el("downloadCartJSON").addEventListener("click", downloadCartJSON);
@@ -107,7 +107,7 @@ try {
         const text = renderAgentCartHandoff(ui.handoffData);
         try {
             await navigator.clipboard.writeText(text);
-            el("floatingCartStatus").textContent = "Checkout copied";
+            el("floatingCartStatus").textContent = "Request copied — nothing sent";
         }
         catch {
             el("floatingCartStatus").textContent = "Clipboard unavailable";

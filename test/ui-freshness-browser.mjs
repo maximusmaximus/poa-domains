@@ -49,7 +49,7 @@ try {
  });
  await scenario('outbid review persists across reload, caps never auto-rise and copies stay blocked until acknowledgement',async(h,p)=>{
   await p.goto(h.url+'/?q=alpha'); await ready(p); await p.locator('#addToCartBtn').click();
-  const amount=p.getByLabel('Amount or max bid for alpha',{exact:true}); await amount.fill('2000');
+  const amount=p.getByLabel('Bid or price amount in POA for alpha',{exact:true}); await amount.fill('2000');
   const a=h.payload.state.auctions['a'.repeat(64)]; a.version=2; a.high.amount='1500'; h.payload.state.sequence++;
   await poll(h,p); await expect(p.locator('#searchResult')).toContainText('1651'); await expect(amount).toHaveValue('2000');
   await expect(p.locator('#copyCartPrompt')).toBeDisabled(); await expect(p.locator('#cartList')).toContainText('outbid'); await expect(p.locator('#tabAuctions .tab-dot')).toBeVisible();
@@ -66,11 +66,11 @@ try {
  },h=>h.payload.state=auctionState());
  await scenario('typing/focus/caret survive registry and network polls, including unsubmitted cart/search drafts',async(h,p)=>{
   await p.goto(h.url+'/?q=alpha'); await ready(p); await p.locator('#addToCartBtn').click();
-  const input=p.getByLabel('Amount or max bid for alpha',{exact:true}); await input.fill('275');
+  const input=p.getByLabel('Bid or price amount in POA for alpha',{exact:true}); await input.fill('275');
   await input.evaluate(n=>{n.focus();n.setSelectionRange(1,2);}); await poll(h,p);
   assert.deepEqual(await input.evaluate(n=>[n.value,document.activeElement===n,n.selectionStart,n.selectionEnd]),['275',true,1,2]);
   await p.clock.fastForward(20000); await expect(input).toBeFocused(); await expect(input).toHaveValue('275');
-  const search=p.getByLabel('Max bid for alpha',{exact:true}); await search.fill('333'); await search.focus(); await poll(h,p); await expect(search).toBeFocused(); await expect(search).toHaveValue('333');
+  const search=p.getByLabel('Maximum bid in POA for alpha',{exact:true}); await search.fill('333'); await search.focus(); await poll(h,p); await expect(search).toBeFocused(); await expect(search).toHaveValue('333');
   await p.locator('#searchInput').fill('unfinished draft'); await poll(h,p); await expect(p.locator('#searchInput')).toHaveValue('unfinished draft');
   await check(p,'bad-name'); await expect(p.locator('#searchResult')).toContainText('Spaces, hyphens');
   await check(p,'alpha'); await p.locator('#searchResult a[href="/d/alpha"]').click(); assert.match(new URL(p.url()).pathname,/\/d\/alpha/);

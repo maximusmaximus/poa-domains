@@ -20,6 +20,7 @@ import {
 } from "./mcp-schema.js";
 export const GATEWAY_ROUTES = Object.freeze([
   ["POST", "/mcp"],
+  ["POST", "/v1/search-log"],
   ["GET", "/v1/network-status"],
   ["HEAD", "/v1/network-status"],
   ...["capabilities", "market", "domain", "intent"].map((p) => [
@@ -210,6 +211,13 @@ export function openApiDocument(): any {
         ? "Exact same-origin signed command only; never keys"
         : "forbidden",
     };
+    if (path === "/v1/search-log") {
+      operation.description = "Explicit browser search telemetry only, never a registry or escrow action. Requires an approved same-site Origin. Private daily-partitioned R2 JSONL shards store a bounded canonical query, server timestamp, host, browser-reported coarse result and source only. Contact/wallet/key-like input is rejected. No IP, account, cookie, user agent or personal-identifier hashes are stored. No public log-reading endpoint.";
+      operation["x-browser-writes"] = "Anonymous search telemetry only; no signed intent or payment";
+      operation["x-max-body-bytes"] = 1024;
+      operation.requestBody = { required: true, content: { "application/json": { schema: objectSchema({query: {type:"string",minLength:1,maxLength:256},result: {enum:["available","auction","owned","unavailable","unknown"]}}, ["query","result"]) } } };
+      operation.responses = {"200":response("Stored in private R2; no registry action",{type:"object",properties:{saved:{const:true},key:{type:"string",pattern:"^v1/[^/]+/[a-f0-9-]+\\.jsonl$"}},required:["saved","key"]}),default:response("Not saved; normal name checking remains available",ref("Error"))};
+    }
     if (discovery) {
       operation.responses = {
         "200": response(

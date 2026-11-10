@@ -1,4 +1,5 @@
 import test from "node:test";
+import {flipCiphertextBit} from "./fixtures/backup-tamper.mjs";
 import assert from "node:assert/strict";
 import { generateKeyPairSync, createHash } from "node:crypto";
 
@@ -41,7 +42,8 @@ test("tampering with records, head or secrets is rejected", async () => {
   await assert.rejects(c.verifyBackup(b), /BACKUP_CONTENT_CHECKSUM/);
   const d = JSON.parse(bodyText);
   await assert.rejects(c.decryptSecrets(d.secrets, pkcs8, c.secretAad(policyHash, { ...head, sequence: 4 })), /AAD/);
-  const e = JSON.parse(bodyText); e.secrets.ciphertext = "A" + e.secrets.ciphertext.slice(1);
+  const e = JSON.parse(bodyText); e.secrets.ciphertext = flipCiphertextBit(e.secrets.ciphertext);
+  assert.notEqual(e.secrets.ciphertext, d.secrets.ciphertext, "tampering must actually change the authenticated bytes");
   await assert.rejects(c.decryptSecrets(e.secrets, pkcs8, e.secrets.aad));
   const wrong = new Uint8Array(generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey.export({ type: "pkcs8", format: "der" }));
   await assert.rejects(c.decryptSecrets(d.secrets, wrong, d.secrets.aad));

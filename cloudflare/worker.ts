@@ -1,3 +1,4 @@
+import { searchLog } from "./search-log.js";
 import { UI_SECURITY, secureUiResponse } from "../src/ui-policy.js";
 import { discoveryDocument } from "../src/discovery.js";
 import {mcpHttp} from "./mcp-http.js";
@@ -135,6 +136,7 @@ const gateway = {
 
       const discovery=discoveryDocument(u.pathname);
       if(discovery){if(request.method!=="GET"&&request.method!=="HEAD")return fail(405,{code:"METHOD_NOT_ALLOWED"});return new Response(request.method==="HEAD"?null:discovery.text,{headers:{...SECURITY,"content-type":discovery.type,"access-control-allow-origin":"*"}});}
+      if(u.pathname === "/v1/search-log") return searchLog(request,env);
       if(u.pathname === "/mcp") return mcpHttp(request,env);
 
       // Same-origin network status: Worker probes minepoa.com; browser never needs a PoA key.
