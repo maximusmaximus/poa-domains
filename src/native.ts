@@ -1,3 +1,4 @@
+import { parseNetworkStatus, type NetworkObservation } from "#poa-network-schema";
 import { Fault, need, obj, integer, exact } from "./core.js";
 import { publicHttps } from "./public-http.js";
 import { parsePublicJSON } from "./native-json.js";
@@ -16,24 +17,7 @@ const digest = (value: unknown) => {
 };
 export function transactionId(value: unknown): string { return digest(value); }
 
-export type NetworkObservation = {
-  kind: "native-network-observation";
-  source: typeof NATIVE_ORIGIN;
-  chainId: typeof NATIVE_CHAIN;
-  observedAt: number;
-  expiresAt: number;
-  verification: "node-reported-unverified";
-  finalityVerified: false;
-  registryReady: false;
-  checkpoint: { height: number; cutoffTs: number };
-  epochsClosed: number;
-  agentsJoined: number;
-  transactions: number;
-  reportedFinalTransactions: number;
-  attestationThreshold: number;
-  engineSha256: string;
-  paramsSha256: string;
-};
+export type { NetworkObservation } from "#poa-network-schema";
 export type NetworkFailure = {
   kind: "native-network-unavailable";
   code: string;
@@ -91,24 +75,12 @@ export class NativeReader {
   }
   async network(): Promise<NetworkObservation> {
     const started = integer(this.clock()), status = obj(await this.read("status")), facts = obj(await this.read("network-facts"));
-    need(status.chain_id === NATIVE_CHAIN && facts.chain_id === NATIVE_CHAIN, "NATIVE_CHAIN_MISMATCH");
-    const cp = obj(status.checkpoint), economics = obj(facts.economics);
     const observedAt = integer(this.clock());
     need(observedAt >= started && observedAt - started <= 22000, "NATIVE_CLOCK");
-    const height = integer(cp.height), cutoffTs = integer(cp.cutoff_ts);
-    need(cutoffTs * 1000 <= observedAt + 300000, "NATIVE_FUTURE_CHECKPOINT");
-    const epochsClosed = integer(status.epochs_closed);
-    need(integer(facts.open_epoch) === epochsClosed && integer(economics.K, 1, 256) === integer(status.K, 1, 256), "NATIVE_INCONSISTENT");
-    const transactions = integer(status.txs), reportedFinalTransactions = integer(status.final);
-    need(reportedFinalTransactions <= transactions, "NATIVE_INCONSISTENT");
-    return {
-      kind: "native-network-observation", source: NATIVE_ORIGIN, chainId: NATIVE_CHAIN,
-      observedAt, expiresAt: observedAt + OBSERVATION_TTL_MS,
-      verification: "node-reported-unverified", finalityVerified: false, registryReady: false,
-      checkpoint: { height, cutoffTs }, epochsClosed, agentsJoined: integer(status.agents_joined),
-      transactions, reportedFinalTransactions, attestationThreshold: status.K,
-      engineSha256: digest(facts.engine_sha256), paramsSha256: digest(facts.params_sha256),
-    };
+    return parseNetworkStatus(status, { facts, now: observedAt, fail: (code: string): never => {
+      const mapped: Record<string,string> = {CHAIN_MISMATCH:"NATIVE_CHAIN_MISMATCH",CONSISTENCY_MISMATCH:"NATIVE_INCONSISTENT",FUTURE_CHECKPOINT:"NATIVE_FUTURE_CHECKPOINT"};
+      throw new Fault(mapped[code] ?? "NATIVE_SCHEMA");
+    } });
   }
   async receipt(id: unknown) {
     const txid = transactionId(id), value = await this.read(`receipt/${txid}`);

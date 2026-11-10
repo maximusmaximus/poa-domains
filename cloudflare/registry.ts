@@ -1,3 +1,4 @@
+import { registryRoute } from "../src/registry-routes.js";
 import { marketView, publicCommand } from "./escrow-public.js";
 import { registryTitles } from "./escrow-titles.js";
 import { DurableObject } from "cloudflare:workers";
@@ -216,31 +217,13 @@ export class PoaRegistry extends DurableObject<Env> {
   // No await between reading registry state and synchronously appending a commit.
   handle(call: RegistryCall): RegistryReply {
     const e = this.engine;
-    const ok = (body: unknown): RegistryReply => ({ status: 200, jsonText: JSON.stringify(body) });
     try {
-      if (call.method === "GET") {
-        if (call.path === "/healthz") return ok({ status: "ok", processAlive: true, chainId: e.config.chainId,
-          revision: e.config.revision, sequence: e.snapshot().sequence, durability: DURABILITY,
-          livePoA: false, principals: this.principals });
-        if (call.path === "/v1/capabilities") return ok({ ...capabilities(e), publicExplorerUrl: this.env.PUBLIC_EXPLORER_URL, escrow:{enabled:String(this.env.POA_ESCROW_ENABLED)==="true",capabilities:"/v1/escrow/capabilities"} });
-        if (call.path === "/v1/state") return ok({ state: e.snapshot(), stateHash: e.stateHash(),
-          observedServerTime: e.observedTime(), durability: DURABILITY, finality: "registry-committed" });
-        if (call.path === "/v1/resolve") return ok(e.resolve(normalizeName(call.query.name, e.normalizationMode).canonical));
-        if (call.path === "/v1/nonce") return ok({ nonce: e.nextNonce(call.query.signer ?? "") });
-        if (call.path.startsWith("/v1/receipts/")) {
-          const id = call.path.slice("/v1/receipts/".length);
-          need(/^[0-9a-f]{64}$/.test(id), "INTENT_ID");
-          const receipt = e.receipt(id);
-          return { status: receipt ? 200 : 404, jsonText: JSON.stringify(receipt ?? { status: "unknown", code: "UNKNOWN_OUTCOME" }) };
-        }
-        return { status: 404, jsonText: JSON.stringify({ code: "NOT_FOUND" }) };
-      }
-      if (call.method === "POST" && call.path === "/v1/intents") {
-        // Conservative global title/nonce reservation; remains effective even if the feature is switched off.
-        need(!this.escrowTitleLocked(), "ESCROW_TITLE_RESERVED");
-        return ok({ ...e.submit(parseJSON(call.packet ?? "")), accepted: true, durability: DURABILITY, finality: "registry-committed" });
-      }
-      return { status: 405, jsonText: JSON.stringify({ code: "METHOD_NOT_ALLOWED" }) };
+      return registryRoute(e, call, {
+        health: { livePoA: false, principals: this.principals },
+        capabilities: { publicExplorerUrl: this.env.PUBLIC_EXPLORER_URL, escrow: {enabled:String(this.env.POA_ESCROW_ENABLED)==="true",capabilities:"/v1/escrow/capabilities"} },
+        // Keep the title/nonce reservation hook in its original durable-object boundary.
+        beforeSubmit: () => need(!this.escrowTitleLocked(), "ESCROW_TITLE_RESERVED"),
+      });
     } catch (error) {
       if (error instanceof Fault) {
         if (error.code === "DURABILITY_UNKNOWN_RESTART_AND_QUERY") {

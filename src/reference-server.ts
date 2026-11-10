@@ -1,9 +1,8 @@
 import { createServer, Server } from "node:http";
 import { readFileSync } from "node:fs";
 import { Engine } from "./engine.js";
-import { capabilities } from "./interface.js";
-import { Fault, need, parseJSON, text } from "./core.js";
-import { normalizeName } from "./names.js";
+import { Fault, need } from "./core.js";
+import { registryRoute, RegistryRouteOptions } from "./registry-routes.js";
 const files: Record<string, [string, string]> = {
   "/icon.svg": ["icon.svg", "image/svg+xml"],
   "/": ["index.html", "text/html; charset=utf-8"],
@@ -14,10 +13,13 @@ const files: Record<string, [string, string]> = {
   "/style.css": ["style.css", "text/css; charset=utf-8"],
   "/XeroEmoji-COLRv1.woff2": ["XeroEmoji-COLRv1.woff2", "font/woff2"],
 };
+// Explicit module allowlist, never arbitrary filesystem paths.
+for (const name of ["ui-cart.js", "ui-core.js", "ui-domain.js", "ui-handoff.js", "ui-ideas.js", "ui-poll.js", "ui-render.js", "ui-router.js", "ui-search.js", "ui-state.js"]) files["/"+name] = [name, "text/javascript; charset=utf-8"];
 export interface ReferenceServerOptions {
   host?: string;
   publicUrl?: string;
   allowedHosts?: string[];
+  routes?: RegistryRouteOptions;
 }
 export async function startReferenceServer(
   engine: Engine,
@@ -68,17 +70,9 @@ export async function startReferenceServer(
       const u = new URL(req.url ?? "/", "http://127.0.0.1");
       if (req.method === "GET") {
         res.setHeader("access-control-allow-origin", "*");
-        if (u.pathname === "/healthz")
-          return send(200, {
-            status: "ok",
-            processAlive: true,
-            chainId: engine.config.chainId,
-            revision: engine.config.revision,
-            sequence: engine.snapshot().sequence,
-            durability: engine.durability(),
-          });
-        if (files[u.pathname]) {
-          const [path, type] = files[u.pathname]!;
+        const assetPath = /^\/(d|p)\/[^/]+\/?$/.test(u.pathname) ? "/" : u.pathname;
+        if (files[assetPath]) {
+          const [path, type] = files[assetPath]!;
           res.setHeader("content-type", type);
           return void res.end(
             readFileSync(
@@ -86,42 +80,11 @@ export async function startReferenceServer(
             ),
           );
         }
-        if (u.pathname === "/v1/capabilities")
-          return send(200, capabilities(engine));
-        if (u.pathname === "/v1/state")
-          return send(200, {
-            state: engine.snapshot(),
-            stateHash: engine.stateHash(),
-            observedServerTime: engine.observedTime(),
-            durability: engine.durability(),
-            finality: "registry-committed",
-          });
-        if (u.pathname === "/v1/resolve")
-          return send(
-            200,
-            engine.resolve(
-              normalizeName(
-                u.searchParams.get("name"),
-                engine.normalizationMode,
-              ).canonical,
-            ),
-          );
-        if (u.pathname === "/v1/nonce")
-          return send(200, {
-            nonce: engine.nextNonce(u.searchParams.get("signer") ?? ""),
-          });
-        if (u.pathname.startsWith("/v1/receipts/")) {
-          const id = u.pathname.slice("/v1/receipts/".length);
-          need(/^[0-9a-f]{64}$/.test(id), "INTENT_ID");
-          const receipt = engine.receipt(id);
-          return send(
-            receipt ? 200 : 404,
-            receipt ?? { status: "unknown", code: "UNKNOWN_OUTCOME" },
-          );
-        }
-        return send(404, { code: "NOT_FOUND" });
+        const reply = registryRoute(engine, {method:"GET",path:u.pathname,query:Object.fromEntries(u.searchParams)},options.routes);
+        return send(reply.status,JSON.parse(reply.jsonText));
       }
       if (req.method === "POST" && u.pathname === "/v1/intents") {
+        need(u.search === "", "QUERY_NOT_ALLOWED");
         need(
           !req.headers.origin && !req.headers["sec-fetch-site"],
           "BROWSER_WRITES_DISABLED",
@@ -144,17 +107,12 @@ export async function startReferenceServer(
           need(bytes <= 65536, "BODY_TOO_LARGE");
           chunks.push(chunk);
         }
+        need(bytes > 0, "EMPTY_BODY");
         const body = new TextDecoder("utf-8", { fatal: true }).decode(
           Buffer.concat(chunks),
         );
-        const packet = parseJSON(body);
-        const receipt = engine.submit(packet);
-        return send(200, {
-          ...receipt,
-          accepted: true,
-          durability: engine.durability(),
-          finality: "registry-committed",
-        });
+        const reply = registryRoute(engine,{method:"POST",path:u.pathname,query:{},packet:body},options.routes);
+        return send(reply.status,JSON.parse(reply.jsonText));
       }
       return send(405, { code: "METHOD_NOT_ALLOWED" });
     } catch (e) {

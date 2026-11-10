@@ -40,7 +40,7 @@
     "cf:typecheck": "npm run cf:prepare && npm run cf:types && tsc --project cloudflare/tsconfig.json --noEmit",
     "cf:dev": "npm run cf:prepare && wrangler dev --local --ip 127.0.0.1 --port 18879 --persist-to ./.local-cf-state",
     "cf:dry-run": "node scripts/worker-deploy.mjs --dry-run",
-    "cf:test": "npm run build && node cloudflare/test/integration.mjs",
+    "cf:test": "npm run build && node cloudflare/test/integration.mjs && node cloudflare/test/routes-contract.mjs",
     "cf:test:backup": "node --experimental-strip-types cloudflare/test/backup-restore.mjs",
     "backup:now": "node scripts/registry-backup.mjs",
     "backup:restore": "node --experimental-strip-types scripts/registry-restore.mjs",
@@ -64,6 +64,10 @@
     "#poa-unicode-data": {
       "types": "./src/unicode-data.ts",
       "default": "./dist/src/unicode-data.js"
+    },
+    "#poa-network-schema": {
+      "types": "./web/network-schema.d.ts",
+      "default": "./web/network-schema.js"
     }
   },
   "overrides": {

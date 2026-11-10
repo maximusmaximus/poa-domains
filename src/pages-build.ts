@@ -48,6 +48,7 @@ export const PUBLIC_FILES = [
   "index.html",
   "app.js",
   "live-network.js",
+  "network-schema.js",
   "emoji17.mjs",
   "emoji-format-checker.mjs",
   "emoji-format-checker.css",
@@ -102,7 +103,7 @@ export function buildProductionBundle(directory = resolve("_site"), observation:
     rmSync(output, { recursive: true });
   }
   mkdirSync(output);
-  for (const file of ["index.html", "app.js", "live-network.js", "style.css", "icon.svg", ...Object.keys(unicodePublicPins)])
+  for (const file of ["index.html", "app.js", "live-network.js", "network-schema.js", "style.css", "icon.svg", ...Object.keys(unicodePublicPins)])
     copyFileSync(join("web", file), join(output, file));
   const config = JSON.parse(readFileSync("web/config.json", "utf8"));
   need(
