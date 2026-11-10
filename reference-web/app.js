@@ -43,7 +43,7 @@ import {
   cartMinimum,
   cartSummary,
   editCartAmount,
-} from "./shared.js?v=afc97f7cddd8";
+} from "./shared.js?v=ac2c1d3185fc";
 
 const el = (id) => document.getElementById(id);
 let cap,
