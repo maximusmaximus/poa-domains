@@ -1,9 +1,11 @@
+# Node 22 runs all unit tests (including escrow unit/public); Node 24 runs every suite.
 name: native-and-reference-checks
 on:
   push:
-    branches: [main]
-  pull_request:
-  workflow_dispatch:
+    branches:
+      - main
+  pull_request: null
+  workflow_dispatch: null
 permissions:
   contents: read
 concurrency:
@@ -19,7 +21,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version: '22.15.0'
+          node-version: 22.15.0
           cache: npm
       - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm ci --ignore-scripts
       - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 WRANGLER_SEND_METRICS=false npm run ci:build
@@ -40,8 +42,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['22.15.0', '24']
-        suite: ['unit']
+        node:
+          - 22.15.0
+          - "24"
+        suite:
+          - unit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -70,8 +75,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['22.15.0', '24']
-        suite: ['browser-smoke', 'browser-e2e', 'browser-escrow']
+        node:
+          - "24"
+        suite:
+          - browser-smoke
+          - browser-e2e
+          - browser-escrow
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -84,18 +93,8 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: compiled
-      - uses: actions/cache@3edfce9056124e459a23f683a21433670d47daca
-        id: playwright
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-browser-${{ hashFiles('package-lock.json') }}
-      - name: Install browser system dependencies (also needed on cache hits)
-        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npx playwright install-deps chromium firefox webkit
-      - name: Install cached browser binaries
-        if: steps.playwright.outputs.cache-hit != 'true'
-        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npx playwright install chromium firefox webkit
       - name: Run covered suite without rebuilding
-        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 node scripts/ci.mjs ${{ matrix.suite }}
+        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright node scripts/ci.mjs ${{ matrix.suite }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: coverage-${{ matrix.suite }}-${{ matrix.node }}
@@ -114,6 +113,9 @@ jobs:
             test-results/emoji-format-product-results.json
             test-results/emoji-format-product/*/error-context.md
             test-results/emoji-format-product/*/attachments/*.json
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
+      options: --init --ipc=host
   cloudflare:
     needs: build
     runs-on: ubuntu-24.04
@@ -121,8 +123,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['22.15.0', '24']
-        suite: ['cloudflare-registry', 'cloudflare-recovery']
+        node:
+          - "24"
+        suite:
+          - cloudflare-registry
+          - cloudflare-recovery
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -135,18 +140,8 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: compiled
-      - uses: actions/cache@3edfce9056124e459a23f683a21433670d47daca
-        id: playwright
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-cloudflare-${{ hashFiles('package-lock.json') }}
-      - name: Install browser system dependencies (also needed on cache hits)
-        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npx playwright install-deps chromium
-      - name: Install cached browser binaries
-        if: steps.playwright.outputs.cache-hit != 'true'
-        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npx playwright install chromium
       - name: Run covered suite without rebuilding
-        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 node scripts/ci.mjs ${{ matrix.suite }}
+        run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright node scripts/ci.mjs ${{ matrix.suite }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: coverage-${{ matrix.suite }}-${{ matrix.node }}
@@ -154,6 +149,9 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           path: .coverage/
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
+      options: --init --ipc=host
   escrow-local:
     needs: build
     runs-on: ubuntu-24.04
@@ -161,8 +159,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['22.15.0', '24']
-        suite: ['escrow-local']
+        node:
+          - "24"
+        suite:
+          - escrow-local
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -191,8 +191,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['22.15.0', '24']
-        suite: ['security']
+        node:
+          - "24"
+        suite:
+          - security
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -217,10 +219,15 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           path: .coverage/
-  # Keep this exact required context: the main ruleset requires "check".
   check:
     if: always()
-    needs: [build, unit, browser, cloudflare, escrow-local, security]
+    needs:
+      - build
+      - unit
+      - browser
+      - cloudflare
+      - escrow-local
+      - security
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -233,7 +240,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version: '24'
+          node-version: "24"
           cache: npm
       - run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm ci --ignore-scripts
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333

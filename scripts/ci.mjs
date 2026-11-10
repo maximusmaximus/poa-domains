@@ -24,20 +24,27 @@ export const suites = {
   security: [["npm", "run", "unicode:audit"], ["npm", "run", "security"], ["npm", "run", "metadata:check"]],
 };
 
+export const coverageMatrix = Object.keys(suites).flatMap(suite => suite === "unit" ? [[suite, "22"], [suite, "24"]] : [[suite, "24"]]);
+export function commandsFor(suite, node) {
+  // Node 22 is the unit-only compatibility leg, including escrow unit/public tests.
+  return suite === "unit" && node === "22" ? [...suites.unit,
+    ["node", "--test", "dist/escrow-tests/unit.mjs", "dist/escrow-tests/public.mjs"]] : suites[suite];
+}
 function run(suite, coverage = true) {
   if (!suites[suite]) throw Error(`Unknown suite: ${suite}`);
   const dir = resolve(".coverage", `${suite}-${process.versions.node.split(".")[0]}`);
   if (coverage) { rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true }); }
-  for (const [command, ...args] of suites[suite]) {
+  const commands = commandsFor(suite, process.versions.node.split(".")[0]);
+  for (const [command, ...args] of commands) {
     const result = spawnSync(command, args, { stdio: "inherit", env: {
       ...process.env, ESCROW_FIXTURE_MODULE: pathToFileURL(resolve("dist/escrow-tests/fixture.mjs")).href, WRANGLER_SEND_METRICS: "false", CF_EXPECT_FRESH: "1",
-      ...(coverage ? { NODE_V8_COVERAGE: resolve(dir, "raw"), NODE_OPTIONS: "--enable-source-maps" } : {}),
+      ...(coverage ? { NODE_V8_COVERAGE: resolve(dir, "raw"), NODE_OPTIONS: `--enable-source-maps --import=${pathToFileURL(resolve("scripts/ci-coverage-preload.mjs")).href}` } : {}),
     }});
     if (result.error) throw result.error;
     if (result.status !== 0) process.exit(result.status ?? 1);
   }
   if (coverage) writeFileSync(resolve(dir, "completed.json"), JSON.stringify({ suite, node: process.versions.node,
-    commands: suites[suite], completed: true }) + "\n");
+    commands, root: process.cwd(), completed: true }) + "\n");
 }
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   const mode = process.argv[2];

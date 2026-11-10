@@ -1,12 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { parse } from "yaml";
-import { suites } from "../scripts/ci.mjs";
+import { suites, coverageMatrix, commandsFor } from "../scripts/ci.mjs";
+import { relocateCoverage } from "../scripts/ci-paths.mjs";
 const workflow = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
 
 test("only main pushes and PRs run CI; superseded runs cancel; exact required check gates all lanes", () => {
@@ -23,7 +24,7 @@ test("only main pushes and PRs run CI; superseded runs cancel; exact required ch
     for (const step of job.steps.filter(s => s.uses?.startsWith("actions/checkout@")))
       assert.equal(step.with["persist-credentials"], false, name);
     if (!["build", "check"].includes(name)) {
-      assert.deepEqual(job.strategy.matrix.node, ["22.15.0", "24"]);
+      assert.deepEqual(job.strategy.matrix.node, name === "unit" ? ["22.15.0", "24"] : ["24"]);
       assert.equal(job.needs, "build");
       assert.ok(job.steps.some(s => s.uses?.startsWith("actions/download-artifact@") && s.with.name === "compiled"));
       assert.ok(!job.steps.some(s => /npm run (build|check|pages:build|cf:test)/.test(s.run ?? "")), name);
@@ -35,8 +36,11 @@ test("only main pushes and PRs run CI; superseded runs cancel; exact required ch
   for (const dir of ["dist/", "_site/", "cloudflare/generated/"]) assert.ok(artifact.with.path.includes(dir));
   for (const name of ["browser", "cloudflare"]) {
     const steps = jobs[name].steps;
-    assert.ok(steps.some(s => s.uses?.startsWith("actions/cache@") && s.with.path.includes("ms-playwright")));
-    assert.ok(steps.some(s => s.run?.includes("playwright install-deps") && !s.if));
+    const version = JSON.parse(readFileSync("package.json", "utf8")).devDependencies["@playwright/test"];
+    assert.ok(jobs[name].container.image.startsWith(`mcr.microsoft.com/playwright:v${version}-noble@sha256:`));
+    assert.match(jobs[name].container.image, /@sha256:[0-9a-f]{64}$/);
+    assert.ok(steps.every(s => !s.run?.includes("playwright install") && !s.run?.includes("apt")));
+    assert.ok(steps.some(s => s.run?.includes("PLAYWRIGHT_BROWSERS_PATH=/ms-playwright")));
   }
 });
 
@@ -77,4 +81,53 @@ test("CI escrow wiring retains the complete unchanged unit, public, runtime and 
     ["node", "cloudflare/test/escrow-runtime.mjs"], ["node", "cloudflare/test/escrow-admin-runtime.mjs"],
   ]);
   assert.deepEqual(suites["browser-escrow"], [["node", "cloudflare/test/escrow-ui.mjs"]]);
+});
+
+test("coverage matrix matches every configured suite/version; Node 22 includes escrow unit coverage", () => {
+  const actual = Object.values(workflow.jobs).filter(j => j.strategy).flatMap(j =>
+    j.strategy.matrix.suite.flatMap(suite => j.strategy.matrix.node.map(node => [suite, node.split(".")[0]])));
+  const key = x => x.join(":");
+  assert.deepEqual(actual.map(key).sort(), coverageMatrix.map(key).sort());
+  assert.equal(actual.length, 9);
+  assert.deepEqual(commandsFor("unit", "22").at(-1), ["node", "--test", "dist/escrow-tests/unit.mjs", "dist/escrow-tests/public.mjs"]);
+});
+
+test("container coverage relocation preserves counters, source contents, and root boundaries", () => {
+  const old = "/__w/repo/repo", next = "/home/runner/work/repo/repo";
+  const input = { result: [{ url: `file://${old}/dist/src/core.js`, functions: [{ ranges: [{ startOffset: 1, endOffset: 4, count: 3 }] }] },
+    { url: `file://${old}-other/unrelated.js`, functions: [] }], "source-map-cache": {
+      [`file://${old}/dist/src/core.js`]: { url: `${old}/dist/src/core.js.map`, data: { sources: ["../../src/core.ts"], sourcesContent: ["export const value = 3;\n"] } }
+    } };
+  const out = relocateCoverage(input, old, next);
+  assert.equal(out.result[0].url, `file://${next}/dist/src/core.js`);
+  assert.deepEqual(out.result[0].functions, input.result[0].functions);
+  assert.equal(out.result[1].url, input.result[1].url);
+  assert.equal(out["source-map-cache"][`file://${next}/dist/src/core.js`].url, `${next}/dist/src/core.js.map`);
+  assert.deepEqual(out["source-map-cache"][`file://${next}/dist/src/core.js`].data, input["source-map-cache"][`file://${old}/dist/src/core.js`].data);
+  assert.equal(input.result[0].url, `file://${old}/dist/src/core.js`, "never mutate input coverage");
+});
+
+test("coverage preload excludes only Wrangler subprocess profiling, not tests or fixture environment", () => {
+  const dir = mkdtempSync(join(tmpdir(), "poa-ci-profile-"));
+  try {
+    const wrangler = join(dir, "wrangler/bin/wrangler.js"), ordinary = join(dir, "ordinary.mjs");
+    mkdirSync(join(dir, "wrangler/bin"), { recursive: true });
+    const probe = 'console.log(JSON.stringify({covered:!!process.env.NODE_V8_COVERAGE, fixture:process.env.ESCROW_FIXTURE_MODULE === "test-fixture"}));';
+    writeFileSync(wrangler, probe); writeFileSync(ordinary, probe);
+    const driver = join(dir, "driver.mjs");
+    writeFileSync(driver, `import {spawn,execFileSync} from "node:child_process";
+import {once} from "node:events";
+const w=${JSON.stringify(wrangler)}, normal=${JSON.stringify(ordinary)};
+const sync=JSON.parse(execFileSync(process.execPath,[w],{encoding:"utf8"}));
+const app=JSON.parse(execFileSync(process.execPath,[normal],{encoding:"utf8"}));
+const p=spawn(process.execPath,[w],{stdio:["ignore","pipe","inherit"]});
+let text="";p.stdout.on("data",x=>text+=x);const [code]=await once(p,"exit");
+if(code!==0)process.exit(code);console.log(JSON.stringify({sync,app,async:JSON.parse(text)}));
+`);
+    const result = spawnSync(process.execPath, ["--import", resolve("scripts/ci-coverage-preload.mjs"), driver], { encoding: "utf8",
+      env: { ...process.env, NODE_V8_COVERAGE: join(dir, "raw"), ESCROW_FIXTURE_MODULE: "test-fixture" } });
+    assert.equal(result.status, 0, result.stderr);
+    const out = JSON.parse(result.stdout);
+    assert.deepEqual(out, {sync:{covered:false,fixture:true}, app:{covered:true,fixture:true}, async:{covered:false,fixture:true}});
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

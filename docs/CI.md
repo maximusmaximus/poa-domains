@@ -9,9 +9,16 @@ The build job compiles once on Node 22.15.0, emits source maps, builds the publi
 Pages allowlist and prepares local Cloudflare test bundles. `dist/`, `_site/`
 and `cloudflare/generated/` travel together in the short-lived `compiled`
 artifact (including the allowlisted `.nojekyll` file). Unit, browser, Cloudflare, escrow-local, and security lanes consume
-that artifact, each tested on Node 22.15.0 and Node 24. No lane recompiles it.
-Playwright binaries are cached by OS, job family and lockfile; system packages
-are installed even on cache hits. Every checkout disables persisted credentials.
+that artifact. Node 24 runs every suite. Node 22.15.0 is a unit-only compatibility
+leg that includes the escrow unit/public tests, rather than repeating browser,
+workerd, security and recovery integration suites. No test source or assertion
+is removed. No lane recompiles the application.
+Browser/Cloudflare jobs use the official Playwright Noble container, pinned to
+the npm package version **and immutable image digest**. The image contains the
+browsers and OS dependencies, cached as image layers. No apt or browser install
+runs in these jobs. The unit-only Node 22 interpretation is intentional: it
+covers the declared minimum runtime while Node 24 performs the full integration
+matrix. Every checkout disables persisted credentials.
 No CI job deploys a Worker or uses Cloudflare credentials.
 Existing escrow source, tests, config, and `scripts/test-escrow.mjs` are unchanged;
 `scripts/ci-bundles.mjs` only prepares source-mapped test bundles for CI.
@@ -29,7 +36,7 @@ Existing escrow source, tests, config, and `scripts/test-escrow.mjs` are unchang
 ## Coverage gate
 
 The gate requires a successful completion manifest and nonempty V8 data from
-**every suite on both Node versions**. It merges V8 process coverage, follows
+**every configured suite/version** (all suites on Node 24, plus Node 22 units). It merges V8 process coverage, follows
 TypeScript and inline escrow bundle source maps, and reports lines and branches
 in the Actions job summary and `coverage-report` artifact. `--all` includes
 unloaded source files as zero, rather than hiding untested modules. Tests,
@@ -54,3 +61,17 @@ by `buildProductionBundle()`. It performs no network observation and never bakes
 a stale live response or timestamp into the output. Runtime network reads stay
 unchanged. A test disables fetch, HTTP(S), TCP and TLS and compares every emitted
 file's hash across two CLI builds. The existing allowlist/secret guards remain.
+
+## Coverage performance and container paths
+
+The CI-only coverage preload stops Node V8 profiling at Wrangler CLI subprocess
+boundaries; Wrangler and its third-party build/watch processes do not execute
+the application inside Node. Application/unit/test Node processes remain
+profiled, fixture environment and test commands are preserved, and workerd
+assertions still run unchanged. This avoids profiling the toolchain without
+claiming workerd source coverage. Contract tests verify both subprocess APIs.
+
+Coverage manifests record the workspace root. Aggregation normalizes container
+`/__w/` prefixes to the report job's root, including source-map cache keys and
+URLs, without changing counters or source content. Relocation and matrix
+completeness are regression-tested. Missing suite/version data still fails shut.
