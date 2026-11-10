@@ -19,11 +19,11 @@ Bid beneficiary defaults to the authorized signer. Resolve that principal before
 Cart Items:
 --- Item 1: alpha (standard root) ---
 Action: announceAuction+bid
-Summary: Request root auction announcement for "alpha" (reserve=250 POA) and place opening bid up to maxTotal=250 POA.
+Summary: Request root auction announcement for "alpha" (reserve=100 POA) and place opening bid up to maxTotal=250 POA.
 Asset: POA | Amount / Max Bid: 250 base units (maxTotal=250)
-Action Parameters JSON: {"name":"alpha","asset":"POA","reserve":"250","maxBid":"250","expectedDeedId":null,"expectedVersion":0}
+Action Parameters JSON: {"name":"alpha","asset":"POA","reserve":"100","maxBid":"250","expectedDeedId":null,"expectedVersion":0}
 One-Command Agent Execution:
-  node dist/src/reference-cli.js act --url http://127.0.0.1:8787 --key-file agent.pem --action announceAuction+bid --params '{"name":"alpha","asset":"POA","reserve":"250","maxBid":"250","expectedDeedId":null,"expectedVersion":0}' --max-total 250
+  node dist/src/reference-cli.js act --url http://127.0.0.1:8787 --key-file agent.pem --action announceAuction+bid --params '{"name":"alpha","asset":"POA","reserve":"100","maxBid":"250","expectedDeedId":null,"expectedVersion":0}' --max-total 250
 Step-by-Step CLI Prepare & Submit Example:
   # Save intent input to item-1.json with nonce = N+0, notBefore = NOW, deadline = NOW+3600, maxTotal = "250", maxNetworkFee = "0"
   node dist/src/reference-cli.js prepare --url http://127.0.0.1:8787 --file item-1.json --out unsigned-1.json
