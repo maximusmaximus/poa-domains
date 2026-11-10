@@ -9,6 +9,8 @@ import {
   writeFileSync,
   existsSync,
 } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { symlinkSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildProductionBundle, PUBLIC_FILES, publicArtifactFiles } from "../src/pages-build.js";
@@ -85,4 +87,26 @@ test("Pages explicit incident recovery matches every unchanged strict-reader inc
   const app = readFileSync("web/app.js", "utf8");
   assert.match(app, /if \(refreshFlight\) return refreshFlight;\s*if \(userRequested && readerNeedsRestart\)/);
   assert.match(app, /addEventListener\("click", \(\) => refresh\(true\)\)/);
+});
+
+
+test("Pages deployment archive retains exactly the tested public discovery files, never hidden private files or links", () => {
+  const dir=mkdtempSync(join(tmpdir(),"poa-production-pages-test-"));
+  const work=mkdtempSync(join(tmpdir(),"poa-pages-archive-"));
+  try {
+    buildProductionBundle(dir);const archive=join(work,"artifact.tar");
+    execFileSync(process.execPath,["scripts/pages-archive.mjs",dir,archive]);
+    const entries=execFileSync("tar",["--list","--file",archive],{encoding:"utf8"}).trim().split("\n").sort();
+    assert.deepEqual(entries,[...PUBLIC_FILES].sort());
+    for(const file of [".well-known/agent.json",".nojekyll"])assert.equal(execFileSync("tar",["--extract","--to-stdout","--file",archive,"--",file],{encoding:"utf8"}),readFileSync(join(dir,file),"utf8"));
+    writeFileSync(join(dir,".private-note"),"not public");
+    assert.throws(()=>execFileSync(process.execPath,["scripts/pages-archive.mjs",dir,join(work,"bad.tar")],{stdio:"pipe"}));
+    assert.equal(existsSync(join(work,"bad.tar")),false);
+    unlinkSync(join(dir,".private-note"));unlinkSync(join(dir,"index.html"));symlinkSync(join(dir,"app.js"),join(dir,"index.html"));
+    assert.throws(()=>execFileSync(process.execPath,["scripts/pages-archive.mjs",dir,join(work,"linked.tar")],{stdio:"pipe"}));
+    assert.equal(existsSync(join(work,"linked.tar")),false);
+    const workflow=readFileSync(".github/workflows/pages.yml","utf8");
+    assert.match(workflow,/node scripts\/pages-archive.mjs _site/);assert.match(workflow,/name: github-pages/);
+    assert.doesNotMatch(workflow,/uses: actions\/upload-pages-artifact@/);
+  } finally {rmSync(dir,{recursive:true,force:true});rmSync(work,{recursive:true,force:true});}
 });

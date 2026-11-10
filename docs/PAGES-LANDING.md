@@ -34,3 +34,10 @@ Tests cover metadata, exact footer, current copy, initial loading, semantic
 visitor-local times, transient failures and explicit incident recovery, keeping
 all GET-only, CSP, no-signing, no-stale-fallback and spelling-isolation checks.
 No Worker, escrow, deployment configuration or secret is changed by this page.
+
+The publisher archives exactly the already-tested `PUBLIC_FILES` allowlist,
+including `.well-known/agent.json` and `.nojekyll`, then uploads `artifact.tar`
+with the standard pinned artifact uploader. The pinned Pages wrapper's generic
+dot-file exclusion is deliberately not used. Unknown files, symlinks and
+hardlinks fail closed; this does not enable arbitrary hidden files. Tests inspect
+the actual tar entries and bytes, not just the staging directory.

@@ -434,7 +434,10 @@ export class Engine {
         const reserve = amount(p.reserve, true);
         const minOpenAt =
           this.config.revision === "poa-mainnet-v1" ? time : time + 86400;
-        const openAt = integer(p.openAt, minOpenAt);
+        // Zero explicitly requests the earliest policy-permitted start at execution.
+        // An absolute quoted "now" can otherwise expire in transit at a second boundary.
+        const requestedOpenAt = integer(p.openAt);
+        const openAt = requestedOpenAt === 0 ? minOpenAt : integer(requestedOpenAt, minOpenAt);
         integer(openAt + AUCTION_WINDOWS[n.tier].window);
         need(!e?.auctionId, "NAME_RESERVED");
         let d: Deed | null = null;

@@ -31,11 +31,15 @@ jobs:
         run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 npm run check
       - name: Redacted source, history and public artifact scan
         run: env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 GITHUB_TOKEN="$GITHUB_TOKEN" bash scripts/gitleaks.sh
-      - name: Upload only the tested public static files
-        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+      - name: Archive the exact tested public allowlist including discovery
+        run: node scripts/pages-archive.mjs _site "$RUNNER_TEMP/artifact.tar"
+      - name: Upload only the validated public archive
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          path: _site
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
           retention-days: 1
+          if-no-files-found: error
   deploy:
     needs: build
     if: github.ref == 'refs/heads/main' && github.repository == 'maximusmaximus/poa-domains'
