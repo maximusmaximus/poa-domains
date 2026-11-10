@@ -36,6 +36,7 @@ async function scan(page, label) {
     incomplete: results.incomplete.map((x) => x.id),
   });
   save();
+  if(label.startsWith("explorer"))assert.equal(results.violations.some(v=>v.id==="heading-order"),false,label+" heading hierarchy");
   assert.deepEqual(
     serious.map((x) => ({
       id: x.id,

@@ -1187,3 +1187,9 @@ button.box-close { margin:0; }
  header { width:100vw; margin-inline:calc(50% - 50vw); }
  header .site-title { width:100%; margin-inline:0; }
 }
+
+@media(max-width:600px){
+ /* Native emoji advances plus tilt are wider than one em; keep each rotated glyph inside its grid cell. */
+ .site-title .title-glyph:not(.title-tile) { font-size:.8em; }
+}
+.manage-domains > h2 { font-size:1.17em; }

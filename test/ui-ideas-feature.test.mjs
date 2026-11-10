@@ -23,7 +23,7 @@ test('v3 keeps headerless masonry, flat closable status and always-visible corne
  assert.doesNotMatch(html,/<h3 id="ideasHeading"/);assert.match(ideas,/idea-offset-/);assert.doesNotMatch(ideas,/add\(group,"h4"/);
  assert.doesNotMatch(html,/id="(?:statusReopen|floatingInfo|infoHint)"|registry-read-status|<h2>🔍 Find a name/);
  assert.match(css,/\.module-info \{ display:inline-flex/);assert.match(css,/grid-template-columns:repeat\(10,minmax\(0,1fr\)\)/);
- assert.match(html,/<label id="searchLabel" for="searchInput">Check Availability<\/label>/);assert.ok(html.indexOf('id="searchHelpText"')>html.indexOf('id="searchBtn"'));
+ assert.match(html,/<h2 id="searchHeading" class="visually-hidden">/);assert.match(html,/<label id="searchLabel" for="searchInput">Check Availability<\/label>/);assert.ok(html.indexOf('id="searchHelpText"')>html.indexOf('id="searchBtn"'));
  assert.equal((html.match(/id="networkStatusBar"/g)??[]).length,1);assert.match(help,/escrowAmount/);assert.match(help,/input.before\(wrap\)/);assert.match(help,/dismiss.after\(b\)/);assert.match(help,/module.append\(p\)/);assert.doesNotMatch(help,/fetch\(|request\(|sign\(/);
 });
 test('emoji actions retain exact accessible purpose and leave technical payment/signing controls alone',()=>{
