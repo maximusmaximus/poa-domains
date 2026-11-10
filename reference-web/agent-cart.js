@@ -1,11 +1,11 @@
-import { actionLabel } from "./ui-copy.js?v=5c1f8083f451";
+import { actionLabel } from "./ui-copy.js?v=4ebb3841970c";
 /** One unsigned Cart Handoff v2 object; text, clipboard and download derive from it. */
 import {
   canonical,
   safeObject,
   validPrincipal,
   cartParamsForSigner,
-} from "./shared.js?v=5c1f8083f451";
+} from "./shared.js?v=4ebb3841970c";
 export const CART_SCHEMA_VERSION = "poa-domains.agent-cart.v2";
 const HASH = { type: "string", pattern: "^[a-f0-9]{64}$" },
   UINT = { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER };

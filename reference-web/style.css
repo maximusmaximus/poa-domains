@@ -1212,9 +1212,36 @@ button.box-close { margin:0; }
 
 .github-mark { flex:none; vertical-align:middle; }
 .footer-links a { display:inline-flex; align-items:center; gap:.45rem; }
-.site-terms { max-width:58rem; margin:1.2rem auto .8rem; text-align:left; color:#b4cad6; font-size:.9rem; line-height:1.6; }
-.site-terms > summary { cursor:pointer; min-height:44px; display:list-item; align-content:center; color:#dfecf5; }
-.site-terms h3 { margin:1rem 0 .3rem; font-size:1rem; color:#dfecf5; }
-.site-terms p { margin:.3rem 0 .8rem; }
 
 #cartAnchor.cart-empty > h4,#cartAnchor.cart-empty > #cartPrompt,#cartAnchor.cart-empty > #cartHandoffMeta { display:none; }
+
+/* One owner for each outer gap: no collapsed child margins or empty-result spacers. */
+:root { --ui-space:12px; --ui-tight:8px; }
+header { margin-block:0; }
+#networkStatusBar { margin-block:var(--ui-space) 0; }
+#recentActions { display:flow-root; margin-block:var(--ui-space) 0; }
+#liveTicker { margin-block:0; min-height:44px; }
+#liveTickerTrack { padding-block:4px; }
+.section-navigation { display:flow-root; margin-block:var(--ui-space) 0; }
+.section-navigation > .section-tabs { margin-block:0; }
+main#homeMain:not([hidden]) { display:flow-root; margin-block:var(--ui-space) 0; }
+main#homeMain > section[data-section] { margin-block:0; padding:var(--ui-space); }
+main#homeMain > #searchSection { padding-top:0; }
+#searchSection .ideas { margin:0 0 var(--ui-tight); padding:0; }
+#searchSection .ideas-masonry { height:auto; min-height:0; padding-block:0!important; align-items:flex-start; }
+.ideas-status:empty,#searchResult:empty,#manageNames:empty,#managePrompt:empty { display:none; }
+.search-label label { margin:0; }
+#searchSection > .search-bar { margin:var(--ui-tight) 0 0; gap:var(--ui-tight); }
+#searchResult { margin:var(--ui-space) 0 0; }
+#cartAnchor { margin-top:var(--ui-space); }
+.manage-domains { margin-bottom:var(--ui-space); padding-bottom:var(--ui-space); }
+#siteFooter { margin-top:var(--ui-space); padding-top:var(--ui-space); }
+/* Existing bottom clearance keeps the fixed cart control off the footer credit. */
+html { scroll-padding-top:6rem; }
+
+.section-navigation:has(> #sectionTabs[hidden]) { display:none; }
+
+/* Keep the stagger, but do not let a tall off-screen column create a blank mobile gap. */
+#searchSection .idea-offset-1 { padding-top:12px; }
+#searchSection .idea-offset-2 { padding-top:6px; }
+#searchSection .idea-offset-3 { padding-top:18px; }

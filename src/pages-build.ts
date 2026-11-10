@@ -55,6 +55,8 @@ export const PUBLIC_FILES = [
   "LICENSE-UNICODE.txt",
   "PUBLIC-PROVENANCE.json",
   "style.css",
+  "terms.html",
+  "terms.css",
   "icon.svg",
   "robots.txt",
   "sitemap.xml",
@@ -119,7 +121,7 @@ export function buildProductionBundle(directory = resolve("_site"), _unusedObser
   );
   // Copy verified generated public text only. Never import Engine/auth/MCP into
   // the production-only Pages guard's dependency graph.
-  for(const name of discoveryFiles){const source=join("reference-web",name),file=join(output,name);need(lstatSync(source).isFile()&&!lstatSync(source).isSymbolicLink(),"ARTIFACT_LINK");if(name.includes("/"))need(!lstatSync(join("reference-web",name.split("/")[0]!)).isSymbolicLink(),"ARTIFACT_LINK");mkdirSync(join(file,".."),{recursive:true});copyFileSync(source,file);}
+  for(const name of [...discoveryFiles,"terms.html","terms.css"]){const source=join("reference-web",name),file=join(output,name);need(lstatSync(source).isFile()&&!lstatSync(source).isSymbolicLink(),"ARTIFACT_LINK");if(name.includes("/"))need(!lstatSync(join("reference-web",name.split("/")[0]!)).isSymbolicLink(),"ARTIFACT_LINK");mkdirSync(join(file,".."),{recursive:true});copyFileSync(source,file);}
 
   const policy =
     "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https://minepoa.com/chain/poa-mainnet-1/api/status https://minepoa.com/chain/poa-mainnet-1/api/network-facts; img-src 'self'; base-uri 'none'; form-action 'none'";

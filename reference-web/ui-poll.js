@@ -1,15 +1,15 @@
-import { installHelp } from "./ui-help.js?v=5c1f8083f451";
-import { renderManagement } from "./ui-manage.js?v=5c1f8083f451";
-import { actionLabel } from "./ui-copy.js?v=5c1f8083f451";
-import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=5c1f8083f451";
-import { ui } from "./ui-state.js?v=5c1f8083f451";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=5c1f8083f451";
-import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=5c1f8083f451";
-import { render } from "./ui-render.js?v=5c1f8083f451";
-import { runSearch } from "./ui-search.js?v=5c1f8083f451";
-import { renderIdeas } from "./ui-ideas.js?v=5c1f8083f451";
-import { mountEscrow } from "./escrow.js?v=5c1f8083f451";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=5c1f8083f451";
+import { installHelp } from "./ui-help.js?v=4ebb3841970c";
+import { renderManagement } from "./ui-manage.js?v=4ebb3841970c";
+import { actionLabel } from "./ui-copy.js?v=4ebb3841970c";
+import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=4ebb3841970c";
+import { ui } from "./ui-state.js?v=4ebb3841970c";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=4ebb3841970c";
+import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=4ebb3841970c";
+import { render } from "./ui-render.js?v=4ebb3841970c";
+import { runSearch } from "./ui-search.js?v=4ebb3841970c";
+import { renderIdeas } from "./ui-ideas.js?v=4ebb3841970c";
+import { mountEscrow } from "./escrow.js?v=4ebb3841970c";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=4ebb3841970c";
 
 export function updateFreshness() {
     updateHandoffAge();

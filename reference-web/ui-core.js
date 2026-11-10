@@ -1,6 +1,6 @@
-import { decorateEmojiButton } from "./ui-copy.js?v=5c1f8083f451";
-import { buildOwnershipIndex, ownershipConflict, safeObject } from "./shared.js?v=5c1f8083f451";
-import { ui } from "./ui-state.js?v=5c1f8083f451";
+import { decorateEmojiButton } from "./ui-copy.js?v=4ebb3841970c";
+import { buildOwnershipIndex, ownershipConflict, safeObject } from "./shared.js?v=4ebb3841970c";
+import { ui } from "./ui-state.js?v=4ebb3841970c";
 
 export const el = (id) => document.getElementById(id);
 

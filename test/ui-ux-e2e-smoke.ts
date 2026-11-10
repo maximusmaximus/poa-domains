@@ -854,7 +854,7 @@ async function runPublicProductionPagesMultiBrowserSmoke(prodUrl: string) {
           .count()) >= 1,
         `${name}: public GitHub Pages mirror links to poadomains.grok.me`,
       );
-      assert.equal((await page.locator("footer").innerText()).replace(/\s+/g," ").trim(),
+      assert.equal((await page.locator(".footer-credit").innerText()).replace(/\s+/g," ").trim(),
         "made with ❤️ in SF by Tesselate Army | maxi.grok.me", `${name}: current landing footer`);
       assert.deepEqual(errors, [], `${name}: public pages zero errors`);
     } finally {
@@ -886,7 +886,7 @@ const summary: {
   surfacesTested: [
     "full-stack-registry-app (poa-mainnet-v1, 5216 emoji17 sequences, 655 reserved roots)",
     "static-reference-snapshot (/poa-domains/ demo bundle)",
-    "public-production-pages (_site/ 22-file static landing + read-only guard + Shadow-DOM emoji checker)",
+    "public-production-pages (_site/ 24-file static landing + read-only guard + Shadow-DOM emoji checker)",
   ],
   browserResults: {},
   agentRoundtripVerified: false,

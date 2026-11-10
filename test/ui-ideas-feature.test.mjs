@@ -44,10 +44,11 @@ test('v4 keeps privacy and non-guaranteed/unsigned explanations in per-area help
  assert.match(help,/field.addEventListener\("input"/);assert.match(css,/min-height:64px/);
 });
 
-test('bottom Terms reuse documented live ownership/escrow/privacy limits without inventing guarantees',()=>{
- const html=readFileSync('reference-web/index.html','utf8'),footer=html.split('<footer')[1];
- assert.ok(footer.indexOf('footer-links')<footer.indexOf('id="siteTerms"')&&footer.indexOf('id="siteTerms"')<footer.indexOf('footer-credit'));
- for(const section of ['📜 About','🔑 Ownership','💰 Payments &amp; fees','↩️ Refunds','🤖 Agents','🔒 Privacy &amp; search logs','⚠️ Risks','⚖️ Disputes'])assert.ok(footer.includes('<h3>'+section+'</h3>'));
- for(const truth of ['no renewals or expiry','original payer','no automatic refund','Query text is saved','not atomic','not guaranteed','no built-in arbitration'])assert.ok(footer.includes(truth),truth);
+test('separate-window Terms reuse the same eight documented live policy sections on Worker and Mirror Site',()=>{
+ const html=readFileSync('reference-web/index.html','utf8'),footer=html.split('<footer')[1],terms=readFileSync('reference-web/terms.html','utf8');
+ assert.doesNotMatch(html,/id="siteTerms"/);assert.match(footer,/href="\/terms" target="_blank" rel="noopener noreferrer"/);
+ for(const section of ['📜 About','🔑 Ownership','💰 Payments &amp; fees','↩️ Refunds','🤖 Agents','🔒 Privacy &amp; search logs','⚠️ Risks','⚖️ Disputes'])assert.ok(terms.includes('<h2>'+section+'</h2>'));
+ for(const truth of ['no renewals or expiry','original payer','no automatic refund','Query text is saved','not atomic','not guaranteed','no built-in arbitration'])assert.ok(terms.includes(truth),truth);
+ assert.doesNotMatch(terms,/<script|<form|coming\s+soon|future\s+plans/i);assert.match(terms,/href="\.\/"/);
  assert.equal((footer.match(/class="github-mark"/g)??[]).length,2);assert.equal((footer.match(/aria-hidden="true" focusable="false"/g)??[]).length,2);assert.match(footer,/>Mirror Site<\/span>/);assert.doesNotMatch(footer,/GitHub Pages/);
 });

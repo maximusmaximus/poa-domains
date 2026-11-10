@@ -1,12 +1,12 @@
-import { drawTicker } from "./ui-ticker.js?v=5c1f8083f451";
-import { actionLabel } from "./ui-copy.js?v=5c1f8083f451";
-import { returnFocus } from "./ui-a11y.js?v=5c1f8083f451";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=5c1f8083f451";
-import { ui } from "./ui-state.js?v=5c1f8083f451";
-import { add, el, person, namedText } from "./ui-core.js?v=5c1f8083f451";
-import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=5c1f8083f451";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=5c1f8083f451";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=5c1f8083f451";
+import { drawTicker } from "./ui-ticker.js?v=4ebb3841970c";
+import { actionLabel } from "./ui-copy.js?v=4ebb3841970c";
+import { returnFocus } from "./ui-a11y.js?v=4ebb3841970c";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=4ebb3841970c";
+import { ui } from "./ui-state.js?v=4ebb3841970c";
+import { add, el, person, namedText } from "./ui-core.js?v=4ebb3841970c";
+import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=4ebb3841970c";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=4ebb3841970c";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=4ebb3841970c";
 
 export function updateTabDots(state) {
     const marks = tabWatermarks(state);

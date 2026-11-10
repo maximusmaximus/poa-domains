@@ -1,4 +1,4 @@
-import { decorateEmojiButton } from "./ui-copy.js?v=5c1f8083f451";
+import { decorateEmojiButton } from "./ui-copy.js?v=4ebb3841970c";
 // Native nonmodal popovers provide touch/keyboard dismissal and do not trap page focus.
 const watched=new WeakSet();
 export function decoratePoaFields(){
@@ -14,7 +14,7 @@ export function installHelp(){
  for(const tab of document.querySelectorAll(".section-tab")){const label=tab.querySelector(".tab-label")?.textContent;if(label){tab.title=label;}}
  for(const [id,message]of Object.entries(descriptions)){
   const module=document.getElementById(id);
-  if(!module||(["escrowPayments","escrowDomain"].includes(id)&&!module.querySelector("h2,h3")))continue;
+  if(!module||(id==="searchResult"&&!module.querySelector(".card"))||(["escrowPayments","escrowDomain"].includes(id)&&!module.querySelector("h2,h3")))continue;
   const selector=id==="searchSection"?"#searchHelpText,#searchPrivacy,#searchLogStatus,#searchLastChecked":id==="searchResult"?"[data-info-description],.amount-label > small":id==="advancedHandoff"?":scope > [data-info-description]":id==="ideasHeading"?".ideas-hint,#ideasContext":id==="manageDomains"?":scope > p":id==="handoffSection"?":scope > .howto,:scope > .handoff-steps,:scope > p":":scope > .howto";
   const source=id==="ideasHeading"?module.closest(".ideas"):module;
   const extra=[...source.querySelectorAll(selector)].filter(n=>!n.closest(".info-popover"));
