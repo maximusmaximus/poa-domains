@@ -81,7 +81,7 @@ try {
     assert.ok(html.includes('id="siteFooter"'));
     assert.match(html, /Tesselate Army/);
     assert.ok(html.includes('id="ideasStrip"')); assert.ok(!html.includes("quick-pills"));
-    assert.match(html, /Live PoA Domains registry/i);
+    assert.match(html, /Loading registry data/i);
     assert.ok(!html.includes("cartSigner"), "cart signer field removed");
     assert.ok(!/local-committed-only/i.test(html), "no local-committed-only in HTML");
     for (const id of ["siteTitle","liveTicker","floatingCartBtn","floatingCartPanel","copyCheckoutBtn","auctionsSection","marketSection","sectionTabs","domainMain","networkStatusBar","siteFooter"]) assert.ok(html.includes(`id="${id}"`), id);

@@ -1318,3 +1318,101 @@ export function htmlHasVisibleXeroEmoji(html) {
     .replace(/font-family:\s*["']?XeroEmoji["']?/gi, "");
   return /xero[\s-]?emoji/i.test(withoutCss);
 }
+
+// Registry-read freshness, not a claim about native chain or escrow balance freshness.
+export function updatedAge(loadedAt, now = Date.now()) {
+  if (!Number.isFinite(loadedAt)) return "not loaded yet";
+  const minutes = Math.max(0, Math.floor((now - loadedAt) / 60000));
+  return minutes < 60 ? `updated ${minutes}m ago` : `updated ${Math.floor(minutes / 60)}h ${minutes % 60}m ago`;
+}
+const SECTION_IDS = new Set(["find", "auctions", "market", "explore", "escrow", "handoff"]);
+export function readViewQuery(search) {
+  const q = new URLSearchParams(search);
+  return { query: (q.get("q") ?? "").slice(0, 2048), tab: SECTION_IDS.has(q.get("tab")) ? q.get("tab") : "find" };
+}
+export function viewPath(pathname, query, tab) {
+  const q = new URLSearchParams();
+  if (query) q.set("q", query.slice(0, 2048));
+  if (SECTION_IDS.has(tab) && tab !== "find") q.set("tab", tab);
+  return pathname + (q.size ? "?" + q : "");
+}
+export function nameErrorReason(error) {
+  const reasons = {
+    "Only roots and direct children": "Use a root name or one child, like shop.rocket. Deeper names are not supported.",
+    "Unsupported name": "Use letters, numbers or supported emoji. Spaces, hyphens and other symbols are not supported.",
+    "Too long": "Keep each part to 32 letters, numbers or emoji or fewer.",
+    "Empty label": "Each part needs a name. Remove the extra dot.",
+  };
+  return "⚠️ Invalid name. " + (reasons[error?.message] ?? "Check the name and try again.");
+}
+/** Current public facts relevant to this cart item. Never raises a user-approved amount. */
+export function cartReview(item, cap, state) {
+  const p = item.params ?? {}, proposed = { ...p }, issues = [];
+  let facts = {}, minimum = item.minimumAmount ?? item.amount, blocked = false;
+  const stop = message => { issues.push(message); blocked = true; };
+  try {
+    if (!state) throw Error("No state");
+    const info = inspectName(item.name, cap.emojiManifest), entry = state.names?.[info.canonical];
+    if (item.action === "announceAuction+bid") {
+      const policy = rootAuctionPolicy(cap, info, item.asset);
+      minimum = policy.reserve; proposed.reserve = minimum; proposed.maxBid = item.amount;
+      const conflict = ownershipConflict(state, item.name, cap.emojiManifest, buildOwnershipIndex(cap.emojiOwnership));
+      const auction = entry?.auctionId || Object.values(state.auctions ?? {}).find(a => a.name === item.name && a.status === "live")?.id;
+      if (!info.isRoot || entry?.activeId || auction || conflict || cap.reservedCatalog?.split(",").includes(item.name))
+        stop("This name is no longer available for a new root auction. Remove it and check Find again.");
+      if (p.reserve !== minimum) issues.push("The capability reserve changed. Review the current minimum.");
+      facts = { policy, activeId: entry?.activeId ?? null, auction: auction ?? null, conflict };
+    } else if (item.action === "bid") {
+      const a = state.auctions?.[p.auctionId];
+      if (!a || a.status !== "live" || a.name !== item.name || state.time < a.openAt || state.time >= auctionCloseAt(a))
+        stop("This auction is no longer open. Remove it and check Find again.");
+      if (a) {
+        minimum = a.high ? minimumNextBid(a.high.amount, cap.increment) : a.reserve;
+        proposed.expectedVersion = a.version;
+        if (p.expectedVersion !== a.version) issues.push("The auction changed or was outbid. Review the new version and minimum bid.");
+        if (item.minimumAmount !== undefined && item.minimumAmount !== minimum) issues.push(`The minimum bid is now ${minimum} ${a.asset}.`);
+        if (item.asset !== a.asset) stop("The auction asset changed. Remove it and check Find again.");
+        facts = { version: a.version, high: a.high, minimum, asset: a.asset, open: a.status === "live" && state.time >= a.openAt && state.time < auctionCloseAt(a) };
+      }
+    } else if (["buyFixed", "fillChildOffer"].includes(item.action)) {
+      const o = state.offers?.[p.offerId], d = o && state.deeds?.[o.parentId];
+      if (!o || !offerIsActive(o, state.time) || !d || d.retired || state.names?.[d.name]?.activeId !== d.id || d.owner !== o.owner)
+        stop("This offer is gone or no longer valid. Remove it and check Find again.");
+      if (o) {
+        proposed.expectedVersion = o.version; minimum = o.price;
+        if (p.expectedVersion !== o.version) issues.push("The offer version changed. Review it before copying.");
+        if (o.price !== item.amount || o.asset !== item.asset) stop("The offer price or asset changed. Remove it and add the fresh offer only if you agree.");
+        if (item.action === "fillChildOffer") {
+          proposed.expectedGeneration = (entry?.generation ?? 0) + 1;
+          if (entry?.activeId || entry?.auctionId || (o.labels && !o.labels.includes(p.label)) || o.kind !== "child") stop("This child offer no longer covers the name. Remove it and check Find again.");
+          if (p.expectedGeneration !== proposed.expectedGeneration) issues.push("The child name generation changed. Review it before copying.");
+        } else if (o.kind !== "resale" || d?.name !== item.name) stop("This resale no longer matches the name. Remove it and check Find again.");
+        facts = { offer: o, owner: d?.owner, deedVersion: d?.version, generation: proposed.expectedGeneration ?? null, activeId: entry?.activeId ?? null };
+      }
+    } else stop("This cart action needs a fresh check in Find. Remove it and add it again.");
+    if (!/^[1-9][0-9]{0,38}$/.test(item.amount) || BigInt(item.amount) < BigInt(minimum))
+      stop(`Your amount is below the current minimum of ${minimum} ${item.asset}. Edit it yourself or remove the item; your cap was not raised.`);
+  } catch { stop("Could not check this item. Refresh, or remove it and check Find again."); }
+  return { signature: JSON.stringify(facts), issues, minimum, params: proposed, canAcknowledge: !blocked && !item.validationError };
+}
+export function recheckCartItem(item, cap, state) {
+  const review = cartReview(item, cap, state);
+  const needsReview = !!item.needsReview || review.issues.length > 0 || (item.reviewedState !== undefined && item.reviewedState !== review.signature);
+  return { ...item, needsReview, reviewMessage: needsReview ? review.issues.join(" ") || "Registry data changed. Review this item before copying." : "",
+    reviewedState: item.reviewedState ?? (needsReview ? undefined : review.signature) };
+}
+export function acknowledgeCartItem(item, cap, state) {
+  const review = cartReview(item, cap, state);
+  if (!review.canAcknowledge) throw Error(review.issues.join(" ") || "Fix the amount before reviewing.");
+  const updated = { ...item, params: review.params, minimumAmount: review.minimum, reviewedState: review.signature, needsReview: false, reviewMessage: "" };
+  updated.summary = cartSummary(updated);
+  return updated;
+}
+
+/** Derive display time from the server read without changing the hashed snapshot. */
+export function registryViewState(payload) {
+  const state = payload?.state, observed = payload?.observedServerTime ?? state?.time;
+  if (!state?.names || !state?.deeds || !state?.auctions || !Number.isSafeInteger(state.time) || state.time < 0 ||
+      !Number.isSafeInteger(observed) || observed < state.time) throw Error("Invalid registry time or state");
+  return { ...state, time: observed };
+}

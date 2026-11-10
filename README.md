@@ -87,6 +87,8 @@ You can also launch an ephemeral in-memory demo instance with `npm run reference
 
 The Web Explorer (`reference-web/`) provides a complete, zero-framework, XSS-hardened interface for human users to inspect registry state, search domain availability, queue domains into a bid/purchase cart, and generate a copy-paste prompt for their AI agent.
 
+The explorer labels hosted registry data, local registry data and synthetic demo data separately; native naming remains distinct from the live escrow service. Registry-read age appears on every tab in minutes/hours (My POA refreshes separately). A failed read keeps the last view with a visible error and pauses cart copying. Changed cart versions/minimums need **Review changed item**; expired offers, changed fixed prices or unavailable names must be removed and checked again. Polling never raises a spending cap or wipes a draft. Share a view with `?q=alpha&tab=auctions`.
+
 ### Human Domain Availability Search & Agent Bid/Purchase Cart
 
 1. **Search Any Root or Child Domain (`#searchSection`)**:

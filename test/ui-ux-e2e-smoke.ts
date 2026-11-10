@@ -272,7 +272,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#searchInput").press("Enter");
   assert.match(
     await page.locator("#searchResult").innerText(),
-    /INVALID DOMAIN FORMAT/,
+    /Invalid name.*Use letters, numbers or supported emoji/,
   );
 
   // (b) Reserved root domain

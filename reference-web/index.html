@@ -5,15 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=53cab020d711" />
+    <link rel="stylesheet" href="/style.css?v=de064ee15921" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
     <header>
       <h1 id="siteTitle" class="site-title" aria-label="poadomains"><span class="title-fallback">poadomains</span></h1>
-      <p id="mode"><span aria-hidden="true">🟢</span> Live PoA Domains registry</p>
+      <p id="mode">⏳ Loading registry data…</p>
     </header>
 
+    <div class="registry-read-status">
+      <p id="registryLoading" role="status">⏳ Loading registry data… You can use the tabs and type a search now.</p>
+      <p id="registryAge" title="Registry data only. My POA refreshes separately.">not loaded yet</p>
+      <div id="registryError" role="alert" hidden><span id="registryErrorText"></span> <button id="registryRetry" type="button" class="secondary small">🔄 Refresh</button></div>
+    </div>
     <div id="networkStatusBar" class="network-status-bar" data-level="checking" role="status" aria-live="polite" hidden>
       <span id="networkStatusIcon" class="network-status-icon" aria-hidden="true">⚪</span>
       <span id="networkStatusText" class="network-status-text">Checking PoA network…</span>
@@ -28,20 +33,20 @@
 
     <nav id="sectionTabs" class="section-tabs" role="tablist" aria-label="Site sections">
       <button type="button" class="section-tab is-active" role="tab" aria-selected="true" data-tab="find" id="tabFind">
-        <span class="tab-icon" aria-hidden="true">🔍</span><span class="tab-label">Find</span><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
+        <span class="tab-icon" aria-hidden="true">🔍</span><span class="tab-label">Find</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="auctions" id="tabAuctions">
-        <span class="tab-icon" aria-hidden="true">🏷️</span><span class="tab-label">Auctions</span><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
+        <span class="tab-icon" aria-hidden="true">🏷️</span><span class="tab-label">Auctions</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="market" id="tabMarket">
-        <span class="tab-icon" aria-hidden="true">💰</span><span class="tab-label">For sale</span><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
+        <span class="tab-icon" aria-hidden="true">💰</span><span class="tab-label">For sale</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="explore" id="tabExplore">
-        <span class="tab-icon" aria-hidden="true">🧭</span><span class="tab-label">Explore</span><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
+        <span class="tab-icon" aria-hidden="true">🧭</span><span class="tab-label">Explore</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
-      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="escrow" id="tabEscrow"><span class="tab-icon" aria-hidden="true">🪙</span><span class="tab-label">My POA</span><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span></button>
+      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="escrow" id="tabEscrow"><span class="tab-icon" aria-hidden="true">🪙</span><span class="tab-label">My POA</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span></button>
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="handoff" id="tabHandoff">
-        <span class="tab-icon" aria-hidden="true">🧾</span><span class="tab-label">Handoff</span><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
+        <span class="tab-icon" aria-hidden="true">🧾</span><span class="tab-label">Handoff</span><small class="tab-age" title="Registry data only; My POA refreshes separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
     </nav>
 
@@ -273,6 +278,6 @@
       <p id="floatingCartStatus" class="muted" role="status"></p>
     </div>
 
-    <script type="module" src="/app.js?v=d0c707dd67a1"></script>
+    <script type="module" src="/app.js?v=c1198131da87"></script>
   </body>
 </html>

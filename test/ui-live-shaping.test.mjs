@@ -293,7 +293,7 @@ test("home HTML: skip link first, one-row tabs, ideas strip, footer links, no to
   const header = html.slice(html.indexOf("<header>"), html.indexOf("</header>"));
   assert.ok(!header.includes("<a "), "no links in header");
   assert.equal(/xero[\s-]?emoji/i.test(html), false);
-  assert.match(html, /Live PoA Domains registry/);
+  assert.match(html, /Loading registry data/);
   assert.ok(!html.includes("cartSigner"));
   assert.ok(!html.includes("listValidSeconds"));
   assert.ok(html.includes("listValidHours"));

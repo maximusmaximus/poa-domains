@@ -29,7 +29,7 @@ export async function browserSmoke(
     await page.waitForFunction(
       () => document.querySelectorAll("#action option").length === 17,
     );
-    assert.match(await page.locator("#mode").innerText(), /Live PoA Domains registry/);
+    assert.match(await page.locator("#mode").innerText(), /(?:Local|Hosted) registry data/);
     await page.waitForFunction(
       () =>
         document
@@ -47,7 +47,7 @@ export async function browserSmoke(
       /registry-committed/,
     );
     checks.push(
-      "read-only UI loads all 17 implemented actions and clearly labels live registry state",
+      "read-only UI loads all 17 implemented actions and clearly labels registry data mode",
     );
     const state = e.snapshot();
     const d = state.deeds[state.names.alpha!.activeId!]!;
