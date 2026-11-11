@@ -1,9 +1,10 @@
-import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=5b78b4c31892";
-import { ui } from "./ui-state.js?v=5b78b4c31892";
-import { add, el } from "./ui-core.js?v=5b78b4c31892";
-import { runSearch } from "./ui-search.js?v=5b78b4c31892";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=5b78b4c31892";
-import { updateTabDots } from "./ui-render.js?v=5b78b4c31892";
+import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=83f3ceb60c16";
+import { ui } from "./ui-state.js?v=83f3ceb60c16";
+import { add, el } from "./ui-core.js?v=83f3ceb60c16";
+import { runSearch } from "./ui-search.js?v=83f3ceb60c16";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=83f3ceb60c16";
+import { updateTabDots } from "./ui-render.js?v=83f3ceb60c16";
+import { syncCartShortcutNow } from "./ui-cart.js?v=83f3ceb60c16";
 
 export function writeViewURL(path = location.pathname) {
     const next = viewPath(path, ui.lastSearch, ui.activeSectionTab);
@@ -123,6 +124,7 @@ export function setSectionTab(tabId, markSeen = true) {
         section.classList.toggle("is-active-section", on);
         section.hidden = !on;
     }
+    syncCartShortcutNow();
     if (markSeen && ui.latestState) {
         const marks = tabWatermarks(ui.latestState);
         ui.tabSeen = { ...ui.tabSeen, [tabId]: marks[tabId] ?? ui.latestState.sequence ?? 0 };

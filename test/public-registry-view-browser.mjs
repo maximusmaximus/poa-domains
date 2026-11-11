@@ -12,6 +12,7 @@ for(const [name,launcher]of [['chromium',chromium],['firefox',firefox],['webkit'
  // Non-critical notes are in the window's ℹ️ popover, immediately left of its ❌; only one short status line stays visible.
  const visibleText=await page.locator('body').innerText();for(const note of ['Test records are hidden','internal registry units, not POA','POA payments refresh separately','Hosted registry data','Local registry data'])assert.ok(!visibleText.includes(note),note);
  assert.equal((await page.locator('#networkStatusText').innerText()).split('\n').length,1);
+ await expect(page.locator('#networkStatusIcon')).toBeHidden();assert.equal([...(await page.locator('#networkStatusBar .status-network').innerText()).matchAll(/[⚪🟢🟡🔴●]/gu)].length,1);
  const corner=await page.locator('#networkStatusBar').evaluate(n=>{const a=n.querySelector('#help-networkStatusBar').getBoundingClientRect(),b=n.querySelector('#networkStatusDismiss').getBoundingClientRect();return{gap:b.left-a.right,dy:Math.abs(a.top-b.top)};});assert.ok(corner.gap>=0&&corner.gap<12&&corner.dy<2,JSON.stringify(corner));
  await page.locator('#help-networkStatusBar').click();await expect(page.locator('#info-networkStatusBar')).toContainText('Test records are hidden, not deleted');await expect(page.locator('#info-networkStatusBar')).toContainText('internal registry units');await page.keyboard.press('Escape');
  const text=await page.locator('body').innerText();for(const n of [...HIDDEN.names,...HIDDEN.accounts,...HIDDEN.auctions,...HIDDEN.offers,...HIDDEN.receipts])assert.ok(!text.includes(n),n);

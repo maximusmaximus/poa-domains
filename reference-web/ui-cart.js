@@ -1,11 +1,11 @@
-import { publicNameUnavailable } from "./shared.js?v=5b78b4c31892";
-import { registryUnit } from "./shared.js?v=5b78b4c31892";
-import { actionLabel } from "./ui-copy.js?v=5b78b4c31892";
-import { trapDialog } from "./ui-a11y.js?v=5b78b4c31892";
-import { ui } from "./ui-state.js?v=5b78b4c31892";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=5b78b4c31892";
-import { add, el, endpointBase } from "./ui-core.js?v=5b78b4c31892";
-import { nameLink } from "./ui-router.js?v=5b78b4c31892";
+import { publicNameUnavailable } from "./shared.js?v=83f3ceb60c16";
+import { registryUnit } from "./shared.js?v=83f3ceb60c16";
+import { actionLabel } from "./ui-copy.js?v=83f3ceb60c16";
+import { trapDialog } from "./ui-a11y.js?v=83f3ceb60c16";
+import { ui } from "./ui-state.js?v=83f3ceb60c16";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=83f3ceb60c16";
+import { add, el, endpointBase } from "./ui-core.js?v=83f3ceb60c16";
+import { nameLink } from "./ui-router.js?v=83f3ceb60c16";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || shouldHoldTransactions(ui.networkStatus.level) || !!ui.networkStatus.hold;
@@ -90,6 +90,15 @@ function syncCartShortcut() {
         anchor.focus({ preventScroll: true });
     }
     btn.hidden = hide;
+}
+// Tab and route changes update the shortcut synchronously instead of waiting for the observer callback.
+export function syncCartShortcutNow() {
+    const area = el("searchSection");
+    if (!area || !el("floatingCartBtn"))
+        return;
+    const r = area.getBoundingClientRect();
+    cartAreaVisible = !area.closest("[hidden]") && area.getClientRects().length > 0 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
+    syncCartShortcut();
 }
 function observeCartArea() {
     if (!cartAreaObserver && globalThis.IntersectionObserver) {
