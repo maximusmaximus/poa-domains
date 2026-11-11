@@ -5,5 +5,14 @@ id = "poa-bearer"
 description = "Potential PoA bearer credential"
 regex = '''\bpk_[A-Za-z0-9_-]{24,}\b'''
 entropy = 3.0
-[allowlist]
+[[allowlists]]
 paths = ['''(^|/)node_modules/''', '''(^|/)dist/''', '''(^|/)\.git/''']
+
+# Exactly six deterministic PUBLIC normalized-name hashes, not credentials.
+# Only this fixture + generic detector + these exact values. No path-wide exemption.
+[[allowlists]]
+description = "Audited public name identifiers in the structural visibility fixture"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(^|/)test/fixtures/public-view-state\.json$''']
+regexes = ['''^(16e3efc1fcaaf3ea18285ea43a37e3c2d59bc56da1e763060f0d8c423df48795|ca9425e748b350178f8583947f9a9a1c2559db149ff8d847dc08cfbd2c5c0eec|ab12daeb1a9ccb24bf075eb1ecafae44ba16e9745af24c5231c93ae4be265f90|e36b734da7288986c3dfd6ca2089fb2f1f448ac6d29e10f97b499efc81b10c4d|53a9daa12276e53024235d8766f87e7fbfae3c406c419d2f740a2ad350c5110b|4e73a46f25b1ab336b680d218a22c73e8c77e0fcc3f8bcc46faacfb3df630e06)$''']

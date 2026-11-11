@@ -1910,6 +1910,12 @@
       "retryable": false
     },
     {
+      "code": "PUBLIC_RECORD_WITHHELD",
+      "httpStatus": 409,
+      "message": "This stored record is not public. The name or reference remains unavailable; it is not free to register. No new action was dispatched. Hidden receipts are not reported as missing: keep the original packet and do not replace its nonce or request ID.",
+      "retryable": false
+    },
+    {
       "code": "DEED_NOT_FOUND",
       "httpStatus": 400,
       "message": "Deed not found. Check the documented inputs and current state.",

@@ -340,7 +340,7 @@ export function openApiDocument(): any {
       title: "PoA Domains Worker API",
       version: API_SCHEMA_VERSION,
       description:
-        "Worker = production. Node is local development only. Registry livePoA:false; native naming is not live. Escrow is a separately gated service. No keys/server-side signing; exact signed-packet retries only. The two disabled lease replay actions are not part of this supported signing contract.",
+        "Worker = production. Node is local development only. Registry livePoA:false; native naming is not live. Registry amounts and onboarding grants are internal units, not native POA or wallet money. Hidden stored test records remain unavailable; PUBLIC_RECORD_WITHHELD is not permission to re-register. Escrow is a separately gated service. No keys/server-side signing; exact signed-packet retries only. The two disabled lease replay actions are not part of this supported signing contract.",
     },
     servers: [{ url: API_ORIGIN }],
     paths,
@@ -400,7 +400,7 @@ export function agentCard(): any {
     name: "PoA Domains Registry",
     url: API_ORIGIN,
     description:
-      "Application registry explorer and agent API; native-chain naming is not live.",
+      "Application registry explorer and agent API; native-chain naming is not live. Registry prices, balances and onboarding grants are internal units, not POA or wallet money. Test records are hidden, not deleted; hidden names remain reserved.",
     surface: API_SURFACE,
     limits: API_LIMITS,
     authentication: {
@@ -438,7 +438,7 @@ export function discoveryDocuments(): Record<
     "/llms.txt": {
       type: "text/plain; charset=utf-8",
       text:
-        "# PoA Domains Registry\n\n> Worker = production. Registry finality is registry-committed, livePoA:false. Native-chain naming is NOT live. Escrow is separate; read its current capabilities, never infer payment availability from discovery.\n\n- [Remote MCP first](" +
+        "# PoA Domains Registry\n\n> Worker = production. Registry finality is registry-committed, livePoA:false. Native-chain naming is NOT live. Registry prices, balances and onboarding grants are internal units, NOT POA or wallet money. Test records are hidden, not deleted. Hidden names and references return PUBLIC_RECORD_WITHHELD and remain unavailable; hidden receipts are not a missing outcome. Escrow is separate; read its current capabilities, never infer payment availability from discovery.\n\n- [Remote MCP first](" +
         API_ORIGIN +
         "/mcp): stateless Streamable HTTP, protocol 2025-11-25. POST only; Accept: application/json, text/event-stream. No browser Origin.\n- [REST OpenAPI](" +
         API_ORIGIN +

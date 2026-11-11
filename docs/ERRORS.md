@@ -1282,6 +1282,10 @@ HTTP 409; retryable: false. Several offers match. Read the offers and quote agai
 
 HTTP 400; retryable: false. Supply each required quote input explicitly before signing.
 
+## PUBLIC_RECORD_WITHHELD
+
+HTTP 409; retryable: false. This stored record is not public. The name or reference remains unavailable; it is not free to register. No new action was dispatched. Hidden receipts are not reported as missing: keep the original packet and do not replace its nonce or request ID.
+
 ## DEED_NOT_FOUND
 
 HTTP 400; retryable: false. Deed not found. Check the documented inputs and current state.

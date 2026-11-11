@@ -19,7 +19,7 @@ try {
         await page.locator("#searchInput").fill(name); await page.locator("#searchBtn").click();
         const tier = inspectName(name, h.cap.emojiManifest).tier;
         const reserve = h.cap.assets.POA[tier === "premium" ? "premiumReserve" : "standardReserve"];
-        const input = page.getByLabel("Maximum bid in POA for " + name, { exact: true });
+        const input = page.getByLabel("Maximum bid in registry units for " + name, { exact: true });
         assert.equal(await input.inputValue(), reserve);
         await input.fill("bad"); await page.locator("#addToCartBtn").click();
         assert.match(await page.locator("#searchResult").innerText(), /at least/);
@@ -27,7 +27,7 @@ try {
         assert.equal(await page.locator("#cartCount").innerText(), "0");
         await input.fill(reserve); await page.locator("#addToCartBtn").click();
         const edited = (BigInt(reserve) * 3n).toString();
-        const cartInput = page.getByLabel("Bid or price amount in POA for " + name, { exact: true });
+        const cartInput = page.getByLabel("Bid or price amount in registry units for " + name, { exact: true });
         await cartInput.fill(edited);
         await page.waitForFunction(()=>!document.querySelector("#copyCartPrompt").disabled);
         const prompt = await page.locator("#cartPrompt").innerText();
@@ -45,7 +45,7 @@ try {
         const repaired = await page.locator("#cartPrompt").innerText();
         const restored=JSON.parse(repaired.split("```json\n")[1].split("\n```")[0]);
         assert.equal(restored.items[0].params.reserve,reserve);assert.equal(restored.items[0].params.maxBid,edited);
-        assert.equal(await page.getByLabel("Bid or price amount in POA for " + name, { exact: true }).inputValue(), edited);
+        assert.equal(await page.getByLabel("Bid or price amount in registry units for " + name, { exact: true }).inputValue(), edited);
         await page.locator("#clearCart").click();
       }
       // Capability timing is not a presentation constant: use a deliberately different read-only fixture.

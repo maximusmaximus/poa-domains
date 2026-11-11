@@ -39,7 +39,7 @@ test("root reserves and both bidding windows match capabilities under both profi
 test("edited prompt snapshot keeps capability reserve fixed while amount, maxBid, summary, CLI cap and checkout change", async () => {
   const edited = editCartAmount(item, "250", cap);
   assert.deepEqual([edited.amount, edited.params.reserve, edited.params.maxBid], ["250", "100", "250"]);
-  assert.match(edited.summary, /reserve=100 POA.*maxTotal=250 POA/);
+  assert.match(edited.summary, /reserve=100 registry units.*maxTotal=250 registry units/);
   assert.equal(item.amount, "100", "pure edit does not mutate prior state");
   const prompt = await buildAgentCartPrompt([edited], cap, SIGNER, "http://127.0.0.1:8787", "local-reference-only", snapshot, 1000000000);
   assert.equal(prompt, readFileSync("test/fixtures/cart-edited-prompt.txt", "utf8"));
@@ -79,7 +79,7 @@ test("above-reserve edit matches both capability policies and CLI forwards an ac
     const edited = editCartAmount({ ...item, amount: minimum, params: { ...item.params, reserve: minimum } }, (BigInt(minimum) * 3n).toString(), c);
     assert.equal(edited.params.reserve, minimum);
     assert.equal(edited.params.maxBid, edited.amount);
-    assert.match(edited.summary, new RegExp(`reserve=${minimum} POA.*maxTotal=${edited.amount} POA`));
+    assert.match(edited.summary, new RegExp(`reserve=${minimum} registry units.*maxTotal=${edited.amount} registry units`));
   }
   const key = generateKeyPairSync("ed25519").privateKey;
   const issuer = publicPrincipal(key), engine = new Engine(fixtureConfig(issuer, "ed25519:" + "3".repeat(64), []), new ManualClock(1000000));
