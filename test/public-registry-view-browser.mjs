@@ -55,6 +55,13 @@ for(const [name,launcher]of [['chromium',chromium],['firefox',firefox],['webkit'
  await page.goto(h.url+'/?q=nexus');await page.waitForFunction(()=>document.body.dataset.registryStatus==='ready');await page.locator('#searchInput').fill('👩🏿‍🦰');await page.locator('#searchBtn').click();await expect(page.locator('#searchResult')).toContainText('not free to register');assert.equal(await page.locator('#addToCartBtn').count(),0);
  await page.locator('#searchInput').fill('newpublicname');await page.locator('#searchBtn').click();await expect(page.locator('#searchResult')).toContainText('registry units');await expect(page.getByLabel('Maximum bid in registry units for newpublicname',{exact:true})).toBeVisible();
  await page.goto(h.url);await page.waitForFunction(()=>document.body.dataset.registryStatus==='ready');await expect(page.locator('#floatingCartBtn')).toBeHidden();if(process.env.PUBLIC_VIEW_SCREENSHOTS&&name==='chromium'){mkdirSync(process.env.PUBLIC_VIEW_SCREENSHOTS,{recursive:true});await page.screenshot({path:process.env.PUBLIC_VIEW_SCREENSHOTS+'/clean-'+(width===390?'mobile':'desktop')+'.png',fullPage:true});}
+ // Regression (Nov 11 prod): the filtered public view must still build an unsigned handoff from its stored-state hash.
+ await page.locator('#searchInput').fill('freshhandoffname');await page.locator('#searchInput').press('Enter');
+ await page.locator('#searchResult input[aria-label^="Maximum bid"]').fill('1000000000');await page.locator('#searchResult button:has-text("🛒")').click();
+ await page.locator('#tabHandoff').click();await expect(page.locator('#cartPrompt')).toContainText(h.payload.stateHash);
+ await expect(page.locator('#cartPrompt')).not.toContainText("Couldn't build");const handoff=JSON.parse((await page.locator('#cartPrompt').innerText()).split('```json\n')[1].split('\n```')[0]);
+ assert.equal(handoff.livePoA,false);assert.equal(handoff.unsigned,true);assert.equal(handoff.sequence,h.payload.state.sequence);
+ await page.locator('#tabFind').click();await page.evaluate(()=>{localStorage.clear();});
  assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.close();}
  assert.deepEqual(h.writes,[]);assert.equal(engine.stateHash(),original.stateHash);console.log('PASS',name,'bounded 390/1440 tabs/chips/help/ticker, contrast>=4.5, stable title, six read-status dots, cart shortcut suppression; clean public view, empty ticker/collections, reserved hidden aliases, internal units, unchanged state, zero writes');
  }finally{await browser.close();await h.close();}

@@ -226,7 +226,7 @@ export function rootAuctionPolicy(cap, info, asset = "POA") {
   const reserve = info.tier === "premium" ? policy?.premiumReserve : policy?.standardReserve;
   if (!/^[1-9][0-9]{0,38}$/.test(reserve ?? "") || !Number.isSafeInteger(timing?.window) ||
       !Number.isSafeInteger(timing?.quiet) || timing.window <= 0 || timing.quiet <= 0)
-    throw Error("⚠️ Prices unavailable. Refresh before adding this name.");
+    throw Error("🤷 Prices unavailable. Tap 🔄 Refresh first.");
   return { reserve, window: timing.window, quiet: timing.quiet };
 }
 export function compactAmount(value) {
@@ -280,7 +280,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA } from "./agent-cart.js?v=83f3ceb60c16";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA } from "./agent-cart.js?v=16e74e99de64";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {

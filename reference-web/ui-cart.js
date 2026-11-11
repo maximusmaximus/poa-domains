@@ -1,11 +1,11 @@
-import { publicNameUnavailable } from "./shared.js?v=83f3ceb60c16";
-import { registryUnit } from "./shared.js?v=83f3ceb60c16";
-import { actionLabel } from "./ui-copy.js?v=83f3ceb60c16";
-import { trapDialog } from "./ui-a11y.js?v=83f3ceb60c16";
-import { ui } from "./ui-state.js?v=83f3ceb60c16";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=83f3ceb60c16";
-import { add, el, endpointBase } from "./ui-core.js?v=83f3ceb60c16";
-import { nameLink } from "./ui-router.js?v=83f3ceb60c16";
+import { publicNameUnavailable } from "./shared.js?v=16e74e99de64";
+import { registryUnit } from "./shared.js?v=16e74e99de64";
+import { actionLabel } from "./ui-copy.js?v=16e74e99de64";
+import { trapDialog } from "./ui-a11y.js?v=16e74e99de64";
+import { ui } from "./ui-state.js?v=16e74e99de64";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=16e74e99de64";
+import { add, el, endpointBase } from "./ui-core.js?v=16e74e99de64";
+import { nameLink } from "./ui-router.js?v=16e74e99de64";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || shouldHoldTransactions(ui.networkStatus.level) || !!ui.networkStatus.hold;
@@ -45,29 +45,29 @@ export function clearAllCart() {
 
 let handoffGeneration=0;
 export function updateHandoffAge(){
-    const text=ui.handoffData?"🧾 Agent Cart Handoff v2 · "+updatedAge(ui.handoffData.generatedAt).replace("updated","generated"):"🧾 Agent Cart Handoff v2 · "+(ui.handoffPending?"building…":"not ready");
+    const text=ui.handoffData?"🧾 Agent Cart Handoff v2 · "+updatedAge(ui.handoffData.generatedAt).replace("updated","generated"):"🧾 Agent Cart Handoff v2 · "+(ui.handoffPending?"building…":ui.handoffError?"not ready: "+ui.handoffError:"not ready");
     for(const id of ["cartHandoffMeta","floatingHandoffMeta"])if(el(id))el(id).textContent=text;
 }
 export async function updatePromptText() {
     const generation=++handoffGeneration;
     el("cartAnchor").classList.toggle("cart-empty",!ui.cart.length);
-    ui.handoffData=null;ui.handoffPending=false;
+    ui.handoffData=null;ui.handoffPending=false;ui.handoffError="";
     if(!ui.cart.length||!ui.cap){
-        if(!ui.cart.length)el("cartPrompt").textContent="Add one or more domains from availability search, live auctions, or standing offers to generate your agent prompt.";
+        if(!ui.cart.length)el("cartPrompt").textContent="🛒 Your cart is empty. Add a name from Find, Auctions or For sale.";
         updateHandoffAge();updateCartCopyState();return;
     }
     if(cartCopyBlocked()){
-        el("cartPrompt").textContent=ui.refreshing?"⏳ Checking registry data before copying…":ui.registryReadFailed?"⚠️ Refresh registry data before copying.":"⚠️ Review changed cart items and fix any amount before copying.";
+        el("cartPrompt").textContent=ui.refreshing?"⏳ Checking the registry…":ui.registryReadFailed||ui.lastLoadedAt===null?"🔄 Refresh registry data first.":shouldHoldTransactions(ui.networkStatus.level)||ui.networkStatus.hold?"⏸️ Handoff paused while the PoA network is down. Nothing was sent.":"✏️ Fix the cart items marked for review.";
         updateHandoffAge();updateCartCopyState();return;
     }
     ui.handoffPending=true;updateHandoffAge();updateCartCopyState();
-    el("cartPrompt").textContent="⏳ Building your versioned cart handoff…";
+    el("cartPrompt").textContent="🧾 Building your handoff…";
     try{
         const data=await buildAgentCartHandoff(structuredClone(ui.cart),ui.cap,"",endpointBase(),ui.configMode,structuredClone(ui.rawSnapshot));
         if(generation!==handoffGeneration||cartCopyBlocked())return;
         ui.handoffData=data;el("cartPrompt").textContent=renderAgentCartHandoff(data);
-    }catch{
-        if(generation===handoffGeneration)el("cartPrompt").textContent="⚠️ Could not build the cart handoff. Refresh registry data and try again. Nothing was submitted.";
+    }catch(error){
+        if(generation===handoffGeneration){ui.handoffError=String(error?.message||error).slice(0,200);el("cartPrompt").textContent="😕 Couldn't build your handoff. Tap 🔄 Refresh and try again. Nothing was sent.";}
     }finally{
         if(generation===handoffGeneration){ui.handoffPending=false;updateHandoffAge();updateCartCopyState();}
     }
@@ -191,7 +191,7 @@ export function renderCart() {
                     renderCart();
                 }
                 catch {
-                    el("cartStatus").textContent = "⚠️ Fix the amount or remove this item, then check Find again.";
+                    el("cartStatus").textContent = "✏️ Fix the amount or remove this item.";
                 }
             });
         }

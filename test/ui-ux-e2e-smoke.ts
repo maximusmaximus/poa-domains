@@ -424,7 +424,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   assert.equal(await page.locator("#copyCartPrompt").isDisabled(), true);
   assert.match(
     (await page.locator("#cartPrompt").textContent()) ?? "",
-    /Add one or more domains/,
+    /Your cart is empty/,
   );
 
   assert.equal(await page.locator("#cartPrompt").isVisible(), false);
