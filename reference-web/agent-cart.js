@@ -1,12 +1,12 @@
-import { registryUnit } from "./shared.js?v=83f3ceb60c16";
-import { actionLabel } from "./ui-copy.js?v=83f3ceb60c16";
+import { registryUnit } from "./shared.js?v=16e74e99de64";
+import { actionLabel } from "./ui-copy.js?v=16e74e99de64";
 /** One unsigned Cart Handoff v2 object; text, clipboard and download derive from it. */
 import {
   canonical,
   safeObject,
   validPrincipal,
   cartParamsForSigner,
-} from "./shared.js?v=83f3ceb60c16";
+} from "./shared.js?v=16e74e99de64";
 export const CART_SCHEMA_VERSION = "poa-domains.agent-cart.v2";
 const HASH = { type: "string", pattern: "^[a-f0-9]{64}$" },
   UINT = { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER };
@@ -294,8 +294,18 @@ export async function buildAgentCartHandoff(
     generatedAt < 0
   )
     throw Error("Refresh registry state before copying");
-  const stateHash = await hash("local-state/v1", snapshot.state);
-  if (snapshot.stateHash && snapshot.stateHash !== stateHash)
+  const view = snapshot.publicView,
+    storedScope =
+      view?.filtered === true &&
+      view.stateHashScope === "complete-stored-state" &&
+      view.sequenceScope === "complete-stored-state";
+  if (storedScope && !/^[a-f0-9]{64}$/.test(snapshot.stateHash ?? ""))
+    throw Error("Refresh registry state before copying");
+  // A filtered public view cannot be re-hashed locally; its stateHash covers the complete stored state.
+  const stateHash = storedScope
+    ? snapshot.stateHash
+    : await hash("local-state/v1", snapshot.state);
+  if (!storedScope && snapshot.stateHash && snapshot.stateHash !== stateHash)
     throw Error("Registry state hash mismatch; refresh before copying");
   const observedServerTime = snapshot.observedServerTime ?? snapshot.state.time;
   if (

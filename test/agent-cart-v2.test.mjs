@@ -57,6 +57,22 @@ function setup(profile = "fixture") {
 }
 const payloadFrom = (text) =>
   JSON.parse(text.split("```json\n")[1].split("\n```")[0]);
+test("filtered public view builds with its complete-stored-state hash; unscoped mismatches still fail", async () => {
+  const t = setup(),
+    stored = "a".repeat(64),
+    view = { filtered: true, policy: "audited-test-records-v1", stateHashScope: "complete-stored-state", sequenceScope: "complete-stored-state" },
+    snapshot = { ...t.snapshot, stateHash: stored, publicView: view },
+    args = (s) => [t.items, t.cap, SIGNER, "http://127.0.0.1:8787", "live-registry", s, 1000000000],
+    data = await buildAgentCartHandoff(...args(snapshot));
+  assert.equal(data.stateHash, stored);
+  assert.equal(data.livePoA, false);
+  assert.equal(data.unsigned, true);
+  assert.ok(schema(data), ajv.errorsText(schema.errors));
+  assert.equal(await validateAgentCartHandoff(data), true);
+  await assert.rejects(buildAgentCartHandoff(...args({ ...t.snapshot, stateHash: stored })), /state hash mismatch/);
+  await assert.rejects(buildAgentCartHandoff(...args({ ...snapshot, publicView: { ...view, stateHashScope: "public-view" } })), /state hash mismatch/);
+  await assert.rejects(buildAgentCartHandoff(...args({ ...snapshot, stateHash: "bad" })), /Refresh registry state/);
+});
 test("single source schemas, golden v2, exact identity/snapshot and one text/JSON contract under both profiles", async () => {
   for (const file of [
     "docs/schemas/agent-cart-v2.schema.json",

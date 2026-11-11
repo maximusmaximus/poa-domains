@@ -1,6 +1,6 @@
-import { ui } from "./ui-state.js?v=83f3ceb60c16";
-import { el, endpointBase, ownershipView } from "./ui-core.js?v=83f3ceb60c16";
-import { buildListingPrompt, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=83f3ceb60c16";
+import { ui } from "./ui-state.js?v=16e74e99de64";
+import { el, endpointBase, ownershipView } from "./ui-core.js?v=16e74e99de64";
+import { buildListingPrompt, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=16e74e99de64";
 
 export function clearHandoff() {
     ui.generation++;
@@ -12,7 +12,7 @@ export function clearHandoff() {
 
 export function copyDomainListingPrompt(kind) {
     if (ui.registryReadFailed) {
-        el("listingPromptStatus").textContent = "⚠️ Refresh registry data before copying.";
+        el("listingPromptStatus").textContent = "🔄 Refresh registry data first.";
         return;
     }
     if (shouldHoldTransactions(ui.networkStatus.level) || ui.networkStatus.hold) {

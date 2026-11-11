@@ -1,10 +1,10 @@
-import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=83f3ceb60c16";
-import { ui } from "./ui-state.js?v=83f3ceb60c16";
-import { add, el } from "./ui-core.js?v=83f3ceb60c16";
-import { runSearch } from "./ui-search.js?v=83f3ceb60c16";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=83f3ceb60c16";
-import { updateTabDots } from "./ui-render.js?v=83f3ceb60c16";
-import { syncCartShortcutNow } from "./ui-cart.js?v=83f3ceb60c16";
+import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=16e74e99de64";
+import { ui } from "./ui-state.js?v=16e74e99de64";
+import { add, el } from "./ui-core.js?v=16e74e99de64";
+import { runSearch } from "./ui-search.js?v=16e74e99de64";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=16e74e99de64";
+import { updateTabDots } from "./ui-render.js?v=16e74e99de64";
+import { syncCartShortcutNow } from "./ui-cart.js?v=16e74e99de64";
 
 export function writeViewURL(path = location.pathname) {
     const next = viewPath(path, ui.lastSearch, ui.activeSectionTab);

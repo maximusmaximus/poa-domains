@@ -125,7 +125,7 @@ try {
   });
   await blocked();
   await expect(page.locator("#cartPrompt")).toContainText(
-    "Add one or more domains",
+    "Your cart is empty",
   );
   await page.locator("#addToCartBtn").click();
   await ready();
@@ -133,7 +133,8 @@ try {
   await page
     .getByLabel("Bid or price amount in registry units for alpha", { exact: true })
     .fill("600");
-  await expect(page.locator("#cartPrompt")).toContainText("Could not build");
+  await expect(page.locator("#cartPrompt")).toContainText("Couldn't build");
+  await expect(page.locator("#cartHandoffMeta")).toContainText("not ready: fixture digest unavailable");
   await blocked();
   await page.evaluate(() => (window.__failDigests = false));
   await page

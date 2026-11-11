@@ -1,16 +1,16 @@
-import { publicNameUnavailable } from "./shared.js?v=83f3ceb60c16";
-import { installHelp } from "./ui-help.js?v=83f3ceb60c16";
-import { renderManagement } from "./ui-manage.js?v=83f3ceb60c16";
-import { actionLabel } from "./ui-copy.js?v=83f3ceb60c16";
-import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=83f3ceb60c16";
-import { ui } from "./ui-state.js?v=83f3ceb60c16";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=83f3ceb60c16";
-import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=83f3ceb60c16";
-import { render, updateTabDots } from "./ui-render.js?v=83f3ceb60c16";
-import { runSearch } from "./ui-search.js?v=83f3ceb60c16";
-import { renderIdeas } from "./ui-ideas.js?v=83f3ceb60c16";
-import { mountEscrow } from "./escrow.js?v=83f3ceb60c16";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=83f3ceb60c16";
+import { publicNameUnavailable } from "./shared.js?v=16e74e99de64";
+import { installHelp } from "./ui-help.js?v=16e74e99de64";
+import { renderManagement } from "./ui-manage.js?v=16e74e99de64";
+import { actionLabel } from "./ui-copy.js?v=16e74e99de64";
+import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=16e74e99de64";
+import { ui } from "./ui-state.js?v=16e74e99de64";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=16e74e99de64";
+import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=16e74e99de64";
+import { render, updateTabDots } from "./ui-render.js?v=16e74e99de64";
+import { runSearch } from "./ui-search.js?v=16e74e99de64";
+import { renderIdeas } from "./ui-ideas.js?v=16e74e99de64";
+import { mountEscrow } from "./escrow.js?v=16e74e99de64";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=16e74e99de64";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -236,7 +236,7 @@ export async function loadRegistry() {
         else {
             if (config.mode !== "local-reference-only" && config.mode !== "live-registry")
                 throw Error("Unknown mode");
-            el("mode").textContent = ui.configMode === "live-registry" ? "🟢 Hosted registry data · Native naming is not enabled." : "🧪 Local registry data · Not native PoA ownership.";
+            el("mode").textContent = ui.configMode === "live-registry" ? "🏠 Hosted registry data. Native naming is not enabled." : "🧪 Local registry data. Not native PoA ownership.";
             if (config.publicApiBase) {
                 const u = new URL(config.publicApiBase);
                 if (u.username ||
@@ -257,7 +257,7 @@ export async function loadRegistry() {
                 el(id).textContent = `${label}: ${policy.reserve} registry units · ${formatDuration(policy.window)} + ${formatDuration(policy.quiet)} quiet`;
             }
             catch {
-                el(id).textContent = "⚠️ Prices unavailable. Refresh to check.";
+                el(id).textContent = "🤷 Prices unavailable. Tap 🔄 Refresh.";
             }
         }
         // Keep stored cart data; omit withheld entries from this public session.
@@ -312,7 +312,7 @@ export async function loadRegistry() {
     catch {
         ui.readState = null;
         ui.registryReadFailed = true;
-        pageStatus("⚠️ Registry data could not load. Tap Refresh to try again. Nothing was submitted.");
+        pageStatus("📡 Couldn't load registry data. Tap 🔄 Refresh.");
     }
     finally {
         ui.starting = false;
