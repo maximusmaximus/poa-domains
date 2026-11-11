@@ -1,4 +1,4 @@
-import { IDEA_WORDS, IDEA_EMOJI, inspectName } from "./shared.js?v=5b78b4c31892";
+import { IDEA_WORDS, IDEA_EMOJI, inspectName } from "./shared.js?v=83f3ceb60c16";
 const topics = [
  {keys:["moon","star","space","rocket","cosmic","astro","nova","🚀","🌙","🪐"],words:["moonbeam","starlight","orbit","galaxy","cosmos","nebula","comet","astro","lunar"],emoji:["🚀","🌙","🪐","⭐","☄️"]},
  {keys:["sea","ocean","wave","river","water","whale","🌊","🐳"],words:["ocean","coral","tidal","harbor","island","river","pearl","sail","lagoon"],emoji:["🌊","🐳","🐙","🐚","🐠"]},
