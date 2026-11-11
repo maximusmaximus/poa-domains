@@ -20,7 +20,7 @@ async function check(p,name) { await p.locator('#searchInput').fill(name); await
 try {
  await scenario('listeners and escrow mount before slow initial state; submitted search survives loading',async(h,p)=>{
   await p.goto(h.url,{waitUntil:'commit'}); await p.locator('#action option').first().waitFor({state:'attached'});
-  await expect(p.locator('#registryLoading')).toBeVisible();
+  await expect(p.locator('#registryLoading')).not.toHaveAttribute('hidden');
   await p.locator('#tabEscrow').click(); await expect(p.locator('#tabEscrow')).toHaveAttribute('aria-selected','true');
   await expect(p.locator('#escrowPayments h2')).toHaveText('🪙 My POA');
   await p.locator('#tabFind').click(); await check(p,'alpha');
@@ -74,7 +74,7 @@ try {
   await p.locator('#searchInput').fill('unfinished draft'); await poll(h,p); await expect(p.locator('#searchInput')).toHaveValue('unfinished draft');
   await check(p,'bad-name'); await expect(p.locator('#searchResult')).toContainText('Spaces, hyphens');
   await check(p,'alpha'); await p.locator('#searchResult a[href="/d/alpha"]').click(); assert.match(new URL(p.url()).pathname,/\/d\/alpha/);
-  await expect(p.locator('#registryAge')).toBeVisible();
+  await expect(p.locator('#registryAge')).toContainText('Registry data');
  });
  await scenario('domain listing edits and focus survive polling; stale listing copy is held',async(h,p)=>{
   await p.goto(h.url+'/d/alpha'); await ready(p);

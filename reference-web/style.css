@@ -1246,6 +1246,10 @@ html { scroll-padding-top:6rem; }
 #searchSection .idea-offset-2 { padding-top:6px; }
 #searchSection .idea-offset-3 { padding-top:18px; }
 
+/* Status window: one short colored line; details are in its info popover. */
+#networkStatusBar .status-network { padding-right: 6.5rem; min-height: 40px; display: flex; align-items: center; }
+#networkStatusBar .network-status-text { font-weight: 700; }
+
 /* Public-view layout: complete controls and chips stay inside the centered column. */
 .section-tabs {
   display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));

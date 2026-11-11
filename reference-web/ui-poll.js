@@ -1,16 +1,16 @@
-import { publicNameUnavailable } from "./shared.js?v=37fc6af3a0a6";
-import { installHelp } from "./ui-help.js?v=37fc6af3a0a6";
-import { renderManagement } from "./ui-manage.js?v=37fc6af3a0a6";
-import { actionLabel } from "./ui-copy.js?v=37fc6af3a0a6";
-import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=37fc6af3a0a6";
-import { ui } from "./ui-state.js?v=37fc6af3a0a6";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=37fc6af3a0a6";
-import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=37fc6af3a0a6";
-import { render, updateTabDots } from "./ui-render.js?v=37fc6af3a0a6";
-import { runSearch } from "./ui-search.js?v=37fc6af3a0a6";
-import { renderIdeas } from "./ui-ideas.js?v=37fc6af3a0a6";
-import { mountEscrow } from "./escrow.js?v=37fc6af3a0a6";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=37fc6af3a0a6";
+import { publicNameUnavailable } from "./shared.js?v=5b78b4c31892";
+import { installHelp } from "./ui-help.js?v=5b78b4c31892";
+import { renderManagement } from "./ui-manage.js?v=5b78b4c31892";
+import { actionLabel } from "./ui-copy.js?v=5b78b4c31892";
+import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=5b78b4c31892";
+import { ui } from "./ui-state.js?v=5b78b4c31892";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=5b78b4c31892";
+import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=5b78b4c31892";
+import { render, updateTabDots } from "./ui-render.js?v=5b78b4c31892";
+import { runSearch } from "./ui-search.js?v=5b78b4c31892";
+import { renderIdeas } from "./ui-ideas.js?v=5b78b4c31892";
+import { mountEscrow } from "./escrow.js?v=5b78b4c31892";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=5b78b4c31892";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -122,6 +122,11 @@ export async function refreshNetworkStatus() {
     applyNetworkHold();
 }
 
+// Keep critical holds visible in a few words; explanations belong in the window's ℹ️ popover.
+function shortNetworkLine(level) {
+    return { online: "🟢 PoA network Online", degraded: "🟡 PoA network Slow", down: "🔴 PoA network Down · actions held" }[level] ?? "⚪ Checking PoA network…";
+}
+
 export function renderNetworkStatus() {
     const bar = el("networkStatusBar");
     if (!bar)
@@ -135,7 +140,10 @@ export function renderNetworkStatus() {
     if (icon)
         icon.textContent = "";
     if (label)
-        label.textContent = text;
+        label.textContent = shortNetworkLine(level);
+    const detail = el("networkStatusDetail");
+    if (detail)
+        detail.textContent = text;
     bar.hidden = !!ui.statusPanelDismissed;
     const serviceError=document.body.dataset.registryStatus==="error",slow=level==="degraded"||document.body.dataset.registryStatus==="loading";
     bar.dataset.color=serviceError?"red":slow?"yellow":bar.dataset.color;

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=56e00ad4e7cb" />
+    <link rel="stylesheet" href="/style.css?v=ba111be21a85" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -16,10 +16,11 @@
     <div id="networkStatusBar" class="network-status-bar combined-status" data-level="checking" role="region" aria-label="Network and site status">
       <button type="button" id="networkStatusDismiss" class="network-status-dismiss" aria-label="Close network and site status">✕</button>
       <div class="status-network"><span id="networkStatusIcon" class="network-status-icon" aria-hidden="true">⚪</span><span id="networkStatusText" class="network-status-text" role="status" aria-live="polite">Checking PoA network…</span></div>
-              <p id="mode">⏳ Loading registry data…</p>
-    <p id="registryUnitsNotice" class="muted">💡 Registry prices and balances use internal registry units, not POA or wallet money. Native naming and real-payment new-name purchases are unavailable. Test records are hidden, not deleted.</p>
-        <p id="registryLoading" role="status">⏳ Loading registry data… You can use the tabs and type a search now.</p>
-        <p id="registryAge" title="Registry data only. POA payments refresh separately.">Registry data not loaded yet · POA payments refresh separately.</p>
+              <p id="mode" data-info-description>⏳ Loading registry data…</p>
+    <p id="networkStatusDetail" data-info-description class="muted">Checking PoA network…</p>
+    <p id="registryUnitsNotice" data-info-description class="muted">💡 Registry prices and balances use internal registry units, not POA or wallet money. Native naming and real-payment new-name purchases are unavailable. Test records are hidden, not deleted.</p>
+        <p id="registryLoading" data-info-description role="status">⏳ Loading registry data… You can use the tabs and type a search now.</p>
+        <p id="registryAge" data-info-description title="Registry data only. POA payments refresh separately.">Registry data not loaded yet · POA payments refresh separately.</p>
         <div id="registryError" role="alert" hidden><span id="registryErrorText"></span> <button id="registryRetry" type="button" class="secondary small">🔄 Refresh</button></div>
     </div>
 
@@ -99,7 +100,7 @@
           </div>
           <div id="cartList" class="cards"></div>
           <h4>Agent prompt</h4>
-          <p id="cartHandoffMeta" class="muted">🧾 Agent Cart Handoff v2 · not ready</p>
+          <p id="cartHandoffMeta" data-info-description class="muted">🧾 Agent Cart Handoff v2 · not ready</p>
           <pre id="cartPrompt" class="prompt-box">Add names from Find, Auctions, or For sale to build a prompt.</pre>
           <div class="button-row">
             <button id="copyCartPrompt" type="button" disabled>Copy prompt</button>
@@ -304,6 +305,6 @@
       <p id="floatingCartStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
 
-    <script type="module" src="/app.js?v=37fc6af3a0a6"></script>
+    <script type="module" src="/app.js?v=5b78b4c31892"></script>
   </body>
 </html>
