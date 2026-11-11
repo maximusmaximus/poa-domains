@@ -61,7 +61,7 @@ try {
   await expect(p.locator('#copyCartPrompt')).toBeDisabled(); await p.getByRole('button',{name:'Review changed item'}).click();
   await expect(p.locator('#copyCartPrompt')).toBeEnabled(); assert.match(await p.locator('#cartPrompt').innerText(),/"expectedVersion":\s*3/);
   h.stateStatus=500; await poll(h,p); await expect(p.locator('#registryError')).toBeVisible(); await expect(p.locator('#copyCartPrompt')).toBeDisabled();
-  await p.locator('#floatingCartBtn').click(); await expect(p.locator('#copyCheckoutBtn')).toBeDisabled(); await p.locator('#floatingCartClose').click();
+  await p.locator('#tabHandoff').click(); await p.locator('#floatingCartBtn').click(); await expect(p.locator('#copyCheckoutBtn')).toBeDisabled(); await p.locator('#floatingCartClose').click(); await p.locator('#tabFind').click();
   h.stateStatus=200; await p.locator('#registryRetry').click(); await ready(p); await expect(p.locator('#copyCartPrompt')).toBeEnabled();
  },h=>h.payload.state=auctionState());
  await scenario('typing/focus/caret survive registry and network polls, including unsubmitted cart/search drafts',async(h,p)=>{

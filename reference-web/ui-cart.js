@@ -1,11 +1,11 @@
-import { publicNameUnavailable } from "./shared.js?v=79aef9675247";
-import { registryUnit } from "./shared.js?v=79aef9675247";
-import { actionLabel } from "./ui-copy.js?v=79aef9675247";
-import { trapDialog } from "./ui-a11y.js?v=79aef9675247";
-import { ui } from "./ui-state.js?v=79aef9675247";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=79aef9675247";
-import { add, el, endpointBase } from "./ui-core.js?v=79aef9675247";
-import { nameLink } from "./ui-router.js?v=79aef9675247";
+import { publicNameUnavailable } from "./shared.js?v=37fc6af3a0a6";
+import { registryUnit } from "./shared.js?v=37fc6af3a0a6";
+import { actionLabel } from "./ui-copy.js?v=37fc6af3a0a6";
+import { trapDialog } from "./ui-a11y.js?v=37fc6af3a0a6";
+import { ui } from "./ui-state.js?v=37fc6af3a0a6";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=37fc6af3a0a6";
+import { add, el, endpointBase } from "./ui-core.js?v=37fc6af3a0a6";
+import { nameLink } from "./ui-router.js?v=37fc6af3a0a6";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || shouldHoldTransactions(ui.networkStatus.level) || !!ui.networkStatus.hold;
@@ -79,7 +79,31 @@ export function downloadCartJSON(){
     el("cartStatus").textContent="📥 JSON downloaded — unsigned, nothing submitted.";
 }
 
+// Find already contains the inline cart. Hide the shortcut while that area is
+// visible so it cannot cover the counter, suggestion, search or cart controls.
+let cartAreaVisible = false, cartAreaObserver;
+function syncCartShortcut() {
+    const btn = el("floatingCartBtn"), anchor = el("cartAnchor");
+    const hide = cartAreaVisible && !anchor.closest("[hidden]") && el("floatingCartPanel").hidden;
+    if (hide && document.activeElement === btn) {
+        anchor.tabIndex = -1;
+        anchor.focus({ preventScroll: true });
+    }
+    btn.hidden = hide;
+}
+function observeCartArea() {
+    if (!cartAreaObserver && globalThis.IntersectionObserver) {
+        cartAreaObserver = new IntersectionObserver(([entry]) => {
+            cartAreaVisible = entry.isIntersecting;
+            syncCartShortcut();
+        });
+        cartAreaObserver.observe(el("searchSection"));
+    }
+    syncCartShortcut();
+}
+
 export function renderFloatingCart() {
+    observeCartArea();
     const badge = el("floatingCartBadge");
     const list = el("floatingCartList");
     const clearBtn = el("floatingCartClear");
@@ -212,6 +236,7 @@ export function setFloatingCartOpen(open) {
     btn.setAttribute("aria-expanded", String(open));
     if(open){renderFloatingCart();releaseCartFocus=trapDialog(panel,backdrop,btn);}
     else{releaseCartFocus?.();releaseCartFocus=null;}
+    syncCartShortcut();
 }
 
 export function syncIdeaMarks() {

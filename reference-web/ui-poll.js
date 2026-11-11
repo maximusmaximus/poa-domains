@@ -1,16 +1,16 @@
-import { publicNameUnavailable } from "./shared.js?v=79aef9675247";
-import { installHelp } from "./ui-help.js?v=79aef9675247";
-import { renderManagement } from "./ui-manage.js?v=79aef9675247";
-import { actionLabel } from "./ui-copy.js?v=79aef9675247";
-import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=79aef9675247";
-import { ui } from "./ui-state.js?v=79aef9675247";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=79aef9675247";
-import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=79aef9675247";
-import { render } from "./ui-render.js?v=79aef9675247";
-import { runSearch } from "./ui-search.js?v=79aef9675247";
-import { renderIdeas } from "./ui-ideas.js?v=79aef9675247";
-import { mountEscrow } from "./escrow.js?v=79aef9675247";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=79aef9675247";
+import { publicNameUnavailable } from "./shared.js?v=37fc6af3a0a6";
+import { installHelp } from "./ui-help.js?v=37fc6af3a0a6";
+import { renderManagement } from "./ui-manage.js?v=37fc6af3a0a6";
+import { actionLabel } from "./ui-copy.js?v=37fc6af3a0a6";
+import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=37fc6af3a0a6";
+import { ui } from "./ui-state.js?v=37fc6af3a0a6";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=37fc6af3a0a6";
+import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=37fc6af3a0a6";
+import { render, updateTabDots } from "./ui-render.js?v=37fc6af3a0a6";
+import { runSearch } from "./ui-search.js?v=37fc6af3a0a6";
+import { renderIdeas } from "./ui-ideas.js?v=37fc6af3a0a6";
+import { mountEscrow } from "./escrow.js?v=37fc6af3a0a6";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=37fc6af3a0a6";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -25,6 +25,7 @@ export function pageStatus(error = "", loading = false) {
     el("registryErrorText").textContent = error;
     el("registryLoading").hidden = !loading || !!ui.latestState;
     document.body.dataset.registryStatus = error ? "error" : loading ? "loading" : "ready";
+    updateTabDots(ui.latestState);
     el("refresh").disabled = loading;
     el("registryRetry").disabled = loading;
     updateCartCopyState();

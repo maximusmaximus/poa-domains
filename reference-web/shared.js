@@ -280,7 +280,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA } from "./agent-cart.js?v=79aef9675247";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA } from "./agent-cart.js?v=37fc6af3a0a6";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -458,39 +458,32 @@ export function parsePublicJSON(source) {
   return result;
 }
 
-/**
- * Site title: "poadomains" spelled with emoji letters. Only vetted code points that
- * Noto Color Emoji (Android Chrome) renders; never regional indicators.
- * Letters with no emoji form (d, n) render as small CSS letter tiles.
- */
+/** Stable, legible emoji letters. I/D/N/S use text tiles, never info, alert or currency symbols. */
 export const TITLE_LETTER_OPTIONS = {
-  p: ["\u{1F17F}\uFE0F"], // 🅿️
-  o: ["\u{1F17E}\uFE0F", "\u2B55", "\u{1F535}", "\u{1F7E0}", "\u26AA", "\u{1F369}", "\u{1F315}"], // 🅾️ ⭕ 🔵 🟠 ⚪ 🍩 🌕
-  a: ["\u{1F170}\uFE0F"], // 🅰️
-  d: [null], // tile
-  m: ["\u24C2\uFE0F"], // Ⓜ️
-  i: ["\u2139\uFE0F", "\u2757"], // ℹ️ ❗
-  n: [null], // tile
-  s: ["\u{1F4B2}"], // 💲
+  p: ["\u{1F17F}\uFE0F"],
+  o: ["\u{1F17E}\uFE0F"],
+  a: ["\u{1F170}\uFE0F"],
+  d: [null],
+  m: ["\u24C2\uFE0F"],
+  i: [null],
+  n: [null],
+  s: [null],
 };
 export const TITLE_SAFE_CODEPOINTS = new Set([
-  0x44, 0x4e, // tile letters D N
-  0xfe0f,
-  0x1f17f, 0x1f17e, 0x2b55, 0x1f535, 0x1f7e0, 0x26aa, 0x1f369, 0x1f315,
-  0x1f170, 0x24c2, 0x2139, 0x2757, 0x1f4b2,
+  0x44, 0x49, 0x4e, 0x53, 0xfe0f, 0x1f17f, 0x1f17e, 0x1f170, 0x24c2,
 ]);
-export const TITLE_THEMES = ["tilt", "wave", "glow", "pop", "flat"];
-export const TITLE_TILE_COLORS = ["blue", "green", "gold", "violet", "coral"];
+export const TITLE_THEMES = ["flat"];
+export const TITLE_TILE_COLORS = ["blue"];
 
 function pick(list, random) {
   return list[Math.floor(random() * list.length) % list.length];
 }
 
-/** One randomized emoji spelling of "poadomains" (new look on each load). */
+/** The same spelling, presentation and tile color on every load. */
 export function buildSiteTitle(random = Math.random) {
   const glyphs = [];
   for (const letter of "poadomains") {
-    const choice = pick(TITLE_LETTER_OPTIONS[letter], random);
+    const choice = TITLE_LETTER_OPTIONS[letter][0];
     glyphs.push(
       choice === null
         ? { kind: "tile", letter, text: letter.toUpperCase() }
@@ -498,8 +491,8 @@ export function buildSiteTitle(random = Math.random) {
     );
   }
   return {
-    theme: pick(TITLE_THEMES, random),
-    tile: pick(TITLE_TILE_COLORS, random),
+    theme: TITLE_THEMES[0],
+    tile: TITLE_TILE_COLORS[0],
     glyphs,
     text: glyphs.map((g) => g.text).join(""),
     spelled: glyphs.map((g) => g.letter).join(""),

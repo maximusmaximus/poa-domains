@@ -62,6 +62,7 @@ try {
     "🧾 Agent Cart Handoff v2 · generated 0m ago",
   );
   await page.locator("#copyCartPrompt").click();
+  await page.locator("#tabHandoff").click();
   await page.locator("#floatingCartBtn").click();
   await page.locator("#copyCheckoutBtn").click();
   assert.deepEqual(await page.evaluate(() => window.__copied), [
@@ -72,6 +73,7 @@ try {
     await page.locator("#cartHandoffMeta").innerText(),
   );
   await page.locator("#floatingCartClose").click();
+  await page.locator("#tabFind").click();
   const pending = page.waitForEvent("download");
   await page.locator("#downloadCartJSON").click();
   const download = await pending;
