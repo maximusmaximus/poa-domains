@@ -40,6 +40,7 @@ export async function browserSmoke(base, evidence) {
     assert.equal(await page.locator("#liveTicker").count(),1);
     assert.ok((await page.locator("#liveTickerTrack .ticker-chip").count()) + (await page.locator("#liveTickerTrack .ticker-empty").count()) >= 1);
     assert.equal(await page.locator(".auction-tab").count(),3);
+    await page.locator("#tabHandoff").click();
     await page.locator("#floatingCartBtn").click();
     assert.equal(await page.locator("#floatingCartPanel").isVisible(),true);
     await page.waitForFunction(()=>!document.querySelector("#copyCheckoutBtn").disabled);
@@ -58,6 +59,7 @@ export async function browserSmoke(base, evidence) {
     await page.evaluate(()=>document.fonts.ready);
     assert.equal(await page.locator("#error").innerText(),"");
     assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);assert.deepEqual(searchLogs.map(x=>x.query),[ideaName,"quantum","openai"]);
+    await page.locator("#tabHandoff").click();
     await page.locator("#floatingCartBtn").click();
     assert.equal(await page.locator("#floatingCartPanel").isVisible(),true);
     await page.screenshot({path:resolve(evidence,"browser.png"),fullPage:true});

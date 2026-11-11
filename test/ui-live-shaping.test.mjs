@@ -39,7 +39,7 @@ function seq(values) {
   return () => values[i++ % values.length];
 }
 
-test("emoji site title spells poadomains and varies per load", () => {
+test("emoji site title spells poadomains consistently without info/alert/currency substitutions", () => {
   const seen = new Set();
   for (let k = 0; k < 40; k++) {
     const t = buildSiteTitle();
@@ -47,8 +47,12 @@ test("emoji site title spells poadomains and varies per load", () => {
     assert.equal(t.glyphs.length, 10);
     seen.add(t.text + t.theme + t.tile);
   }
-  assert.ok(seen.size > 5, "randomized styles");
-  assert.ok(Object.values(TITLE_LETTER_OPTIONS).flat().filter(Boolean).length >= 10);
+  assert.equal(seen.size, 1, "stable title across reloads");
+  assert.equal(buildSiteTitle().text, "🅿️🅾️🅰️D🅾️Ⓜ️🅰️INS");
+  assert.deepEqual(buildSiteTitle(() => 0), buildSiteTitle(() => .99));
+  assert.ok(!/[ℹ❗💲]/u.test(buildSiteTitle().text));
+  assert.equal(buildSiteTitle().theme, "flat");
+  assert.equal(buildSiteTitle().tile, "blue");
 });
 
 test("partitionAuctions splits past current upcoming from real shapes", () => {

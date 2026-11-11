@@ -49,12 +49,13 @@ async function scan(page, label) {
     label,
   );
 }
-async function tabTo(page, id) {
+async function tabTo(page, id, direction = "Tab") {
   for (let i = 0; i < 160; i++) {
     if (await page.evaluate((id) => document.activeElement?.id === id, id))
       return;
-    await page.keyboard.press("Tab");
+    await page.keyboard.press(direction);
   }
+  console.error("Keyboard reachability", await page.evaluate(()=>({active:document.activeElement?.outerHTML,tabs:[...document.querySelectorAll(".section-tab")].map(n=>({id:n.id,index:n.tabIndex,selected:n.getAttribute("aria-selected")})),inert:[...document.querySelectorAll("[inert]")].map(n=>n.id)})));
   throw Error("Not keyboard reachable: " + id);
 }
 const h = await uiHarness();
@@ -130,9 +131,11 @@ try {
     );
     await page.locator("#addToCartBtn").click();
     await expect(page.locator("#copyCartPrompt")).toBeEnabled();
+    await page.locator("#tabHandoff").click();
     await page.locator("#floatingCartBtn").click();
     await scan(page, `cart dialog ${width}`);
     await page.keyboard.press("Escape");
+    await page.locator("#tabFind").click();
     // Motion is controlled by interaction, not refresh/play buttons. Focus and reduced motion stop it.
     assert.equal(await page.locator("#ideasPause,#ideasShuffle").count(),0);
     const row=page.locator('#ideasStrip .ideas-row').first();await row.focus();
@@ -146,7 +149,7 @@ try {
   }
   await browser.close();
   browser = null;
-  for (const [name, kind] of Object.entries({ chromium, firefox, webkit })) {
+  for (const [name, kind] of Object.entries({ chromium, firefox, webkit }).filter(([n])=>!process.env.UI_IDEAS_BROWSER||process.env.UI_IDEAS_BROWSER===n)) {
     browser = await kind.launch();
     const page = await browser.newPage({
       viewport: { width: 1440, height: 900 },
@@ -166,6 +169,10 @@ try {
       await page.evaluate(() => window.__a11yCopied[0]),
       /poa-domains.agent-cart.v2/,
     );
+    // The shortcut does not cover the visible inline cart. Select another panel by keyboard.
+    await tabTo(page, "tabFind", "Shift+Tab");
+    await page.keyboard.press("End");
+    await expect(page.locator("#handoffSection")).toBeVisible();
     await tabTo(page, "floatingCartBtn");
     await page.keyboard.press("Enter");
     await expect(page.locator("#floatingCartClose")).toBeFocused();

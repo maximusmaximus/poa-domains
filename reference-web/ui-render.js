@@ -1,13 +1,13 @@
-import { registryUnit } from "./shared.js?v=79aef9675247";
-import { drawTicker } from "./ui-ticker.js?v=79aef9675247";
-import { actionLabel } from "./ui-copy.js?v=79aef9675247";
-import { returnFocus } from "./ui-a11y.js?v=79aef9675247";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=79aef9675247";
-import { ui } from "./ui-state.js?v=79aef9675247";
-import { add, el, person, namedText } from "./ui-core.js?v=79aef9675247";
-import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=79aef9675247";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=79aef9675247";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=79aef9675247";
+import { registryUnit } from "./shared.js?v=5b78b4c31892";
+import { drawTicker } from "./ui-ticker.js?v=5b78b4c31892";
+import { actionLabel } from "./ui-copy.js?v=5b78b4c31892";
+import { returnFocus } from "./ui-a11y.js?v=5b78b4c31892";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=5b78b4c31892";
+import { ui } from "./ui-state.js?v=5b78b4c31892";
+import { add, el, person, namedText } from "./ui-core.js?v=5b78b4c31892";
+import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=5b78b4c31892";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=5b78b4c31892";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=5b78b4c31892";
 
 export function updateTabDots(state) {
     const marks = tabWatermarks(state);
@@ -17,7 +17,11 @@ export function updateTabDots(state) {
         if (!dot)
             continue;
         const show = tabHasNew(id, marks, ui.tabSeen);
-        dot.hidden = !show;
+        // This dot is registry-read status, not a payment/native-naming readiness signal.
+        dot.hidden = false;
+        const status = document.body.dataset.registryStatus || "loading";
+        dot.title = `Registry snapshot ${status}; POA payments are checked separately`;
+        dot.setAttribute("aria-hidden", "true");
         const sr = btn.querySelector(".tab-new-text");
         if (sr)
             sr.hidden = !show;

@@ -1,4 +1,4 @@
-import { decorateEmojiButton } from "./ui-copy.js?v=79aef9675247";
+import { decorateEmojiButton } from "./ui-copy.js?v=5b78b4c31892";
 // Native nonmodal popovers provide touch/keyboard dismissal and do not trap page focus.
 const watched=new WeakSet();
 export function decoratePoaFields(){
@@ -15,7 +15,7 @@ export function installHelp(){
  for(const [id,message]of Object.entries(descriptions)){
   const module=document.getElementById(id);
   if(!module||(id==="searchResult"&&!module.querySelector(".card"))||(["escrowPayments","escrowDomain"].includes(id)&&!module.querySelector("h2,h3")))continue;
-  const selector=id==="searchSection"?"#searchHelpText,#searchPrivacy,#searchLogStatus,#searchLastChecked":id==="searchResult"?"[data-info-description],.amount-label > small":id==="advancedHandoff"?":scope > [data-info-description]":id==="ideasHeading"?".ideas-hint,#ideasContext":id==="manageDomains"?":scope > p":id==="handoffSection"?":scope > .howto,:scope > .handoff-steps,:scope > p":":scope > .howto";
+  const selector=id==="searchSection"?"#searchHelpText,#searchPrivacy,#searchLogStatus,#searchLastChecked":id==="searchResult"?"[data-info-description],.amount-label > small":id==="advancedHandoff"?":scope > [data-info-description]":id==="ideasHeading"?".ideas-hint,#ideasContext":id==="manageDomains"?":scope > p":id==="handoffSection"?":scope > .howto,:scope > .handoff-steps,:scope > p":id==="networkStatusBar"?":scope > [data-info-description]":id==="cartAnchor"?":scope > .howto,[data-info-description]":":scope > .howto";
   const source=id==="ideasHeading"?module.closest(".ideas"):module;
   const extra=[...source.querySelectorAll(selector)].filter(n=>!n.closest(".info-popover"));
   const existing=module.querySelector(`[data-help-for="${id}"]`);
