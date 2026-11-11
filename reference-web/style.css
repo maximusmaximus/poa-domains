@@ -1249,6 +1249,8 @@ html { scroll-padding-top:6rem; }
 /* Status window: one short colored line; details are in its info popover. */
 #networkStatusBar .status-network { padding-right: 6.5rem; min-height: 40px; display: flex; align-items: center; }
 #networkStatusBar .network-status-text { font-weight: 700; }
+/* The short line already starts with its colored emoji; hide the extra CSS dot. */
+#networkStatusBar .network-status-icon { display: none; }
 
 /* Public-view layout: complete controls and chips stay inside the centered column. */
 .section-tabs {
