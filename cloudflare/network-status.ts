@@ -113,6 +113,8 @@ type Cache = {
 export type NetworkStatusDeps = {
   fetch?: typeof fetch;
   now?: () => number;
+  /** Test hook; production uses REQUEST_MS. */
+  requestMs?: number;
 };
 
 export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
@@ -121,25 +123,25 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
   let cache: Cache | null = null;
   let consecutiveFailures = 0;
   let everSucceeded = false;
+  const requestMs = deps.requestMs ?? REQUEST_MS;
+  // Hard per-caller deadline: a probe shared from another request (or a stalled body) can never hang a response.
+  const deadlineMs = requestMs + 1000;
   let inflight: Promise<NetworkStatusSnapshot> | null = null;
+  let inflightAt = 0;
 
   async function probe(): Promise<NetworkStatusSnapshot> {
     const started = now();
+    // The abort timer covers headers AND body; previously it was cleared once headers arrived.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), requestMs);
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), REQUEST_MS);
-      let response: Response;
-      try {
-        // Workers Fetch rejects some browser-only init fields; keep this minimal.
-        response = await fetcher(STATUS_URL, {
-          method: "GET",
-          redirect: "manual",
-          headers: { Accept: "application/json" },
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timer);
-      }
+      // Workers Fetch rejects some browser-only init fields; keep this minimal.
+      const response: Response = await fetcher(STATUS_URL, {
+        method: "GET",
+        redirect: "manual",
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      });
       const latencyMs = Math.max(0, now() - started);
       if (!response || response.status !== 200 || response.status >= 300) {
         consecutiveFailures += 1;
@@ -170,7 +172,13 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
           latencyMs,
         });
       }
-      const body = (await response.json()) as Record<string, unknown>;
+      const body = (await Promise.race([
+        response.json(),
+        new Promise((_, reject) => {
+          if (controller.signal.aborted) reject(Error("NETWORK_TIMEOUT"));
+          controller.signal.addEventListener("abort", () => reject(Error("NETWORK_TIMEOUT")), { once: true });
+        }),
+      ])) as Record<string, unknown>;
       let parsed;
       try { parsed = parseNetworkStatus(body, {availabilityOnly:true, now:started, fail: () => { throw Error("NETWORK_SCHEMA"); }}); }
       catch { /* Keep the deployed status-only probe failure/hold behavior. */ }
@@ -219,7 +227,25 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
         failures: consecutiveFailures,
         latencyMs: Math.max(0, now() - started),
       });
+    } finally {
+      clearTimeout(timer);
     }
+  }
+
+  /** Same result a failed probe would give, without mutating counters (the probe itself still records). */
+  function timedOut(): NetworkStatusSnapshot {
+    const failures = consecutiveFailures + 1;
+    return snapshot(classifyProbe({ ok: false, latencyMs: deadlineMs, consecutiveFailures: failures, everSucceeded }), {
+      checkedAt: now(),
+      failures,
+      latencyMs: deadlineMs,
+    });
+  }
+
+  function withDeadline(run: Promise<NetworkStatusSnapshot>): Promise<NetworkStatusSnapshot> {
+    let id: ReturnType<typeof setTimeout> | undefined;
+    const limit = new Promise<NetworkStatusSnapshot>((resolve) => { id = setTimeout(() => resolve(timedOut()), deadlineMs); });
+    return Promise.race([run, limit]).finally(() => clearTimeout(id));
   }
 
   async function getStatus(options?: {
@@ -233,13 +259,16 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
     ) {
       return cache.snap;
     }
-    if (inflight) return inflight;
-    inflight = probe().then((snap) => {
+    // Reuse a recent shared probe, but never one older than the deadline (its request may have been cancelled).
+    if (inflight && t - inflightAt < deadlineMs) return withDeadline(inflight);
+    const run: Promise<NetworkStatusSnapshot> = probe().then((snap) => {
       cache = { at: now(), snap };
-      inflight = null;
+      if (inflight === run) inflight = null;
       return snap;
     });
-    return inflight;
+    inflight = run;
+    inflightAt = t;
+    return withDeadline(run);
   }
 
   /** Non-probing read for write-hold: never increments failures on a POST path. */

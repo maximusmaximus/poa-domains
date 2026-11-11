@@ -58,3 +58,33 @@ test("monitor: success clears failures", async () => {
   assert.equal(s.hold, false);
   assert.equal(s.detail.epochsClosed, 10);
 });
+
+// Regression (Nov 11 prod): a stalled body or a shared probe whose request was cancelled hung /v1/network-status for minutes.
+test("monitor: stalled response body is aborted by the request timer", async () => {
+  const monitor = createNetworkStatusMonitor({
+    requestMs: 50,
+    fetch: async () => new Response(new ReadableStream({ start() {} }), { status: 200, headers: { "content-type": "application/json" } }),
+  });
+  const t0 = Date.now(), snap = await monitor.getStatus();
+  assert.ok(Date.now() - t0 < 1000, "resolved after the request timeout, not hung");
+  assert.equal(snap.level, "checking");
+  assert.equal(snap.failures, 1);
+  assert.equal(snap.livePoA, false);
+});
+
+test("monitor: a never-settling shared probe cannot hang callers, and is replaced after the deadline", async () => {
+  let calls = 0, clock = 0;
+  const monitor = createNetworkStatusMonitor({
+    requestMs: 30,
+    now: () => clock,
+    fetch: async () => { calls += 1; return new Promise(() => {}); }, // ignores abort, like a cancelled cross-request fetch
+  });
+  const t0 = Date.now(), [a, b] = await Promise.all([monitor.getStatus(), monitor.getStatus()]);
+  assert.ok(Date.now() - t0 < 2500, "bounded by requestMs + 1s deadline");
+  assert.equal(calls, 1, "concurrent callers share one probe");
+  assert.equal(a.level, "checking");
+  assert.equal(b.level, "checking");
+  clock += 2000;
+  await monitor.getStatus();
+  assert.equal(calls, 2, "stale in-flight probe is replaced");
+});

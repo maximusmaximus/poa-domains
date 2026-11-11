@@ -1,16 +1,16 @@
-import { publicNameUnavailable } from "./shared.js?v=16e74e99de64";
-import { installHelp } from "./ui-help.js?v=16e74e99de64";
-import { renderManagement } from "./ui-manage.js?v=16e74e99de64";
-import { actionLabel } from "./ui-copy.js?v=16e74e99de64";
-import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=16e74e99de64";
-import { ui } from "./ui-state.js?v=16e74e99de64";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=16e74e99de64";
-import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=16e74e99de64";
-import { render, updateTabDots } from "./ui-render.js?v=16e74e99de64";
-import { runSearch } from "./ui-search.js?v=16e74e99de64";
-import { renderIdeas } from "./ui-ideas.js?v=16e74e99de64";
-import { mountEscrow } from "./escrow.js?v=16e74e99de64";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=16e74e99de64";
+import { publicNameUnavailable } from "./shared.js?v=193b1cfcba90";
+import { installHelp } from "./ui-help.js?v=193b1cfcba90";
+import { renderManagement } from "./ui-manage.js?v=193b1cfcba90";
+import { actionLabel } from "./ui-copy.js?v=193b1cfcba90";
+import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=193b1cfcba90";
+import { ui } from "./ui-state.js?v=193b1cfcba90";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=193b1cfcba90";
+import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=193b1cfcba90";
+import { render, updateTabDots } from "./ui-render.js?v=193b1cfcba90";
+import { runSearch } from "./ui-search.js?v=193b1cfcba90";
+import { renderIdeas } from "./ui-ideas.js?v=193b1cfcba90";
+import { mountEscrow } from "./escrow.js?v=193b1cfcba90";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=193b1cfcba90";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -100,6 +100,8 @@ export async function refreshNetworkStatus() {
             method: "GET",
             credentials: "omit",
             cache: "no-store",
+            // Never let one stuck status read keep the window on "Checking" across refreshes.
+            signal: globalThis.AbortSignal?.timeout ? AbortSignal.timeout(15000) : undefined,
         });
         if (!response.ok)
             throw Error("status");
