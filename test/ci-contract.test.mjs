@@ -145,7 +145,15 @@ if(code!==0)process.exit(code);console.log(JSON.stringify({sync,app,async:JSON.p
 test("three-browser font regression stays in the covered all-browser lane, not Chromium-only Pages check", () => {
   const pages = parse(readFileSync(".github/workflows/pages.yml", "utf8"));
   const install = pages.jobs.build.steps.find(step => step.run?.includes("playwright install"));
-  assert.match(install.run, /playwright install --with-deps chromium$/);
+  // Pages builds in CI's pinned Playwright container: no apt mirrors, Chromium preinstalled.
+  assert.equal(pages.jobs.build.container.image, workflow.jobs.browser.container.image);
+  assert.match(pages.jobs.build.container.image, /@sha256:[0-9a-f]{64}$/);
+  assert.equal(pages.jobs.build.env.PLAYWRIGHT_BROWSERS_PATH, "/ms-playwright");
+  assert.match(install.run, /playwright install chromium/);
+  assert.ok(pages.jobs.build.steps.every(s => !s.run?.includes("--with-deps") && !/\bapt(-get)?\b/.test(s.run ?? "")), "no apt in Pages");
+  for (const name of ["Archive the exact tested public allowlist including discovery", "Upload only the validated public archive"])
+    assert.equal(pages.jobs.build.steps.find(s => s.name === name).if, "github.event_name != 'pull_request'");
+  assert.match(pages.jobs.deploy.if, /^github.event_name != 'pull_request' && github.ref == 'refs\/heads\/main'/);
   assert.ok(pages.jobs.build.steps.some(step => step.run?.endsWith("npm run check")));
   const command = ["node", "test/ui-perf-browser.mjs"];
   const owners = Object.entries(suites).filter(([, commands]) => commands.some(c => JSON.stringify(c) === JSON.stringify(command))).map(([name]) => name);
