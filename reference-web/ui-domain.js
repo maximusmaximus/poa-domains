@@ -1,11 +1,11 @@
-import { publicNameUnavailable, unavailableKey } from "./shared.js?v=16e74e99de64";
-import { registryUnit } from "./shared.js?v=16e74e99de64";
-import { actionLabel } from "./ui-copy.js?v=16e74e99de64";
-import { ui } from "./ui-state.js?v=16e74e99de64";
-import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=16e74e99de64";
-import { add, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=16e74e99de64";
-import { nameLink, ownerLink } from "./ui-router.js?v=16e74e99de64";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=16e74e99de64";
+import { publicNameUnavailable, unavailableKey } from "./shared.js?v=193b1cfcba90";
+import { registryUnit } from "./shared.js?v=193b1cfcba90";
+import { actionLabel } from "./ui-copy.js?v=193b1cfcba90";
+import { ui } from "./ui-state.js?v=193b1cfcba90";
+import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=193b1cfcba90";
+import { add, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=193b1cfcba90";
+import { nameLink, ownerLink } from "./ui-router.js?v=193b1cfcba90";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=193b1cfcba90";
 
 export function renderDomainPage(name) {
     if (!ui.latestState || !name)
