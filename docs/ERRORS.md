@@ -382,6 +382,10 @@ HTTP 400; retryable: false. Escrow network writes disabled. Check the documented
 
 HTTP 400; retryable: false. Escrow new names off. Check the documented inputs and current state.
 
+## ESCROW_NODE_AUTH
+
+HTTP 400; retryable: false. Escrow node auth. Check the documented inputs and current state.
+
 ## ESCROW_NODE_CHAIN
 
 HTTP 400; retryable: false. Escrow node chain. Check the documented inputs and current state.

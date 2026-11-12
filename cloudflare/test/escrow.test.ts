@@ -541,3 +541,19 @@ test("engine: issueFromTreasury is escrow-only, mints at the schedule price, cap
  assert.equal(e.previewEscrowIssue(registration(2,"other","999999999")).status,"rejected","price must equal schedule");
  assert.throws(()=>e.submitEscrowIssue(consent({net:{now:1000}} as any)),/ESCROW_ISSUE_ACTION/);
 });
+test("PoA API token is sent only as a header, never in the URL, and auth failures fail closed",async()=>{
+ const seen:{url:string;auth:string|null}[]=[];const token="test-token-not-real";
+ const request=(async function(this:typeof globalThis,input:any,init:any){
+  const h=new Headers(init.headers);seen.push({url:String(input),auth:h.get("authorization")});
+  assert.equal(new URL(input).origin,"https://minepoa.com");assert.equal(init.redirect,"manual");
+  return new Response(JSON.stringify({error:"Unauthorized"}),{status:401});
+ }) as typeof fetch;
+ const n=new PoaHttpNetwork(()=>true,request,undefined,Date.now,token);
+ await assert.rejects(n.status(),/ESCROW_NODE_AUTH/);
+ assert.ok(seen.length>=2,"falls through every candidate path on 401");
+ for(const s of seen){assert.equal(s.auth,`Bearer ${token}`);assert.ok(!s.url.includes(token));}
+ const body=depositBody(3,policy.wallet,"1.000000","auth-fixture");seen.length=0;
+ await n.submit(body);assert.equal(seen[0]!.auth,`Bearer ${token}`);assert.ok(!seen[0]!.url.includes(token));
+ seen.length=0;await assert.rejects(new PoaHttpNetwork(()=>false,request).status(),/ESCROW_NODE_AUTH/);
+ for(const s of seen)assert.equal(s.auth,null);
+});

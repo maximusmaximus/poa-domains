@@ -2,6 +2,8 @@
 interface __BaseEnv_Env {
   POA_ESCROW_KEY?: string;
   ESCROW_ADMIN_TOKEN?: string;
+  /** PoA account API token for authenticated minepoa.com chain reads/submits. Secret; header only. */
+  POA_API_TOKEN?: string;
   POA_ESCROW_ADDRESS?: string;
   POA_ESCROW_ENGINE_SHA256?: string;
   POA_ESCROW_PARAMS_SHA256?: string;
