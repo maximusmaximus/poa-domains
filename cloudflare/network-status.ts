@@ -291,14 +291,12 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
     waitUntil?: (p: Promise<unknown>) => void;
   }): Promise<NetworkStatusSnapshot> {
     const t = now();
-    if (
-      !options?.bypassCache &&
-      cache &&
-      t - cache.at < CACHE_MS
-    ) {
-      return cache.snap;
-    }
     const shared = options?.shared;
+    const fresh = !!cache && t - cache.at < CACHE_MS;
+    // A fresh local "checking" (no success yet in this isolate) must not hide a real last-known level.
+    if (!options?.bypassCache && fresh && (cache!.snap.level !== "checking" || !shared)) {
+      return cache!.snap;
+    }
     if (shared && !options?.bypassCache) {
       let row: { at: number; value: string } | null = null;
       let id: ReturnType<typeof setTimeout> | undefined;
@@ -307,14 +305,15 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
       } catch { row = null; } finally { clearTimeout(id); }
       const last = fromShared(row, t);
       if (last) {
-        // Answer instantly; refresh in the background (one probe per isolate, deduplicated).
-        if (!(inflight && t - inflightAt < deadlineMs)) {
+        // Answer instantly; refresh in the background (one probe per isolate per cache window, deduplicated).
+        if (!fresh && !(inflight && t - inflightAt < deadlineMs)) {
           const run = start(t);
           const bg = persist(run, shared);
           if (options?.waitUntil) options.waitUntil(bg);
         }
         return last;
       }
+      if (fresh) return cache!.snap;
     }
     // Reuse a recent shared probe, but never one older than the deadline (its request may have been cancelled).
     if (inflight && t - inflightAt < deadlineMs) return withDeadline(inflight);

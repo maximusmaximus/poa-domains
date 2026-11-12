@@ -154,3 +154,25 @@ test("last known: down still needs two failed checks, and successful probes are 
   await new Promise((r) => setTimeout(r, 10));
   assert.equal(JSON.parse(store.row.value).level, "online");
 });
+
+test("last known: a failed first check in a cold isolate does not hide the stored level or re-probe within the cache window", async () => {
+  let clock = 5_000_000, calls = 0;
+  const store = memoryStore({ at: clock - 120_000, value: JSON.stringify({ level: "online" }) });
+  const monitor = createNetworkStatusMonitor({ now: () => clock, requestMs: 20, fetch: async () => { calls += 1; throw Error("offline"); } });
+  const pending = [];
+  const first = await monitor.getStatus({ shared: store, waitUntil: (p) => pending.push(p) });
+  assert.equal(first.level, "online");
+  await Promise.all(pending);
+  assert.equal(monitor.peekStatus().level, "checking", "local fresh check failed");
+  clock += 1000;
+  const second = await monitor.getStatus({ shared: store, waitUntil: (p) => pending.push(p) });
+  assert.equal(second.level, "online");
+  assert.equal(second.lastKnown, true);
+  assert.equal(second.hold, false);
+  assert.equal(calls, 1, "no extra upstream probe inside the cache window");
+  const noStore = createNetworkStatusMonitor({ now: () => clock, requestMs: 20, fetch: async () => { calls += 1; throw Error("offline"); } });
+  assert.equal((await noStore.getStatus({ shared: memoryStore() })).level, "checking");
+  const before = calls;
+  assert.equal((await noStore.getStatus({ shared: memoryStore() })).level, "checking");
+  assert.equal(calls, before, "empty store: cached checking is reused, no re-probe");
+});
