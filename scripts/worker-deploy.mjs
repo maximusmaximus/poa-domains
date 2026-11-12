@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { parse } from "jsonc-parser";
 
@@ -45,6 +45,30 @@ export function expectedPolicy(env) {
   for (const key of ["POA_ESCROW_ENGINE_SHA256", "POA_ESCROW_PARAMS_SHA256"])
     if (!/^[0-9a-f]{64}$/.test(policy[key])) fail("INVALID_PRODUCTION_PIN");
   return policy;
+}
+export const NETWORK_FACTS = "https://minepoa.com/chain/poa-mainnet-1/api/network-facts";
+export const NETWORK_CLIENT = "https://minepoa.com/chain/poa-mainnet-1/client/poa.mjs";
+// Max-approved pin transition (t108s1102). Both repin vars set => this deploy writes ONLY the two
+// pin bindings; every other escrow binding and secret is kept server-side by --keep-vars.
+export function repinPlan(env, expected) {
+  const engine = env.POA_ESCROW_REPIN_ENGINE_SHA256 || "", params = env.POA_ESCROW_REPIN_PARAMS_SHA256 || "";
+  if (!engine && !params) return null;
+  if (!/^[0-9a-f]{64}$/.test(engine) || !/^[0-9a-f]{64}$/.test(params)) fail("INVALID_REPIN");
+  if (expected && engine === expected.POA_ESCROW_ENGINE_SHA256 && params === expected.POA_ESCROW_PARAMS_SHA256) fail("REPIN_NOOP");
+  return { POA_ESCROW_ENGINE_SHA256: engine, POA_ESCROW_PARAMS_SHA256: params };
+}
+// Refuse a repin unless the official network advertises exactly these pins AND the served client hashes to the engine pin.
+export async function assertAdvertised(pins, fetchImpl) {
+  const read = url => fetchImpl(url, { method: "GET", redirect: "error", signal: AbortSignal.timeout(60000) });
+  const facts = await read(NETWORK_FACTS);
+  if (!facts.ok) fail("REPIN_FACTS_UNAVAILABLE");
+  const f = await facts.json();
+  if (f.chain_id !== "poa-mainnet-1" || f.engine_sha256 !== pins.POA_ESCROW_ENGINE_SHA256 ||
+      f.params_sha256 !== pins.POA_ESCROW_PARAMS_SHA256) fail("REPIN_NOT_ADVERTISED");
+  const client = await read(NETWORK_CLIENT);
+  if (!client.ok) fail("REPIN_CLIENT_UNAVAILABLE");
+  const digest = createHash("sha256").update(new Uint8Array(await client.arrayBuffer())).digest("hex");
+  if (digest !== pins.POA_ESCROW_ENGINE_SHA256) fail("REPIN_CLIENT_HASH_MISMATCH");
 }
 export function assertBindings(bindings, expected) {
   if (!Array.isArray(bindings)) fail("MISSING_LIVE_BINDINGS");
@@ -114,12 +138,14 @@ export function wranglerArgs(configPath, dryRun) {
 }
 export async function runDeployment({ dryRun, env = process.env, fetchImpl = fetch, run = spawnSync, root = process.cwd() }) {
   const config = productionConfig(parseConfig(readFileSync(resolve(root, "wrangler.jsonc"), "utf8")));
-  let expected, before;
+  let expected, before, repin = null;
   if (!dryRun) {
     expected = expectedPolicy(env);
+    repin = repinPlan(env, expected);
     if (!env.CLOUDFLARE_API_TOKEN) fail("MISSING_CLOUDFLARE_API_TOKEN");
     await assertGitHub(env, fetchImpl);
-    before = await liveSnapshot(expected, env.CLOUDFLARE_API_TOKEN, fetchImpl);
+    before = await liveSnapshot(expected, env.CLOUDFLARE_API_TOKEN, fetchImpl); // precheck: live == current pins
+    if (repin) { await assertAdvertised(repin, fetchImpl); config.vars = { ...config.vars, ...repin }; }
   }
   const path = resolve(root, `.wrangler-production-${randomUUID()}.json`);
   writeFileSync(path, JSON.stringify(config, null, 2) + "\n", { flag: "wx", mode: 0o600 });
@@ -139,6 +165,12 @@ export async function runDeployment({ dryRun, env = process.env, fetchImpl = fet
       await assertGitHub(env, fetchImpl);
       if (await liveSnapshot(expected, env.CLOUDFLARE_API_TOKEN, fetchImpl) !== before) fail("LIVE_VERSION_CHANGED");
       execute(false);
+      // Post-check: the new live version carries exactly the expected policy (new pins after a repin).
+      const after = { ...expected, ...(repin ?? {}) };
+      for (let attempt = 1; ; attempt++) {
+        try { await liveSnapshot(after, env.CLOUDFLARE_API_TOKEN, fetchImpl); break; }
+        catch (e) { if (attempt >= 6) throw e; await new Promise(r => setTimeout(r, env.DEPLOY_POSTCHECK_DELAY_MS === "0" ? 0 : 5000)); }
+      }
     }
   } finally { unlinkSync(path); }
 }

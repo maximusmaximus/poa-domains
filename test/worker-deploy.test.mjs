@@ -4,7 +4,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { parse } from "yaml";
 import { endpoint } from "../dist/src/client.js";
 import { ACCOUNT, WORKER, REPO, ADDRESS, POLICY, parseConfig, productionConfig, expectedPolicy,
-  assertBindings, assertProductionEnvironment, assertGitHub, liveSnapshot, wranglerArgs, runDeployment } from "../scripts/worker-deploy.mjs";
+  assertBindings, assertProductionEnvironment, assertGitHub, liveSnapshot, wranglerArgs, runDeployment, repinPlan, assertAdvertised, NETWORK_FACTS, NETWORK_CLIENT } from "../scripts/worker-deploy.mjs";
 const config = parseConfig(readFileSync("wrangler.jsonc", "utf8"));
 const expected = { ...Object.fromEntries(POLICY.map(k => [k, config.vars[k]])),
   POA_ESCROW_ENABLED: "true", POA_ESCROW_NETWORK_WRITES: "approved-v1", POA_ESCROW_ADDRESS: ADDRESS };
@@ -154,4 +154,45 @@ test("production host is allowlisted; discovery paths run Worker first; all erro
   assert.ok(readFileSync("cloudflare/test/integration.mjs", "utf8").includes('"--local-upstream", "poadomains.grok.me"'));
   const coverage = JSON.parse(readFileSync(".c8rc.json", "utf8"));
   assert.ok(coverage.src.includes("scripts")); assert.ok(coverage.include.includes("scripts/worker-deploy.mjs"));
+});
+
+test("repin (Max t108s1102): validated, advertised + client-hash verified, writes only the two pins, post-checks new pins", async () => {
+  const { createHash } = await import("node:crypto");
+  const client = new TextEncoder().encode("official client bytes");
+  const engine = createHash("sha256").update(client).digest("hex"), params = "b".repeat(64);
+  assert.equal(repinPlan({}, expected), null);
+  assert.equal(repinPlan({ POA_ESCROW_REPIN_ENGINE_SHA256: "", POA_ESCROW_REPIN_PARAMS_SHA256: "" }, expected), null);
+  assert.throws(() => repinPlan({ POA_ESCROW_REPIN_ENGINE_SHA256: engine }, expected), /INVALID_REPIN/);
+  assert.throws(() => repinPlan({ POA_ESCROW_REPIN_ENGINE_SHA256: expected.POA_ESCROW_ENGINE_SHA256, POA_ESCROW_REPIN_PARAMS_SHA256: expected.POA_ESCROW_PARAMS_SHA256 }, expected), /REPIN_NOOP/);
+  const pins = repinPlan({ POA_ESCROW_REPIN_ENGINE_SHA256: engine, POA_ESCROW_REPIN_PARAMS_SHA256: params }, expected);
+  const network = (facts, bytes = client) => async url => url === NETWORK_FACTS ? { ok: true, json: async () => facts }
+    : url === NETWORK_CLIENT ? { ok: true, arrayBuffer: async () => bytes.buffer.slice(0) } : assert.fail(url);
+  await assertAdvertised(pins, network({ chain_id: "poa-mainnet-1", engine_sha256: engine, params_sha256: params }));
+  await assert.rejects(assertAdvertised(pins, network({ chain_id: "poa-mainnet-1", engine_sha256: engine, params_sha256: "c".repeat(64) })), /REPIN_NOT_ADVERTISED/);
+  await assert.rejects(assertAdvertised(pins, network({ chain_id: "poa-mainnet-1", engine_sha256: engine, params_sha256: params }, new TextEncoder().encode("truncated"))), /REPIN_CLIENT_HASH_MISMATCH/);
+  // Full deploy: precheck old pins, deploy plan carries ONLY the two new pin vars, post-check sees new pins.
+  let deployed = false; const plans = [];
+  const newBindings = bindings.map(b => b.name in pins ? { ...b, text: pins[b.name] } : b);
+  const p = provider(); const upstream = network({ chain_id: "poa-mainnet-1", engine_sha256: engine, params_sha256: params });
+  const fetchImpl = async (url, o) => {
+    if (url === NETWORK_FACTS || url === NETWORK_CLIENT) return upstream(url);
+    const r = await p.fetchImpl(url, o);
+    if (!deployed || !(url.endsWith("/settings") || url.includes("/versions/"))) return r;
+    const body = await r.json(); if (body.result.bindings) body.result.bindings = newBindings; else body.result.resources.bindings = newBindings;
+    return { ok: true, json: async () => body };
+  };
+  const run = (_exe, args) => { const plan = JSON.parse(readFileSync(args[args.indexOf("--config") + 1], "utf8"));
+    plans.push(Object.keys(plan.vars).filter(k => k.startsWith("POA_ESCROW_")).sort()); if (!args.includes("--dry-run")) deployed = true; return { status: 0 }; };
+  const repinEnv = { ...env, POA_ESCROW_REPIN_ENGINE_SHA256: engine, POA_ESCROW_REPIN_PARAMS_SHA256: params, DEPLOY_POSTCHECK_DELAY_MS: "0" };
+  await runDeployment({ dryRun: false, env: repinEnv, fetchImpl, run });
+  assert.deepEqual(plans, [["POA_ESCROW_ENGINE_SHA256", "POA_ESCROW_PARAMS_SHA256"], ["POA_ESCROW_ENGINE_SHA256", "POA_ESCROW_PARAMS_SHA256"]]);
+  // A deploy whose live version did not take the new pins fails its post-check (operator then rolls back).
+  deployed = false; let real = 0;
+  await assert.rejects(runDeployment({ dryRun: false, env: repinEnv, fetchImpl: async (u, o) => (u === NETWORK_FACTS || u === NETWORK_CLIENT) ? upstream(u) : p.fetchImpl(u, o),
+    run: (_e, args) => { if (!args.includes("--dry-run")) real++; return { status: 0 }; } }), /LIVE_POLICY_MISMATCH/);
+  assert.equal(real, 1);
+  // Not advertised => no deployment at all.
+  real = 0;
+  await assert.rejects(runDeployment({ dryRun: false, env: { ...repinEnv, POA_ESCROW_REPIN_PARAMS_SHA256: "d".repeat(64) }, fetchImpl, run: (_e, args) => { if (!args.includes("--dry-run")) real++; return { status: 0 }; } }), /REPIN_NOT_ADVERTISED/);
+  assert.equal(real, 0);
 });
