@@ -1,14 +1,14 @@
-import { publicNameUnavailable } from "./shared.js?v=193b1cfcba90";
-import { registryUnit } from "./shared.js?v=193b1cfcba90";
-import { actionLabel } from "./ui-copy.js?v=193b1cfcba90";
-import { trapDialog } from "./ui-a11y.js?v=193b1cfcba90";
-import { ui } from "./ui-state.js?v=193b1cfcba90";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=193b1cfcba90";
-import { add, el, endpointBase } from "./ui-core.js?v=193b1cfcba90";
-import { nameLink } from "./ui-router.js?v=193b1cfcba90";
+import { publicNameUnavailable } from "./shared.js?v=0a86fcdcc190";
+import { registryUnit } from "./shared.js?v=0a86fcdcc190";
+import { actionLabel } from "./ui-copy.js?v=0a86fcdcc190";
+import { trapDialog } from "./ui-a11y.js?v=0a86fcdcc190";
+import { ui } from "./ui-state.js?v=0a86fcdcc190";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=0a86fcdcc190";
+import { add, el, endpointBase } from "./ui-core.js?v=0a86fcdcc190";
+import { nameLink } from "./ui-router.js?v=0a86fcdcc190";
 
 export function cartCopyBlocked() {
-    return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || shouldHoldTransactions(ui.networkStatus.level) || !!ui.networkStatus.hold;
+    return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
 }
 
 export function updateCartCopyState() {
@@ -57,7 +57,7 @@ export async function updatePromptText() {
         updateHandoffAge();updateCartCopyState();return;
     }
     if(cartCopyBlocked()){
-        el("cartPrompt").textContent=ui.refreshing?"⏳ Checking the registry…":ui.registryReadFailed||ui.lastLoadedAt===null?"🔄 Refresh registry data first.":shouldHoldTransactions(ui.networkStatus.level)||ui.networkStatus.hold?"⏸️ Handoff paused while the PoA network is down. Nothing was sent.":"✏️ Fix the cart items marked for review.";
+        el("cartPrompt").textContent=ui.refreshing?"⏳ Checking the registry…":ui.registryReadFailed||ui.lastLoadedAt===null?"🔄 Refresh registry data first.":shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)||ui.networkStatus.hold?"⏸️ Handoff paused while the PoA network is down. Nothing was sent.":"✏️ Fix the cart items marked for review.";
         updateHandoffAge();updateCartCopyState();return;
     }
     ui.handoffPending=true;updateHandoffAge();updateCartCopyState();
@@ -121,7 +121,7 @@ export function renderFloatingCart() {
     badge.hidden = ui.cart.length === 0;
     el("floatingCartBtn").setAttribute("aria-label", ui.cart.length ? `Open cart, ${ui.cart.length} items` : "Open cart");
     clearBtn.disabled = ui.cart.length === 0;
-    const held = shouldHoldTransactions(ui.networkStatus.level) || !!ui.networkStatus.hold;
+    const held = shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level) || !!ui.networkStatus.hold;
     copyBtn.disabled = ui.cart.length === 0 || cartCopyBlocked() || ui.handoffPending || !ui.handoffData;
     if (held)
         copyBtn.classList.add("action-held");
@@ -155,7 +155,7 @@ export function renderCart() {
     el("cartCount").textContent = String(ui.cart.length);
     el("clearCart").disabled = ui.cart.length === 0;
     {
-        const held = shouldHoldTransactions(ui.networkStatus.level) || !!ui.networkStatus.hold;
+        const held = shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level) || !!ui.networkStatus.hold;
         el("copyCartPrompt").disabled = ui.cart.length === 0 || cartCopyBlocked() || ui.handoffPending || !ui.handoffData;
         if (held)
             el("copyCartPrompt").classList.add("action-held");

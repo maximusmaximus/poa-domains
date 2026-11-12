@@ -1,16 +1,16 @@
-import { publicNameUnavailable } from "./shared.js?v=193b1cfcba90";
-import { installHelp } from "./ui-help.js?v=193b1cfcba90";
-import { renderManagement } from "./ui-manage.js?v=193b1cfcba90";
-import { actionLabel } from "./ui-copy.js?v=193b1cfcba90";
-import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=193b1cfcba90";
-import { ui } from "./ui-state.js?v=193b1cfcba90";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=193b1cfcba90";
-import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=193b1cfcba90";
-import { render, updateTabDots } from "./ui-render.js?v=193b1cfcba90";
-import { runSearch } from "./ui-search.js?v=193b1cfcba90";
-import { renderIdeas } from "./ui-ideas.js?v=193b1cfcba90";
-import { mountEscrow } from "./escrow.js?v=193b1cfcba90";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=193b1cfcba90";
+import { publicNameUnavailable } from "./shared.js?v=0a86fcdcc190";
+import { installHelp } from "./ui-help.js?v=0a86fcdcc190";
+import { renderManagement } from "./ui-manage.js?v=0a86fcdcc190";
+import { actionLabel } from "./ui-copy.js?v=0a86fcdcc190";
+import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=0a86fcdcc190";
+import { ui } from "./ui-state.js?v=0a86fcdcc190";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=0a86fcdcc190";
+import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=0a86fcdcc190";
+import { render, updateTabDots } from "./ui-render.js?v=0a86fcdcc190";
+import { runSearch } from "./ui-search.js?v=0a86fcdcc190";
+import { renderIdeas } from "./ui-ideas.js?v=0a86fcdcc190";
+import { mountEscrow } from "./escrow.js?v=0a86fcdcc190";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=0a86fcdcc190";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -109,6 +109,13 @@ export async function refreshNetworkStatus() {
         if (!body || typeof body.level !== "string")
             throw Error("shape");
         ui.networkStatus = body;
+        // A last-known value is display-only: recheck soon so the fresh check replaces it.
+        if (body.lastKnown === true && (ui.networkRecheck ?? 0) < 3) {
+            ui.networkRecheck = (ui.networkRecheck ?? 0) + 1;
+            setTimeout(() => { refreshNetworkStatus().then(renderNetworkStatus, () => {}); }, 4000);
+        }
+        else if (body.lastKnown !== true)
+            ui.networkRecheck = 0;
     }
     catch {
         // Conservative: one client miss does not flip to Down; Worker owns the 2-failure rule.
@@ -141,18 +148,20 @@ export function renderNetworkStatus() {
     const label = el("networkStatusText");
     if (icon)
         icon.textContent = "";
+    const lastKnown = ui.networkStatus.lastKnown === true, stale = lastKnown && ui.networkStatus.stale === true;
+    bar.dataset.stale = stale ? "true" : "false";
     if (label)
-        label.textContent = shortNetworkLine(level);
+        label.textContent = shortNetworkLine(level) + (stale ? " · 🕰️" : "");
     const detail = el("networkStatusDetail");
     if (detail)
-        detail.textContent = text;
+        detail.textContent = text + (stale ? ` Last checked ${Math.max(1, Math.round((ui.networkStatus.ageMs || 0) / 60000))} min ago; rechecking now.` : "");
     bar.hidden = !!ui.statusPanelDismissed;
     const serviceError=document.body.dataset.registryStatus==="error",slow=level==="degraded"||document.body.dataset.registryStatus==="loading";
     bar.dataset.color=serviceError?"red":slow?"yellow":bar.dataset.color;
 }
 
 export function applyNetworkHold() {
-    const hold = shouldHoldTransactions(ui.networkStatus.level) || !!ui.networkStatus.hold;
+    const hold = shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level) || !!ui.networkStatus.hold;
     const heldIds = [
         "copyCheckoutBtn",
         "copyCartPrompt",

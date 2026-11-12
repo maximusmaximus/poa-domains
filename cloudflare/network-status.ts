@@ -16,6 +16,10 @@ export type NetworkStatusSnapshot = {
   latencyMs: number | null;
   failures: number;
   source: string;
+  /** Present only when served from the shared last-known store, not this isolate's own fresh check. */
+  lastKnown?: true;
+  ageMs?: number;
+  stale?: boolean;
   detail: {
     epochsClosed: number | null;
     checkpointHeight: number | null;
@@ -32,6 +36,15 @@ const REQUEST_MS = 10500;
 const CACHE_MS = 20_000;
 const SLOW_MS = 4000;
 const FAIL_THRESHOLD = 2;
+/** Last-known status older than this is shown with a subtle stale indicator. */
+export const STALE_MS = 5 * 60_000;
+const SHARED_READ_MS = 1500;
+
+/** Display-only shared store (registry DO side table). Never consulted for the write hold. */
+export type SharedStatusStore = {
+  load(): Promise<{ at: number; value: string } | null>;
+  save(at: number, value: string): Promise<void>;
+};
 
 const LEVEL_META: Record<
   NetworkLevel,
@@ -248,8 +261,34 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
     return Promise.race([run, limit]).finally(() => clearTimeout(id));
   }
 
+  function persist(run: Promise<NetworkStatusSnapshot>, shared?: SharedStatusStore): Promise<unknown> {
+    // "checking" carries no information; never overwrite a real last-known level with it.
+    return run.then((snap) => (shared && snap.level !== "checking" ? shared.save(snap.checkedAt, JSON.stringify(snap)) : undefined)).catch(() => undefined);
+  }
+
+  function fromShared(row: { at: number; value: string } | null, t: number): NetworkStatusSnapshot | null {
+    if (!row || !Number.isSafeInteger(row.at) || typeof row.value !== "string" || row.value.length > 4096) return null;
+    let v: Record<string, unknown>;
+    try { v = JSON.parse(row.value); } catch { return null; }
+    const level = v?.level;
+    if (level !== "online" && level !== "degraded" && level !== "down") return null;
+    const ageMs = Math.max(0, t - row.at);
+    // Rebuild from the level only; stored text is never trusted as-is.
+    const base = snapshot(level, {
+      checkedAt: row.at,
+      failures: Number.isSafeInteger(v.failures) ? (v.failures as number) : 0,
+      latencyMs: Number.isSafeInteger(v.latencyMs) ? (v.latencyMs as number) : null,
+    });
+    // Within the normal cache window this is exactly what a local cache hit would serve.
+    if (ageMs < CACHE_MS) return base;
+    // Older values are display-only: the hold always comes from fresh checks.
+    return { ...base, hold: false, lastKnown: true, ageMs, stale: ageMs > STALE_MS };
+  }
+
   async function getStatus(options?: {
     bypassCache?: boolean;
+    shared?: SharedStatusStore;
+    waitUntil?: (p: Promise<unknown>) => void;
   }): Promise<NetworkStatusSnapshot> {
     const t = now();
     if (
@@ -259,8 +298,33 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
     ) {
       return cache.snap;
     }
+    const shared = options?.shared;
+    if (shared && !options?.bypassCache) {
+      let row: { at: number; value: string } | null = null;
+      let id: ReturnType<typeof setTimeout> | undefined;
+      try {
+        row = await Promise.race([shared.load(), new Promise<null>((resolve) => { id = setTimeout(() => resolve(null), SHARED_READ_MS); })]);
+      } catch { row = null; } finally { clearTimeout(id); }
+      const last = fromShared(row, t);
+      if (last) {
+        // Answer instantly; refresh in the background (one probe per isolate, deduplicated).
+        if (!(inflight && t - inflightAt < deadlineMs)) {
+          const run = start(t);
+          const bg = persist(run, shared);
+          if (options?.waitUntil) options.waitUntil(bg);
+        }
+        return last;
+      }
+    }
     // Reuse a recent shared probe, but never one older than the deadline (its request may have been cancelled).
     if (inflight && t - inflightAt < deadlineMs) return withDeadline(inflight);
+    const run = start(t);
+    const saved = persist(run, shared);
+    if (options?.waitUntil) options.waitUntil(saved);
+    return withDeadline(run);
+  }
+
+  function start(t: number): Promise<NetworkStatusSnapshot> {
     const run: Promise<NetworkStatusSnapshot> = probe().then((snap) => {
       cache = { at: now(), snap };
       if (inflight === run) inflight = null;
@@ -268,7 +332,7 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
     });
     inflight = run;
     inflightAt = t;
-    return withDeadline(run);
+    return run;
   }
 
   /** Non-probing read for write-hold: never increments failures on a POST path. */

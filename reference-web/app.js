@@ -1,17 +1,17 @@
-import { installHelp } from "./ui-help.js?v=193b1cfcba90";
-import { wireManagement } from "./ui-manage.js?v=193b1cfcba90";
-import { logSubmittedSearch } from "./ui-search-log.js?v=193b1cfcba90";
-import { bindTabKeys } from "./ui-a11y.js?v=193b1cfcba90";
-import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=193b1cfcba90";
-import { ui } from "./ui-state.js?v=193b1cfcba90";
-import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=193b1cfcba90";
-import { navigateHome, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=193b1cfcba90";
-import { el, endpointBase } from "./ui-core.js?v=193b1cfcba90";
-import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=193b1cfcba90";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=193b1cfcba90";
-import { runSearch } from "./ui-search.js?v=193b1cfcba90";
-import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=193b1cfcba90";
-import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=193b1cfcba90";
+import { installHelp } from "./ui-help.js?v=0a86fcdcc190";
+import { wireManagement } from "./ui-manage.js?v=0a86fcdcc190";
+import { logSubmittedSearch } from "./ui-search-log.js?v=0a86fcdcc190";
+import { bindTabKeys } from "./ui-a11y.js?v=0a86fcdcc190";
+import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=0a86fcdcc190";
+import { ui } from "./ui-state.js?v=0a86fcdcc190";
+import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=0a86fcdcc190";
+import { navigateHome, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=0a86fcdcc190";
+import { el, endpointBase } from "./ui-core.js?v=0a86fcdcc190";
+import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=0a86fcdcc190";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=0a86fcdcc190";
+import { runSearch } from "./ui-search.js?v=0a86fcdcc190";
+import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=0a86fcdcc190";
+import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=0a86fcdcc190";
 
 try {
     ui.statusPanelDismissed = false; // New page visits show status; closing lasts for this page only.
@@ -64,7 +64,7 @@ try {
     el("clearCart").addEventListener("click", clearAllCart);
     el("downloadCartJSON").addEventListener("click", downloadCartJSON);
     el("copyCartPrompt").addEventListener("click", async () => {
-        if (shouldHoldTransactions(ui.networkStatus.level) || ui.networkStatus.hold) {
+        if (shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level) || ui.networkStatus.hold) {
             el("cartStatus").textContent = "Held ⏸️ until the PoA network is back";
             return;
         }
@@ -99,7 +99,7 @@ try {
     el("floatingCartBackdrop").addEventListener("click", () => setFloatingCartOpen(false));
     el("floatingCartClear").addEventListener("click", clearAllCart);
     el("copyCheckoutBtn").addEventListener("click", async () => {
-        if (shouldHoldTransactions(ui.networkStatus.level) || ui.networkStatus.hold) {
+        if (shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level) || ui.networkStatus.hold) {
             el("floatingCartStatus").textContent = "Held ⏸️ until the PoA network is back";
             return;
         }
@@ -188,7 +188,7 @@ try {
         }
     });
     el("copy").addEventListener("click", async () => {
-        if (ui.copy && !ui.registryReadFailed && !shouldHoldTransactions(ui.networkStatus.level) && !ui.networkStatus.hold)
+        if (ui.copy && !ui.registryReadFailed && !shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level) && !ui.networkStatus.hold)
             try {
                 await navigator.clipboard.writeText(ui.copy);
             }

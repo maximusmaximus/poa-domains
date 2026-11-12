@@ -1,10 +1,10 @@
-import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=193b1cfcba90";
-import { ui } from "./ui-state.js?v=193b1cfcba90";
-import { add, el } from "./ui-core.js?v=193b1cfcba90";
-import { runSearch } from "./ui-search.js?v=193b1cfcba90";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=193b1cfcba90";
-import { updateTabDots } from "./ui-render.js?v=193b1cfcba90";
-import { syncCartShortcutNow } from "./ui-cart.js?v=193b1cfcba90";
+import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=0a86fcdcc190";
+import { ui } from "./ui-state.js?v=0a86fcdcc190";
+import { add, el } from "./ui-core.js?v=0a86fcdcc190";
+import { runSearch } from "./ui-search.js?v=0a86fcdcc190";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=0a86fcdcc190";
+import { updateTabDots } from "./ui-render.js?v=0a86fcdcc190";
+import { syncCartShortcutNow } from "./ui-cart.js?v=0a86fcdcc190";
 
 export function writeViewURL(path = location.pathname) {
     const next = viewPath(path, ui.lastSearch, ui.activeSectionTab);
