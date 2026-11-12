@@ -38,13 +38,21 @@ export class PoaHttpNetwork implements Network {
     return JSON.parse(new TextDecoder("utf-8",{fatal:true}).decode(bytes));
   }
   private async getFirst(paths:string[], limit=2000000, displaySignal?:AbortSignal):Promise<any> {
-    let lastErr:unknown;
+    return (await this.getFirstTracked(paths,limit,displaySignal)).value;
+  }
+  /** Same as getFirst, but also reports whether an earlier path was refused (401/403) before a fallback answered. */
+  private async getFirstTracked(paths:string[], limit=2000000, displaySignal?:AbortSignal):Promise<{value:any;refused:boolean}> {
+    let lastErr:unknown;let refused=false;
     for(const path of paths){
-      try{const v=await this.get(path,limit,displaySignal);if(v!==null)return v;}
-      catch(e){if(e instanceof Error&&(e.message==="ESCROW_NODE_HTTP"||e.message==="ESCROW_NODE_AUTH")){lastErr=e;continue;}throw e;}
+      try{const v=await this.get(path,limit,displaySignal);if(v!==null)return {value:v,refused};}
+      catch(e){
+        if(e instanceof Error&&e.message==="ESCROW_NODE_AUTH"){refused=true;lastErr=e;continue;}
+        if(e instanceof Error&&e.message==="ESCROW_NODE_HTTP"){lastErr=e;continue;}
+        throw e;
+      }
     }
     if(lastErr)throw lastErr;
-    return null;
+    return {value:null,refused};
   }
   async status():Promise<Status> { return this.readStatus(false); }
   /** Read-only observation using the SAME protocol and rollback checks.
@@ -62,7 +70,17 @@ export class PoaHttpNetwork implements Network {
       finally{if(display)timing[kind]=Math.max(0,this.clock()-started);}
     };
     try {
-      const pending=[read([`/chain/${CHAIN}/api/status`,"/api/status"],"statusMs"),
+      // If PoA refuses the chain status route, its public summary is not a substitute: it is a
+      // stale digest without a chain id. Hold honestly as "ledger locked" (ESCROW_NODE_AUTH)
+      // instead of reporting a misleading network-identity mismatch.
+      const statusRead=(async()=>{
+        try{
+          const r=await this.getFirstTracked([`/chain/${CHAIN}/api/status`,"/api/status"],2000000,displaySignal);
+          if(r.refused&&!(r.value&&typeof r.value==="object"&&r.value.chain_id===CHAIN))throw new Error("ESCROW_NODE_AUTH");
+          return r.value;
+        }finally{if(display)timing.statusMs=Math.max(0,this.clock()-started);}
+      })();
+      const pending=[statusRead,
         read([`/chain/${CHAIN}/api/network-facts`,"/api/network-facts","/api/network/facts"],"factsMs")];
       let s:any,f:any;
       if(display){
