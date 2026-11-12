@@ -166,7 +166,7 @@ export class PoaRegistry extends DurableObject<Env> {
     const signing = () => enabled() && String(this.env.POA_ESCROW_NETWORK_WRITES) === "approved-v1";
     const e = this.engine;
     const titles = registryTitles(e);
-    this.escrowService = new Escrow(new SQLiteEscrowJournal(this.ctx.storage, policy), new PoaHttpNetwork(signing, fetch, { engine: this.env.POA_ESCROW_ENGINE_SHA256 ?? MAINNET_ENGINE_SHA256, params: this.env.POA_ESCROW_PARAMS_SHA256 ?? MAINNET_PARAMS_SHA256 }),
+    this.escrowService = new Escrow(new SQLiteEscrowJournal(this.ctx.storage, policy), new PoaHttpNetwork(signing, fetch, { engine: this.env.POA_ESCROW_ENGINE_SHA256 ?? MAINNET_ENGINE_SHA256, params: this.env.POA_ESCROW_PARAMS_SHA256 ?? MAINNET_PARAMS_SHA256 }, Date.now, this.env.POA_API_TOKEN),
       new WorkerSecretSigner(policy.wallet, () => this.env.POA_ESCROW_KEY, signing), titles, policy, () => Date.now(), enabled,
       undefined, () => newNameCheckout(this.env).status === "on");
     return this.escrowService;

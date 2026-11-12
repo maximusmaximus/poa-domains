@@ -12,16 +12,23 @@ export class PoaHttpNetwork implements Network {
   private lastCutoff?: number;
   constructor(private writesAllowed:()=>boolean, private request:typeof fetch=fetch,
     private pins:{engine:string;params:string}={engine:MAINNET_ENGINE_SHA256,params:MAINNET_PARAMS_SHA256},
-    private clock:()=>number=Date.now) {
+    private clock:()=>number=Date.now, private apiToken?:string) {
     // Native workerd fetch requires its global receiver, not this network adapter.
     // Arrow-function mocks and already-bound injected clients retain their behavior.
     this.request=request.bind(globalThis);
   }
+  /** PoA now requires an account token on most chain routes. Sent only as a header to the fixed
+   * minepoa.com origin (never in a URL, never on redirects), and only when a token is configured. */
+  private headers(base:Record<string,string>):Record<string,string> {
+    const t=this.apiToken?.trim();return t?{...base,Authorization:`Bearer ${t}`}:base;
+  }
   private async get(path:string, limit=2000000, displaySignal?:AbortSignal):Promise<any> {
-    const r=await this.request(`https://minepoa.com${path}`,{signal:displaySignal ?? AbortSignal.timeout(12000),redirect:"manual",headers:{Accept:"application/json"}});
+    const r=await this.request(`https://minepoa.com${path}`,{signal:displaySignal ?? AbortSignal.timeout(12000),redirect:"manual",headers:this.headers({Accept:"application/json"})});
     // workerd supports manual, not error. Never follow a redirected node URL.
     if(r.status>=300&&r.status<400){await r.body?.cancel();throw new Error("ESCROW_NODE_REDIRECT");}
-    if(r.status===404)return null;need(r.ok,"ESCROW_NODE_HTTP");
+    if(r.status===404)return null;
+    if(r.status===401||r.status===403){await r.body?.cancel();throw new Error("ESCROW_NODE_AUTH");}
+    need(r.ok,"ESCROW_NODE_HTTP");
     const age=r.headers.get("age");if(age!==null)need(/^\d+$/.test(age)&&Number(age)<=120,"ESCROW_STALE");
     const reader=r.body!.getReader();let size=0;const chunks:Uint8Array[]=[];
     try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;
@@ -34,7 +41,7 @@ export class PoaHttpNetwork implements Network {
     let lastErr:unknown;
     for(const path of paths){
       try{const v=await this.get(path,limit,displaySignal);if(v!==null)return v;}
-      catch(e){if(e instanceof Error&&e.message==="ESCROW_NODE_HTTP"){lastErr=e;continue;}throw e;}
+      catch(e){if(e instanceof Error&&(e.message==="ESCROW_NODE_HTTP"||e.message==="ESCROW_NODE_AUTH")){lastErr=e;continue;}throw e;}
     }
     if(lastErr)throw lastErr;
     return null;
@@ -166,7 +173,7 @@ export class PoaHttpNetwork implements Network {
   async submit(body:Transfer):Promise<void> {
     need(this.writesAllowed(),"ESCROW_NETWORK_WRITES_DISABLED");verifyTransfer(body);
     const r=await this.request(`https://minepoa.com/chain/${CHAIN}/api/submit`,{method:"POST",redirect:"manual",signal:AbortSignal.timeout(12000),
-      headers:{"content-type":"application/json"},body:JSON.stringify({kind:"tx",body})});
+      headers:this.headers({"content-type":"application/json"}),body:JSON.stringify({kind:"tx",body})});
     // The service always resolves submission by tx lookup, including 202 and 4xx. No retries here.
     await r.body?.cancel();
     need(r.status<300||r.status>=400,"ESCROW_NODE_REDIRECT");

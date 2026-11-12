@@ -560,6 +560,12 @@
       "retryable": false
     },
     {
+      "code": "ESCROW_NODE_AUTH",
+      "httpStatus": 400,
+      "message": "Escrow node auth. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
       "code": "ESCROW_NODE_CHAIN",
       "httpStatus": 400,
       "message": "Escrow node chain. Check the documented inputs and current state.",
