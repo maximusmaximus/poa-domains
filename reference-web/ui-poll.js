@@ -1,16 +1,16 @@
-import { publicNameUnavailable } from "./shared.js?v=0a86fcdcc190";
-import { installHelp } from "./ui-help.js?v=0a86fcdcc190";
-import { renderManagement } from "./ui-manage.js?v=0a86fcdcc190";
-import { actionLabel } from "./ui-copy.js?v=0a86fcdcc190";
-import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=0a86fcdcc190";
-import { ui } from "./ui-state.js?v=0a86fcdcc190";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=0a86fcdcc190";
-import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=0a86fcdcc190";
-import { render, updateTabDots } from "./ui-render.js?v=0a86fcdcc190";
-import { runSearch } from "./ui-search.js?v=0a86fcdcc190";
-import { renderIdeas } from "./ui-ideas.js?v=0a86fcdcc190";
-import { mountEscrow } from "./escrow.js?v=0a86fcdcc190";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=0a86fcdcc190";
+import { publicNameUnavailable } from "./shared.js?v=1178313f1e36";
+import { installHelp } from "./ui-help.js?v=1178313f1e36";
+import { renderManagement } from "./ui-manage.js?v=1178313f1e36";
+import { actionLabel } from "./ui-copy.js?v=1178313f1e36";
+import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=1178313f1e36";
+import { ui } from "./ui-state.js?v=1178313f1e36";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=1178313f1e36";
+import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=1178313f1e36";
+import { render, updateTabDots } from "./ui-render.js?v=1178313f1e36";
+import { runSearch } from "./ui-search.js?v=1178313f1e36";
+import { renderIdeas } from "./ui-ideas.js?v=1178313f1e36";
+import { mountEscrow } from "./escrow.js?v=1178313f1e36";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=1178313f1e36";
 
 export function updateFreshness() {
     updateHandoffAge();

@@ -1,11 +1,11 @@
-import { publicNameUnavailable } from "./shared.js?v=0a86fcdcc190";
-import { registryUnit } from "./shared.js?v=0a86fcdcc190";
-import { actionLabel } from "./ui-copy.js?v=0a86fcdcc190";
-import { trapDialog } from "./ui-a11y.js?v=0a86fcdcc190";
-import { ui } from "./ui-state.js?v=0a86fcdcc190";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=0a86fcdcc190";
-import { add, el, endpointBase } from "./ui-core.js?v=0a86fcdcc190";
-import { nameLink } from "./ui-router.js?v=0a86fcdcc190";
+import { publicNameUnavailable } from "./shared.js?v=1178313f1e36";
+import { registryUnit } from "./shared.js?v=1178313f1e36";
+import { actionLabel } from "./ui-copy.js?v=1178313f1e36";
+import { trapDialog } from "./ui-a11y.js?v=1178313f1e36";
+import { ui } from "./ui-state.js?v=1178313f1e36";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=1178313f1e36";
+import { add, el, endpointBase } from "./ui-core.js?v=1178313f1e36";
+import { nameLink } from "./ui-router.js?v=1178313f1e36";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
