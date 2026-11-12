@@ -1,28 +1,40 @@
-# POA new-name checkout (OFF)
+# POA new-name checkout (built, OFF)
 
-Status: **OFF**. `/v1/escrow/capabilities` reports `newNameCheckout:"off"`; no route accepts a
-new-name purchase in POA. Approved direction: Max, Nov 11 2026 (t108s1102).
+Status: **OFF**. `/v1/escrow/capabilities` → `newNameCheckout: {status:"off", priceRule}`. It turns on only
+when the Worker binding `POA_ESCROW_NEW_NAMES=approved-v1` exists, which needs Max's go and a reviewed deploy-script
+change (the live escrow-binding check rejects an unreviewed `POA_ESCROW_*` binding).
 
-## Why it is not just a flag flip
-Escrow today sells only titles someone already owns (`terms()` needs a seller; settle needs a
-seller-signed transfer). A brand-new name has no seller, and the registry `register` action is
-paid in internal registry units, which new accounts no longer receive (PR #72).
+## Flow: deposit → credit → issue
+1. The buyer signs `intent` {amount}, sends that exact POA amount with the memo `poadomains:<intent>`, then signs `detect` {intent, txid}.
+   This is the existing escrow credit (final transfer, exact binding).
+2. The buyer signs a registry packet `issueFromTreasury`
+   `{name, asset:"POA", price, expectedDeedId:null, expectedVersion:0, metadata}` with `maxTotal:"0"`.
+3. The buyer signs the escrow command `issue` {name, amount, registration:<packet>}, sent to `POST /v1/escrow/command`.
+   In ONE storage transaction, escrow checks:
+   - the flag is on;
+   - the network is fresh and escrow is not paused or halted;
+   - the per-transaction limit;
+   - `amount` equals the schedule price;
+   - the buyer's available credit covers the price;
+   - the registration was signed by this buyer for this name and price, and its preview succeeds.
 
-## Proposed design (each step needs review; the last needs Max)
-1. **Engine**: add an escrow-paid issuance path: `register` with `payment:"escrow-poa"` that
-   debits 0 internal units. It is only reachable through the escrow hook and is gated by
-   sequence, so committed history replays unchanged.
-2. **Escrow command `register`** `{name, amount, registration}`: the buyer signs both the escrow
-   command and the registry `register` packet. Escrow checks that the name is available, that
-   `amount` equals the quoted POA price, and that the buyer's credited balance covers it within
-   the limits and the network-health hold. It then debits the buyer and books the amount to the
-   treasury as a settled sale (no network write), and submits the buyer's packet atomically.
-   On any registry rejection, the full amount goes back to the buyer's available balance.
-   Refunds stay original-payer only.
-3. **Treasury sweep**: booked treasury proceeds are paid out by the existing payout outbox, under
-   the same caps and hold.
-4. **UI/handoff/MCP**: show "Buy with POA" only when `newNameCheckout:"on"`.
-5. **Tests**: exactly-once over restarts, a hold blocks the purchase, a failed registration
-   refunds the buyer, and a double-spend race is rejected.
-6. **Turn on**: set `POA_ESCROW_NEW_NAMES=approved-v1` and change `newNameCheckout()`. This
-   needs Max's explicit approval after the runtime tests pass.
+   It then debits the buyer, books a READY payout to the treasury, and mints the permanent name
+   to the buyer. If anything fails, nothing is debited and nothing is minted.
+4. The treasury proceeds pay out through the existing outbox (same caps, holds and daily limit). Any unused credit is
+   withdrawn by `withdraw`, which pays only the original payer.
+
+## Pricing rule
+POA price = the registry's existing reserve schedule for the name's tier, at **1 registry unit = 1 POA** (both use 6 decimals).
+In the live config: standard names cost **0.001000 POA** and premium names cost **0.100000 POA**. This is the existing
+schedule, which was set for internal units; Max should confirm or change it before turning the checkout on.
+
+## Safety
+- `issueFromTreasury` is not a public action. It is missing from discovery, quotes and prepare, and public submit and
+  preview refuse it (`ESCROW_ONLY`). Replay of recorded commits doesn't run admission, so restarts replay it exactly.
+- The audited production history (seq 16) contains no such action, so its replay and hash are unchanged.
+
+## Tests
+- Escrow unit tests cover: OFF refuses, wrong price, insufficient funds, idempotency, no double issue, atomic failure,
+  hold, pause, limit, and engine escrow-only behavior.
+- The real workerd/SQLite runtime test covers the full deposit → credit → issue path, restart replay, the treasury
+  payout, and the original-payer refund.

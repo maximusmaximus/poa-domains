@@ -101,6 +101,7 @@ Command parameter schemas (all fields required; no extras):
 | `cancel` / `expire` | `auction` |
 | `withdraw` | `amount` (original payer only; no redirect) |
 | `settle` / `repair-title` | `auction`, `transfer` (seller-signed existing registry transfer packet) |
+| `issue` | `name`, `amount`, `registration` (buyer-signed `issueFromTreasury`; **OFF** unless `POA_ESCROW_NEW_NAMES=approved-v1`; see NEW-NAME-CHECKOUT.md) |
 
 Outbid/cancel/expiry create original-payer refund obligations. Pausing or a network
 hold does not erase liabilities. Expiry without executable seller consent refunds
@@ -206,8 +207,7 @@ credit, the payer separately signs `bid` or `buy`. Seller consent is a separatel
 registry transfer inside `settle`, never a direct transfer submitted ahead of payment.
 Fixed-price reservations still require seller handover and final seller/fee payments.
 Existing registry-only fixed offers are not silently converted; their owner must cancel
-the old encumbrance before creating a POA escrow listing. No issuance or lease support
-is added. Refund requests have no redirect field: payment goes only to the original payer.
+the old encumbrance before creating a POA escrow listing. No lease support is added; POA new-name issuance exists behind an OFF flag (NEW-NAME-CHECKOUT.md). Refund requests have no redirect field: payment goes only to the original payer.
 
 `npm run escrow:ui` drives these exact signed public HTTP boundaries and the real
 workerd/SQLite ledger/title store against the isolated mock chain: deposit waiting/seen/

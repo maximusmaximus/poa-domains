@@ -37,7 +37,10 @@ interface Bootstrap {
 export type { RegistryCall, RegistryReply } from "../src/registry-routes.js";
 
 /** POA new-name checkout (primary issuance via escrow). OFF until the issuance path below ships AND Max approves turning it on. */
-export function newNameCheckout(env:{POA_ESCROW_NEW_NAMES?:string}):"off"{ void env.POA_ESCROW_NEW_NAMES; return "off"; }
+export const NEW_NAME_PRICE_RULE="POA price = registry reserve schedule for the name's tier; 1 registry unit = 1 POA (6 decimals)";
+export function newNameCheckout(env:{POA_ESCROW_NEW_NAMES?:string}):{status:"on"|"off";priceRule:string}{
+  return {status:String(env.POA_ESCROW_NEW_NAMES)==="approved-v1"?"on":"off",priceRule:NEW_NAME_PRICE_RULE};
+}
 
 export class PoaRegistry extends DurableObject<Env> {
   private engine!: CloudflareEngine;
@@ -164,7 +167,8 @@ export class PoaRegistry extends DurableObject<Env> {
     const e = this.engine;
     const titles = registryTitles(e);
     this.escrowService = new Escrow(new SQLiteEscrowJournal(this.ctx.storage, policy), new PoaHttpNetwork(signing, fetch, { engine: this.env.POA_ESCROW_ENGINE_SHA256 ?? MAINNET_ENGINE_SHA256, params: this.env.POA_ESCROW_PARAMS_SHA256 ?? MAINNET_PARAMS_SHA256 }),
-      new WorkerSecretSigner(policy.wallet, () => this.env.POA_ESCROW_KEY, signing), titles, policy, () => Date.now(), enabled);
+      new WorkerSecretSigner(policy.wallet, () => this.env.POA_ESCROW_KEY, signing), titles, policy, () => Date.now(), enabled,
+      undefined, () => newNameCheckout(this.env).status === "on");
     return this.escrowService;
   }
   async escrowRead(path:string,query:Record<string,string>):Promise<unknown>{

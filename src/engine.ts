@@ -6,7 +6,7 @@ import {
   principal,
   DOMAIN,
 } from "./auth.js";
-import { ACTIONS, Action } from "./actions.js";
+import { ACTIONS, Action, ESCROW_ONLY_ACTIONS } from "./actions.js";
 import {
   Config,
   validateConfig,
@@ -177,6 +177,20 @@ export class Engine {
     this.admit(packet);
     return this.execute(packet, integer(this.clock.now()));
   }
+  // POA new-name checkout: the escrow ledger has already verified, debited and booked the buyer's POA
+  // in the SAME storage transaction. Public submit/preview refuse issueFromTreasury (ESCROW_ONLY).
+  private escrowIssue = false;
+  private asEscrowIssue<T>(packet: unknown, run: () => T): T {
+    need((packet as { body?: { action?: unknown } } | null)?.body?.action === "issueFromTreasury", "ESCROW_ISSUE_ACTION");
+    this.escrowIssue = true;
+    try { return run(); } finally { this.escrowIssue = false; }
+  }
+  submitEscrowIssue(packet: unknown): Receipt { return this.asEscrowIssue(packet, () => this.submit(packet)); }
+  previewEscrowIssue(packet: unknown): Receipt {
+    const candidate = new Engine(this.config, { now: () => this.clock.now() }, this.admission);
+    candidate.state = structuredClone(this.state);
+    return candidate.submitEscrowIssue(packet);
+  }
   // Admission policy for NEW submissions only. Replay of recorded commits never runs it,
   // so history recorded under earlier rules replays byte-for-byte.
   //  - Ownership is permanent: no leases, renewals or lease expiry. Names change hands
@@ -187,13 +201,14 @@ export class Engine {
     const body = (value as { body?: { action?: unknown; params?: any } } | null)?.body;
     if (!body || typeof body !== "object") return;
     const { action, params: p } = body;
+    if (action === "issueFromTreasury" && !this.escrowIssue) throw new Fault("ESCROW_ONLY");
     if (this.admission.permanentOnly && (action === "renewLease" || action === "expireLease"))
       throw new Fault("PERMANENT_OWNERSHIP_ONLY");
     if (this.admission.permanentOnly && action === "createChildOffer" && p && typeof p === "object" &&
         (p.rights === null || typeof p.rights !== "object" || p.rights.kind !== "permanent"))
       throw new Fault("PERMANENT_OWNERSHIP_ONLY");
     let name: string | null = null;
-    if (action === "announceAuction" && typeof p?.name === "string") name = p.name;
+    if ((action === "announceAuction" || action === "issueFromTreasury") && typeof p?.name === "string") name = p.name;
     if (action === "fillChildOffer" && typeof p?.label === "string" && typeof p?.offerId === "string") {
       const o = this.state.offers[p.offerId];
       if (this.admission.permanentOnly && o?.rights?.kind === "lease")
@@ -260,8 +275,8 @@ export class Engine {
       amount(b.maxTotal);
       need(b.maxNetworkFee === "0", "NETWORK_FEE_POLICY");
       need(time >= b.notBefore && time < b.deadline, "INTENT_EXPIRED");
-      need(Object.hasOwn(ACTIONS, b.action), "UNSUPPORTED_ACTION");
-      exact(b.params, [...ACTIONS[b.action as Action]]);
+      need(Object.hasOwn(ACTIONS, b.action) || Object.hasOwn(ESCROW_ONLY_ACTIONS, b.action), "UNSUPPORTED_ACTION");
+      exact(b.params, [...(Object.hasOwn(ACTIONS, b.action) ? ACTIONS[b.action as Action] : ESCROW_ONLY_ACTIONS[b.action as keyof typeof ESCROW_ONLY_ACTIONS])]);
       result = this.apply(next, b, id, time);
       this.assertInvariants(next);
     } catch (e) {
@@ -437,7 +452,7 @@ export class Engine {
       this.credit(s, b.signer, "POA", 10000000n);
     }
     const p = b.params;
-    switch (b.action as Action) {
+    switch (b.action as Action | keyof typeof ESCROW_ONLY_ACTIONS) {
       case "announceAuction": {
         const { n, e } = this.entry(s, p.name);
         need(n.labels.length === 1, "ROOT_ONLY");
@@ -799,6 +814,24 @@ export class Engine {
         o.cancelled = true;
         o.version++;
         return { cancelled: true };
+      }
+      case "issueFromTreasury": {
+        // Primary issuance paid in POA via escrow. Price = the existing reserve schedule (registry
+        // micro-units, 1:1 with POA micros). No internal-unit debit, so the signed cap must be 0.
+        need(this.config.revision === "poa-mainnet-v1", "ESCROW_ISSUE_POLICY");
+        const { n, e } = this.entry(s, p.name);
+        need(n.labels.length === 1, "ROOT_ONLY");
+        need(!e?.activeId, "NAME_TAKEN");
+        need(!e?.auctionId, "NAME_RESERVED");
+        need(p.expectedDeedId === null && p.expectedVersion === 0, "STALE_VERSION");
+        need(b.signer !== this.config.treasury, "SELLER_SELF_BID");
+        need(b.maxTotal === "0", "AMOUNT_CAP");
+        const asset = this.asset(p.asset);
+        const a = this.config.assets[asset]!;
+        need(amount(p.price, true) === amount(n.tier === "premium" ? a.premiumReserve : a.standardReserve), "RESERVE_POLICY");
+        const m = metadata(p.metadata, n.canonical, rightsHash({ kind: "permanent" }, null));
+        const d = this.mint(s, n.canonical, b.signer, { kind: "permanent" }, null, m, time);
+        return { deedId: d.id, owner: d.owner };
       }
       case "transfer": {
         const d = this.deed(s, p);

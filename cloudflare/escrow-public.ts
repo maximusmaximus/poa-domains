@@ -2,7 +2,7 @@
 import { Escrow, State } from "./escrow.js";
 import { verifyCommand, address, decimal, micros } from "./escrow-codec.js";
 import { exact, need, parseJSON } from "../src/core.js";
-const PUBLIC_ACTIONS=new Set(["intent","detect","withdraw","open","list","bid","buy","cancel","expire","settle","repair-title","view"]);
+const PUBLIC_ACTIONS=new Set(["intent","detect","withdraw","open","list","bid","buy","cancel","expire","settle","repair-title","issue","view"]);
 export function marketView(s: State, name?: string) {
   return Object.values(s.auctions).filter(a=>name===undefined||a.name===name).slice(-100).map(a=>({
     id:a.id,name:a.name,seller:a.seller,kind:a.kind??"auction",price:decimal(BigInt(a.reserve)),

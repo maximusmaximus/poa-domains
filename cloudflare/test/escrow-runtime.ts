@@ -6,7 +6,8 @@ import { Engine } from "../../src/engine.js";
 import { mainnetConfig } from "../../src/config.js";
 import { BootableSystemClock, seedRegistry } from "../../src/seed.js";
 import { signBody } from "../../src/auth.js";
-import { capabilities, prepare } from "../../src/interface.js";
+import { capabilities, prepare, buildMetadataWitness } from "../../src/interface.js";
+import { normalizeName } from "../../src/names.js";
 import { SQLiteJournal } from "../sqlite-journal.js";
 import { Escrow, SQLiteEscrowJournal, invariant, exportEscrow, restoreEscrow } from "../escrow.js";
 import { registryTitles } from "../escrow-titles.js";
@@ -17,7 +18,7 @@ import { base58 } from "../../src/native-crypto.js";
 import { MockNetwork, policy, signer, who, key, command, depositBody } from "./escrow-fixture.js";
 interface TestEnv { ASSETS:Fetcher; TEST:DurableObjectNamespace<EscrowHarness>; }
 export class EscrowHarness extends DurableObject<TestEnv> {
-  private engine!:Engine;private escrow!:Escrow;private net!:MockNetwork;private clock=new BootableSystemClock();private armed="";private uiEnabled=true;
+  private engine!:Engine;private escrow!:Escrow;private net!:MockNetwork;private clock=new BootableSystemClock();private armed="";private newNames=false;private uiEnabled=true;
   constructor(ctx:DurableObjectState,env:TestEnv){super(ctx,env);ctx.blockConcurrencyWhile(async()=>{
     const sql=ctx.storage.sql;sql.exec("CREATE TABLE IF NOT EXISTS journal(sequence INTEGER PRIMARY KEY,record TEXT NOT NULL); CREATE TABLE IF NOT EXISTS test_network(id INTEGER PRIMARY KEY,value TEXT NOT NULL)");
     this.net=new MockNetwork();const saved=sql.exec<{value:string}>("SELECT value FROM test_network WHERE id=1").toArray()[0];if(saved){Object.assign(this.net,JSON.parse(saved.value));this.net.mismatch=BigInt(this.net.mismatch);}
@@ -31,7 +32,7 @@ export class EscrowHarness extends DurableObject<TestEnv> {
     this.clock.overrideTime=Math.floor(this.net.now/1000);
     const p={...policy,perTx:"250000.000000",daily:"1000000.000000",feeBps:this.engine.config.feeBps};
     this.escrow=new Escrow(new SQLiteEscrowJournal(ctx.storage,p),this.net,signer(),registryTitles(this.engine),p,()=>this.net.now,()=>true,
-      point=>{if(this.armed===point){this.armed="";throw Error("TEST_CRASH");}});
+      point=>{if(this.armed===point){this.armed="";throw Error("TEST_CRASH");}},()=>this.newNames);
     save();
   });}
   async run(v:any):Promise<unknown>{
@@ -57,6 +58,16 @@ export class EscrowHarness extends DurableObject<TestEnv> {
           maxTotal:"0",maxNetworkFee:"0",action:"transfer",params:{name,expectedDeedId:d.id,expectedVersion:d.version,recipient:who(buyer)}},capabilities(this.engine));
         return {packet:signBody(body,[key(seller)]),...this.result()};
       }
+      if(v.op==="new-names")this.newNames=v.value===true;
+      if(v.op==="issue-packet"){
+        const n=v.name,buyer=v.buyer,a=this.engine.config.assets.POA!;
+        const price=v.price??String(BigInt(normalizeName(n,this.engine.normalizationMode).tier==="premium"?a.premiumReserve:a.standardReserve));
+        const e=this.engine,body={domain:"poa-domains.local.intent.v1",revision:e.config.revision,chainId:e.config.chainId,genesisHash:e.config.genesisHash,registryId:e.registryId,policyHash:e.policyHash,normalizationHash:e.config.normalizationHash,
+          signer:who(buyer),coSigners:[],requestId:"escrow-issue-"+n+"-"+this.net.now,nonce:e.nextNonce(who(buyer)),notBefore:0,deadline:Math.floor(this.net.now/1000)+600000,
+          maxTotal:v.maxTotal??"0",maxNetworkFee:"0",action:"issueFromTreasury",params:{name:n,asset:"POA",price,expectedDeedId:null,expectedVersion:0,metadata:buildMetadataWitness(n)}};
+        return {packet:signBody(body,[key(buyer)]),price,...this.result()};
+      }
+      if(v.op==="name-owner"){const s=this.engine.snapshot(),row=s.names[v.name];return {nameOwner:row?.activeId?s.deeds[row.activeId]!.owner:null,...this.result()};}
       if(v.op==="archive")return {archive:exportEscrow(this.ctx.storage),...this.result()};
       if(v.op==="restore-archive")restoreEscrow(this.ctx.storage,v.archive);
       if(v.op==="tick")await this.escrow.tick();

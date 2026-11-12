@@ -130,6 +130,10 @@ HTTP 400; retryable: false. Send exactly application/json without content encodi
 
 HTTP 400; retryable: false. Deed generation. Check the documented inputs and current state.
 
+## DEED_NOT_FOUND
+
+HTTP 400; retryable: false. Deed not found. Check the documented inputs and current state.
+
 ## DEPTH
 
 HTTP 400; retryable: false. Depth. Check the documented inputs and current state.
@@ -258,6 +262,10 @@ HTTP 400; retryable: false. Escrow distinct wallet. Check the documented inputs 
 
 HTTP 400; retryable: false. Escrow domain. Check the documented inputs and current state.
 
+## ESCROW_DUPLICATE
+
+HTTP 400; retryable: false. Escrow duplicate. Check the documented inputs and current state.
+
 ## ESCROW_DUPLICATE_PAYMENT
 
 HTTP 400; retryable: false. Escrow duplicate payment. Check the documented inputs and current state.
@@ -302,6 +310,30 @@ HTTP 400; retryable: false. Escrow increment policy. Check the documented inputs
 
 HTTP 400; retryable: false. Escrow insufficient funds. Check the documented inputs and current state.
 
+## ESCROW_ISSUE_ACTION
+
+HTTP 400; retryable: false. Escrow issue action. Check the documented inputs and current state.
+
+## ESCROW_ISSUE_COMMIT
+
+HTTP 400; retryable: false. Escrow issue commit. Check the documented inputs and current state.
+
+## ESCROW_ISSUE_CONSENT
+
+HTTP 400; retryable: false. Escrow issue consent. Check the documented inputs and current state.
+
+## ESCROW_ISSUE_NAME
+
+HTTP 400; retryable: false. Escrow issue name. Check the documented inputs and current state.
+
+## ESCROW_ISSUE_NOT_READY
+
+HTTP 400; retryable: false. Escrow issue not ready. Check the documented inputs and current state.
+
+## ESCROW_ISSUE_POLICY
+
+HTTP 400; retryable: false. Escrow issue policy. Check the documented inputs and current state.
+
 ## ESCROW_JOURNAL_CAPACITY
 
 HTTP 400; retryable: false. Escrow journal capacity. Check the documented inputs and current state.
@@ -334,6 +366,10 @@ HTTP 400; retryable: false. Escrow market kind. Check the documented inputs and 
 
 HTTP 400; retryable: false. Escrow name. Check the documented inputs and current state.
 
+## ESCROW_NAME_TAKEN
+
+HTTP 400; retryable: false. Escrow name taken. Check the documented inputs and current state.
+
 ## ESCROW_NETWORK_HELD
 
 HTTP 409; retryable: true. Escrow network held. Check the documented inputs and current state.
@@ -341,6 +377,10 @@ HTTP 409; retryable: true. Escrow network held. Check the documented inputs and 
 ## ESCROW_NETWORK_WRITES_DISABLED
 
 HTTP 400; retryable: false. Escrow network writes disabled. Check the documented inputs and current state.
+
+## ESCROW_NEW_NAMES_OFF
+
+HTTP 400; retryable: false. Escrow new names off. Check the documented inputs and current state.
 
 ## ESCROW_NODE_CHAIN
 
@@ -377,6 +417,10 @@ HTTP 409; retryable: true. Escrow not final. Check the documented inputs and cur
 ## ESCROW_NO_ADMIN_CREDENTIAL
 
 HTTP 400; retryable: false. Escrow no admin credential. Check the documented inputs and current state.
+
+## ESCROW_ONLY
+
+HTTP 400; retryable: false. Escrow only. Check the documented inputs and current state.
 
 ## ESCROW_OPERATOR_SETUP_HELD
 
@@ -618,6 +662,10 @@ HTTP 400; retryable: false. Journal corrupt. Check the documented inputs and cur
 
 HTTP 400; retryable: false. Json. Check the documented inputs and current state.
 
+## KEYS
+
+HTTP 400; retryable: false. Keys. Check the documented inputs and current state.
+
 ## KEY_FILE_PERMISSIONS
 
 HTTP 400; retryable: false. Key file permissions. Check the documented inputs and current state.
@@ -638,6 +686,10 @@ HTTP 400; retryable: false. Key scheme. Check the documented inputs and current 
 
 HTTP 400; retryable: false. Labels. Check the documented inputs and current state.
 
+## LABEL_NOT_OFFERED
+
+HTTP 400; retryable: false. Label not offered. Check the documented inputs and current state.
+
 ## LEASE_ASSET
 
 HTTP 400; retryable: false. Lease asset. Check the documented inputs and current state.
@@ -654,13 +706,45 @@ HTTP 400; retryable: false. Lease obligation. Check the documented inputs and cu
 
 HTTP 400; retryable: false. Manifest mismatch. Check the documented inputs and current state.
 
+## MCP_ACCEPT
+
+HTTP 406; retryable: false. Mcp accept. Check the documented inputs and current state.
+
 ## MCP_ALREADY_INITIALIZED
 
 HTTP 400; retryable: false. Mcp already initialized. Check the documented inputs and current state.
 
+## MCP_BAD_PARAMS
+
+HTTP 400; retryable: false. Mcp bad params. Check the documented inputs and current state.
+
 ## MCP_NOT_INITIALIZED
 
 HTTP 400; retryable: false. Mcp not initialized. Check the documented inputs and current state.
+
+## MCP_ORIGIN
+
+HTTP 403; retryable: false. Mcp origin. Check the documented inputs and current state.
+
+## MCP_PARSE_ERROR
+
+HTTP 400; retryable: false. Mcp parse error. Check the documented inputs and current state.
+
+## MCP_PROTOCOL_VERSION
+
+HTTP 400; retryable: false. Mcp protocol version. Check the documented inputs and current state.
+
+## MCP_RATE_LIMITED
+
+HTTP 429; retryable: false. Mcp rate limited. Check the documented inputs and current state.
+
+## MCP_RATE_UNAVAILABLE
+
+HTTP 503; retryable: false. Mcp rate unavailable. Check the documented inputs and current state.
+
+## MCP_RESOURCE
+
+HTTP 400; retryable: false. Mcp resource. Check the documented inputs and current state.
 
 ## METADATA_BINDING
 
@@ -681,6 +765,10 @@ HTTP 400; retryable: false. Method not found. Check the documented inputs and cu
 ## MIN_RAISE
 
 HTTP 400; retryable: false. The bid is below the current minimum next bid.
+
+## NAME
+
+HTTP 400; retryable: false. Name. Check the documented inputs and current state.
 
 ## NAME_DEPTH
 
@@ -970,6 +1058,18 @@ HTTP 503; retryable: true. The signed request may have been accepted. Keep it, q
 
 HTTP 400; retryable: false. Ownership class taken. Check the documented inputs and current state.
 
+## PAGE_CURSOR
+
+HTTP 400; retryable: false. Use the unchanged nextCursor from this collection.
+
+## PAGE_LIMIT
+
+HTTP 400; retryable: false. Choose a whole-number page limit from 1 to 100.
+
+## PARAMS
+
+HTTP 400; retryable: false. Params. Check the documented inputs and current state.
+
 ## PERMANENT_DEED
 
 HTTP 400; retryable: false. Permanent deed. Check the documented inputs and current state.
@@ -1014,6 +1114,10 @@ HTTP 400; retryable: false. Public json. Check the documented inputs and current
 
 HTTP 400; retryable: false. Public number. Check the documented inputs and current state.
 
+## PUBLIC_RECORD_WITHHELD
+
+HTTP 409; retryable: false. This stored record is not public. The name or reference remains unavailable; it is not free to register. No new action was dispatched. Hidden receipts are not reported as missing: keep the original packet and do not replace its nonce or request ID.
+
 ## QUERY_NOT_ALLOWED
 
 HTTP 400; retryable: false. Query not allowed. Check the documented inputs and current state.
@@ -1021,6 +1125,14 @@ HTTP 400; retryable: false. Query not allowed. Check the documented inputs and c
 ## QUIET_PERIOD
 
 HTTP 400; retryable: false. Quiet period. Check the documented inputs and current state.
+
+## QUOTE_AMBIGUOUS
+
+HTTP 409; retryable: false. Several offers match. Read the offers and quote again with an explicit offerId.
+
+## QUOTE_INPUT_REQUIRED
+
+HTTP 400; retryable: false. Supply each required quote input explicitly before signing.
 
 ## RECORDS
 
@@ -1037,26 +1149,6 @@ HTTP 400; retryable: false. Registry initialization failed. Check the documented
 ## REGISTRY_UNAVAILABLE
 
 HTTP 503; retryable: true. Registry reads are temporarily unavailable.
-
-## SEARCH_LOG_DISABLED
-
-HTTP 503; retryable: true. Search saving is not configured. Name checks still work.
-
-## SEARCH_LOG_FAILED
-
-HTTP 503; retryable: true. Search could not be saved. Name checks still work.
-
-## SEARCH_LOG_RATE_LIMITED
-
-HTTP 429; retryable: true. Search saving is busy. Name checking still works.
-
-## SEARCH_LOG_LIMITER_UNAVAILABLE
-
-HTTP 503; retryable: true. Search saving is temporarily unavailable. Name checking still works.
-
-## SEARCH_QUERY_PRIVATE
-
-HTTP 400; retryable: false. Only name queries without contact, wallet or key-like text can be saved.
 
 ## RENEWAL_TERMS
 
@@ -1093,6 +1185,14 @@ HTTP 400; retryable: false. Reserved name. Check the documented inputs and curre
 ## RESERVE_POLICY
 
 HTTP 400; retryable: false. Reserve policy. Check the documented inputs and current state.
+
+## RESOURCE_ID
+
+HTTP 400; retryable: false. Resource id. Check the documented inputs and current state.
+
+## RESOURCE_NOT_FOUND
+
+HTTP 404; retryable: false. Resource not found. Check the documented inputs and current state.
 
 ## RESTORE_DISABLED
 
@@ -1142,6 +1242,26 @@ HTTP 400; retryable: false. Rpc error. Check the documented inputs and current s
 
 HTTP 400; retryable: false. Schema. Check the documented inputs and current state.
 
+## SEARCH_LOG_DISABLED
+
+HTTP 503; retryable: true. Search saving is not configured. Name checks still work.
+
+## SEARCH_LOG_FAILED
+
+HTTP 503; retryable: true. Search could not be saved. Name checks still work.
+
+## SEARCH_LOG_LIMITER_UNAVAILABLE
+
+HTTP 503; retryable: true. Search saving is temporarily unavailable. Name checking still works.
+
+## SEARCH_LOG_RATE_LIMITED
+
+HTTP 429; retryable: true. Search saving is busy. Name checking still works.
+
+## SEARCH_QUERY_PRIVATE
+
+HTTP 400; retryable: false. Only name queries without contact, wallet or key-like text can be saved.
+
 ## SECRET_FIELD
 
 HTTP 400; retryable: false. Secret field. Check the documented inputs and current state.
@@ -1173,6 +1293,10 @@ HTTP 400; retryable: false. Signatures. Check the documented inputs and current 
 ## SIZE
 
 HTTP 400; retryable: false. Size. Check the documented inputs and current state.
+
+## STALE_CURSOR
+
+HTTP 409; retryable: false. The registry changed. Restart this paginated read without a cursor.
 
 ## STALE_OFFER
 
@@ -1253,87 +1377,3 @@ HTTP 400; retryable: false. Validity. Check the documented inputs and current st
 ## WRITER_LOCKED
 
 HTTP 400; retryable: false. Writer locked. Check the documented inputs and current state.
-
-## RESOURCE_ID
-
-HTTP 400; retryable: false. Resource id. Check the documented inputs and current state.
-
-## RESOURCE_NOT_FOUND
-
-HTTP 404; retryable: false. Resource not found. Check the documented inputs and current state.
-
-## PAGE_LIMIT
-
-HTTP 400; retryable: false. Choose a whole-number page limit from 1 to 100.
-
-## PAGE_CURSOR
-
-HTTP 400; retryable: false. Use the unchanged nextCursor from this collection.
-
-## STALE_CURSOR
-
-HTTP 409; retryable: false. The registry changed. Restart this paginated read without a cursor.
-
-## QUOTE_AMBIGUOUS
-
-HTTP 409; retryable: false. Several offers match. Read the offers and quote again with an explicit offerId.
-
-## QUOTE_INPUT_REQUIRED
-
-HTTP 400; retryable: false. Supply each required quote input explicitly before signing.
-
-## PUBLIC_RECORD_WITHHELD
-
-HTTP 409; retryable: false. This stored record is not public. The name or reference remains unavailable; it is not free to register. No new action was dispatched. Hidden receipts are not reported as missing: keep the original packet and do not replace its nonce or request ID.
-
-## DEED_NOT_FOUND
-
-HTTP 400; retryable: false. Deed not found. Check the documented inputs and current state.
-
-## LABEL_NOT_OFFERED
-
-HTTP 400; retryable: false. Label not offered. Check the documented inputs and current state.
-
-## NAME
-
-HTTP 400; retryable: false. Name. Check the documented inputs and current state.
-
-## PARAMS
-
-HTTP 400; retryable: false. Params. Check the documented inputs and current state.
-
-## KEYS
-
-HTTP 400; retryable: false. Keys. Check the documented inputs and current state.
-
-## MCP_PARSE_ERROR
-
-HTTP 400; retryable: false. Mcp parse error. Check the documented inputs and current state.
-
-## MCP_BAD_PARAMS
-
-HTTP 400; retryable: false. Mcp bad params. Check the documented inputs and current state.
-
-## MCP_RESOURCE
-
-HTTP 400; retryable: false. Mcp resource. Check the documented inputs and current state.
-
-## MCP_ORIGIN
-
-HTTP 403; retryable: false. Mcp origin. Check the documented inputs and current state.
-
-## MCP_PROTOCOL_VERSION
-
-HTTP 400; retryable: false. Mcp protocol version. Check the documented inputs and current state.
-
-## MCP_ACCEPT
-
-HTTP 406; retryable: false. Mcp accept. Check the documented inputs and current state.
-
-## MCP_RATE_UNAVAILABLE
-
-HTTP 503; retryable: false. Mcp rate unavailable. Check the documented inputs and current state.
-
-## MCP_RATE_LIMITED
-
-HTTP 429; retryable: false. Mcp rate limited. Check the documented inputs and current state.
