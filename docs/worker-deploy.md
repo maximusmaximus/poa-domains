@@ -139,8 +139,8 @@ variables** (these are not secrets or deployment overrides):
 | `POA_ESCROW_ADDRESS` | `poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf` |
 | `POA_ESCROW_PER_TX` | `250000.000000` |
 | `POA_ESCROW_DAILY` | `1000000.000000` |
-| `POA_ESCROW_ENGINE_SHA256` | `4e1f5c41dda9fda8939d92ffd6e9c2f05b66b4b8f1c5ff271960ea18b7bc6aa5` |
-| `POA_ESCROW_PARAMS_SHA256` | `82f994768b0bd7d430226147bfe90aad5aff1d4a50eae0400e8a950cb4416348` |
+| `POA_ESCROW_ENGINE_SHA256` | `e01abd959dd0439dd89af8e8c187d1bed3897deb2a855a615e7dfa2d0222f1fb` |
+| `POA_ESCROW_PARAMS_SHA256` | `6a5451ccd3109bb861e12dc31788fe368e0f974f89c41b1e4c8bfab178101101` |
 
 Re-read live policy at approval time; do not replay this observation over a later
 operator change. The existing runner refuses missing/mismatched values, preserves
@@ -154,3 +154,15 @@ door (there is no grok.me zone/custom-domain binding here), confirm it passes
 POST/body/protocol/Accept headers and trusted client-IP behavior, and verify the
 remote handshake/security guards **after** the separately approved deployment.
 Merging later source does not configure the proxy, grant approval or deploy it.
+
+## Pin transition (repin)
+
+Approved by Max on Nov 11 2026 (t108s1102). Set the production environment variables
+`POA_ESCROW_REPIN_ENGINE_SHA256` / `POA_ESCROW_REPIN_PARAMS_SHA256` to the new pins. The next gated
+deploy then (1) prechecks that the live Worker still has the current pins, (2) refuses unless
+`network-facts` advertises exactly the new pins and the served `client/poa.mjs` hashes to the
+new engine pin, (3) writes only those two bindings (`--keep-vars` keeps everything else), and
+(4) post-checks the new live version. Afterwards set `POA_ESCROW_ENGINE_SHA256` /
+`POA_ESCROW_PARAMS_SHA256` to the new values and delete the two repin variables. Pins are not part of
+the persisted escrow policy digest, so a repin does not trigger `ESCROW_POLICY_CHANGED`.
+Rollback: `wrangler rollback` to the previous version restores its bindings.

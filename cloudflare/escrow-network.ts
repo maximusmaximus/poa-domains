@@ -3,8 +3,8 @@ import { DisplayReadError, type ReadTiming } from "./display-freshness.js";
 import { integer, need } from "../src/core.js";
 import { CHAIN, Transfer, address, digest, verifyTransfer } from "./escrow-codec.js";
 import { Context, Cut, Network, Observation, Status } from "./escrow.js";
-export const MAINNET_ENGINE_SHA256 = "4e1f5c41dda9fda8939d92ffd6e9c2f05b66b4b8f1c5ff271960ea18b7bc6aa5";
-export const MAINNET_PARAMS_SHA256 = "82f994768b0bd7d430226147bfe90aad5aff1d4a50eae0400e8a950cb4416348";
+export const MAINNET_ENGINE_SHA256 = "e01abd959dd0439dd89af8e8c187d1bed3897deb2a855a615e7dfa2d0222f1fb";
+export const MAINNET_PARAMS_SHA256 = "6a5451ccd3109bb861e12dc31788fe368e0f974f89c41b1e4c8bfab178101101";
 export const PILOT_PER_TX = "250000.000000";
 export const PILOT_DAILY = "1000000.000000";
 export class PoaHttpNetwork implements Network {
