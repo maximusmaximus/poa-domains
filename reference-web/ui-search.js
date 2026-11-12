@@ -1,10 +1,10 @@
-import { publicNameUnavailable } from "./shared.js?v=0a86fcdcc190";
-import { registryUnit } from "./shared.js?v=0a86fcdcc190";
-import { ui } from "./ui-state.js?v=0a86fcdcc190";
-import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=0a86fcdcc190";
-import { add, el, person, variantOwner } from "./ui-core.js?v=0a86fcdcc190";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=0a86fcdcc190";
-import { addToCart } from "./ui-cart.js?v=0a86fcdcc190";
+import { publicNameUnavailable } from "./shared.js?v=1178313f1e36";
+import { registryUnit } from "./shared.js?v=1178313f1e36";
+import { ui } from "./ui-state.js?v=1178313f1e36";
+import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=1178313f1e36";
+import { add, el, person, variantOwner } from "./ui-core.js?v=1178313f1e36";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=1178313f1e36";
+import { addToCart } from "./ui-cart.js?v=1178313f1e36";
 
 export function runSearch(rawQuery, remember = true) {
     if (remember) {
