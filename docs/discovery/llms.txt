@@ -1,6 +1,6 @@
 # PoA Domains Registry
 
-> Worker = production. Registry finality is registry-committed, livePoA:false. Native-chain naming is NOT live. Registry prices, balances and onboarding grants are internal units, NOT POA or wallet money. Test records are hidden, not deleted. Hidden names and references return PUBLIC_RECORD_WITHHELD and remain unavailable; hidden receipts are not a missing outcome. Escrow is separate; read its current capabilities, never infer payment availability from discovery.
+> Worker = production. Registry finality is registry-committed, livePoA:false. Native-chain naming is NOT live. Registry prices, balances and past starter grants are internal units (new accounts get none since commit #16), NOT POA or wallet money. Test records are hidden, not deleted. Hidden names and references return PUBLIC_RECORD_WITHHELD and remain unavailable; hidden receipts are not a missing outcome. Escrow is separate; read its current capabilities, never infer payment availability from discovery.
 
 - [Remote MCP first](https://poadomains.grok.me/mcp): stateless Streamable HTTP, protocol 2025-11-25. POST only; Accept: application/json, text/event-stream. No browser Origin.
 - [REST OpenAPI](https://poadomains.grok.me/openapi.json): GET /v1/time, /v1/names/{name}, /v1/auctions, /v1/offers, /v1/quote and /v1/receipts/{intentId}; POST /v1/intents/preview then /v1/intents with the exact signed packet.

@@ -132,6 +132,8 @@ export class Engine {
     this.storage?.close();
     this.stopped = true;
   }
+  /** Current committed sequence (cheap public read). */
+  get sequence(): number { return this.state.sequence; }
   snapshot(): State {
     return structuredClone(this.state);
   }

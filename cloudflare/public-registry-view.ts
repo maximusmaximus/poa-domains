@@ -1,6 +1,6 @@
 /** Public projection only. Never passed to Engine, persistence, escrow or backups. */
 import { OWNERSHIP_TOKEN } from "../src/emoji-ownership.js";
-import { Engine } from "../src/engine.js";
+import { Engine, onboardingGrantOpen } from "../src/engine.js";
 import { normalizeName } from "../src/names.js";
 import { parseJSON } from "../src/core.js";
 import { errorReply } from "../src/errors.js";
@@ -138,7 +138,7 @@ export function publicRegistryRoute(e: Engine, call: RegistryCall, options: Regi
     data.publicView={filtered:true,policy:"audited-test-records-v1",stateHashScope:"complete-stored-state",sequenceScope:"complete-stored-state"};
   } else if(call.path==="/v1/capabilities") {
     delete data.onboardingGrantPoa;
-    data.onboardingGrantRegistryUnits="10000000";
+    data.onboardingGrantRegistryUnits=onboardingGrantOpen(e.registryId,e.sequence)?"10000000":"0";
     data.publicView={filtered:true,policy:"audited-test-records-v1",hiddenNamesRemainReserved:true,unavailableNameKeys:HIDDEN.names.map(n=>unavailableKey(hintNameKey(e,n))),unavailableAccountKeys:HIDDEN.accounts.map(unavailableKey)};
     data.assets=Object.fromEntries(Object.entries(data.assets).map(([k,v])=>[k,{...(v as object),kind:"internal-registry-units",nativePayment:false,label:"internal registry units"}]));
   } else if(call.path==="/v1/auctions" || call.path==="/v1/offers") {
