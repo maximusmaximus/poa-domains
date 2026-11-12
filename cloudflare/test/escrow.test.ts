@@ -36,6 +36,7 @@ function capacityJournal(j:MemoryJournal){
 import { Engine } from "../../src/engine.js";
 import { mainnetConfig } from "../../src/config.js";
 import { signBody } from "../../src/auth.js";
+import { buildMetadataWitness } from "../../src/interface.js";
 function consent(f:ReturnType<typeof fixture>):any{
  const e=new Engine(mainnetConfig(who(6),who(5),[who(2),who(3),who(4)]),{now:()=>Math.floor(f.net.now/1000)});
  const b={domain:"poa-domains.local.intent.v1",revision:e.config.revision,chainId:CHAIN,genesisHash:e.config.genesisHash,registryId:e.registryId,policyHash:e.policyHash,normalizationHash:e.config.normalizationHash,
@@ -480,4 +481,63 @@ test("display fallback aliases use one overall read deadline, not a new deadline
   if(path==='/api/network/facts')return Response.json({chain_id:CHAIN,engine_sha256:MAINNET_ENGINE_SHA256,params_sha256:MAINNET_PARAMS_SHA256});
   return new Response(null,{status:404});}) as typeof fetch;
  const shown=await new PoaHttpNetwork(()=>false,request,undefined,()=>now).displayStatus();assert.equal(shown.stale,false);assert.equal(requests,5);assert.equal(signals.size,1);
+});
+
+// ---- POA new-name checkout (escrow "issue"), mock title store; the real Engine path is in escrow-runtime.mjs ----
+function issueFixture(on=true){
+ const journal=new MemoryJournal(policy),net=new MockNetwork();let newNames=on;const issued:Record<string,string>={};let failCommit=false,commits=0;
+ const titles={terms:()=>({reserve:"1.000000",window:1000,quiet:1000}),validate:()=>{},commit:()=>{},
+  issueTerms:(name:string)=>{assert.ok(!issued[name],"taken");return {price:"2000000"};},
+  validateIssue:(p:any,name:string,buyer:string,price:string)=>{assert.equal(p.body.signer,buyer);assert.equal(p.body.params.name,name);assert.equal(p.body.params.price,price);},
+  issue:(p:any)=>{if(failCommit)throw Error("ESCROW_ISSUE_COMMIT");issued[p.body.params.name]=p.body.signer;commits++;}};
+ const e=new Escrow(journal,net,signer(),titles,policy,()=>net.now,()=>true,()=>{},()=>newNames);e.pause(false);
+ return {e,net,issued,setOn:(v:boolean)=>{newNames=v;},failNext:(v:boolean)=>{failCommit=v;},commits:()=>commits};
+}
+function registration(buyer:number,name:string,price="2000000"):any{
+ const e=new Engine(mainnetConfig(who(6),who(5),[who(2),who(3),who(4)]),{now:()=>1});
+ const b={domain:"poa-domains.local.intent.v1",revision:e.config.revision,chainId:CHAIN,genesisHash:e.config.genesisHash,registryId:e.registryId,policyHash:e.policyHash,normalizationHash:e.config.normalizationHash,
+  signer:who(buyer),coSigners:[],requestId:"issue-"+name,nonce:0,notBefore:0,deadline:2000000000,maxTotal:"0",maxNetworkFee:"0",action:"issueFromTreasury",
+  params:{name,asset:"POA",price,expectedDeedId:null,expectedVersion:0,metadata:buildMetadataWitness(name)}};
+ return signBody(b,[key(buyer)]);
+}
+test("checkout OFF: issue is refused before reading state, network or titles",async()=>{
+ const f=issueFixture(false);await fund(f as any);const before=f.e.state();
+ await assert.rejects(f.e.command(command(who(3),"i","issue",{name:"fresh",amount:"2.000000",registration:registration(3,"fresh")})),/ESCROW_NEW_NAMES_OFF/);
+ assert.deepEqual(f.e.state(),before);assert.equal(f.commits(),0);
+});
+test("checkout ON: exact price, credited funds, treasury payout, idempotent, no double issue",async()=>{
+ const f=issueFixture();await fund(f as any,3,"3.000000");
+ await assert.rejects(f.e.command(command(who(3),"w","issue",{name:"fresh",amount:"1.000000",registration:registration(3,"fresh")})),/ESCROW_PRICE/);
+ await assert.rejects(f.e.command(command(who(4),"x","issue",{name:"fresh",amount:"2.000000",registration:registration(4,"fresh")})),/ESCROW_INSUFFICIENT_FUNDS/);
+ const r=await f.e.command(command(who(3),"ok","issue",{name:"fresh",amount:"2.000000",registration:registration(3,"fresh")})) as any;
+ const s=f.e.state();assert.equal(s.available[who(3)],"1000000");assert.equal(f.issued.fresh,who(3));
+ assert.deepEqual({to:s.payments[r.payment]!.to,amount:s.payments[r.payment]!.amount,kind:s.payments[r.payment]!.kind,status:s.payments[r.payment]!.status},{to:policy.treasury,amount:"2000000",kind:"seller",status:"READY"});
+ invariant(s);
+ assert.deepEqual(await f.e.command(command(who(3),"ok","issue",{name:"fresh",amount:"2.000000",registration:registration(3,"fresh")})),r);assert.equal(f.commits(),1);
+ await assert.rejects(f.e.command(command(who(3),"ok2","issue",{name:"fresh",amount:"2.000000",registration:registration(3,"fresh")})));
+ assert.equal(f.e.state().available[who(3)],"1000000","no second debit");
+});
+test("checkout: a failed registry issue leaves no debit and no payout (atomic)",async()=>{
+ const f=issueFixture();await fund(f as any,3,"3.000000");const before=f.e.state();f.failNext(true);
+ await assert.rejects(f.e.command(command(who(3),"fail","issue",{name:"fresh",amount:"2.000000",registration:registration(3,"fresh")})),/ESCROW_ISSUE_COMMIT/);
+ assert.deepEqual(f.e.state(),before);
+});
+test("checkout: network hold, pause and per-transaction limit still apply",async()=>{
+ const f=issueFixture();await fund(f as any,3,"3.000000");
+ f.net.stale=true;await assert.rejects(f.e.command(command(who(3),"h","issue",{name:"fresh",amount:"2.000000",registration:registration(3,"fresh")})),/ESCROW_STALE|ESCROW_NETWORK_HELD/);f.net.stale=false;
+ await f.e.pause(true);await assert.rejects(f.e.command(command(who(3),"p","issue",{name:"fresh",amount:"2.000000",registration:registration(3,"fresh")})),/ESCROW_PAUSED/);await f.e.pause(false);
+ await assert.rejects(f.e.command(command(who(3),"l","issue",{name:"fresh",amount:"999999999.000000",registration:registration(3,"fresh")})),/ESCROW_AMOUNT/);
+ assert.equal(f.commits(),0);
+});
+test("engine: issueFromTreasury is escrow-only, mints at the schedule price, cap 0; audited history hash unchanged",()=>{
+ const e=new Engine(mainnetConfig(who(6),who(5),[who(2),who(3),who(4)]),{now:()=>1});
+ const price=String(BigInt(e.config.assets.POA!.standardReserve)),reg=registration(3,"fresh",price);
+ assert.throws(()=>e.submit(reg),/ESCROW_ONLY/);
+ assert.throws(()=>e.preview(reg),/ESCROW_ONLY/);
+ assert.equal(e.previewEscrowIssue(reg).status,"succeeded");
+ const r=e.submitEscrowIssue(reg);assert.equal(r.status,"succeeded");const s=e.snapshot();assert.equal(s.deeds[s.names.fresh!.activeId!]!.owner,who(3));
+ assert.deepEqual(e.submitEscrowIssue(registration(3,"fresh",price)),r,"same signed request is idempotent");
+ assert.equal(e.submitEscrowIssue(registration(4,"fresh",price)).status,"rejected","an issued name cannot be issued twice");
+ assert.equal(e.previewEscrowIssue(registration(2,"other","999999999")).status,"rejected","price must equal schedule");
+ assert.throws(()=>e.submitEscrowIssue(consent({net:{now:1000}} as any)),/ESCROW_ISSUE_ACTION/);
 });

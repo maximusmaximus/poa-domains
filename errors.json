@@ -182,6 +182,12 @@
       "retryable": false
     },
     {
+      "code": "DEED_NOT_FOUND",
+      "httpStatus": 400,
+      "message": "Deed not found. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
       "code": "DEPTH",
       "httpStatus": 400,
       "message": "Depth. Check the documented inputs and current state.",
@@ -374,6 +380,12 @@
       "retryable": false
     },
     {
+      "code": "ESCROW_DUPLICATE",
+      "httpStatus": 400,
+      "message": "Escrow duplicate. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
       "code": "ESCROW_DUPLICATE_PAYMENT",
       "httpStatus": 400,
       "message": "Escrow duplicate payment. Check the documented inputs and current state.",
@@ -440,6 +452,42 @@
       "retryable": false
     },
     {
+      "code": "ESCROW_ISSUE_ACTION",
+      "httpStatus": 400,
+      "message": "Escrow issue action. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_ISSUE_COMMIT",
+      "httpStatus": 400,
+      "message": "Escrow issue commit. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_ISSUE_CONSENT",
+      "httpStatus": 400,
+      "message": "Escrow issue consent. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_ISSUE_NAME",
+      "httpStatus": 400,
+      "message": "Escrow issue name. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_ISSUE_NOT_READY",
+      "httpStatus": 400,
+      "message": "Escrow issue not ready. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_ISSUE_POLICY",
+      "httpStatus": 400,
+      "message": "Escrow issue policy. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
       "code": "ESCROW_JOURNAL_CAPACITY",
       "httpStatus": 400,
       "message": "Escrow journal capacity. Check the documented inputs and current state.",
@@ -488,6 +536,12 @@
       "retryable": false
     },
     {
+      "code": "ESCROW_NAME_TAKEN",
+      "httpStatus": 400,
+      "message": "Escrow name taken. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
       "code": "ESCROW_NETWORK_HELD",
       "httpStatus": 409,
       "message": "Escrow network held. Check the documented inputs and current state.",
@@ -497,6 +551,12 @@
       "code": "ESCROW_NETWORK_WRITES_DISABLED",
       "httpStatus": 400,
       "message": "Escrow network writes disabled. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_NEW_NAMES_OFF",
+      "httpStatus": 400,
+      "message": "Escrow new names off. Check the documented inputs and current state.",
       "retryable": false
     },
     {
@@ -551,6 +611,12 @@
       "code": "ESCROW_NO_ADMIN_CREDENTIAL",
       "httpStatus": 400,
       "message": "Escrow no admin credential. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_ONLY",
+      "httpStatus": 400,
+      "message": "Escrow only. Check the documented inputs and current state.",
       "retryable": false
     },
     {
@@ -914,6 +980,12 @@
       "retryable": false
     },
     {
+      "code": "KEYS",
+      "httpStatus": 400,
+      "message": "Keys. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
       "code": "KEY_FILE_PERMISSIONS",
       "httpStatus": 400,
       "message": "Key file permissions. Check the documented inputs and current state.",
@@ -944,6 +1016,12 @@
       "retryable": false
     },
     {
+      "code": "LABEL_NOT_OFFERED",
+      "httpStatus": 400,
+      "message": "Label not offered. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
       "code": "LEASE_ASSET",
       "httpStatus": 400,
       "message": "Lease asset. Check the documented inputs and current state.",
@@ -968,15 +1046,63 @@
       "retryable": false
     },
     {
+      "code": "MCP_ACCEPT",
+      "httpStatus": 406,
+      "message": "Mcp accept. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
       "code": "MCP_ALREADY_INITIALIZED",
       "httpStatus": 400,
       "message": "Mcp already initialized. Check the documented inputs and current state.",
       "retryable": false
     },
     {
+      "code": "MCP_BAD_PARAMS",
+      "httpStatus": 400,
+      "message": "Mcp bad params. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
       "code": "MCP_NOT_INITIALIZED",
       "httpStatus": 400,
       "message": "Mcp not initialized. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MCP_ORIGIN",
+      "httpStatus": 403,
+      "message": "Mcp origin. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MCP_PARSE_ERROR",
+      "httpStatus": 400,
+      "message": "Mcp parse error. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MCP_PROTOCOL_VERSION",
+      "httpStatus": 400,
+      "message": "Mcp protocol version. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MCP_RATE_LIMITED",
+      "httpStatus": 429,
+      "message": "Mcp rate limited. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MCP_RATE_UNAVAILABLE",
+      "httpStatus": 503,
+      "message": "Mcp rate unavailable. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "MCP_RESOURCE",
+      "httpStatus": 400,
+      "message": "Mcp resource. Check the documented inputs and current state.",
       "retryable": false
     },
     {
@@ -1007,6 +1133,12 @@
       "code": "MIN_RAISE",
       "httpStatus": 400,
       "message": "The bid is below the current minimum next bid.",
+      "retryable": false
+    },
+    {
+      "code": "NAME",
+      "httpStatus": 400,
+      "message": "Name. Check the documented inputs and current state.",
       "retryable": false
     },
     {
@@ -1442,6 +1574,24 @@
       "retryable": false
     },
     {
+      "code": "PAGE_CURSOR",
+      "httpStatus": 400,
+      "message": "Use the unchanged nextCursor from this collection.",
+      "retryable": false
+    },
+    {
+      "code": "PAGE_LIMIT",
+      "httpStatus": 400,
+      "message": "Choose a whole-number page limit from 1 to 100.",
+      "retryable": false
+    },
+    {
+      "code": "PARAMS",
+      "httpStatus": 400,
+      "message": "Params. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
       "code": "PERMANENT_DEED",
       "httpStatus": 400,
       "message": "Permanent deed. Check the documented inputs and current state.",
@@ -1508,6 +1658,12 @@
       "retryable": false
     },
     {
+      "code": "PUBLIC_RECORD_WITHHELD",
+      "httpStatus": 409,
+      "message": "This stored record is not public. The name or reference remains unavailable; it is not free to register. No new action was dispatched. Hidden receipts are not reported as missing: keep the original packet and do not replace its nonce or request ID.",
+      "retryable": false
+    },
+    {
       "code": "QUERY_NOT_ALLOWED",
       "httpStatus": 400,
       "message": "Query not allowed. Check the documented inputs and current state.",
@@ -1517,6 +1673,18 @@
       "code": "QUIET_PERIOD",
       "httpStatus": 400,
       "message": "Quiet period. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "QUOTE_AMBIGUOUS",
+      "httpStatus": 409,
+      "message": "Several offers match. Read the offers and quote again with an explicit offerId.",
+      "retryable": false
+    },
+    {
+      "code": "QUOTE_INPUT_REQUIRED",
+      "httpStatus": 400,
+      "message": "Supply each required quote input explicitly before signing.",
       "retryable": false
     },
     {
@@ -1542,36 +1710,6 @@
       "httpStatus": 503,
       "message": "Registry reads are temporarily unavailable.",
       "retryable": true
-    },
-    {
-      "code": "SEARCH_LOG_DISABLED",
-      "httpStatus": 503,
-      "message": "Search saving is not configured. Name checks still work.",
-      "retryable": true
-    },
-    {
-      "code": "SEARCH_LOG_FAILED",
-      "httpStatus": 503,
-      "message": "Search could not be saved. Name checks still work.",
-      "retryable": true
-    },
-    {
-      "code": "SEARCH_LOG_RATE_LIMITED",
-      "httpStatus": 429,
-      "message": "Search saving is busy. Name checking still works.",
-      "retryable": true
-    },
-    {
-      "code": "SEARCH_LOG_LIMITER_UNAVAILABLE",
-      "httpStatus": 503,
-      "message": "Search saving is temporarily unavailable. Name checking still works.",
-      "retryable": true
-    },
-    {
-      "code": "SEARCH_QUERY_PRIVATE",
-      "httpStatus": 400,
-      "message": "Only name queries without contact, wallet or key-like text can be saved.",
-      "retryable": false
     },
     {
       "code": "RENEWAL_TERMS",
@@ -1625,6 +1763,18 @@
       "code": "RESERVE_POLICY",
       "httpStatus": 400,
       "message": "Reserve policy. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RESOURCE_ID",
+      "httpStatus": 400,
+      "message": "Resource id. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "RESOURCE_NOT_FOUND",
+      "httpStatus": 404,
+      "message": "Resource not found. Check the documented inputs and current state.",
       "retryable": false
     },
     {
@@ -1700,6 +1850,36 @@
       "retryable": false
     },
     {
+      "code": "SEARCH_LOG_DISABLED",
+      "httpStatus": 503,
+      "message": "Search saving is not configured. Name checks still work.",
+      "retryable": true
+    },
+    {
+      "code": "SEARCH_LOG_FAILED",
+      "httpStatus": 503,
+      "message": "Search could not be saved. Name checks still work.",
+      "retryable": true
+    },
+    {
+      "code": "SEARCH_LOG_LIMITER_UNAVAILABLE",
+      "httpStatus": 503,
+      "message": "Search saving is temporarily unavailable. Name checking still works.",
+      "retryable": true
+    },
+    {
+      "code": "SEARCH_LOG_RATE_LIMITED",
+      "httpStatus": 429,
+      "message": "Search saving is busy. Name checking still works.",
+      "retryable": true
+    },
+    {
+      "code": "SEARCH_QUERY_PRIVATE",
+      "httpStatus": 400,
+      "message": "Only name queries without contact, wallet or key-like text can be saved.",
+      "retryable": false
+    },
+    {
       "code": "SECRET_FIELD",
       "httpStatus": 400,
       "message": "Secret field. Check the documented inputs and current state.",
@@ -1745,6 +1925,12 @@
       "code": "SIZE",
       "httpStatus": 400,
       "message": "Size. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "STALE_CURSOR",
+      "httpStatus": 409,
+      "message": "The registry changed. Restart this paginated read without a cursor.",
       "retryable": false
     },
     {
@@ -1865,132 +2051,6 @@
       "code": "WRITER_LOCKED",
       "httpStatus": 400,
       "message": "Writer locked. Check the documented inputs and current state.",
-      "retryable": false
-    },
-    {
-      "code": "RESOURCE_ID",
-      "httpStatus": 400,
-      "message": "Resource id. Check the documented inputs and current state.",
-      "retryable": false
-    },
-    {
-      "code": "RESOURCE_NOT_FOUND",
-      "httpStatus": 404,
-      "message": "Resource not found. Check the documented inputs and current state.",
-      "retryable": false
-    },
-    {
-      "code": "PAGE_LIMIT",
-      "httpStatus": 400,
-      "message": "Choose a whole-number page limit from 1 to 100.",
-      "retryable": false
-    },
-    {
-      "code": "PAGE_CURSOR",
-      "httpStatus": 400,
-      "message": "Use the unchanged nextCursor from this collection.",
-      "retryable": false
-    },
-    {
-      "code": "STALE_CURSOR",
-      "httpStatus": 409,
-      "message": "The registry changed. Restart this paginated read without a cursor.",
-      "retryable": false
-    },
-    {
-      "code": "QUOTE_AMBIGUOUS",
-      "httpStatus": 409,
-      "message": "Several offers match. Read the offers and quote again with an explicit offerId.",
-      "retryable": false
-    },
-    {
-      "code": "QUOTE_INPUT_REQUIRED",
-      "httpStatus": 400,
-      "message": "Supply each required quote input explicitly before signing.",
-      "retryable": false
-    },
-    {
-      "code": "PUBLIC_RECORD_WITHHELD",
-      "httpStatus": 409,
-      "message": "This stored record is not public. The name or reference remains unavailable; it is not free to register. No new action was dispatched. Hidden receipts are not reported as missing: keep the original packet and do not replace its nonce or request ID.",
-      "retryable": false
-    },
-    {
-      "code": "DEED_NOT_FOUND",
-      "httpStatus": 400,
-      "message": "Deed not found. Check the documented inputs and current state.",
-      "retryable": false
-    },
-    {
-      "code": "LABEL_NOT_OFFERED",
-      "httpStatus": 400,
-      "message": "Label not offered. Check the documented inputs and current state.",
-      "retryable": false
-    },
-    {
-      "code": "NAME",
-      "httpStatus": 400,
-      "message": "Name. Check the documented inputs and current state.",
-      "retryable": false
-    },
-    {
-      "code": "PARAMS",
-      "httpStatus": 400,
-      "message": "Params. Check the documented inputs and current state.",
-      "retryable": false
-    },
-    {
-      "code": "KEYS",
-      "httpStatus": 400,
-      "message": "Keys. Check the documented inputs and current state.",
-      "retryable": false
-    },
-    {
-      "code": "MCP_PARSE_ERROR",
-      "httpStatus": 400,
-      "message": "Mcp parse error. Check the documented inputs and current state.",
-      "retryable": false
-    },
-    {
-      "code": "MCP_BAD_PARAMS",
-      "httpStatus": 400,
-      "message": "Mcp bad params. Check the documented inputs and current state.",
-      "retryable": false
-    },
-    {
-      "code": "MCP_RESOURCE",
-      "httpStatus": 400,
-      "message": "Mcp resource. Check the documented inputs and current state.",
-      "retryable": false
-    },
-    {
-      "code": "MCP_ORIGIN",
-      "httpStatus": 403,
-      "message": "Mcp origin. Check the documented inputs and current state.",
-      "retryable": false
-    },
-    {
-      "code": "MCP_PROTOCOL_VERSION",
-      "httpStatus": 400,
-      "message": "Mcp protocol version. Check the documented inputs and current state.",
-      "retryable": false
-    },
-    {
-      "code": "MCP_ACCEPT",
-      "httpStatus": 406,
-      "message": "Mcp accept. Check the documented inputs and current state.",
-      "retryable": false
-    },
-    {
-      "code": "MCP_RATE_UNAVAILABLE",
-      "httpStatus": 503,
-      "message": "Mcp rate unavailable. Check the documented inputs and current state.",
-      "retryable": false
-    },
-    {
-      "code": "MCP_RATE_LIMITED",
-      "httpStatus": 429,
-      "message": "Mcp rate limited. Check the documented inputs and current state.",
       "retryable": false
     }
   ]

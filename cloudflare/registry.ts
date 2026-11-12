@@ -36,6 +36,12 @@ interface Bootstrap {
 }
 export type { RegistryCall, RegistryReply } from "../src/registry-routes.js";
 
+/** POA new-name checkout (primary issuance via escrow). OFF until the issuance path below ships AND Max approves turning it on. */
+export const NEW_NAME_PRICE_RULE="POA price = registry reserve schedule for the name's tier; 1 registry unit = 1 POA (6 decimals)";
+export function newNameCheckout(env:{POA_ESCROW_NEW_NAMES?:string}):{status:"on"|"off";priceRule:string}{
+  return {status:String(env.POA_ESCROW_NEW_NAMES)==="approved-v1"?"on":"off",priceRule:NEW_NAME_PRICE_RULE};
+}
+
 export class PoaRegistry extends DurableObject<Env> {
   private engine!: CloudflareEngine;
   private escrowService?: Escrow;
@@ -161,7 +167,8 @@ export class PoaRegistry extends DurableObject<Env> {
     const e = this.engine;
     const titles = registryTitles(e);
     this.escrowService = new Escrow(new SQLiteEscrowJournal(this.ctx.storage, policy), new PoaHttpNetwork(signing, fetch, { engine: this.env.POA_ESCROW_ENGINE_SHA256 ?? MAINNET_ENGINE_SHA256, params: this.env.POA_ESCROW_PARAMS_SHA256 ?? MAINNET_PARAMS_SHA256 }),
-      new WorkerSecretSigner(policy.wallet, () => this.env.POA_ESCROW_KEY, signing), titles, policy, () => Date.now(), enabled);
+      new WorkerSecretSigner(policy.wallet, () => this.env.POA_ESCROW_KEY, signing), titles, policy, () => Date.now(), enabled,
+      undefined, () => newNameCheckout(this.env).status === "on");
     return this.escrowService;
   }
   async escrowRead(path:string,query:Record<string,string>):Promise<unknown>{
@@ -171,7 +178,7 @@ export class PoaRegistry extends DurableObject<Env> {
       const freshness=await escrow.readiness(),s=escrow.state();const configured=String(this.env.POA_ESCROW_NETWORK_WRITES)==="approved-v1"&&!!this.env.POA_ESCROW_KEY&&(this.env.ESCROW_ADMIN_TOKEN?.length??0)>=32;
       return {enabled:true,paused:s.paused,held:s.paused||!!s.halt||freshness.held||!configured,
         holdReason:s.halt??(s.paused?"POA payments paused":!configured?"POA payments held for operator setup":freshness.reason),
-        address:escrow.policy.wallet,limits:{perTransaction:escrow.policy.perTx,daily:escrow.policy.daily},freshness,serverTime:Date.now(),registryId:this.engine.registryId};
+        address:escrow.policy.wallet,limits:{perTransaction:escrow.policy.perTx,daily:escrow.policy.daily},newNameCheckout:newNameCheckout(this.env),freshness,serverTime:Date.now(),registryId:this.engine.registryId};
     }
     if(path==="intent")return escrow.depositView(query.id!,query.txid);
     if(path==="market"||path==="domain")return {items:marketView(escrow.state(),path==="domain"?query.name:undefined),serverTime:Date.now()};

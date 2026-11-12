@@ -64,3 +64,8 @@ export const ACTIONS = {
   ],
 } as const;
 export type Action = keyof typeof ACTIONS;
+// Escrow-only primary issuance paid in POA through the escrow ledger. NOT a public action: absent from
+// discovery/quotes/prepare; public submit and preview refuse it (ESCROW_ONLY).
+export const ESCROW_ONLY_ACTIONS = {
+  issueFromTreasury: ["name", "asset", "price", "expectedVersion", "expectedDeedId", "metadata"],
+} as const;

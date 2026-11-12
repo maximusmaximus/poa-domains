@@ -31,6 +31,10 @@ export interface TitleStore {
   terms(name: string, seller: string): { reserve: string; window: number; quiet: number };
   validate(packet: Packet, name: string, seller: string, buyer: string): void;
   commit(packet: Packet): void;
+  /** POA new-name checkout (optional; absent => OFF). Price in POA micros from the registry reserve schedule. */
+  issueTerms?(name: string): { price: string };
+  validateIssue?(packet: Packet, name: string, buyer: string, price: string): void;
+  issue?(packet: Packet): void;
 }
 export interface Policy { wallet: string; treasury: string; perTx: string; daily: string; feeBps: number; maxAgeMs: number; }
 type PayStatus = "READY" | "SIGNED" | "UNKNOWN" | "FINAL";
@@ -136,7 +140,7 @@ export class SQLiteEscrowJournal implements Journal {
 export class Escrow {
   constructor(readonly journal: Journal, private network: Network, private signer: Signer,
     private titles: TitleStore, readonly policy: Policy, private now=()=>Date.now(), private enabled=()=>false,
-    private crash: (point:string)=>void=()=>{}) {
+    private crash: (point:string)=>void=()=>{}, private newNames: ()=>boolean=()=>false) {
     need(journal.load().policy===digest(policy) && signer.address===policy.wallet,"ESCROW_POLICY_CHANGED");
   }
   private serial<T>(fn:()=>Promise<T>): Promise<T> {
@@ -252,6 +256,14 @@ export class Escrow {
       case "open": exact(p,["name","reserve"]); text(p.name,256); need(micros(p.reserve)>0n,"ESCROW_RESERVE"); break;
       case "buy": case "bid": exact(p,["auction","amount"]); text(p.auction,64); need(micros(p.amount)>0n,"ESCROW_AMOUNT"); break;
       case "cancel": case "expire": exact(p,["auction"]); text(p.auction,64); break;
+      case "issue": {
+        need(this.newNames(),"ESCROW_NEW_NAMES_OFF");
+        exact(p,["name","amount","registration"]); text(p.name,256);
+        need(micros(p.amount)>0n && micros(p.amount)<=micros(this.policy.perTx),"ESCROW_AMOUNT");
+        const packet=authenticate(p.registration), nowSec=Math.floor(this.now()/1000);
+        need(integer(packet.body.notBefore)<=nowSec && integer(packet.body.deadline)>=nowSec+600,"ESCROW_CONSENT_EXPIRING");
+        break;
+      }
       case "settle": case "repair-title": {
         exact(p,["auction","transfer"]); text(p.auction,64);
         const packet=authenticate(p.transfer), nowSec=Math.floor(this.now()/1000);
@@ -341,6 +353,26 @@ export class Escrow {
             const id=`${kind}-${a.id}`;s.payments[id]={id,kind,to,amount:String(n),status:"READY",day:null,body:null,txid:null};payments.push(id);
           }
           (a.history??=[]).push({event:"Seller handover signed; settling",at:this.now()});a.status="SETTLING";s.settlements[a.id]={auction:a.id,packet,payments,status:"PAYING"};break;
+        }
+        case "issue": {
+          // deposit -> credit -> issue: buyer's credited POA buys a brand-new name from the treasury.
+          need(this.newNames(),"ESCROW_NEW_NAMES_OFF");
+          need(this.titles.issueTerms&&this.titles.validateIssue&&this.titles.issue,"ESCROW_NEW_NAMES_OFF");
+          need(s.sequence<PILOT_JOURNAL_LIMIT-32,"ESCROW_JOURNAL_CAPACITY");
+          exact(p,["name","amount","registration"]);
+          const name=text(p.name,256),n=micros(p.amount),terms=this.titles.issueTerms!(name);
+          need(n===BigInt(terms.price),"ESCROW_PRICE");need(n<=micros(this.policy.perTx),"ESCROW_PAYOUT_LIMIT");
+          need(c.actor!==this.policy.treasury,"ESCROW_SELF_SALE");
+          need(BigInt(s.available[c.actor]??"0")>=n,"ESCROW_INSUFFICIENT_FUNDS");
+          need(!Object.values(s.auctions).some(a=>a.name===name&&(a.status==="OPEN"||a.status==="SETTLING")),"ESCROW_TITLE_RESERVED");
+          const packet=authenticate(p.registration);this.titles.validateIssue!(packet,name,c.actor,String(n));
+          const id=`issue-${digest([rk,c])}`;need(!s.payments[id],"ESCROW_DUPLICATE");
+          s.available[c.actor]=String(BigInt(s.available[c.actor]??"0")-n);
+          s.payments[id]={id,kind:"seller",to:this.policy.treasury,amount:String(n),status:"READY",day:null,body:null,txid:null};
+          // Fail BEFORE the registry write if this entry could not be admitted (invariant + drain budget).
+          invariant(s);need(BigInt(s.sequence+1)+recoveryReserve(s,this.policy)<=BigInt(PILOT_JOURNAL_LIMIT),"ESCROW_JOURNAL_CAPACITY");
+          this.titles.issue!(packet);
+          result={issued:name,price:decimal(n),payment:id};break;
         }
         case "repair-title": {
           exact(p,["auction","transfer"]);const a=s.auctions[text(p.auction,64)], st=s.settlements[String(p.auction)];
