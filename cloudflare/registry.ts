@@ -36,6 +36,9 @@ interface Bootstrap {
 }
 export type { RegistryCall, RegistryReply } from "../src/registry-routes.js";
 
+/** POA new-name checkout (primary issuance via escrow). OFF until the issuance path below ships AND Max approves turning it on. */
+export function newNameCheckout(env:{POA_ESCROW_NEW_NAMES?:string}):"off"{ void env.POA_ESCROW_NEW_NAMES; return "off"; }
+
 export class PoaRegistry extends DurableObject<Env> {
   private engine!: CloudflareEngine;
   private escrowService?: Escrow;
@@ -171,7 +174,7 @@ export class PoaRegistry extends DurableObject<Env> {
       const freshness=await escrow.readiness(),s=escrow.state();const configured=String(this.env.POA_ESCROW_NETWORK_WRITES)==="approved-v1"&&!!this.env.POA_ESCROW_KEY&&(this.env.ESCROW_ADMIN_TOKEN?.length??0)>=32;
       return {enabled:true,paused:s.paused,held:s.paused||!!s.halt||freshness.held||!configured,
         holdReason:s.halt??(s.paused?"POA payments paused":!configured?"POA payments held for operator setup":freshness.reason),
-        address:escrow.policy.wallet,limits:{perTransaction:escrow.policy.perTx,daily:escrow.policy.daily},freshness,serverTime:Date.now(),registryId:this.engine.registryId};
+        address:escrow.policy.wallet,limits:{perTransaction:escrow.policy.perTx,daily:escrow.policy.daily},newNameCheckout:newNameCheckout(this.env),freshness,serverTime:Date.now(),registryId:this.engine.registryId};
     }
     if(path==="intent")return escrow.depositView(query.id!,query.txid);
     if(path==="market"||path==="domain")return {items:marketView(escrow.state(),path==="domain"?query.name:undefined),serverTime:Date.now()};
