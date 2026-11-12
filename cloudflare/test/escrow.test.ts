@@ -553,7 +553,7 @@ test("PoA API token is sent only as a header, never in the URL, and auth failure
  assert.ok(seen.length>=2,"falls through every candidate path on 401");
  for(const s of seen){assert.equal(s.auth,`Bearer ${token}`);assert.ok(!s.url.includes(token));}
  const body=depositBody(3,policy.wallet,"1.000000","auth-fixture");seen.length=0;
- await n.submit(body);assert.equal(seen[0].auth,`Bearer ${token}`);assert.ok(!seen[0].url.includes(token));
+ await n.submit(body);assert.equal(seen[0]!.auth,`Bearer ${token}`);assert.ok(!seen[0]!.url.includes(token));
  seen.length=0;await assert.rejects(new PoaHttpNetwork(()=>false,request).status(),/ESCROW_NODE_AUTH/);
  for(const s of seen)assert.equal(s.auth,null);
 });
