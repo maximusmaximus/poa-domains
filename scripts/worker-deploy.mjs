@@ -59,15 +59,24 @@ export function repinPlan(env, expected) {
 }
 // Refuse a repin unless the official network advertises exactly these pins AND the served client hashes to the engine pin.
 export async function assertAdvertised(pins, fetchImpl) {
-  const read = url => fetchImpl(url, { method: "GET", redirect: "error", signal: AbortSignal.timeout(60000) });
-  const facts = await read(NETWORK_FACTS);
-  if (!facts.ok) fail("REPIN_FACTS_UNAVAILABLE");
-  const f = await facts.json();
+  // minepoa.com serves the ~380 KB client slowly (20-60 s seen on Nov 11). Bound each whole read
+  // (headers + body) and retry; any failure still fails closed before anything is deployed.
+  const read = async (url, body) => {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const r = await fetchImpl(url, { method: "GET", redirect: "error", signal: AbortSignal.timeout(120000) });
+        if (!r.ok) throw Error("HTTP");
+        return await body(r);
+      } catch (e) { if (attempt >= 3) return null; }
+    }
+  };
+  const f = await read(NETWORK_FACTS, r => r.json());
+  if (!f) fail("REPIN_FACTS_UNAVAILABLE");
   if (f.chain_id !== "poa-mainnet-1" || f.engine_sha256 !== pins.POA_ESCROW_ENGINE_SHA256 ||
       f.params_sha256 !== pins.POA_ESCROW_PARAMS_SHA256) fail("REPIN_NOT_ADVERTISED");
-  const client = await read(NETWORK_CLIENT);
-  if (!client.ok) fail("REPIN_CLIENT_UNAVAILABLE");
-  const digest = createHash("sha256").update(new Uint8Array(await client.arrayBuffer())).digest("hex");
+  const bytes = await read(NETWORK_CLIENT, r => r.arrayBuffer());
+  if (!bytes) fail("REPIN_CLIENT_UNAVAILABLE");
+  const digest = createHash("sha256").update(new Uint8Array(bytes)).digest("hex");
   if (digest !== pins.POA_ESCROW_ENGINE_SHA256) fail("REPIN_CLIENT_HASH_MISMATCH");
 }
 export function assertBindings(bindings, expected) {
