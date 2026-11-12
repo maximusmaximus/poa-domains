@@ -76,6 +76,14 @@ export interface AdmissionPolicy {
 export const PRACTICE_POLICY: Readonly<AdmissionPolicy> = Object.freeze({ permanentOnly: true, emojiOwnership: true });
 /** Legacy semantics, kept so lease-era engine behaviour stays tested for replay. */
 export const LEGACY_LEASE_POLICY: Readonly<AdmissionPolicy> = Object.freeze({ permanentOnly: false, emojiOwnership: true });
+/** Production registry approved by Max on Nov 11 2026: no internal-unit onboarding grant after sequence 16. */
+export const PRODUCTION_REGISTRY_ID = "4c27c2d05c20f03e3ca1dfe90bb2cea4eb24c57b72a6a5d4074dbf15b6bbbed3";
+export const ONBOARDING_GRANT_FINAL_SEQUENCE = 16;
+/** Forward-only: commits applied at sequence 0..15 (history #1..#16) replay exactly as before. */
+export function onboardingGrantOpen(registry: string, sequenceBefore: number): boolean {
+  return registry !== PRODUCTION_REGISTRY_ID || sequenceBefore < ONBOARDING_GRANT_FINAL_SEQUENCE;
+}
+
 export class Engine {
   readonly config: Config;
   readonly policyHash: string;
@@ -417,6 +425,7 @@ export class Engine {
   private apply(s: State, b: Body, id: string, time: number): any {
     if (
       this.config.revision === "poa-mainnet-v1" &&
+      onboardingGrantOpen(this.registryId, s.sequence) &&
       !Object.hasOwn(s.balances, b.signer) &&
       b.signer !== this.config.issuer &&
       b.signer !== this.config.treasury &&
