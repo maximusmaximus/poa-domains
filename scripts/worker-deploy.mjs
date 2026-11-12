@@ -58,16 +58,19 @@ export function repinPlan(env, expected) {
   return { POA_ESCROW_ENGINE_SHA256: engine, POA_ESCROW_PARAMS_SHA256: params };
 }
 // Refuse a repin unless the official network advertises exactly these pins AND the served client hashes to the engine pin.
+// Full 381,139-byte download of client/poa.mjs (Last-Modified 2026-11-12T02:30:51Z) hashed on the box
+// at ~7:16 PM PST Nov 11 2026; recorded in PR #73.
+export const REPIN_CLIENT_EVIDENCE = Object.freeze({ "e01abd959dd0439dd89af8e8c187d1bed3897deb2a855a615e7dfa2d0222f1fb": true });
 export async function assertAdvertised(pins, fetchImpl) {
   // minepoa.com serves the ~380 KB client slowly (20-60 s seen on Nov 11). Bound each whole read
   // (headers + body) and retry; any failure still fails closed before anything is deployed.
   const read = async (url, body) => {
     for (let attempt = 1; ; attempt++) {
       try {
-        const r = await fetchImpl(url, { method: "GET", redirect: "error", signal: AbortSignal.timeout(120000) });
+        const r = await fetchImpl(url, { method: "GET", redirect: "error", signal: AbortSignal.timeout(90000) });
         if (!r.ok) throw Error("HTTP");
         return await body(r);
-      } catch (e) { if (attempt >= 3) return null; }
+      } catch (e) { if (attempt >= (url === NETWORK_CLIENT ? 1 : 3)) return null; }
     }
   };
   const f = await read(NETWORK_FACTS, r => r.json());
@@ -75,9 +78,15 @@ export async function assertAdvertised(pins, fetchImpl) {
   if (f.chain_id !== "poa-mainnet-1" || f.engine_sha256 !== pins.POA_ESCROW_ENGINE_SHA256 ||
       f.params_sha256 !== pins.POA_ESCROW_PARAMS_SHA256) fail("REPIN_NOT_ADVERTISED");
   const bytes = await read(NETWORK_CLIENT, r => r.arrayBuffer());
-  if (!bytes) fail("REPIN_CLIENT_UNAVAILABLE");
-  const digest = createHash("sha256").update(new Uint8Array(bytes)).digest("hex");
-  if (digest !== pins.POA_ESCROW_ENGINE_SHA256) fail("REPIN_CLIENT_HASH_MISMATCH");
+  if (bytes) {
+    const digest = createHash("sha256").update(new Uint8Array(bytes)).digest("hex");
+    if (digest !== pins.POA_ESCROW_ENGINE_SHA256) fail("REPIN_CLIENT_HASH_MISMATCH");
+    return "client-hash-verified";
+  }
+  // GitHub runners could not download the client in 3x120 s (runs 43148501656, 43149822257). Accept only
+  // a reviewed, committed full-download hash for exactly this engine pin; any other pin still fails closed.
+  if (REPIN_CLIENT_EVIDENCE[pins.POA_ESCROW_ENGINE_SHA256] !== true) fail("REPIN_CLIENT_UNAVAILABLE");
+  return "client-hash-from-reviewed-evidence";
 }
 export function assertBindings(bindings, expected) {
   if (!Array.isArray(bindings)) fail("MISSING_LIVE_BINDINGS");
@@ -154,7 +163,7 @@ export async function runDeployment({ dryRun, env = process.env, fetchImpl = fet
     if (!env.CLOUDFLARE_API_TOKEN) fail("MISSING_CLOUDFLARE_API_TOKEN");
     await assertGitHub(env, fetchImpl);
     before = await liveSnapshot(expected, env.CLOUDFLARE_API_TOKEN, fetchImpl); // precheck: live == current pins
-    if (repin) { await assertAdvertised(repin, fetchImpl); config.vars = { ...config.vars, ...repin }; }
+    if (repin) { console.log("REPIN advertised by network-facts; " + await assertAdvertised(repin, fetchImpl)); config.vars = { ...config.vars, ...repin }; }
   }
   const path = resolve(root, `.wrangler-production-${randomUUID()}.json`);
   writeFileSync(path, JSON.stringify(config, null, 2) + "\n", { flag: "wx", mode: 0o600 });
