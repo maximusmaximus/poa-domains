@@ -122,7 +122,7 @@ const gateway = {
       throw error;
     }));
   },
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const requestId=correlationId(request.headers.get("x-request-id"));
     const fail=(status:number,body:unknown)=>{const reply=errorReply(status,body,requestId);const r=json(reply.status,reply.body);if(reply.body.code==="NETWORK_HELD")r.headers.set("retry-after","30");return r;};
     let submitting = false, dispatched = false;
@@ -142,7 +142,11 @@ const gateway = {
       // Same-origin network status: Worker probes minepoa.com; browser never needs a PoA key.
       if (u.pathname === "/v1/network-status") {
         if (request.method !== "GET" && request.method !== "HEAD") return fail(405, { code: "METHOD_NOT_ALLOWED" });
-        const status = await networkStatusMonitor.getStatus();
+        const stub = env.REGISTRY.getByName(SINGLETON);
+        const status = await networkStatusMonitor.getStatus({
+          shared: { load: async () => await stub.lastNetworkStatus(), save: async (at, value) => { await stub.saveNetworkStatus(at, value); } },
+          waitUntil: ctx ? (p) => ctx.waitUntil(p) : undefined,
+        });
         return json(200, status, true);
       }
 

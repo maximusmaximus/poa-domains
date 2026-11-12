@@ -61,6 +61,12 @@ for(const [name,launcher]of [['chromium',chromium],['firefox',firefox],['webkit'
  await page.locator('#tabHandoff').click();await expect(page.locator('#cartPrompt')).toContainText(h.payload.stateHash);
  await expect(page.locator('#cartPrompt')).not.toContainText("Couldn't build");const handoff=JSON.parse((await page.locator('#cartPrompt').innerText()).split('```json\n')[1].split('\n```')[0]);
  assert.equal(handoff.livePoA,false);assert.equal(handoff.unsigned,true);assert.equal(handoff.sequence,h.payload.state.sequence);
+ // Last known status: instant, stale marker on the line, age only in ℹ️, and a display-only Down never holds.
+ h.networkStatus={level:'down',hold:false,lastKnown:true,ageMs:420000,stale:true,message:'🔴 PoA network Down — actions held ⏸️ until the network is back',livePoA:false};
+ await page.reload();await expect(page.locator('#networkStatusText')).toHaveText('🔴 PoA network Down · actions held · 🕰️');await expect(page.locator('#networkStatusBar')).toHaveAttribute('data-stale','true');
+ await expect(page.locator('#networkStatusDetail')).toContainText('Last checked 7 min ago');await expect(page.locator('#copyCartPrompt')).toBeEnabled();
+ h.networkStatus={level:'down',hold:true,message:'🔴 PoA network Down — actions held ⏸️ until the network is back',livePoA:false};await page.reload();await expect(page.locator('#copyCartPrompt')).toBeDisabled();await expect(page.locator('#networkStatusBar')).toHaveAttribute('data-stale','false');
+ h.networkStatus=undefined;await page.reload();
  await page.locator('#tabFind').click();await page.evaluate(()=>{localStorage.clear();});
  assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.close();}
  assert.deepEqual(h.writes,[]);assert.equal(engine.stateHash(),original.stateHash);console.log('PASS',name,'bounded 390/1440 tabs/chips/help/ticker, contrast>=4.5, stable title, six read-status dots, cart shortcut suppression; clean public view, empty ticker/collections, reserved hidden aliases, internal units, unchanged state, zero writes');

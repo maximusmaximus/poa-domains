@@ -1,6 +1,6 @@
-import { ui } from "./ui-state.js?v=193b1cfcba90";
-import { el, endpointBase, ownershipView } from "./ui-core.js?v=193b1cfcba90";
-import { buildListingPrompt, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=193b1cfcba90";
+import { ui } from "./ui-state.js?v=0a86fcdcc190";
+import { el, endpointBase, ownershipView } from "./ui-core.js?v=0a86fcdcc190";
+import { buildListingPrompt, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=0a86fcdcc190";
 
 export function clearHandoff() {
     ui.generation++;
@@ -15,7 +15,7 @@ export function copyDomainListingPrompt(kind) {
         el("listingPromptStatus").textContent = "🔄 Refresh registry data first.";
         return;
     }
-    if (shouldHoldTransactions(ui.networkStatus.level) || ui.networkStatus.hold) {
+    if (shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level) || ui.networkStatus.hold) {
         el("listingPromptStatus").textContent = "Held ⏸️ until the PoA network is back";
         return;
     }

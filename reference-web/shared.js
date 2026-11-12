@@ -280,7 +280,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA } from "./agent-cart.js?v=193b1cfcba90";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA } from "./agent-cart.js?v=0a86fcdcc190";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {

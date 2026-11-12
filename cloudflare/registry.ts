@@ -51,6 +51,19 @@ export class PoaRegistry extends DurableObject<Env> {
       }
     });
   }
+  /** Display-only last known PoA network status. Separate table: never registry state, journal, hash, sequence or backup. */
+  lastNetworkStatus(): { at: number; value: string } | null {
+    const sql = this.ctx.storage.sql;
+    if (!sql.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='network_status_cache'").toArray().length) return null;
+    return sql.exec<{ at: number; value: string }>("SELECT at, value FROM network_status_cache WHERE id=1").toArray()[0] ?? null;
+  }
+  saveNetworkStatus(at: number, value: string): void {
+    if (!Number.isSafeInteger(at) || at < 0 || typeof value !== "string" || value.length > 4096) throw new TypeError("invalid network status row");
+    const sql = this.ctx.storage.sql;
+    sql.exec("CREATE TABLE IF NOT EXISTS network_status_cache (id INTEGER PRIMARY KEY CHECK(id=1), at INTEGER NOT NULL, value TEXT NOT NULL)");
+    // Newest observation wins across isolates.
+    sql.exec("INSERT INTO network_status_cache(id, at, value) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET at=excluded.at, value=excluded.value WHERE excluded.at >= network_status_cache.at", at, value);
+  }
   #initialize(): void {
     const sql = this.ctx.storage.sql;
     sql.exec("CREATE TABLE IF NOT EXISTS bootstrap (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS journal (sequence INTEGER PRIMARY KEY, record TEXT NOT NULL)");
