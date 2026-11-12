@@ -3,7 +3,7 @@ import { ACTIONS, Action } from "./actions.js";
 import { ownershipInfo } from "./emoji-ownership.js";
 import { Body, DOMAIN, validateBody, intentId } from "./auth.js";
 import { canonical, exact, need } from "./core.js";
-import { Engine, AUCTION_WINDOWS } from "./engine.js";
+import { Engine, AUCTION_WINDOWS, onboardingGrantOpen } from "./engine.js";
 import { cidFor, Metadata } from "./metadata.js";
 import { Rights, rightsHash } from "./model.js";
 import {
@@ -52,7 +52,7 @@ export function capabilities(e: Engine): any {
     publicExplorerUrl: "https://poadomains.grok.me",
     githubMirrorUrl: "https://maximusmaximus.github.io/poa-domains/",
     onboardingGrantPoa:
-      e.config.revision === "poa-mainnet-v1" ? "10000000" : "0",
+      e.config.revision === "poa-mainnet-v1" && onboardingGrantOpen(e.registryId, e.sequence) ? "10000000" : "0",
     assets: e.config.assets,
     auctionWindows: AUCTION_WINDOWS,
     increment: e.config.increment,
