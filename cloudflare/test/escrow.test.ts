@@ -557,3 +557,12 @@ test("PoA API token is sent only as a header, never in the URL, and auth failure
  seen.length=0;await assert.rejects(new PoaHttpNetwork(()=>false,request).status(),/ESCROW_NODE_AUTH/);
  for(const s of seen)assert.equal(s.auth,null);
 });
+test("locked PoA chain status holds as ESCROW_NODE_AUTH, not a misleading identity mismatch",async()=>{
+ const request=(async(url:any)=>{const p=new URL(String(url)).pathname;
+  if(p===`/chain/${CHAIN}/api/status`)return new Response(JSON.stringify({error:"Unauthorized"}),{status:401});
+  if(p==="/api/status")return Response.json({network:"PoA prototype",K:5,supply:"1",txs:1907,final:9064,invalid:0,epochs_closed:75,as_of:new Date().toISOString(),checkpoint_height:811925,state_root:"a".repeat(64),stale:true,stale_age_s:793});
+  return Response.json({chain_id:CHAIN,open_epoch:75,engine_sha256:MAINNET_ENGINE_SHA256,params_sha256:MAINNET_PARAMS_SHA256});
+ }) as typeof fetch;
+ await assert.rejects(new PoaHttpNetwork(()=>false,request).status(),/ESCROW_NODE_AUTH/);
+ await assert.rejects(new PoaHttpNetwork(()=>false,request).displayStatus(),/ESCROW_NODE_AUTH/);
+});

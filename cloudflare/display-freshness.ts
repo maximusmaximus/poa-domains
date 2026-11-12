@@ -8,6 +8,7 @@ export interface DisplayReadiness {
 const REASONS: Record<string, string> = {
   ESCROW_NODE_TIMEOUT: "The public network read timed out. Payments stay held.",
   ESCROW_NODE_UNAVAILABLE: "The public network read is unavailable. Payments stay held.",
+  ESCROW_NODE_AUTH: "PoA's ledger is locked right now, so payments wait until it reopens. 🔒",
   ESCROW_NODE_HTTP: "The public node returned an error. Payments stay held.",
   ESCROW_NODE_REDIRECT: "The public node redirected a safety read. Payments stay held.",
   ESCROW_NODE_RESPONSE_LIMIT: "The public node response was too large. Payments stay held.",
