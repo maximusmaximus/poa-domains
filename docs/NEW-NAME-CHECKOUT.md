@@ -24,9 +24,12 @@ The committed Wrangler default remains `false`. Payments still follow escrow's c
    withdrawn by `withdraw`, which pays only the original payer.
 
 ## Pricing rule
-POA price = the registry's existing reserve schedule for the name's tier, at **1 registry unit = 1 POA** (both use 6 decimals).
-In the live config: standard names cost **0.001000 POA** and premium names cost **0.100000 POA**. This is the existing
-schedule, which was set for internal units; Max should confirm or change it before turning the checkout on.
+Starting POA checkout prices, approved Nov 13 2026: **100.000000 POA** for common/standard names and
+**1000.000000 POA** for premium names (1 POA = 1,000,000 micros). These are the escrow `issue` prices;
+they are separate from the immutable registry-unit auction reserves, which stay in the stored policy.
+Quotes expose the checkout price as `poaPrice`. `/v1/escrow/capabilities`.newNameCheckout and
+`/v1/capabilities`.poaNewNamePrices report the same schedule. 1000 POA is within the unchanged
+escrow limits (250,000 POA per transaction, 1,000,000 POA per day).
 
 ## Safety
 - `issueFromTreasury` is not a public action. It is missing from discovery, quotes and prepare, and public submit and

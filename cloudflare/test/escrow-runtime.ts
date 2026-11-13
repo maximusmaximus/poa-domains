@@ -8,6 +8,7 @@ import { BootableSystemClock, seedRegistry } from "../../src/seed.js";
 import { signBody } from "../../src/auth.js";
 import { capabilities, prepare, buildMetadataWitness } from "../../src/interface.js";
 import { normalizeName } from "../../src/names.js";
+import { poaNewNamePriceMicros } from "../../src/new-name-prices.js";
 import { SQLiteJournal } from "../sqlite-journal.js";
 import { Escrow, SQLiteEscrowJournal, invariant, exportEscrow, restoreEscrow } from "../escrow.js";
 import { registryTitles } from "../escrow-titles.js";
@@ -60,8 +61,8 @@ export class EscrowHarness extends DurableObject<TestEnv> {
       }
       if(v.op==="new-names")this.newNames=v.value===true;
       if(v.op==="issue-packet"){
-        const n=v.name,buyer=v.buyer,a=this.engine.config.assets.POA!;
-        const price=v.price??String(BigInt(normalizeName(n,this.engine.normalizationMode).tier==="premium"?a.premiumReserve:a.standardReserve));
+        const n=v.name,buyer=v.buyer;
+        const price=v.price??poaNewNamePriceMicros(normalizeName(n,this.engine.normalizationMode).tier==="premium"?"premium":"standard");
         const e=this.engine,body={domain:"poa-domains.local.intent.v1",revision:e.config.revision,chainId:e.config.chainId,genesisHash:e.config.genesisHash,registryId:e.registryId,policyHash:e.policyHash,normalizationHash:e.config.normalizationHash,
           signer:who(buyer),coSigners:[],requestId:"escrow-issue-"+n+"-"+this.net.now,nonce:e.nextNonce(who(buyer)),notBefore:0,deadline:Math.floor(this.net.now/1000)+600000,
           maxTotal:v.maxTotal??"0",maxNetworkFee:"0",action:"issueFromTreasury",params:{name:n,asset:"POA",price,expectedDeedId:null,expectedVersion:0,metadata:buildMetadataWitness(n)}};

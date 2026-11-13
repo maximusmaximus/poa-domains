@@ -13,6 +13,7 @@ import {
   normalizationModeForHash,
   normalizeName,
 } from "./names.js";
+import { POA_NEW_NAME_PRICES, POA_NEW_NAME_PRICE_RULE } from "./new-name-prices.js";
 export function buildMetadataWitness(
   name: string,
   r: Rights = { kind: "permanent" },
@@ -65,6 +66,8 @@ export function capabilities(e: Engine): any {
     githubMirrorUrl: "https://maximusmaximus.github.io/poa-domains/",
     ...newAccountUnitsFields(e),
     assets: e.config.assets,
+    poaNewNamePrices: POA_NEW_NAME_PRICES,
+    poaNewNamePriceRule: POA_NEW_NAME_PRICE_RULE,
     auctionWindows: AUCTION_WINDOWS,
     increment: e.config.increment,
     feeBps: e.config.feeBps,

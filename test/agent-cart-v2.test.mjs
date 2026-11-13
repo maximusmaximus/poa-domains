@@ -421,7 +421,8 @@ test("all single-action plans validate, and version/deed/generation changes bind
 test("handoff and MCP prompt state current reality honestly; preflight is not a simulation environment", async () => {
   const t = setup(), text = renderAgentCartHandoff(await buildAgentCartHandoff(...t.args));
   assert.match(text, /✅ What is real now: this production registry\./);
-  assert.match(text, /⛔ Nothing here moves POA or wallet funds; never send POA for this plan\./);
+  assert.match(text, /⛔ Nothing in this cart moves POA or wallet funds; never send POA for this plan\./);
+  assert.match(text, /starts at 100 POA for common names and 1000 POA for premium names/);
   assert.match(text, /Native on-chain naming is not enabled \(livePoA:false\)/);
   assert.doesNotMatch(text, /Not live yet/);
   assert.doesNotMatch(text, /onboarding grant/i);

@@ -1,6 +1,6 @@
-import { autoScroll } from "./ui-motion.js?v=62eb7aeeb6c0";
-import { shapeLiveActions } from "./shared.js?v=62eb7aeeb6c0";
-import { actionLabel } from "./ui-copy.js?v=62eb7aeeb6c0";
+import { autoScroll } from "./ui-motion.js?v=1c042d35a226";
+import { shapeLiveActions } from "./shared.js?v=1c042d35a226";
+import { actionLabel } from "./ui-copy.js?v=1c042d35a226";
 export function recentActions(state){const items=shapeLiveActions(state,Number.MAX_SAFE_INTEGER),seen=new Set(items.map(x=>x.id));for(const r of Object.values(state?.receipts??{})){const id="receipt:"+(r.intentId??r.sequence);if(!seen.has(id))items.push({id,name:r.result?.name??"",sequence:r.sequence??0,label:(r.result?.name?r.result.name+" · ":"")+"Registry action #"+r.sequence+" · "+r.status});}return items.sort((a,b)=>b.sequence-a.sequence);}
 let signature="";
 export function drawTicker(state){const strip=document.getElementById("liveTicker"),track=document.getElementById("liveTickerTrack"),items=recentActions(state),key=JSON.stringify(items);if(!strip||!track||key===signature||track.contains(document.activeElement))return;signature=key;track.replaceChildren();

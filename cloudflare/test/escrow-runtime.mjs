@@ -49,21 +49,21 @@ try{
  await stop();const final=await start("complete-restart");check("completed name title, refunds and idempotency survive full restart",()=>assert.deepEqual(final,refunded));
  // POA new-name checkout: deposit -> credit -> issue from treasury, on the real Engine + SQLite registry journal.
  instance="?instance=isolated-new-name-checkout";await call({op:"unpause"});
- const buyIntent=await cmd(4,"issue-intent","intent",{amount:"1.000000"});const funded=await call({op:"fund",actor:4,amount:"1.000000",intent:buyIntent.result.intent});
+ const buyIntent=await cmd(4,"issue-intent","intent",{amount:"150.000000"});const funded=await call({op:"fund",actor:4,amount:"150.000000",intent:buyIntent.result.intent});
  await cmd(4,"issue-detect","detect",{intent:buyIntent.result.intent,txid:funded.txid});
  const quote=await call({op:"issue-packet",name:"freshname",buyer:4});const price=(Number(quote.price)/1e6).toFixed(6);
  const off=await call({op:"command",actor:4,key:"issue-off",action:"issue",params:{name:"freshname",amount:price,registration:quote.packet}},409);
  check("checkout OFF by default: issue refused before any debit or registry write",()=>assert.equal(off.code,"ESCROW_NEW_NAMES_OFF"));
- const unchanged=await call({op:"name-owner",name:"freshname"});check("OFF leaves the name unissued and the credit intact",()=>{assert.equal(unchanged.nameOwner,null);assert.equal(unchanged.state.available[who(4)],"1000000");});
+ const unchanged=await call({op:"name-owner",name:"freshname"});check("OFF leaves the name unissued and the credit intact",()=>{assert.equal(unchanged.nameOwner,null);assert.equal(unchanged.state.available[who(4)],"150000000");});
  const direct=await call({op:"normal-write",packet:quote.packet},409);check("public registry submit of issueFromTreasury is refused (escrow only)",()=>assert.equal(direct.code,"ESCROW_ONLY"));
  await call({op:"new-names",value:true});
  const wrong=await call({op:"command",actor:4,key:"issue-wrong",action:"issue",params:{name:"freshname",amount:"0.500000",registration:quote.packet}},409);
- check("price must equal the reserve schedule converted 1:1 to POA",()=>assert.equal(wrong.code,"ESCROW_PRICE"));
+ check("price must equal the POA checkout schedule",()=>assert.equal(wrong.code,"ESCROW_PRICE"));
  const thief=await call({op:"command",actor:3,key:"issue-thief",action:"issue",params:{name:"freshname",amount:price,registration:quote.packet}},409);
  check("another payer cannot use the buyer's signed registration",()=>assert.ok(["ESCROW_ISSUE_CONSENT","ESCROW_INSUFFICIENT_FUNDS"].includes(thief.code)));
  const bought=await cmd(4,"issue-ok","issue",{name:"freshname",amount:price,registration:quote.packet});
  const owner=await call({op:"name-owner",name:"freshname"});
- check("issue mints the permanent name to the buyer and debits exactly the price",()=>{assert.equal(owner.nameOwner,who(4));assert.equal(owner.state.available[who(4)],String(1000000n-BigInt(quote.price)));assert.equal(bought.result.price,price);});
+ check("issue mints the permanent name to the buyer and debits exactly the price",()=>{assert.equal(owner.nameOwner,who(4));assert.equal(owner.state.available[who(4)],String(150000000n-BigInt(quote.price)));assert.equal(bought.result.price,price);});
  check("proceeds are a READY treasury payout liability, accounting invariant holds",()=>{const pay=owner.state.payments[bought.result.payment];assert.equal(pay.to,who(5));assert.equal(pay.amount,quote.price);assert.equal(pay.status,"READY");});
  const again=await cmd(4,"issue-ok","issue",{name:"freshname",amount:price,registration:quote.packet});check("same request key is idempotent, never a second debit",()=>assert.deepEqual(again.result,bought.result));
  const quote2=await call({op:"issue-packet",name:"freshname",buyer:4});const taken=await call({op:"command",actor:4,key:"issue-again",action:"issue",params:{name:"freshname",amount:price,registration:quote2.packet}},409);
@@ -73,7 +73,7 @@ try{
  check("full restart replays the issueFromTreasury commit and escrow ledger exactly",()=>assert.deepEqual(afterIssueRestart,beforeIssueRestart));
  await call({op:"tick"});await call({op:"tick"});const paidOut=await call({op:"status"});
  check("treasury proceeds pay out through the existing outbox",()=>assert.ok(paidOut.submissions.some(x=>x.to===who(5)&&x.amount===price)));
- await cmd(4,"issue-withdraw","withdraw",{amount:(Number(1000000n-BigInt(quote.price))/1e6).toFixed(6)});await call({op:"tick"});await call({op:"tick"});
+ await cmd(4,"issue-withdraw","withdraw",{amount:(Number(150000000n-BigInt(quote.price))/1e6).toFixed(6)});await call({op:"tick"});await call({op:"tick"});
  const refundedBuyer=await call({op:"status"});check("remaining credit refunds only to the original payer",()=>assert.ok(refundedBuyer.submissions.some(x=>x.to===who(4))));
  instance="";
  const archived=await call({op:"archive"});instance="?instance=isolated-archive-restore";
