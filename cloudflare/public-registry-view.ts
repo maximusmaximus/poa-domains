@@ -82,7 +82,7 @@ export const HIDDEN = {
 export const REGISTRY_UNITS = Object.freeze({
   label: "internal registry units", nativePayment: false, redeemable: false,
   legacyAssetId: "POA", legacyAssetIdIsNativeCurrency: false,
-  notice: "Registry amounts are internal accounting units, not POA or wallet money. Native naming and real-payment new-name purchases are unavailable.",
+  notice: "Registry amounts are internal accounting units, not POA or wallet money. New names can also be bought with POA through escrow; read /v1/escrow/capabilities for current enabled, paused and held status before any payment. Native naming is not enabled.",
 });
 // UI hint only, not an authorization or privacy boundary. Backend checks remain authoritative.
 export function unavailableKey(text: string): string { let n=14695981039346656037n; for(const c of text){n=BigInt.asUintN(64,(n^BigInt(c.codePointAt(0)!))*1099511628211n);} return n.toString(16).padStart(16,"0"); }

@@ -50,9 +50,9 @@ Deployment prerequisites (configured for the approved first release):
    reviewed Worker-update/read permissions. No token is committed or created here.
 3. Set these **non-secret production-environment variables** from the currently
    active live bindings, not from the disabled repository defaults:
-   `POA_ESCROW_ENABLED`, `POA_ESCROW_NETWORK_WRITES`, `POA_ESCROW_ADDRESS`,
-   `POA_ESCROW_PER_TX`, `POA_ESCROW_DAILY`, `POA_ESCROW_ENGINE_SHA256`,
-   `POA_ESCROW_PARAMS_SHA256`. Missing values fail closed.
+   `POA_ESCROW_ENABLED`, `POA_ESCROW_NETWORK_WRITES`, `POA_ESCROW_NEW_NAMES`,
+   `POA_ESCROW_ADDRESS`, `POA_ESCROW_PER_TX`, `POA_ESCROW_DAILY`,
+   `POA_ESCROW_ENGINE_SHA256`, `POA_ESCROW_PARAMS_SHA256`. Missing values fail closed.
 4. Only then explicitly enable the repository switch. Each eligible deployment
    still waits for Max's production-environment approval. This is a GitHub
    environment, **not** a Wrangler `--env` that would create another Worker.
@@ -166,3 +166,19 @@ new engine pin, (3) writes only those two bindings (`--keep-vars` keeps everythi
 `POA_ESCROW_PARAMS_SHA256` to the new values and delete the two repin variables. Pins are not part of
 the persisted escrow policy digest, so a repin does not trigger `ESCROW_POLICY_CHANGED`.
 Rollback: `wrangler rollback` to the previous version restores its bindings.
+
+## POA new-name checkout
+
+Approved by Max on Nov 13 2026 (t136u, 3:20 PM PT). The committed Wrangler default
+stays `POA_ESCROW_NEW_NAMES=false`. Set the production environment variable
+`POA_ESCROW_NEW_NAMES` to `approved-v1`. The next gated deploy then (1) prechecks
+the current seven live escrow bindings, allowing this binding to be absent,
+(2) writes only `POA_ESCROW_NEW_NAMES=approved-v1` (`--keep-vars` keeps everything
+else, including pause/hold state, the escrow wallet and limits), and (3) post-checks
+the new live version. Later deploys require the live binding to remain `approved-v1`
+and do not rewrite it. This does not change prices, pins, the escrow wallet or
+paused/held behavior.
+
+| Variable | Expected value |
+| --- | --- |
+| `POA_ESCROW_NEW_NAMES` | `approved-v1` |
