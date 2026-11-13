@@ -60,7 +60,7 @@ const payloadFrom = (text) =>
 test("filtered public view builds with its complete-stored-state hash; unscoped mismatches still fail", async () => {
   const t = setup(),
     stored = "a".repeat(64),
-    view = { filtered: true, policy: "audited-test-records-v1", stateHashScope: "complete-stored-state", sequenceScope: "complete-stored-state" },
+    view = { filtered: true, policy: "audited-withheld-records-v1", stateHashScope: "complete-stored-state", sequenceScope: "complete-stored-state" },
     snapshot = { ...t.snapshot, stateHash: stored, publicView: view },
     args = (s) => [t.items, t.cap, SIGNER, "http://127.0.0.1:8787", "live-registry", s, 1000000000],
     data = await buildAgentCartHandoff(...args(snapshot));
@@ -330,8 +330,12 @@ test("missing/corrupt public facts and unsafe URLs/fields fail closed; empty and
     1000000000,
   );
   assert.equal(data.signerPrincipal, null);
-  assert.match(renderAgentCartHandoff(data), /^⚠️ STATIC SYNTHETIC DEMO/);
+  assert.equal(data.context, "static-synthetic-illustration");
+  assert.match(renderAgentCartHandoff(data), /^⚠️ STATIC SYNTHETIC ILLUSTRATION/);
   assert.ok(schema(data), ajv.errorsText(schema.errors));
+  const legacy = structuredClone(data);
+  legacy.context = "static-synthetic-demo";
+  assert.ok(schema(legacy), ajv.errorsText(schema.errors));
 });
 
 test("real Node static allowlist serves the v2 module/schema and rejects arbitrary files", async () => {

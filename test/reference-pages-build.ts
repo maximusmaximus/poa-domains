@@ -92,7 +92,7 @@ export function buildReferenceBundle(directory: string) {
     join(output, "config.json"),
     JSON.stringify(
       {
-        mode: "static-synthetic-demo",
+        mode: "static-synthetic-illustration",
         publicApiBase: null,
         files: {
           state: "./demo/state.json",
@@ -156,7 +156,7 @@ export function buildReferenceBundle(directory: string) {
     JSON.stringify(
       {
         status: "built",
-        mode: "static-synthetic-demo",
+        mode: "static-synthetic-illustration",
         files: 12,
         names: Object.keys(fixture.state.state.names).length,
         actions: Object.keys(fixture.capabilities.actions).length,

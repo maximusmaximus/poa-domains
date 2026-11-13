@@ -60,7 +60,7 @@ try {
   check("capabilities", () => {
     assert.equal(cap.emojiAliases, 5216); assert.equal(cap.reservedCount, 655);
     assert.equal(cap.assets.POA.premiumReserve, "100000"); assert.equal(cap.assets.POA.standardReserve, "1000");
-    assert.equal(cap.onboardingGrantPoa, "10000000"); assert.equal(cap.publicExplorerUrl, "https://poadomains.grok.me");
+    assert.equal(cap.newAccountRegistryUnits, "10000000"); assert.equal(cap.onboardingGrantPoa, "10000000"); assert.equal(cap.publicExplorerUrl, "https://poadomains.grok.me");
     assert.equal(cap.githubMirrorUrl, "https://maximusmaximus.github.io/poa-domains/"); assert.equal(cap.chainId, "poa-mainnet-1");
     assert.equal(cap.revision, "poa-mainnet-v1"); assert.equal(cap.normalizationHash, EMOJI17_NORMALIZATION_HASH);
     assert.equal(Object.keys(cap.actions).length, 17); assert.equal(cap.durability, "durable-object-sqlite");

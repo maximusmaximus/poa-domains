@@ -81,7 +81,7 @@ export async function verifyReferenceStaticPage(
     await page.waitForFunction(()=>!(document.querySelector("#copyCartPrompt") as HTMLButtonElement).disabled);
     assert.match(
       await page.locator("#cartPrompt").innerText(),
-      /STATIC SYNTHETIC DEMO CART/,
+      /STATIC SYNTHETIC ILLUSTRATION CART/,
     );
     assert.match(await page.locator("#cartPrompt").innerText(), /orbit/);
     checks.push(

@@ -1,16 +1,16 @@
-import { publicNameUnavailable } from "./shared.js?v=335106478a06";
-import { installHelp } from "./ui-help.js?v=335106478a06";
-import { renderManagement } from "./ui-manage.js?v=335106478a06";
-import { actionLabel } from "./ui-copy.js?v=335106478a06";
-import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=335106478a06";
-import { ui } from "./ui-state.js?v=335106478a06";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=335106478a06";
-import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=335106478a06";
-import { render, updateTabDots } from "./ui-render.js?v=335106478a06";
-import { runSearch } from "./ui-search.js?v=335106478a06";
-import { renderIdeas } from "./ui-ideas.js?v=335106478a06";
-import { mountEscrow } from "./escrow.js?v=335106478a06";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=335106478a06";
+import { publicNameUnavailable } from "./shared.js?v=62eb7aeeb6c0";
+import { installHelp } from "./ui-help.js?v=62eb7aeeb6c0";
+import { renderManagement } from "./ui-manage.js?v=62eb7aeeb6c0";
+import { actionLabel } from "./ui-copy.js?v=62eb7aeeb6c0";
+import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=62eb7aeeb6c0";
+import { ui } from "./ui-state.js?v=62eb7aeeb6c0";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=62eb7aeeb6c0";
+import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=62eb7aeeb6c0";
+import { render, updateTabDots } from "./ui-render.js?v=62eb7aeeb6c0";
+import { runSearch } from "./ui-search.js?v=62eb7aeeb6c0";
+import { renderIdeas } from "./ui-ideas.js?v=62eb7aeeb6c0";
+import { mountEscrow } from "./escrow.js?v=62eb7aeeb6c0";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=62eb7aeeb6c0";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -227,7 +227,7 @@ export async function loadRegistry() {
     try {
         const config = await json(new URL("config.json", import.meta.url));
         ui.configMode = config.mode;
-        ui.demo = config.mode === "static-synthetic-demo";
+        ui.demo = config.mode === "static-synthetic-illustration" || config.mode === "static-synthetic-demo";
         if (ui.demo) {
             if (config.publicApiBase !== null)
                 throw Error("Demo has no backend");

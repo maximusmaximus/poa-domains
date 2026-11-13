@@ -78,11 +78,27 @@ export function registryMcpProfile(backend: McpRegistryBackend, beforeWitness?: 
       description:
         "Read policies, identity and typed enabled action schemas. Large emoji tables are opt-in.",
       inputSchema: objectSchema({ includeEmoji: { type: "boolean" } }, []),
-      outputSchema: output({
-        actions: O,
-        actionSchemas: O,
-        livePoA: { const: false },
-      }),
+      outputSchema: output(
+        {
+          actions: O,
+          actionSchemas: O,
+          livePoA: { const: false },
+          newAccountRegistryUnits: S,
+          onboardingGrantRegistryUnits: {
+            type: "string",
+            deprecated: true,
+            description: "Deprecated alias of newAccountRegistryUnits. Same value.",
+          },
+          onboardingGrantPoa: {
+            type: "string",
+            deprecated: true,
+            description:
+              "Deprecated alias of newAccountRegistryUnits. Omitted on the production public view.",
+          },
+          publicView: O,
+        },
+        ["actions", "actionSchemas", "livePoA"],
+      ),
       call: async (args: any) => {
         const cap = await read(
           "/v1/capabilities",

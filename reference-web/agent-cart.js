@@ -1,13 +1,33 @@
-import { registryUnit } from "./shared.js?v=335106478a06";
-import { actionLabel } from "./ui-copy.js?v=335106478a06";
+import { registryUnit } from "./shared.js?v=62eb7aeeb6c0";
+import { actionLabel } from "./ui-copy.js?v=62eb7aeeb6c0";
 /** One unsigned Cart Handoff v2 object; text, clipboard and download derive from it. */
 import {
   canonical,
   safeObject,
   validPrincipal,
   cartParamsForSigner,
-} from "./shared.js?v=335106478a06";
+} from "./shared.js?v=62eb7aeeb6c0";
 export const CART_SCHEMA_VERSION = "poa-domains.agent-cart.v2";
+export const CART_ILLUSTRATION_CONTEXT = "static-synthetic-illustration";
+export const CART_ILLUSTRATION_CONTEXT_DEPRECATED = "static-synthetic-demo";
+export const CART_CONTEXTS = Object.freeze([
+  "live-registry",
+  "local-reference-only",
+  CART_ILLUSTRATION_CONTEXT,
+  CART_ILLUSTRATION_CONTEXT_DEPRECATED,
+]);
+export function isIllustrationCart(context) {
+  return (
+    context === CART_ILLUSTRATION_CONTEXT ||
+    context === CART_ILLUSTRATION_CONTEXT_DEPRECATED
+  );
+}
+export function canonicalCartContext(context) {
+  return context === CART_ILLUSTRATION_CONTEXT_DEPRECATED
+    ? CART_ILLUSTRATION_CONTEXT
+    : context;
+}
+
 const HASH = { type: "string", pattern: "^[a-f0-9]{64}$" },
   UINT = { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER };
 const AMOUNT = { type: "string", pattern: "^(0|[1-9][0-9]{0,38})$" };
@@ -38,7 +58,14 @@ export const AGENT_CART_SCHEMA = {
     livePoA: { const: false },
     unsigned: { const: true },
     context: {
-      enum: ["live-registry", "local-reference-only", "static-synthetic-demo"],
+      enum: [
+        "live-registry",
+        "local-reference-only",
+        "static-synthetic-illustration",
+        "static-synthetic-demo",
+      ],
+      description:
+        "Canonical illustration context is static-synthetic-illustration. static-synthetic-demo is a deprecated alias accepted by readers and validators.",
     },
     endpoint: { type: "string", format: "uri" },
     chainId: { type: "string" },
@@ -276,13 +303,10 @@ export async function buildAgentCartHandoff(
   if (!Array.isArray(items) || !items.length) return null;
   if (
     items.length > 64 ||
-    ![
-      "live-registry",
-      "local-reference-only",
-      "static-synthetic-demo",
-    ].includes(context)
+    !CART_CONTEXTS.includes(context)
   )
     throw Error("Invalid cart size or context");
+  context = canonicalCartContext(context);
   const registry = identity(cap),
     origin = endpoint(endpointUrl),
     signer = validPrincipal(signerPrincipal) ? signerPrincipal : null;
@@ -555,9 +579,9 @@ export function renderAgentCartHandoff(data) {
     "```",
     "",
   ];
-  if (data.context === "static-synthetic-demo")
+  if (isIllustrationCart(data.context))
     lines.unshift(
-      "⚠️ STATIC SYNTHETIC DEMO CART — NO LIVE API. Do not sign or submit these fixture plans.",
+      "⚠️ STATIC SYNTHETIC ILLUSTRATION CART — NO LIVE API. Do not sign or submit these plans.",
     );
   return lines.join("\n");
 }

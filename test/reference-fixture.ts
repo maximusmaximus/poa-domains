@@ -354,12 +354,12 @@ export function publicDemoFixture() {
     },
     capabilities: {
       ...cap,
-      mode: "static-synthetic-demo",
+      mode: "static-synthetic-illustration",
       durability: "public-static-fixture",
     },
     examples: inputs,
     details: {
-      mode: "static-synthetic-demo",
+      mode: "static-synthetic-illustration",
       generatedAt: new Date().toISOString(),
       roles,
       fixtureTime: clock.now(),

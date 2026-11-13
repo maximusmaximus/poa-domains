@@ -5,6 +5,9 @@ import {
   API_LIMITS,
   API_SURFACE,
   DISCOVERY_PATHS,
+  NEW_ACCOUNT_UNITS_FIELD,
+  PUBLIC_VIEW_POLICY,
+  PUBLIC_VIEW_POLICY_DEPRECATED,
 } from "./api-contract.js";
 import { REGISTRY_ROUTES } from "./registry-routes.js";
 import { registryMcpProfile } from "./mcp-registry.js";
@@ -56,6 +59,27 @@ export const ERROR_SCHEMA = {
 const O = { type: "object" },
   S = { type: "string" },
   ref = (name: string) => ({ $ref: "#/components/schemas/" + name });
+const UNITS_AMOUNT = {
+  type: "string",
+  pattern: "^(0|[1-9][0-9]{0,38})$",
+};
+const PUBLIC_VIEW_SCHEMA = {
+  type: "object",
+  properties: {
+    filtered: { type: "boolean" },
+    policy: {
+      type: "string",
+      enum: [PUBLIC_VIEW_POLICY, PUBLIC_VIEW_POLICY_DEPRECATED],
+      description:
+        "Canonical value is audited-withheld-records-v1. audited-test-records-v1 is a deprecated alias accepted by readers.",
+    },
+    hiddenNamesRemainReserved: { type: "boolean" },
+    unavailableNameKeys: { type: "array", items: { type: "string" } },
+    unavailableAccountKeys: { type: "array", items: { type: "string" } },
+    stateHashScope: { type: "string" },
+    sequenceScope: { type: "string" },
+  },
+};
 const parameter = (
   name: string,
   where: string,
@@ -211,6 +235,16 @@ export function openApiDocument(): any {
         ? "Exact same-origin signed command only; never keys"
         : "forbidden",
     };
+    if (path === "/v1/capabilities")
+      operation.responses["200"] = response(
+        "Registry identity, policies and limits",
+        ref("Capabilities"),
+      );
+    if (path === "/v1/state")
+      operation.responses["200"] = response(
+        "Committed registry state; publicView is present when the view is filtered",
+        ref("RegistryState"),
+      );
     if (path === "/v1/search-log") {
       operation.description = "Explicit browser search telemetry only, never a registry or escrow action. Requires an approved same-site Origin. Private daily-partitioned R2 JSONL shards store a bounded canonical query, server timestamp, host, browser-reported coarse result and source only. Contact/wallet/key-like input is rejected. No IP, account, cookie, user agent or personal-identifier hashes are stored. No public log-reading endpoint.";
       operation["x-browser-writes"] = "Anonymous search telemetry only; no signed intent or payment";
@@ -348,6 +382,36 @@ export function openApiDocument(): any {
       schemas: {
         SignedPacket: PACKET_SCHEMA,
         Error: ERROR_SCHEMA,
+        PublicView: PUBLIC_VIEW_SCHEMA,
+        Capabilities: {
+          type: "object",
+          properties: {
+            [NEW_ACCOUNT_UNITS_FIELD]: {
+              ...UNITS_AMOUNT,
+              description:
+                "Internal registry units credited to a new account on this registry, if any. \"0\" means none.",
+            },
+            onboardingGrantRegistryUnits: {
+              ...UNITS_AMOUNT,
+              deprecated: true,
+              description:
+                "Deprecated alias of newAccountRegistryUnits. Same value; do not use in new clients.",
+            },
+            onboardingGrantPoa: {
+              ...UNITS_AMOUNT,
+              deprecated: true,
+              description:
+                "Deprecated alias of newAccountRegistryUnits. Omitted on the production public view.",
+            },
+            publicView: PUBLIC_VIEW_SCHEMA,
+          },
+        },
+        RegistryState: {
+          type: "object",
+          properties: {
+            publicView: PUBLIC_VIEW_SCHEMA,
+          },
+        },
         EscrowSignedCommand: objectSchema({ command: O, signature: S }),
         JsonRpcRequest: objectSchema(
           {

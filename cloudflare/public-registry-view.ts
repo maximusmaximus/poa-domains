@@ -1,6 +1,7 @@
 /** Public projection only. Never passed to Engine, persistence, escrow or backups. */
 import { OWNERSHIP_TOKEN } from "../src/emoji-ownership.js";
 import { Engine, onboardingGrantOpen } from "../src/engine.js";
+import { PUBLIC_VIEW_POLICY } from "../src/api-contract.js";
 import { normalizeName } from "../src/names.js";
 import { parseJSON } from "../src/core.js";
 import { errorReply } from "../src/errors.js";
@@ -135,11 +136,13 @@ export function publicRegistryRoute(e: Engine, call: RegistryCall, options: Regi
     // balances), never individual financial fields inside an otherwise real row.
     for(const key of ["names","deeds","auctions","offers","balances","credits","nonces","receipts","requests","bids"])
       state[key]=Object.fromEntries(Object.entries(state[key]??{}).filter(([k,v])=>!hiddenReference(k)&&!hiddenReference(v)));
-    data.publicView={filtered:true,policy:"audited-test-records-v1",stateHashScope:"complete-stored-state",sequenceScope:"complete-stored-state"};
+    data.publicView={filtered:true,policy:PUBLIC_VIEW_POLICY,stateHashScope:"complete-stored-state",sequenceScope:"complete-stored-state"};
   } else if(call.path==="/v1/capabilities") {
     delete data.onboardingGrantPoa;
-    data.onboardingGrantRegistryUnits=onboardingGrantOpen(e.registryId,e.sequence)?"10000000":"0";
-    data.publicView={filtered:true,policy:"audited-test-records-v1",hiddenNamesRemainReserved:true,unavailableNameKeys:HIDDEN.names.map(n=>unavailableKey(hintNameKey(e,n))),unavailableAccountKeys:HIDDEN.accounts.map(unavailableKey)};
+    const units=onboardingGrantOpen(e.registryId,e.sequence)?"10000000":"0";
+    data.newAccountRegistryUnits=units;
+    data.onboardingGrantRegistryUnits=units; // deprecated alias
+    data.publicView={filtered:true,policy:PUBLIC_VIEW_POLICY,hiddenNamesRemainReserved:true,unavailableNameKeys:HIDDEN.names.map(n=>unavailableKey(hintNameKey(e,n))),unavailableAccountKeys:HIDDEN.accounts.map(unavailableKey)};
     data.assets=Object.fromEntries(Object.entries(data.assets).map(([k,v])=>[k,{...(v as object),kind:"internal-registry-units",nativePayment:false,label:"internal registry units"}]));
   } else if(call.path==="/v1/auctions" || call.path==="/v1/offers") {
     // Page over the public collection, not a private page: no hidden-ID cursors.
