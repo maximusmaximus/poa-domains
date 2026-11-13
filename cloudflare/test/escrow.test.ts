@@ -339,7 +339,22 @@ test("reconciliation cut on the current receipt shape uses the pinned engine's t
  for(const [label,txs] of [["tie",[{body:tie}]],["not final",[{body:before,o:{final:0}}]],["low atts",[{body:before,o:{atts:4}}]]] as const){
   n=make(txs as any,"1.000000");s=await n.status();await assert.rejects(n.cut(W,[txid((txs as any)[0].body)],s),/ESCROW_CHECKPOINT_DETAILS_REQUIRED/,label);
  }
- // Status without a checkpoint cutoff => hold.
+ // PoA's explicit per-tx `checkpointed:{height}` at or below the balance's checkpoint => covered, even without a cutoff.
+ const cp={height:10,note:"covered by a 5/5-signed, chain-anchored checkpoint"};
+ n=make([{body:tie,o:{checkpointed:cp}}],"1.000000");s=await n.status();assert.deepEqual((await n.cut(W,[txid(tie)],s)).covered,[txid(tie)]);
+ n=make([{body:before,o:{checkpointed:cp}}],"1.000000",null);s=await n.status();assert.deepEqual((await n.cut(W,[txid(before)],s)).covered,[txid(before)]);
+ // Checkpointed at a newer checkpoint than the balance, and after its cutoff => not in this balance.
+ n=make([{body:after,o:{checkpointed:{height:11}}}],"0.000000");s=await n.status();assert.deepEqual((await n.cut(W,[txid(after)],s)).covered,[]);
+ // Contradictions, non-final covered money, and malformed coverage hold.
+ for(const [label,txs,cutoff] of [
+  ["checkpointed but after cutoff",[{body:after,o:{checkpointed:cp}}],CUTOFF_V2],
+  ["checkpointed not final",[{body:before,o:{checkpointed:cp,final:0}}],null],
+  ["checkpointed low atts",[{body:before,o:{checkpointed:cp,atts:3}}],null],
+  ["checkpointed newer, no cutoff",[{body:before,o:{checkpointed:{height:11}}}],null],
+  ["checkpointed bad height",[{body:before,o:{checkpointed:{height:"10"}}}],CUTOFF_V2],
+  ["checkpointed without height",[{body:before,o:{checkpointed:{note:"x"}}}],CUTOFF_V2],
+ ] as const){n=make(txs as any,"1.000000",cutoff as any);s=await n.status();await assert.rejects(n.cut(W,[txid((txs as any)[0].body)],s),/ESCROW_CHECKPOINT_DETAILS_REQUIRED|INTEGER/,label);}
+ // Status without a checkpoint cutoff and no explicit coverage => hold.
  n=make([{body:before}],"1.000000",null);s=await n.status();await assert.rejects(n.cut(W,[txid(before)],s),/ESCROW_CHECKPOINT_DETAILS_REQUIRED/);
  // Address balance not as-of this checkpoint => unaligned.
  n=v2Net({"/api/status":statusV2(),"/api/network/facts":factsV2,[`/api/explorer/address/${W}`]:{address:W,balance:"1.000000",balance_as_of:{checkpoint_height:9},txs:[]}});

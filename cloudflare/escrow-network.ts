@@ -128,7 +128,7 @@ export class PoaHttpNetwork implements Network {
   }
   async lookup(id:string):Promise<Observation|null> { return (await this.observe(id))?.o??null; }
   /** Lookup plus which receipt shape answered (legacy carries from/type and validity flags). */
-  private async observe(id:string):Promise<{o:Observation;legacy:boolean;receipt:any}|null> {
+  private async observe(id:string):Promise<{o:Observation;legacy:boolean;receipt:any;explorer:any}|null> {
     need(/^[0-9a-f]{64}$/.test(id),"ESCROW_TXID");
     const [t,r]=await Promise.all([
       this.getFirst([`/api/explorer/tx/${id}`,`/chain/${CHAIN}/api/explorer/tx/${id}`]),
@@ -160,7 +160,7 @@ export class PoaHttpNetwork implements Network {
     // New receipt shape: only an explorer-final record with peer-final attestations counts.
     const explorerFinal=(t.final===1||t.final===true)&&attestations>=PEER_FINAL_ATTESTATIONS;
     return {o:{id,body:t.body,chain:t.body.cid,valid:r.status==="included"&&(legacyValid||explorerFinal),
-      attestations,checkpoint},legacy,receipt:r};
+      attestations,checkpoint},legacy,receipt:r,explorer:t};
   }
   async cut(wallet:string,ids:string[],status:Status):Promise<Cut> {
     address(wallet);const b=await this.getFirst([`/api/explorer/address/${wallet}`,`/chain/${CHAIN}/api/explorer/address/${wallet}`]);
@@ -170,16 +170,25 @@ export class PoaHttpNetwork implements Network {
       const seen=await this.observe(id),o=seen?.o;
       if(o?.checkpoint){need(o.checkpoint.height<=status.height,"ESCROW_UNALIGNED_CUT");covered.push(id);}
       else if(seen&&!seen.legacy){
-        // Current receipt shape (no checkpoint_covered). Coverage is the pinned engine's own
-        // predicate for the checkpoint this balance is "as of": a tx is baked into checkpoint state
-        // iff body.ts < cutoff.ts (same-second ties need the cutoff tx's txCmp order, which we do
-        // not have, so they hold). Only peer-final (K=5 attested) money counts as baked; anything
-        // under the cutoff that is not peer-final is ambiguous and holds.
-        need(status.cutoff!==undefined,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
-        const cutoff=integer(status.cutoff),ts=integer(o!.body.ts,1);
-        if(ts>cutoff)continue;
-        need(ts<cutoff&&o!.valid===true&&o!.attestations>=PEER_FINAL_ATTESTATIONS,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
-        covered.push(id);
+        // Current receipt shape (no checkpoint_covered). Two coverage signals, either sufficient:
+        //  - PoA's explicit per-tx explorer field `checkpointed:{height}` ("covered by a 5/5-signed,
+        //    chain-anchored checkpoint") at or below the checkpoint this balance is as of;
+        //  - the pinned engine's own coverage predicate for that checkpoint: body.ts < cutoff.ts.
+        // Not covered only when body.ts > cutoff.ts (same-second ties need the cutoff tx's txCmp
+        // order, which we do not have). Covered money must also be peer-final (K=5) to count as
+        // baked. Contradictions and anything else hold; nothing is guessed.
+        const t=seen.explorer,ts=integer(o!.body.ts,1);
+        const cpHeight=t.checkpointed!==undefined&&t.checkpointed!==null?integer(t.checkpointed.height):undefined;
+        const cutoff=status.cutoff!==undefined?integer(status.cutoff):undefined;
+        const byCheckpoint=cpHeight!==undefined&&cpHeight<=status.height;
+        const afterCutoff=cutoff!==undefined&&ts>cutoff;
+        const byCutoff=cutoff!==undefined&&ts<cutoff;
+        need(!(byCheckpoint&&afterCutoff),"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
+        if(byCheckpoint||byCutoff){
+          need(o!.valid===true&&o!.attestations>=PEER_FINAL_ATTESTATIONS,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
+          covered.push(id);continue;
+        }
+        need(afterCutoff,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
       }
       else if(o&&o.attestations>=PEER_FINAL_ATTESTATIONS){
         // Legacy receipt: peer-final open-window money is excluded from checkpoint-only
