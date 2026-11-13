@@ -414,14 +414,19 @@ test("all single-action plans validate, and version/deed/generation changes bind
 });
 
 // Nov 11: a production handoff must say exactly what is real and never present simulate_intent as a test network.
-test("handoff and MCP prompt state real vs not-live honestly; preflight is not a simulation environment", async () => {
+test("handoff and MCP prompt state current reality honestly; preflight is not a simulation environment", async () => {
   const t = setup(), text = renderAgentCartHandoff(await buildAgentCartHandoff(...t.args));
   assert.match(text, /✅ What is real now: this production registry\./);
-  assert.match(text, /⛔ Not live yet: POA payments \(escrow is held\), native on-chain naming \(livePoA:false\)/);
-  assert.match(text, /Nothing here moves POA or wallet funds; never send POA for this plan\./);
+  assert.match(text, /⛔ Nothing here moves POA or wallet funds; never send POA for this plan\./);
+  assert.match(text, /Native on-chain naming is not enabled \(livePoA:false\)/);
+  assert.doesNotMatch(text, /Not live yet/);
+  assert.doesNotMatch(text, /onboarding grant/i);
+  assert.doesNotMatch(text, /legacy wire asset/);
   assert.match(text, /🔎 simulate_intent is a no-change preflight check .* not a test network or simulation\./);
   assert.doesNotMatch(text, /→ simulate →/);
   const { MCP_INSTRUCTIONS } = await import("../dist/src/mcp-core.js");
-  assert.match(MCP_INSTRUCTIONS, /Not live yet: POA payments/);
+  assert.match(MCP_INSTRUCTIONS, /Nothing here moves POA or wallet funds; never send POA for this plan/);
+  assert.doesNotMatch(MCP_INSTRUCTIONS, /Not live yet/);
+  assert.doesNotMatch(MCP_INSTRUCTIONS, /starter grant/i);
   assert.match(MCP_INSTRUCTIONS, /not a test network or simulation/);
 });

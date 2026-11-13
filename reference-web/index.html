@@ -18,7 +18,7 @@
       <div class="status-network"><span id="networkStatusIcon" class="network-status-icon" aria-hidden="true">⚪</span><span id="networkStatusText" class="network-status-text" role="status" aria-live="polite">Checking PoA network…</span></div>
               <p id="mode" data-info-description>⏳ Loading registry data…</p>
     <p id="networkStatusDetail" data-info-description class="muted">Checking PoA network…</p>
-    <p id="registryUnitsNotice" data-info-description class="muted">💡 Prices and balances are internal registry units, not POA or wallet money. Native naming is not enabled, and real-payment new-name purchases are unavailable. Test records are hidden, not deleted.</p>
+    <p id="registryUnitsNotice" data-info-description class="muted">💡 Prices and balances are internal registry units, not POA or wallet money. Native naming is not enabled, and real-payment new-name purchases are unavailable. Some stored names stay reserved even when hidden from public lists.</p>
         <p id="registryLoading" data-info-description role="status">⏳ Loading registry data… You can use the tabs and type a search now.</p>
         <p id="registryAge" data-info-description title="Registry data only. POA payments refresh separately.">Registry data not loaded yet · POA payments refresh separately.</p>
         <div id="registryError" role="alert" hidden><span id="registryErrorText"></span> <button id="registryRetry" type="button" class="secondary small">🔄 Refresh</button></div>
@@ -100,7 +100,7 @@
           </div>
           <div id="cartList" class="cards"></div>
           <h4>Agent prompt</h4>
-          <p id="cartRealityNote" data-info-description class="muted">✅ Real: this production registry and your approved signed registry actions (internal registry units). ⛔ Not live yet: POA payments (escrow held), native on-chain naming. Nothing here moves POA. “Simulate” is a no-change preflight check here, not a test network.</p>
+          <p id="cartRealityNote" data-info-description class="muted">✅ This production registry and your approved signed registry actions are real (internal registry units). ⛔ Nothing here moves POA or wallet funds. “Simulate” is a no-change preflight check on this same registry, not a separate network.</p>
           <p id="cartHandoffMeta" data-info-description class="muted">🧾 Agent Cart Handoff v2 · not ready</p>
           <pre id="cartPrompt" class="prompt-box">Add names from Find, Auctions, or For sale to build a prompt.</pre>
           <div class="button-row">
@@ -306,6 +306,6 @@
       <p id="floatingCartStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
 
-    <script type="module" src="/app.js?v=1178313f1e36"></script>
+    <script type="module" src="/app.js?v=335106478a06"></script>
   </body>
 </html>
