@@ -38,7 +38,7 @@ const ASSET: Schema = {
   maxLength: 16,
   examples: ["POA"],
   description:
-    "Use an asset advertised by this registry's capabilities; TEST exists only in local fixtures.",
+    "Use an asset advertised by this registry's capabilities.",
 };
 const METADATA = objectSchema({
   cid: { type: "string", maxLength: 128 },

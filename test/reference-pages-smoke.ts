@@ -57,7 +57,7 @@ try {
     JSON.stringify(
       {
         ...result,
-        mode: "static-synthetic-demo",
+        mode: "static-synthetic-illustration",
         repoSubpath: prefix,
         serverClosed: true,
         testOnly: true,

@@ -26,7 +26,18 @@ export const DISCOVERY_PATHS = Object.freeze([
   "/schemas/signed-packet.json",
   "/schemas/mcp-tools.json",
 ]);
+export const NEW_ACCOUNT_UNITS_FIELD = "newAccountRegistryUnits";
+/** Deprecated aliases kept with the same value so existing agents keep working. */
+export const NEW_ACCOUNT_UNITS_DEPRECATED = Object.freeze([
+  "onboardingGrantRegistryUnits",
+  "onboardingGrantPoa",
+]);
+export const PUBLIC_VIEW_POLICY = "audited-withheld-records-v1";
+export const PUBLIC_VIEW_POLICY_DEPRECATED = "audited-test-records-v1";
+export const CART_CONTEXT_ILLUSTRATION = "static-synthetic-illustration";
+export const CART_CONTEXT_ILLUSTRATION_DEPRECATED = "static-synthetic-demo";
 export const API_SURFACE = Object.freeze({
+
   schemaVersion: API_SCHEMA_VERSION,
   canonicalOrigin: API_ORIGIN,
   rest: {

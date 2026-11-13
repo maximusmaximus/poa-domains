@@ -60,7 +60,7 @@ const payloadFrom = (text) =>
 test("filtered public view builds with its complete-stored-state hash; unscoped mismatches still fail", async () => {
   const t = setup(),
     stored = "a".repeat(64),
-    view = { filtered: true, policy: "audited-test-records-v1", stateHashScope: "complete-stored-state", sequenceScope: "complete-stored-state" },
+    view = { filtered: true, policy: "audited-withheld-records-v1", stateHashScope: "complete-stored-state", sequenceScope: "complete-stored-state" },
     snapshot = { ...t.snapshot, stateHash: stored, publicView: view },
     args = (s) => [t.items, t.cap, SIGNER, "http://127.0.0.1:8787", "live-registry", s, 1000000000],
     data = await buildAgentCartHandoff(...args(snapshot));
@@ -330,8 +330,12 @@ test("missing/corrupt public facts and unsafe URLs/fields fail closed; empty and
     1000000000,
   );
   assert.equal(data.signerPrincipal, null);
-  assert.match(renderAgentCartHandoff(data), /^⚠️ STATIC SYNTHETIC DEMO/);
+  assert.equal(data.context, "static-synthetic-illustration");
+  assert.match(renderAgentCartHandoff(data), /^⚠️ STATIC SYNTHETIC ILLUSTRATION/);
   assert.ok(schema(data), ajv.errorsText(schema.errors));
+  const legacy = structuredClone(data);
+  legacy.context = "static-synthetic-demo";
+  assert.ok(schema(legacy), ajv.errorsText(schema.errors));
 });
 
 test("real Node static allowlist serves the v2 module/schema and rejects arbitrary files", async () => {
@@ -414,14 +418,19 @@ test("all single-action plans validate, and version/deed/generation changes bind
 });
 
 // Nov 11: a production handoff must say exactly what is real and never present simulate_intent as a test network.
-test("handoff and MCP prompt state real vs not-live honestly; preflight is not a simulation environment", async () => {
+test("handoff and MCP prompt state current reality honestly; preflight is not a simulation environment", async () => {
   const t = setup(), text = renderAgentCartHandoff(await buildAgentCartHandoff(...t.args));
   assert.match(text, /✅ What is real now: this production registry\./);
-  assert.match(text, /⛔ Not live yet: POA payments \(escrow is held\), native on-chain naming \(livePoA:false\)/);
-  assert.match(text, /Nothing here moves POA or wallet funds; never send POA for this plan\./);
+  assert.match(text, /⛔ Nothing here moves POA or wallet funds; never send POA for this plan\./);
+  assert.match(text, /Native on-chain naming is not enabled \(livePoA:false\)/);
+  assert.doesNotMatch(text, /Not live yet/);
+  assert.doesNotMatch(text, /onboarding grant/i);
+  assert.doesNotMatch(text, /legacy wire asset/);
   assert.match(text, /🔎 simulate_intent is a no-change preflight check .* not a test network or simulation\./);
   assert.doesNotMatch(text, /→ simulate →/);
   const { MCP_INSTRUCTIONS } = await import("../dist/src/mcp-core.js");
-  assert.match(MCP_INSTRUCTIONS, /Not live yet: POA payments/);
+  assert.match(MCP_INSTRUCTIONS, /Nothing here moves POA or wallet funds; never send POA for this plan/);
+  assert.doesNotMatch(MCP_INSTRUCTIONS, /Not live yet/);
+  assert.doesNotMatch(MCP_INSTRUCTIONS, /starter grant/i);
   assert.match(MCP_INSTRUCTIONS, /not a test network or simulation/);
 });

@@ -705,7 +705,9 @@ test("launchable full-stack registry app initializes mainnet profile, serves Uni
       assert.equal(cap.chainId, "poa-mainnet-1");
       assert.equal(cap.reservedCount, 655);
       assert.equal(cap.publicExplorerUrl, "https://poadomains.grok.me");
+      assert.equal(cap.newAccountRegistryUnits, "10000000");
       assert.equal(cap.onboardingGrantPoa, "10000000");
+      assert.equal(cap.onboardingGrantRegistryUnits, "10000000");
       assert.ok(
         typeof cap.reservedCatalog === "string" &&
           cap.reservedCatalog.split(",").includes("google"),

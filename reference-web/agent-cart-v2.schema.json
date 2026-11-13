@@ -20,8 +20,10 @@
       "enum": [
         "live-registry",
         "local-reference-only",
+        "static-synthetic-illustration",
         "static-synthetic-demo"
-      ]
+      ],
+      "description": "Canonical illustration context is static-synthetic-illustration. static-synthetic-demo is a deprecated alias accepted by readers and validators."
     },
     "endpoint": {
       "type": "string",
@@ -211,7 +213,7 @@
           "const": "Abort on a changed version, ownership, price or offer; obtain a new explicit review, never silently repair the plan."
         },
         "budget": {
-          "const": "All registry amounts and onboarding grants are internal units, not native POA or wallet money. Before signing, enforce every operation maxTotal and the whole-cart cap per asset; count committed and unknown operations against it."
+          "const": "All registry amounts are internal units, not native POA or wallet money. Before signing, enforce every operation maxTotal and the whole-cart cap per asset; count committed and unknown operations against it."
         },
         "submit": {
           "const": "Submit only an explicitly approved complete signed packet. Keep its original bytes, requestId, nonce and intentId."

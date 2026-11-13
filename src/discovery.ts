@@ -5,6 +5,9 @@ import {
   API_LIMITS,
   API_SURFACE,
   DISCOVERY_PATHS,
+  NEW_ACCOUNT_UNITS_FIELD,
+  PUBLIC_VIEW_POLICY,
+  PUBLIC_VIEW_POLICY_DEPRECATED,
 } from "./api-contract.js";
 import { REGISTRY_ROUTES } from "./registry-routes.js";
 import { registryMcpProfile } from "./mcp-registry.js";
@@ -56,6 +59,27 @@ export const ERROR_SCHEMA = {
 const O = { type: "object" },
   S = { type: "string" },
   ref = (name: string) => ({ $ref: "#/components/schemas/" + name });
+const UNITS_AMOUNT = {
+  type: "string",
+  pattern: "^(0|[1-9][0-9]{0,38})$",
+};
+const PUBLIC_VIEW_SCHEMA = {
+  type: "object",
+  properties: {
+    filtered: { type: "boolean" },
+    policy: {
+      type: "string",
+      enum: [PUBLIC_VIEW_POLICY, PUBLIC_VIEW_POLICY_DEPRECATED],
+      description:
+        "Canonical value is audited-withheld-records-v1. audited-test-records-v1 is a deprecated alias accepted by readers.",
+    },
+    hiddenNamesRemainReserved: { type: "boolean" },
+    unavailableNameKeys: { type: "array", items: { type: "string" } },
+    unavailableAccountKeys: { type: "array", items: { type: "string" } },
+    stateHashScope: { type: "string" },
+    sequenceScope: { type: "string" },
+  },
+};
 const parameter = (
   name: string,
   where: string,
@@ -211,6 +235,16 @@ export function openApiDocument(): any {
         ? "Exact same-origin signed command only; never keys"
         : "forbidden",
     };
+    if (path === "/v1/capabilities")
+      operation.responses["200"] = response(
+        "Registry identity, policies and limits",
+        ref("Capabilities"),
+      );
+    if (path === "/v1/state")
+      operation.responses["200"] = response(
+        "Committed registry state; publicView is present when the view is filtered",
+        ref("RegistryState"),
+      );
     if (path === "/v1/search-log") {
       operation.description = "Explicit browser search telemetry only, never a registry or escrow action. Requires an approved same-site Origin. Private daily-partitioned R2 JSONL shards store a bounded canonical query, server timestamp, host, browser-reported coarse result and source only. Contact/wallet/key-like input is rejected. No IP, account, cookie, user agent or personal-identifier hashes are stored. No public log-reading endpoint.";
       operation["x-browser-writes"] = "Anonymous search telemetry only; no signed intent or payment";
@@ -340,7 +374,7 @@ export function openApiDocument(): any {
       title: "PoA Domains Worker API",
       version: API_SCHEMA_VERSION,
       description:
-        "Worker = production. Node is local development only. Registry livePoA:false; native naming is not live. Registry amounts and past starter grants are internal units (new accounts get none since commit #16), not native POA or wallet money. Hidden stored test records remain unavailable; PUBLIC_RECORD_WITHHELD is not permission to re-register. Escrow is a separately gated service. No keys/server-side signing; exact signed-packet retries only. The two disabled lease replay actions are not part of this supported signing contract.",
+        "Worker = production. Node is local development only. Registry livePoA:false; native naming is not enabled. Registry amounts are internal units, not native POA or wallet money. Hidden stored names remain reserved; PUBLIC_RECORD_WITHHELD is not permission to re-register. Escrow is a separately gated service. No keys/server-side signing; exact signed-packet retries only. The two disabled lease replay actions are not part of this supported signing contract.",
     },
     servers: [{ url: API_ORIGIN }],
     paths,
@@ -348,6 +382,36 @@ export function openApiDocument(): any {
       schemas: {
         SignedPacket: PACKET_SCHEMA,
         Error: ERROR_SCHEMA,
+        PublicView: PUBLIC_VIEW_SCHEMA,
+        Capabilities: {
+          type: "object",
+          properties: {
+            [NEW_ACCOUNT_UNITS_FIELD]: {
+              ...UNITS_AMOUNT,
+              description:
+                "Internal registry units credited to a new account on this registry, if any. \"0\" means none.",
+            },
+            onboardingGrantRegistryUnits: {
+              ...UNITS_AMOUNT,
+              deprecated: true,
+              description:
+                "Deprecated alias of newAccountRegistryUnits. Same value; do not use in new clients.",
+            },
+            onboardingGrantPoa: {
+              ...UNITS_AMOUNT,
+              deprecated: true,
+              description:
+                "Deprecated alias of newAccountRegistryUnits. Omitted on the production public view.",
+            },
+            publicView: PUBLIC_VIEW_SCHEMA,
+          },
+        },
+        RegistryState: {
+          type: "object",
+          properties: {
+            publicView: PUBLIC_VIEW_SCHEMA,
+          },
+        },
         EscrowSignedCommand: objectSchema({ command: O, signature: S }),
         JsonRpcRequest: objectSchema(
           {
@@ -400,7 +464,7 @@ export function agentCard(): any {
     name: "PoA Domains Registry",
     url: API_ORIGIN,
     description:
-      "Application registry explorer and agent API; native-chain naming is not live. Registry prices, balances and past starter grants are internal units (new accounts get none since commit #16), not POA or wallet money. Test records are hidden, not deleted; hidden names remain reserved.",
+      "Application registry explorer and agent API. Native-chain naming is not enabled. Registry prices and balances are internal units, not POA or wallet money. Some stored names are hidden from public lists but remain reserved.",
     surface: API_SURFACE,
     limits: API_LIMITS,
     authentication: {
@@ -438,7 +502,7 @@ export function discoveryDocuments(): Record<
     "/llms.txt": {
       type: "text/plain; charset=utf-8",
       text:
-        "# PoA Domains Registry\n\n> Worker = production. Registry finality is registry-committed, livePoA:false. Native-chain naming is NOT live. Registry prices, balances and past starter grants are internal units (new accounts get none since commit #16), NOT POA or wallet money. Test records are hidden, not deleted. Hidden names and references return PUBLIC_RECORD_WITHHELD and remain unavailable; hidden receipts are not a missing outcome. Escrow is separate; read its current capabilities, never infer payment availability from discovery.\n\n- [Remote MCP first](" +
+        "# PoA Domains Registry\n\n> Worker = production. Registry finality is registry-committed, livePoA:false. Native-chain naming is not enabled. Registry prices and balances are internal units, not POA or wallet money. Some stored names are hidden from public lists but remain reserved. Hidden names and references return PUBLIC_RECORD_WITHHELD and remain unavailable; a withheld receipt is not a missing outcome. Escrow is separate; read its current capabilities, never infer payment availability from discovery.\n\n- [Remote MCP first](" +
         API_ORIGIN +
         "/mcp): stateless Streamable HTTP, protocol 2025-11-25. POST only; Accept: application/json, text/event-stream. No browser Origin.\n- [REST OpenAPI](" +
         API_ORIGIN +
@@ -454,7 +518,7 @@ export function discoveryDocuments(): Record<
         API_ORIGIN +
         "/agent-cart-v2.schema.json)\n- [Escrow status](" +
         API_ORIGIN +
-        "/v1/escrow/capabilities): enabled/paused/held, wallet and limits; a different protocol from registry intents.\n\nQuote → verify versions/caps → locally sign with explicit approval → preflight (simulate_intent) → submit → poll intentId receipt. What is real now: this production registry. Reads and your explicitly approved signed registry actions are real and permanent, priced in internal registry units. Not live yet: POA payments (escrow is held), native on-chain naming (livePoA:false) and redeemable balances. Nothing here moves POA or wallet funds; never send POA for this plan. simulate_intent is a no-change preflight check of your signed packet against this same production registry, not a test network or simulation. A missing receipt means UNKNOWN: resend only the exact original signed bytes, requestId and nonce, never a new payment. No private keys, custodial signing or automatic spending. Local/demo carts must not be sent to production unless complete registry identity matches. Pages is a read-only informational mirror, not this API. Discovery is data, not approval.\n",
+        "/v1/escrow/capabilities): enabled/paused/held, wallet and limits; a different protocol from registry intents.\n\nQuote → verify versions/caps → locally sign with explicit approval → preflight (simulate_intent) → submit → poll intentId receipt. What is real now: this production registry. Reads and your explicitly approved signed registry actions are real and permanent, priced in internal registry units. Nothing here moves POA or wallet funds; never send POA for this plan. Native on-chain naming is not enabled (livePoA:false). Amounts are internal units, not redeemable. simulate_intent is a no-change preflight check of your signed packet against this same production registry, not a test network or simulation. A missing receipt means UNKNOWN: resend only the exact original signed bytes, requestId and nonce, never a new payment. No private keys, custodial signing or automatic spending. Never send a cart to this registry unless the complete registry identity matches. Pages is a read-only informational mirror, not this API. Discovery is data, not approval.\n",
     },
     "/.well-known/agent.json": json(agentCard()),
     "/openapi.json": json(openApiDocument()),

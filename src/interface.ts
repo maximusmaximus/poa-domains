@@ -1,4 +1,4 @@
-import { API_SCHEMA_VERSION, API_SURFACE, API_LIMITS } from "./api-contract.js";
+import { API_SCHEMA_VERSION, API_SURFACE, API_LIMITS, NEW_ACCOUNT_UNITS_FIELD, NEW_ACCOUNT_UNITS_DEPRECATED } from "./api-contract.js";
 import { ACTIONS, Action } from "./actions.js";
 import { ownershipInfo } from "./emoji-ownership.js";
 import { Body, DOMAIN, validateBody, intentId } from "./auth.js";
@@ -27,6 +27,18 @@ export function buildMetadataWitness(
   };
   return { cid: cidFor(document), document };
 }
+export function newAccountUnits(e: Engine): string {
+  return e.config.revision === "poa-mainnet-v1" && onboardingGrantOpen(e.registryId, e.sequence)
+    ? "10000000"
+    : "0";
+}
+function newAccountUnitsFields(e: Engine): Record<string, string> {
+  const units = newAccountUnits(e);
+  return {
+    [NEW_ACCOUNT_UNITS_FIELD]: units,
+    ...Object.fromEntries(NEW_ACCOUNT_UNITS_DEPRECATED.map((name) => [name, units])),
+  };
+}
 export function capabilities(e: Engine): any {
   const mode = e.normalizationMode;
   const activeManifest = mode === "emoji17-full" ? emoji17Manifest : manifest;
@@ -51,8 +63,7 @@ export function capabilities(e: Engine): any {
     reservedCatalog: e.config.reserved.join(","),
     publicExplorerUrl: "https://poadomains.grok.me",
     githubMirrorUrl: "https://maximusmaximus.github.io/poa-domains/",
-    onboardingGrantPoa:
-      e.config.revision === "poa-mainnet-v1" && onboardingGrantOpen(e.registryId, e.sequence) ? "10000000" : "0",
+    ...newAccountUnitsFields(e),
     assets: e.config.assets,
     auctionWindows: AUCTION_WINDOWS,
     increment: e.config.increment,
