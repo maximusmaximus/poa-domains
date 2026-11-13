@@ -38,6 +38,7 @@ import { Engine } from "../../src/engine.js";
 import { mainnetConfig } from "../../src/config.js";
 import { signBody } from "../../src/auth.js";
 import { buildMetadataWitness } from "../../src/interface.js";
+import { poaNewNamePriceMicros } from "../../src/new-name-prices.js";
 function consent(f:ReturnType<typeof fixture>):any{
  const e=new Engine(mainnetConfig(who(6),who(5),[who(2),who(3),who(4)]),{now:()=>Math.floor(f.net.now/1000)});
  const b={domain:"poa-domains.local.intent.v1",revision:e.config.revision,chainId:CHAIN,genesisHash:e.config.genesisHash,registryId:e.registryId,policyHash:e.policyHash,normalizationHash:e.config.normalizationHash,
@@ -695,7 +696,7 @@ test("checkout: network hold, pause and per-transaction limit still apply",async
 });
 test("engine: issueFromTreasury is escrow-only, mints at the schedule price, cap 0; audited history hash unchanged",()=>{
  const e=new Engine(mainnetConfig(who(6),who(5),[who(2),who(3),who(4)]),{now:()=>1});
- const price=String(BigInt(e.config.assets.POA!.standardReserve)),reg=registration(3,"fresh",price);
+ const price=poaNewNamePriceMicros("standard"),reg=registration(3,"fresh",price);
  assert.throws(()=>e.submit(reg),/ESCROW_ONLY/);
  assert.throws(()=>e.preview(reg),/ESCROW_ONLY/);
  assert.equal(e.previewEscrowIssue(reg).status,"succeeded");

@@ -7,6 +7,7 @@ import { minimumNext } from "./config.js";
 import { normalizeName } from "./names.js";
 import { buildMetadataWitness } from "./interface.js";
 import { Auction, Offer, canManage } from "./model.js";
+import { poaNewNamePriceDecimal } from "./new-name-prices.js";
 
 export function readContext(e: Engine) {
   const state=e.snapshot();
@@ -61,7 +62,7 @@ export function quote(e: Engine, q:Record<string,string>) {
   const required=(key:string)=>{requiredInputs.push(key);return null;};
   if(conflict&&["announceAuction","fillChildOffer"].includes(action)) return {
     name,action,asset:q.asset??"POA",available:false,ownershipConflict:conflict,
-    owner:null,reserve:null,minimumNextBid:null,price:null,fee:null,feeBps:e.config.feeBps,
+    owner:null,reserve:null,minimumNextBid:null,price:null,poaPrice:null,fee:null,feeBps:e.config.feeBps,
     feeIncludedInPrice:true,feeChargedNow:false,requiredMaxTotal:null,expectedVersion:null,
     params:null,requiredInputs,blockedBy:"OWNERSHIP_CLASS_TAKEN",requiresSignedPreview:true,...readContext(e)};
 
@@ -151,8 +152,10 @@ export function quote(e: Engine, q:Record<string,string>) {
   need(e.config.assets[asset],"ASSET");
   need(q.asset===undefined||q.asset===asset,"ASSET");
   const fee=requiredMaxTotal===null?null:(amount(feeBase)*BigInt(e.config.feeBps)/10000n).toString();
-  return {name,action,asset,available:!deed&&!entry?.auctionId&&!conflict&&!e.config.reserved.includes(name),
-    ownershipConflict:conflict,owner:deed?.owner??null,reserve,minimumNextBid,price,fee,
+  const available=!deed&&!entry?.auctionId&&!conflict&&!e.config.reserved.includes(name);
+  const poaPrice=available&&normalized.labels.length===1?poaNewNamePriceDecimal(normalized.tier==="premium"?"premium":"standard"):null;
+  return {name,action,asset,available,
+    ownershipConflict:conflict,owner:deed?.owner??null,reserve,minimumNextBid,price,poaPrice,fee,
     feeBps:e.config.feeBps,feeIncludedInPrice:true,feeChargedNow,requiredMaxTotal,expectedVersion,params,requiredInputs,blockedBy:null,
     // A quote is a plan, not permission: balance, signatures, time and co-signers still need preview.
     requiresSignedPreview:true,...readContext(e)};

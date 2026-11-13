@@ -3,6 +3,7 @@ import { Packet } from "../src/auth.js";
 import { normalizeName } from "../src/names.js";
 import { need } from "../src/core.js";
 import { TitleStore } from "./escrow.js";
+import { poaNewNamePriceMicros } from "../src/new-name-prices.js";
 export function registryTitles(e: Engine): TitleStore {
   need(e.config.increment.kind === "eosStrict10", "ESCROW_INCREMENT_POLICY");
   return {
@@ -19,14 +20,14 @@ export function registryTitles(e: Engine): TitleStore {
         need(e.preview(packet).status === "succeeded", "ESCROW_TITLE_NOT_READY");
       },
       commit: (packet: Packet) => { need(e.submit(packet).status === "succeeded", "ESCROW_TITLE_COMMIT"); },
-      // POA new-name checkout. Rule: POA price = the registry reserve schedule for the name's tier,
-      // 1 registry micro-unit = 1 POA micro (both 6 decimals): standard 0.001000 POA, premium 0.100000 POA (live config).
+      // POA new-name checkout. Explicit schedule, not the immutable registry auction reserve:
+      // standard/common 100.000000 POA, premium 1000.000000 POA (1 POA = 1,000,000 micros).
       issueTerms: (name) => {
         const s = e.snapshot(), row = s.names[name];
         need(!row?.activeId && !row?.auctionId, "ESCROW_NAME_TAKEN");
         const n = normalizeName(name, e.normalizationMode), a = e.config.assets.POA;
         need(a && n.labels.length === 1, "ESCROW_ISSUE_NAME");
-        return { price: String(BigInt(n.tier === "premium" ? a.premiumReserve : a.standardReserve)) };
+        return { price: poaNewNamePriceMicros(n.tier === "premium" ? "premium" : "standard") };
       },
       validateIssue: (packet: Packet, name, buyer, price) => {
         const b = packet.body, q = b.params as Record<string, unknown>;

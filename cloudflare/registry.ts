@@ -9,6 +9,7 @@ import { WorkerSecretSigner, verifyCommand, digest } from "./escrow-codec.js";
 import { PoaHttpNetwork, MAINNET_ENGINE_SHA256, MAINNET_PARAMS_SHA256, PILOT_PER_TX, PILOT_DAILY } from "./escrow-network.js";
 import { nativePrincipal } from "../src/auth.js";
 import { mainnetConfig, Config } from "../src/config.js";
+import { POA_NEW_NAME_PRICE_RULE, POA_NEW_NAME_PRICES } from "../src/new-name-prices.js";
 import { Engine } from "../src/engine.js";
 import { Fault, exact, need, parseJSON } from "../src/core.js";
 import { capabilities } from "../src/interface.js";
@@ -36,10 +37,10 @@ interface Bootstrap {
 }
 export type { RegistryCall, RegistryReply } from "../src/registry-routes.js";
 
-/** POA new-name checkout (primary issuance via escrow). OFF until the issuance path below ships AND Max approves turning it on. */
-export const NEW_NAME_PRICE_RULE="POA price = registry reserve schedule for the name's tier; 1 registry unit = 1 POA (6 decimals)";
-export function newNameCheckout(env:{POA_ESCROW_NEW_NAMES?:string}):{status:"on"|"off";priceRule:string}{
-  return {status:String(env.POA_ESCROW_NEW_NAMES)==="approved-v1"?"on":"off",priceRule:NEW_NAME_PRICE_RULE};
+/** POA new-name checkout (primary issuance via escrow). */
+export const NEW_NAME_PRICE_RULE=POA_NEW_NAME_PRICE_RULE;
+export function newNameCheckout(env:{POA_ESCROW_NEW_NAMES?:string}):{status:"on"|"off";priceRule:string;prices:typeof POA_NEW_NAME_PRICES}{
+  return {status:String(env.POA_ESCROW_NEW_NAMES)==="approved-v1"?"on":"off",priceRule:NEW_NAME_PRICE_RULE,prices:POA_NEW_NAME_PRICES};
 }
 
 export class PoaRegistry extends DurableObject<Env> {

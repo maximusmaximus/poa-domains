@@ -14,6 +14,7 @@ import {
   registryId,
   minimumNext,
 } from "./config.js";
+import { poaNewNamePriceMicros } from "./new-name-prices.js";
 import {
   amount,
   bounded,
@@ -816,8 +817,9 @@ export class Engine {
         return { cancelled: true };
       }
       case "issueFromTreasury": {
-        // Primary issuance paid in POA via escrow. Price = the existing reserve schedule (registry
-        // micro-units, 1:1 with POA micros). No internal-unit debit, so the signed cap must be 0.
+        // Primary issuance paid in POA via escrow. Price is the explicit POA checkout schedule
+        // (100 POA standard, 1000 POA premium), not the immutable registry auction reserve.
+        // No internal-unit debit, so the signed cap must be 0.
         need(this.config.revision === "poa-mainnet-v1", "ESCROW_ISSUE_POLICY");
         const { n, e } = this.entry(s, p.name);
         need(n.labels.length === 1, "ROOT_ONLY");
@@ -827,8 +829,8 @@ export class Engine {
         need(b.signer !== this.config.treasury, "SELLER_SELF_BID");
         need(b.maxTotal === "0", "AMOUNT_CAP");
         const asset = this.asset(p.asset);
-        const a = this.config.assets[asset]!;
-        need(amount(p.price, true) === amount(n.tier === "premium" ? a.premiumReserve : a.standardReserve), "RESERVE_POLICY");
+        need(asset === "POA", "ASSET");
+        need(amount(p.price, true) === amount(poaNewNamePriceMicros(n.tier === "premium" ? "premium" : "standard")), "RESERVE_POLICY");
         const m = metadata(p.metadata, n.canonical, rightsHash({ kind: "permanent" }, null));
         const d = this.mint(s, n.canonical, b.signer, { kind: "permanent" }, null, m, time);
         return { deedId: d.id, owner: d.owner };

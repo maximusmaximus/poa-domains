@@ -301,11 +301,15 @@ test("poa-mainnet-v1 config profile executes full Unicode 17 emoji domain lifecy
   assert.equal(cfg.signingMode, "poa1-ed25519");
   assert.equal(cfg.normalizationHash, EMOJI17_NORMALIZATION_HASH);
   assert.equal(cfg.assets.POA!.kind, "poa-native");
+  assert.equal(cfg.assets.POA!.standardReserve, "1000");
+  assert.equal(cfg.assets.POA!.premiumReserve, "100000");
   assert.equal(cfg.reserved.length, 655);
   const clock = new ManualClock(1000000);
   const e = new Engine(cfg, clock);
   const cap = capabilities(e);
   assert.equal(cap.emojiAliases, 5216);
+  assert.equal(cap.poaNewNamePrices.standard, "100.000000");
+  assert.equal(cap.poaNewNamePrices.premium, "1000.000000");
   let reqSeq = 0;
   const submitPoa = (
     signerId: string,

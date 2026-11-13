@@ -374,7 +374,7 @@ export function openApiDocument(): any {
       title: "PoA Domains Worker API",
       version: API_SCHEMA_VERSION,
       description:
-        "Worker = production. Node is local development only. Registry livePoA:false; native naming is not enabled. Registry amounts are internal units, not native POA or wallet money. Hidden stored names remain reserved; PUBLIC_RECORD_WITHHELD is not permission to re-register. Escrow is a separately gated service. No keys/server-side signing; exact signed-packet retries only. The two disabled lease replay actions are not part of this supported signing contract.",
+        "Worker = production. Node is local development only. Registry livePoA:false; native naming is not enabled. Registry amounts are internal units, not native POA or wallet money. POA new-name checkout starts at 100 POA for common names and 1000 POA for premium names; read the live quote poaPrice and escrow capabilities before paying. Hidden stored names remain reserved; PUBLIC_RECORD_WITHHELD is not permission to re-register. Escrow is a separately gated service. No keys/server-side signing; exact signed-packet retries only. The two disabled lease replay actions are not part of this supported signing contract.",
     },
     servers: [{ url: API_ORIGIN }],
     paths,
@@ -464,7 +464,7 @@ export function agentCard(): any {
     name: "PoA Domains Registry",
     url: API_ORIGIN,
     description:
-      "Application registry explorer and agent API. Native-chain naming is not enabled. Registry prices and balances are internal units, not POA or wallet money. Some stored names are hidden from public lists but remain reserved.",
+      "Application registry explorer and agent API. Native-chain naming is not enabled. Registry prices and balances are internal units, not POA or wallet money. POA new-name checkout starts at 100 POA for common names and 1000 POA for premium names; read the live quote poaPrice and escrow capabilities before paying. Some stored names are hidden from public lists but remain reserved.",
     surface: API_SURFACE,
     limits: API_LIMITS,
     authentication: {
@@ -502,7 +502,7 @@ export function discoveryDocuments(): Record<
     "/llms.txt": {
       type: "text/plain; charset=utf-8",
       text:
-        "# PoA Domains Registry\n\n> Worker = production. Registry finality is registry-committed, livePoA:false. Native-chain naming is not enabled. Registry prices and balances are internal units, not POA or wallet money. Some stored names are hidden from public lists but remain reserved. Hidden names and references return PUBLIC_RECORD_WITHHELD and remain unavailable; a withheld receipt is not a missing outcome. Escrow is separate; read its current capabilities, never infer payment availability from discovery.\n\n- [Remote MCP first](" +
+        "# PoA Domains Registry\n\n> Worker = production. Registry finality is registry-committed, livePoA:false. Native-chain naming is not enabled. Registry prices and balances are internal units, not POA or wallet money. POA new-name checkout starts at 100 POA for common names and 1000 POA for premium names; read the live quote poaPrice and escrow capabilities before paying. Some stored names are hidden from public lists but remain reserved. Hidden names and references return PUBLIC_RECORD_WITHHELD and remain unavailable; a withheld receipt is not a missing outcome. Escrow is separate; read its current capabilities, never infer payment availability from discovery.\n\n- [Remote MCP first](" +
         API_ORIGIN +
         "/mcp): stateless Streamable HTTP, protocol 2025-11-25. POST only; Accept: application/json, text/event-stream. No browser Origin.\n- [REST OpenAPI](" +
         API_ORIGIN +

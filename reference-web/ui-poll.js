@@ -1,16 +1,16 @@
-import { publicNameUnavailable } from "./shared.js?v=62eb7aeeb6c0";
-import { installHelp } from "./ui-help.js?v=62eb7aeeb6c0";
-import { renderManagement } from "./ui-manage.js?v=62eb7aeeb6c0";
-import { actionLabel } from "./ui-copy.js?v=62eb7aeeb6c0";
-import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=62eb7aeeb6c0";
-import { ui } from "./ui-state.js?v=62eb7aeeb6c0";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=62eb7aeeb6c0";
-import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=62eb7aeeb6c0";
-import { render, updateTabDots } from "./ui-render.js?v=62eb7aeeb6c0";
-import { runSearch } from "./ui-search.js?v=62eb7aeeb6c0";
-import { renderIdeas } from "./ui-ideas.js?v=62eb7aeeb6c0";
-import { mountEscrow } from "./escrow.js?v=62eb7aeeb6c0";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=62eb7aeeb6c0";
+import { publicNameUnavailable } from "./shared.js?v=1c042d35a226";
+import { installHelp } from "./ui-help.js?v=1c042d35a226";
+import { renderManagement } from "./ui-manage.js?v=1c042d35a226";
+import { actionLabel } from "./ui-copy.js?v=1c042d35a226";
+import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=1c042d35a226";
+import { ui } from "./ui-state.js?v=1c042d35a226";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=1c042d35a226";
+import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=1c042d35a226";
+import { render, updateTabDots } from "./ui-render.js?v=1c042d35a226";
+import { runSearch } from "./ui-search.js?v=1c042d35a226";
+import { renderIdeas } from "./ui-ideas.js?v=1c042d35a226";
+import { mountEscrow } from "./escrow.js?v=1c042d35a226";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=1c042d35a226";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -265,7 +265,12 @@ export async function loadRegistry() {
         for (const [id, tier, label] of [["premiumPolicy", "premium", "Single emoji"], ["standardPolicy", "standard", "Standard roots"]]) {
             try {
                 const policy = rootAuctionPolicy(ui.cap, { tier });
-                el(id).textContent = `${label}: ${policy.reserve} registry units · ${formatDuration(policy.window)} + ${formatDuration(policy.quiet)} quiet`;
+                const poa = ui.cap?.poaNewNamePrices?.[tier];
+                const poaLabel = typeof poa === "string" ? poa.replace(/\.0+$/, "") + " POA starting price" : null;
+                el(id).textContent = poaLabel
+                    ? `${label}: ${poaLabel} · ${formatDuration(policy.window)} + ${formatDuration(policy.quiet)} quiet`
+                    : `${label}: ${policy.reserve} registry units · ${formatDuration(policy.window)} + ${formatDuration(policy.quiet)} quiet`;
+                el(id).title = "Starting POA checkout price for a new name. Registry-unit auction reserves are unchanged in the stored policy. Read live escrow status before any payment.";
             }
             catch {
                 el(id).textContent = "🤷 Prices unavailable. Tap 🔄 Refresh.";

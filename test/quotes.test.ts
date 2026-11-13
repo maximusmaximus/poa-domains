@@ -29,6 +29,7 @@ test("quoted params and gross caps match actual signed submissions for every adm
   {
     const t=setup();const {q,receipt}=submitQuote(t,"announceAuction","quotes",{},t.issuer);
     assert.equal(q.reserve,t.config.assets.POA!.standardReserve);assert.equal(q.expectedVersion,0);
+    assert.equal(q.poaPrice,"100.000000");
     const id=receipt.result.auctionId,a=t.e.snapshot().auctions[id]!;t.clock.set(a.openAt);
     const first=submitQuote(t,"bid","quotes",{auctionId:id});assert.equal(first.q.requiredMaxTotal,a.reserve);
     const second=submitQuote(t,"bid","quotes",{auctionId:id},t.bob);assert.equal(second.q.minimumNextBid,"111");
