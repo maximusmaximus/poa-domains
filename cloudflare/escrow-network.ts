@@ -1,12 +1,14 @@
 /** Fixed-origin native transport. Public node data is explicitly trusted, not a consensus verifier. */
 import { DisplayReadError, type ReadTiming } from "./display-freshness.js";
 import { integer, need } from "../src/core.js";
-import { CHAIN, Transfer, address, digest, verifyTransfer } from "./escrow-codec.js";
+import { CHAIN, Transfer, address, digest, micros, verifyTransfer } from "./escrow-codec.js";
 import { Context, Cut, Network, Observation, Status } from "./escrow.js";
 export const MAINNET_ENGINE_SHA256 = "e01abd959dd0439dd89af8e8c187d1bed3897deb2a855a615e7dfa2d0222f1fb";
 export const MAINNET_PARAMS_SHA256 = "6a5451ccd3109bb861e12dc31788fe368e0f974f89c41b1e4c8bfab178101101";
 export const PILOT_PER_TX = "250000.000000";
 export const PILOT_DAILY = "1000000.000000";
+/** K=5 peer attestations: the same threshold Escrow.final() requires for open-window money. */
+const PEER_FINAL_ATTESTATIONS = 5;
 export class PoaHttpNetwork implements Network {
   private lastHeight?: number;
   private lastCutoff?: number;
@@ -130,8 +132,21 @@ export class PoaHttpNetwork implements Network {
       this.getFirst([`/api/explorer/tx/${id}`,`/chain/${CHAIN}/api/explorer/tx/${id}`]),
       this.getFirst([`/chain/${CHAIN}/api/receipt/${id}`,`/api/receipt/${id}`]),
     ]);
-    if(!t||!r)return null;need(t.id===id&&r.txid===id,"ESCROW_TX_BINDING");verifyTransfer(t.body);
-    need(r.from===t.body.from&&r.type==="transfer","ESCROW_RECEIPT_BINDING");
+    if(!t||!r)return null;
+    need(typeof t==="object"&&typeof r==="object","ESCROW_TX_BINDING");
+    need(t.id===id&&r.txid===id,"ESCROW_TX_BINDING");verifyTransfer(t.body);
+    if(r.height!==undefined)integer(r.height);
+    // PoA's receipt now carries only {txid, ts, status, height}. Sender/type/finality are bound
+    // from the explorer record; legacy receipt fields, when present, must still agree exactly.
+    const legacy=r.from!==undefined||r.type!==undefined;
+    if(legacy)need(r.from===t.body.from&&r.type==="transfer","ESCROW_RECEIPT_BINDING");
+    else need(t.type==="transfer"&&t.from_addr===t.body.from,"ESCROW_RECEIPT_BINDING");
+    if(t.type!==undefined)need(t.type==="transfer"&&t.body.type==="transfer","ESCROW_RECEIPT_BINDING");
+    if(t.from_addr!==undefined)need(t.from_addr===t.body.from,"ESCROW_RECEIPT_BINDING");
+    if(t.to_addr!==undefined)need(t.to_addr===t.body.to,"ESCROW_RECEIPT_BINDING");
+    if(t.amount!==undefined)need(typeof t.amount==="string"&&micros(t.amount)===micros(t.body.amount),"ESCROW_RECEIPT_BINDING");
+    if(t.memo!==undefined)need(t.memo===t.body.memo,"ESCROW_RECEIPT_BINDING");
+    const attestations=integer(t.atts);
     let checkpoint:Observation["checkpoint"]=null;
     if(r.checkpoint_covered===true){
       // Explicit node-trust mode: receipt coverage + a matching current checkpoint cut.
@@ -139,8 +154,11 @@ export class PoaHttpNetwork implements Network {
       const s=await this.status(),height=t.finality?.height??t.checkpointed?.height??t.checkpoint_height;
       if(Number.isSafeInteger(height)&&height>=0&&height<=s.height&&!s.stale)checkpoint={height:s.height,root:s.root,anchored:true,quorum:5};
     }
-    return {id,body:t.body,chain:t.body.cid,valid:r.status==="included"&&(r.valid_in_open_window===true||r.checkpoint_covered===true),
-      attestations:integer(t.atts),checkpoint};
+    const legacyValid=r.valid_in_open_window===true||r.checkpoint_covered===true;
+    // New receipt shape: only an explorer-final record with peer-final attestations counts.
+    const explorerFinal=(t.final===1||t.final===true)&&attestations>=PEER_FINAL_ATTESTATIONS;
+    return {id,body:t.body,chain:t.body.cid,valid:r.status==="included"&&(legacyValid||explorerFinal),
+      attestations,checkpoint};
   }
   async cut(wallet:string,ids:string[],status:Status):Promise<Cut> {
     address(wallet);const b=await this.getFirst([`/api/explorer/address/${wallet}`,`/chain/${CHAIN}/api/explorer/address/${wallet}`]);
@@ -149,9 +167,12 @@ export class PoaHttpNetwork implements Network {
     for(const id of ids){
       const o=await this.lookup(id);
       if(o?.checkpoint){need(o.checkpoint.height<=status.height,"ESCROW_UNALIGNED_CUT");covered.push(id);}
-      else if(o&&o.attestations>=5){
+      else if(o&&o.attestations>=PEER_FINAL_ATTESTATIONS){
         // Peer-final open-window money is deliberately excluded from checkpoint-only reconciliation.
+        // The current receipt shape omits checkpoint_covered; without an explicit false we cannot
+        // tell whether the checkpoint balance includes this transfer, so reconciliation holds.
         const r=await this.getFirst([`/chain/${CHAIN}/api/receipt/${id}`,`/api/receipt/${id}`]);
+        need(r?.txid===id&&r.status==="included","ESCROW_TX_BINDING");
         need(r.checkpoint_covered===false,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
       }
     }

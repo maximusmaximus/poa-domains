@@ -197,6 +197,66 @@ test("fixed-origin native adapter validates receipt/body bindings and checkpoint
  const cut=await n.cut(policy.wallet,[id],s);assert.deepEqual(cut.covered,[id]);assert.equal(cut.balance,"1.000000");assert.ok(paths.length>=8);
 });
 
+test("native adapter binds sender/type/finality from the explorer when PoA's receipt is {txid,ts,status,height}",async()=>{
+ const body=depositBody(3,policy.wallet,"1.000000","receipt-v2"),id=txid(body);
+ const explorer=(o:any={})=>({id,type:"transfer",from_addr:body.from,to_addr:body.to,amount:body.amount,ts:body.ts,memo:body.memo,atts:5,final:1,
+  body,as_of:new Date(1800000000000).toISOString(),checkpoint_height:10,source:"index",...o});
+ const receiptV2=(o:any={})=>({txid:id,ts:body.ts,status:"included",height:806,...o});
+ const net=(t:any,r:any,extra:(p:string)=>any=()=>undefined)=>{
+  const request=(async(input:any,init:any)=>{const u=new URL(input);assert.equal(u.origin,"https://minepoa.com");assert.ok(!init?.method||init.method==="GET");
+   let b:any=extra(u.pathname)??null;
+   if(u.pathname===`/api/explorer/tx/${id}`)b=t;
+   if(u.pathname===`/api/receipt/${id}`)b=r;
+   if(u.pathname===`/chain/poa-mainnet-1/api/explorer/tx/${id}`||u.pathname===`/chain/poa-mainnet-1/api/receipt/${id}`)return Response.json({error:"paused"},{status:503});
+   return Response.json(b,{status:b?200:404});}) as typeof fetch;
+  return new PoaHttpNetwork(()=>false,request,{engine:root,params:root},()=>1800000000000);
+ };
+ // New receipt shape + final explorer record => valid, peer-final (no invented checkpoint).
+ const ok=await net(explorer(),receiptV2()).lookup(id);
+ assert.equal(ok?.valid,true);assert.equal(ok?.attestations,5);assert.equal(ok?.checkpoint,null);assert.deepEqual(ok?.body,body);
+ // Explorer final as boolean is accepted too.
+ assert.equal((await net(explorer({final:true}),receiptV2()).lookup(id))?.valid,true);
+ // Mismatched or missing sender/type/to/amount/memo/id are rejected outright.
+ for(const bad of [{from_addr:who(4)},{from_addr:undefined},{type:"stake"},{type:undefined},{to_addr:who(4)},{amount:"2.000000"},{amount:"bogus"},{memo:"poadomains:other"},{id:"f".repeat(64)}])
+  await assert.rejects(net(explorer(bad),receiptV2()).lookup(id),/ESCROW_(RECEIPT|TX)_BINDING|ESCROW_AMOUNT/,JSON.stringify(bad));
+ // Tampered signed body (to/amount/memo) fails signature verification.
+ for(const field of ["to","amount","memo"] as const){
+  const tampered={...body,[field]:field==="to"?who(4):field==="amount"?"2.000000":"poadomains:other"};
+  await assert.rejects(net(explorer({body:tampered,to_addr:tampered.to,amount:tampered.amount,memo:tampered.memo}),receiptV2()).lookup(id),/ESCROW_SIGNATURE/);
+ }
+ // Receipt bound to another txid, or not included, never counts.
+ await assert.rejects(net(explorer(),receiptV2({txid:"f".repeat(64)})).lookup(id),/ESCROW_TX_BINDING/);
+ assert.equal((await net(explorer(),receiptV2({status:"pending"})).lookup(id))?.valid,false);
+ await assert.rejects(net(explorer(),receiptV2({height:-1})).lookup(id));
+ // Non-final or low-attestation explorer records are not valid.
+ assert.equal((await net(explorer({final:0}),receiptV2()).lookup(id))?.valid,false);
+ assert.equal((await net(explorer({final:undefined}),receiptV2()).lookup(id))?.valid,false);
+ assert.equal((await net(explorer({atts:4}),receiptV2()).lookup(id))?.valid,false);
+ assert.equal((await net(explorer({final:"1"}),receiptV2()).lookup(id))?.valid,false);
+ await assert.rejects(net(explorer({atts:undefined}),receiptV2()).lookup(id));
+ // Missing explorer record or receipt (404 + paused chain mirror) => held, never an observation.
+ await assert.rejects(net(null,receiptV2()).lookup(id),/ESCROW_NODE_HTTP/);
+ await assert.rejects(net(explorer(),null).lookup(id),/ESCROW_NODE_HTTP/);
+ // Old receipt shape still works, and its sender/type must still match.
+ const legacy={txid:id,status:"included",from:body.from,type:"transfer",valid_in_open_window:true,checkpoint_covered:false};
+ const old=await net({id,body,atts:2},legacy).lookup(id);assert.equal(old?.valid,true);assert.equal(old?.attestations,2);
+ await assert.rejects(net({id,body,atts:5},{...legacy,from:who(4)}).lookup(id),/ESCROW_RECEIPT_BINDING/);
+ await assert.rejects(net({id,body,atts:5},{...legacy,type:"stake"}).lookup(id),/ESCROW_RECEIPT_BINDING/);
+ await assert.rejects(net({id,body,atts:5},{txid:id,status:"included",from:body.from}).lookup(id),/ESCROW_RECEIPT_BINDING/);
+ // Legacy receipt + explorer fields that disagree with the body is still rejected.
+ await assert.rejects(net(explorer({from_addr:who(4)}),legacy).lookup(id),/ESCROW_RECEIPT_BINDING/);
+ // Reconciliation cut: new shape omits checkpoint_covered, so peer-final money holds instead of being guessed.
+ const cutNet=net(explorer(),receiptV2(),p=>p==="/api/status"?{K:5,as_of:new Date(1800000000000).toISOString(),stale:false,checkpoint_height:10,state_root:root}:
+  p==="/api/network/facts"?{chain_id:CHAIN,engine_sha256:root,params_sha256:root}:
+  p===`/api/explorer/address/${policy.wallet}`?{address:policy.wallet,balance:"1.000000",balance_as_of:{checkpoint_height:10}}:undefined);
+ const s=await cutNet.status();await assert.rejects(cutNet.cut(policy.wallet,[id],s),/ESCROW_CHECKPOINT_DETAILS_REQUIRED/);
+ // Legacy explicit checkpoint_covered:false still reconciles with the peer-final transfer excluded.
+ const cutOld=net(explorer(),legacy,p=>p==="/api/status"?{K:5,as_of:new Date(1800000000000).toISOString(),stale:false,checkpoint_height:10,state_root:root}:
+  p==="/api/network/facts"?{chain_id:CHAIN,engine_sha256:root,params_sha256:root}:
+  p===`/api/explorer/address/${policy.wallet}`?{address:policy.wallet,balance:"0.000000",balance_as_of:{checkpoint_height:10}}:undefined);
+ assert.deepEqual((await cutOld.cut(policy.wallet,[id],await cutOld.status())).covered,[]);
+});
+
 test("native adapter supports post-8:59-PST /chain/poa-mainnet-1/api/status schema, network-facts, cutoff context, and rollback tripwire",async()=>{
  const body=depositBody(3,policy.wallet,"5.000000","live-schema"),id=txid(body);
  const ownTx=depositBody(1,who(2),"1.000000","prev-out"),ownId=txid(ownTx);
