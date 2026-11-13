@@ -7,6 +7,7 @@ import { Escrow, PILOT_ADMISSION_LIMIT, PILOT_JOURNAL_LIMIT, invariant, nextEntr
 import { CHAIN, WorkerSecretSigner, digest, micros, decimal, txid, verifyCommand, verifyTransfer } from "../escrow-codec.js";
 import { PoaHttpNetwork, MAINNET_ENGINE_SHA256, MAINNET_PARAMS_SHA256, PILOT_PER_TX, PILOT_DAILY } from "../escrow-network.js";
 import { MockNetwork, MemoryJournal, policy, who, key, seed, signer, command, depositBody, root, parents } from "./escrow-fixture.js";
+import type { Status } from "../escrow.js";
 function fixture(crash=(point:string)=>{}, p=policy){
   const journal=new MemoryJournal(p),net=new MockNetwork();let enabled=true;
   let owner=who(2),transferCount=0;
@@ -255,6 +256,94 @@ test("native adapter binds sender/type/finality from the explorer when PoA's rec
   p==="/api/network/facts"?{chain_id:CHAIN,engine_sha256:root,params_sha256:root}:
   p===`/api/explorer/address/${policy.wallet}`?{address:policy.wallet,balance:"0.000000",balance_as_of:{checkpoint_height:10}}:undefined);
  assert.deepEqual((await cutOld.cut(policy.wallet,[id],await cutOld.status())).covered,[]);
+});
+
+// ---- PoA's current receipt shape {txid,ts,status,height}: payouts (nonce/parents) and reconciliation cuts ----
+const NOW_V2=1800000000000,CUTOFF_V2=1799999000;
+function signedV2(n:number,to:string,amount:string,memo:string,nonce:number,ts:number){
+ return signer(n).transfer({type:"transfer",cid:CHAIN,from:who(n),to,amount,memo,nonce,parents,ts});
+}
+function explorerV2(body:any,o:any={}){return {id:txid(body),type:body.type,from_addr:body.from,to_addr:body.to,amount:body.amount,ts:body.ts,memo:body.memo,
+ atts:5,final:1,body,as_of:new Date(NOW_V2).toISOString(),checkpoint_height:10,source:"index",...o};}
+const receiptV2=(id:string,o:any={})=>({txid:id,ts:1,status:"included",height:806,...o});
+function v2Net(routes:Record<string,any>){
+ const request=(async(input:any,init:any)=>{const u=new URL(input);assert.equal(u.origin,"https://minepoa.com");assert.ok(!init?.method||init.method==="GET");
+  if(u.pathname.startsWith("/chain/poa-mainnet-1/api/")&&!u.pathname.endsWith("/status")&&!u.pathname.endsWith("/network-facts"))return Response.json({error:"paused"},{status:503});
+  const b=routes[u.pathname];return Response.json(b??null,{status:b?200:404});}) as typeof fetch;
+ return new PoaHttpNetwork(()=>false,request,{engine:root,params:root},()=>NOW_V2);
+}
+const statusV2=(cutoff:number|null=CUTOFF_V2)=>({K:5,as_of:new Date(NOW_V2).toISOString(),stale:false,checkpoint_height:10,state_root:root,...(cutoff!==null?{checkpoint:{height:10,cutoff_ts:cutoff}}:{})});
+const factsV2={chain_id:CHAIN,engine_sha256:root,params_sha256:root};
+
+test("payout context on the current receipt shape: nonce from the journal-bound explorer view, parents from final listing",async()=>{
+ const W=policy.wallet;
+ const out=signedV2(1,who(3),"2.000000","poadomains:refund-a",6,CUTOFF_V2+50),outId=txid(out);
+ const older=signedV2(1,who(4),"1.000000","poadomains:refund-0",5,CUTOFF_V2+10),olderId=txid(older);
+ const incoming=signedV2(3,W,"3.000000","poadomains:dep",2,CUTOFF_V2+80);
+ const p1="b".repeat(64),p0="d".repeat(64),p2="c".repeat(64);
+ const row=(b:any,o:any={})=>({id:txid(b),type:b.type,from_addr:b.from,to_addr:b.to,amount:b.amount,epoch:null,ts:b.ts,atts:5,final:1,...o});
+ const build=(o:{addr?:any,tx?:any,receipt?:any,list?:any,extra?:Record<string,any>}={})=>v2Net({
+  "/api/status":statusV2(),"/api/network/facts":factsV2,
+  [`/api/explorer/address/${W}`]:o.addr??{address:W,balance:"9.000000",balance_as_of:{checkpoint_height:10},txs:[row(incoming),row(out),row(older)]},
+  [`/api/explorer/tx/${outId}`]:o.tx??explorerV2(out),
+  [`/api/receipt/${outId}`]:o.receipt??receiptV2(outId),
+  "/api/explorer/txs":o.list??[{id:p1,final:1,atts:5},{id:p0,final:0,atts:1},{id:p2,final:1,atts:6}],
+  [`/api/receipt/${p1}`]:receiptV2(p1),[`/api/receipt/${p0}`]:receiptV2(p0),[`/api/receipt/${p2}`]:receiptV2(p2),
+  ...(o.extra??{})});
+ // Happy path: first payout (no journal tx yet) and journal-bound payout agree on nonce 7.
+ const ctx=await build().context(W);assert.equal(ctx.nextNonce,7);assert.deepEqual(ctx.parents,[p1,p2]);assert.equal(ctx.cutoff,CUTOFF_V2);
+ assert.equal((await build().context(W,outId)).nextNonce,7);
+ // Journal and explorer disagree on the latest outgoing tx (stale journal or a foreign spend) => hold.
+ await assert.rejects(build().context(W,olderId),/ESCROW_NONCE_CONTEXT/);
+ await assert.rejects(build().context(W,"e".repeat(64)),/ESCROW_NONCE_CONTEXT/);
+ // Latest outgoing must be included, peer-final, and bound to its id/sender.
+ for(const [label,o] of [
+  ["not final",{tx:explorerV2(out,{final:0})}],["low atts",{tx:explorerV2(out,{atts:4})}],["final string",{tx:explorerV2(out,{final:"1"})}],
+  ["atts missing",{tx:explorerV2(out,{atts:undefined})}],
+  ["pending receipt",{receipt:receiptV2(outId,{status:"pending"})}],["receipt other txid",{receipt:receiptV2("f".repeat(64))}],
+  ["explorer other id",{tx:explorerV2(out,{id:"f".repeat(64)})}],["from_addr mismatch",{tx:explorerV2(out,{from_addr:who(4)})}],
+  ["type mismatch",{tx:explorerV2(out,{type:"stake"})}],["body nonce tampered",{tx:explorerV2(out,{body:{...out,nonce:60}})}],
+  ["body from another wallet",{tx:explorerV2(out,{body:signedV2(2,who(3),"2.000000","poadomains:refund-a",6,CUTOFF_V2+50)})}],
+  ["body missing",{tx:explorerV2(out,{body:undefined})}],
+  ["address view for another wallet",{addr:{address:who(2),txs:[row(out)]}}],["address view without txs",{addr:{address:W}}],
+  ["unordered listing",{addr:{address:W,txs:[row(older),row(out)]}}],["listing row without ts",{addr:{address:W,txs:[row(incoming,{ts:undefined}),row(out)]}}],
+ ] as const) await assert.rejects(build(o as any).context(W),/ESCROW_NONCE_CONTEXT|ESCROW_SIGNATURE|INTEGER/,label);
+ // Explorer record or receipt missing (404 + paused chain mirror) => held.
+ await assert.rejects(build({extra:{[`/api/explorer/tx/${outId}`]:undefined}}).context(W));
+ await assert.rejects(build({extra:{[`/api/receipt/${outId}`]:undefined}}).context(W));
+ // No outgoing tx visible at all => the wallet is not an enrolled sender; hold.
+ await assert.rejects(build({addr:{address:W,txs:[row(incoming)]}}).context(W),/ESCROW_ENROLLED_SENDER_REQUIRED/);
+ // Parents must be final in the listing and included in their receipt.
+ await assert.rejects(build({list:[{id:p1,final:1},{id:p0,final:0},{id:p2,final:0}]}).context(W),/ESCROW_PARENTS/);
+ await assert.rejects(build({list:[{id:p1,final:1},{id:p1,final:1}]}).context(W),/ESCROW_PARENTS/);
+ await assert.rejects(build({list:[{id:p1,final:1},{id:p2,final:1}],extra:{[`/api/receipt/${p2}`]:receiptV2(p2,{status:"rejected"})}}).context(W),/ESCROW_PARENTS/);
+ await assert.rejects(build({list:{}}).context(W),/ESCROW_PARENTS/);
+});
+
+test("reconciliation cut on the current receipt shape uses the pinned engine's ts<cutoff coverage and holds on anything ambiguous",async()=>{
+ const W=policy.wallet;
+ const dep=(tag:string,ts:number)=>signedV2(3,W,"1.000000",`poadomains:${tag}`,1,ts);
+ const before=dep("before",CUTOFF_V2-5),after=dep("after",CUTOFF_V2+5),tie=dep("tie",CUTOFF_V2);
+ const make=(txs:{body:any,o?:any}[],balance:string,cutoff:number|null=CUTOFF_V2)=>{
+  const routes:Record<string,any>={"/api/status":statusV2(cutoff),"/api/network/facts":factsV2,
+   [`/api/explorer/address/${W}`]:{address:W,balance,balance_as_of:{checkpoint_height:10},txs:[]}};
+  for(const {body,o} of txs){const id=txid(body);routes[`/api/explorer/tx/${id}`]=explorerV2(body,o);routes[`/api/receipt/${id}`]=receiptV2(id);}
+  return v2Net(routes);
+ };
+ // Peer-final under the cutoff is baked into the checkpoint balance; after the cutoff it is not.
+ let n=make([{body:before},{body:after}],"1.000000");let s:Status=await n.status();
+ const cut=await n.cut(W,[txid(before),txid(after)],s);assert.deepEqual(cut.covered,[txid(before)]);assert.equal(cut.balance,"1.000000");
+ // Above the cutoff, even a not-yet-final tx is simply not covered.
+ n=make([{body:after,o:{final:0,atts:1}}],"0.000000");s=await n.status();assert.deepEqual((await n.cut(W,[txid(after)],s)).covered,[]);
+ // Same-second tie, or under the cutoff without peer finality => hold.
+ for(const [label,txs] of [["tie",[{body:tie}]],["not final",[{body:before,o:{final:0}}]],["low atts",[{body:before,o:{atts:4}}]]] as const){
+  n=make(txs as any,"1.000000");s=await n.status();await assert.rejects(n.cut(W,[txid((txs as any)[0].body)],s),/ESCROW_CHECKPOINT_DETAILS_REQUIRED/,label);
+ }
+ // Status without a checkpoint cutoff => hold.
+ n=make([{body:before}],"1.000000",null);s=await n.status();await assert.rejects(n.cut(W,[txid(before)],s),/ESCROW_CHECKPOINT_DETAILS_REQUIRED/);
+ // Address balance not as-of this checkpoint => unaligned.
+ n=v2Net({"/api/status":statusV2(),"/api/network/facts":factsV2,[`/api/explorer/address/${W}`]:{address:W,balance:"1.000000",balance_as_of:{checkpoint_height:9},txs:[]}});
+ s=await n.status();await assert.rejects(n.cut(W,[txid(before)],s),/ESCROW_UNALIGNED_CUT/);
 });
 
 test("native adapter supports post-8:59-PST /chain/poa-mainnet-1/api/status schema, network-facts, cutoff context, and rollback tripwire",async()=>{

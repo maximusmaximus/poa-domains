@@ -1,7 +1,7 @@
 /** Fixed-origin native transport. Public node data is explicitly trusted, not a consensus verifier. */
 import { DisplayReadError, type ReadTiming } from "./display-freshness.js";
 import { integer, need } from "../src/core.js";
-import { CHAIN, Transfer, address, digest, micros, verifyTransfer } from "./escrow-codec.js";
+import { CHAIN, Transfer, address, digest, micros, txid, verifyTransfer } from "./escrow-codec.js";
 import { Context, Cut, Network, Observation, Status } from "./escrow.js";
 export const MAINNET_ENGINE_SHA256 = "e01abd959dd0439dd89af8e8c187d1bed3897deb2a855a615e7dfa2d0222f1fb";
 export const MAINNET_PARAMS_SHA256 = "6a5451ccd3109bb861e12dc31788fe368e0f974f89c41b1e4c8bfab178101101";
@@ -126,7 +126,9 @@ export class PoaHttpNetwork implements Network {
       throw error;
     }
   }
-  async lookup(id:string):Promise<Observation|null> {
+  async lookup(id:string):Promise<Observation|null> { return (await this.observe(id))?.o??null; }
+  /** Lookup plus which receipt shape answered (legacy carries from/type and validity flags). */
+  private async observe(id:string):Promise<{o:Observation;legacy:boolean;receipt:any}|null> {
     need(/^[0-9a-f]{64}$/.test(id),"ESCROW_TXID");
     const [t,r]=await Promise.all([
       this.getFirst([`/api/explorer/tx/${id}`,`/chain/${CHAIN}/api/explorer/tx/${id}`]),
@@ -157,20 +159,31 @@ export class PoaHttpNetwork implements Network {
     const legacyValid=r.valid_in_open_window===true||r.checkpoint_covered===true;
     // New receipt shape: only an explorer-final record with peer-final attestations counts.
     const explorerFinal=(t.final===1||t.final===true)&&attestations>=PEER_FINAL_ATTESTATIONS;
-    return {id,body:t.body,chain:t.body.cid,valid:r.status==="included"&&(legacyValid||explorerFinal),
-      attestations,checkpoint};
+    return {o:{id,body:t.body,chain:t.body.cid,valid:r.status==="included"&&(legacyValid||explorerFinal),
+      attestations,checkpoint},legacy,receipt:r};
   }
   async cut(wallet:string,ids:string[],status:Status):Promise<Cut> {
     address(wallet);const b=await this.getFirst([`/api/explorer/address/${wallet}`,`/chain/${CHAIN}/api/explorer/address/${wallet}`]);
     need(b?.address===wallet&&b.balance_as_of?.checkpoint_height===status.height,"ESCROW_UNALIGNED_CUT");
     const covered:string[]=[];
     for(const id of ids){
-      const o=await this.lookup(id);
+      const seen=await this.observe(id),o=seen?.o;
       if(o?.checkpoint){need(o.checkpoint.height<=status.height,"ESCROW_UNALIGNED_CUT");covered.push(id);}
+      else if(seen&&!seen.legacy){
+        // Current receipt shape (no checkpoint_covered). Coverage is the pinned engine's own
+        // predicate for the checkpoint this balance is "as of": a tx is baked into checkpoint state
+        // iff body.ts < cutoff.ts (same-second ties need the cutoff tx's txCmp order, which we do
+        // not have, so they hold). Only peer-final (K=5 attested) money counts as baked; anything
+        // under the cutoff that is not peer-final is ambiguous and holds.
+        need(status.cutoff!==undefined,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
+        const cutoff=integer(status.cutoff),ts=integer(o!.body.ts,1);
+        if(ts>cutoff)continue;
+        need(ts<cutoff&&o!.valid===true&&o!.attestations>=PEER_FINAL_ATTESTATIONS,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
+        covered.push(id);
+      }
       else if(o&&o.attestations>=PEER_FINAL_ATTESTATIONS){
-        // Peer-final open-window money is deliberately excluded from checkpoint-only reconciliation.
-        // The current receipt shape omits checkpoint_covered; without an explicit false we cannot
-        // tell whether the checkpoint balance includes this transfer, so reconciliation holds.
+        // Legacy receipt: peer-final open-window money is excluded from checkpoint-only
+        // reconciliation only on an explicit checkpoint_covered:false.
         const r=await this.getFirst([`/chain/${CHAIN}/api/receipt/${id}`,`/api/receipt/${id}`]);
         need(r?.txid===id&&r.status==="included","ESCROW_TX_BINDING");
         need(r.checkpoint_covered===false,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
@@ -190,24 +203,61 @@ export class PoaHttpNetwork implements Network {
       cutoff=integer(snap.checkpoint.cutoff?.ts);
     }
     const own=await this.getFirst([`/api/explorer/address/${wallet}`,`/chain/${CHAIN}/api/explorer/address/${wallet}`]);
-    const explorerTxId=own?.txs?.find((t:any)=>t.from_addr===wallet)?.id;
+    need(own?.address===wallet&&Array.isArray(own.txs),"ESCROW_NONCE_CONTEXT");
+    // "Most recent outgoing tx" is only meaningful on a newest-first listing; anything else holds.
+    for(let i=1;i<own.txs.length;i++)need(Number.isSafeInteger(own.txs[i]?.ts)&&Number.isSafeInteger(own.txs[i-1]?.ts)&&own.txs[i].ts<=own.txs[i-1].ts,"ESCROW_NONCE_CONTEXT");
+    const explorerTxId=own.txs.find((t:any)=>t?.from_addr===wallet)?.id;
     const candidateIds=[explorerTxId,knownTxid].filter((x):x is string=>typeof x==="string"&&/^[0-9a-f]{64}$/.test(x));
     need(candidateIds.length>0,"ESCROW_ENROLLED_SENDER_REQUIRED");
+    const first=await this.getFirst([`/chain/${CHAIN}/api/receipt/${candidateIds[0]}`,`/api/receipt/${candidateIds[0]}`]);
+    const legacy=first!==null&&typeof first==="object"&&(first.from!==undefined||first.next_nonce!==undefined);
+    const nextNonce=legacy?await this.legacyNonce(wallet,candidateIds):await this.explorerNonce(wallet,own.txs,knownTxid);
+    const list=await this.getFirst(["/api/explorer/txs",`/chain/${CHAIN}/api/explorer/txs`]);
+    need(Array.isArray(list),"ESCROW_PARENTS");const parents:string[]=[];
+    for(const t of list.slice(0,8)){
+      if(!t||typeof t!=="object"||typeof t.id!=="string"||!/^[0-9a-f]{64}$/.test(t.id)||parents.includes(t.id))continue;
+      const receipt=await this.getFirst([`/chain/${CHAIN}/api/receipt/${t.id}`,`/api/receipt/${t.id}`]);
+      if(!(receipt?.txid===t.id&&receipt.status==="included"))continue;
+      const legacyOk=receipt.valid_in_open_window===true||receipt.checkpoint_covered===true;
+      // Current receipt shape: the explorer listing must show the parent final.
+      const explorerOk=receipt.from===undefined&&receipt.valid_in_open_window===undefined&&receipt.checkpoint_covered===undefined&&(t.final===1||t.final===true);
+      if(legacyOk||explorerOk)parents.push(t.id);
+      if(parents.length===2)break;
+    }
+    need(parents.length===2,"ESCROW_PARENTS");return {nextNonce,parents,cutoff};
+  }
+  /** Legacy receipts: the node's next_nonce for the wallet's own included txs. */
+  private async legacyNonce(wallet:string,candidateIds:string[]):Promise<number> {
     let nextNonce=0;
     for(const txId of new Set(candidateIds)){
       const r=await this.getFirst([`/chain/${CHAIN}/api/receipt/${txId}`,`/api/receipt/${txId}`]);
       need(r?.status==="included"&&r.from===wallet&&(r.valid_in_open_window===true||r.checkpoint_covered===true),"ESCROW_NONCE_CONTEXT");
       nextNonce=Math.max(nextNonce,integer(r.next_nonce,1));
     }
-    const list=await this.getFirst(["/api/explorer/txs",`/chain/${CHAIN}/api/explorer/txs`]);
-    need(Array.isArray(list),"ESCROW_PARENTS");const parents:string[]=[];
-    for(const t of list.slice(0,8)){
-      if(!/^[0-9a-f]{64}$/.test(t.id))continue;
-      const receipt=await this.getFirst([`/chain/${CHAIN}/api/receipt/${t.id}`,`/api/receipt/${t.id}`]);
-      if(receipt?.txid===t.id&&receipt.status==="included"&&(receipt.valid_in_open_window===true||receipt.checkpoint_covered===true))parents.push(t.id);
-      if(parents.length===2)break;
-    }
-    need(parents.length===2,"ESCROW_PARENTS");return {nextNonce,parents,cutoff};
+    return nextNonce;
+  }
+  /** Current receipts carry no next_nonce. The pinned engine/client build a tx with
+   * nonce = (sender's last consumed nonce) + 1, so take the wallet's most recent outgoing tx from
+   * the explorer address view and require it to be (a) the same tx our journal last finalized,
+   * when we have one, (b) bound to its id by body hash and to this wallet, (c) included and
+   * peer-final, so its nonce was consumed. Any gap, reorder, foreign spend or pending tx holds. */
+  private async explorerNonce(wallet:string,txs:any[],knownTxid?:string):Promise<number> {
+    const latest=txs.find((t:any)=>t?.from_addr===wallet);
+    need(latest&&typeof latest.id==="string"&&/^[0-9a-f]{64}$/.test(latest.id),"ESCROW_ENROLLED_SENDER_REQUIRED");
+    if(knownTxid!==undefined)need(latest.id===knownTxid,"ESCROW_NONCE_CONTEXT");
+    const id=latest.id;
+    const [t,r]=await Promise.all([
+      this.getFirst([`/api/explorer/tx/${id}`,`/chain/${CHAIN}/api/explorer/tx/${id}`]),
+      this.getFirst([`/chain/${CHAIN}/api/receipt/${id}`,`/api/receipt/${id}`]),
+    ]);
+    need(t&&typeof t==="object"&&r&&typeof r==="object","ESCROW_NONCE_CONTEXT");
+    need(r.txid===id&&r.status==="included"&&r.from===undefined&&r.next_nonce===undefined,"ESCROW_NONCE_CONTEXT");
+    const body=t.body;
+    need(t.id===id&&body&&typeof body==="object"&&!Array.isArray(body)&&txid(body)===id,"ESCROW_NONCE_CONTEXT");
+    need(body.from===wallet&&t.from_addr===wallet&&body.cid===CHAIN&&typeof body.type==="string"&&t.type===body.type,"ESCROW_NONCE_CONTEXT");
+    if(body.type==="transfer")verifyTransfer(body);
+    need((t.final===1||t.final===true)&&integer(t.atts)>=PEER_FINAL_ATTESTATIONS,"ESCROW_NONCE_CONTEXT");
+    return integer(body.nonce,1)+1;
   }
   async submit(body:Transfer):Promise<void> {
     need(this.writesAllowed(),"ESCROW_NETWORK_WRITES_DISABLED");verifyTransfer(body);
