@@ -7,7 +7,7 @@ interface __BaseEnv_Env {
   POA_ESCROW_ADDRESS?: string;
   POA_ESCROW_ENGINE_SHA256?: string;
   POA_ESCROW_PARAMS_SHA256?: string;
-  /** Reserved switch for POA new-name checkout; currently always reported "off". */
+  /** POA new-name checkout; live value approved-v1 turns it on, any other value is off. */
   POA_ESCROW_NEW_NAMES?: string;
   POA_ESCROW_PER_TX?: string;
   POA_ESCROW_DAILY?: string;

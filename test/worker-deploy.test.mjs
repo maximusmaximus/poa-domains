@@ -4,10 +4,10 @@ import { readFileSync, existsSync } from "node:fs";
 import { parse } from "yaml";
 import { endpoint } from "../dist/src/client.js";
 import { ACCOUNT, WORKER, REPO, ADDRESS, POLICY, parseConfig, productionConfig, expectedPolicy,
-  assertBindings, assertProductionEnvironment, assertGitHub, liveSnapshot, wranglerArgs, runDeployment, repinPlan, assertAdvertised, NETWORK_FACTS, NETWORK_CLIENT } from "../scripts/worker-deploy.mjs";
+  assertBindings, assertProductionEnvironment, assertGitHub, liveSnapshot, wranglerArgs, runDeployment, repinPlan, checkoutPlan, assertAdvertised, NETWORK_FACTS, NETWORK_CLIENT } from "../scripts/worker-deploy.mjs";
 const config = parseConfig(readFileSync("wrangler.jsonc", "utf8"));
 const expected = { ...Object.fromEntries(POLICY.map(k => [k, config.vars[k]])),
-  POA_ESCROW_ENABLED: "true", POA_ESCROW_NETWORK_WRITES: "approved-v1", POA_ESCROW_ADDRESS: ADDRESS };
+  POA_ESCROW_ENABLED: "true", POA_ESCROW_NETWORK_WRITES: "approved-v1", POA_ESCROW_NEW_NAMES: "approved-v1", POA_ESCROW_ADDRESS: ADDRESS };
 const bindings = [...POLICY.map(name => ({ name, type: "plain_text", text: expected[name] })),
   ...["POA_ESCROW_KEY", "ESCROW_ADMIN_TOKEN"].map(name => ({ name, type: "secret_text" }))];
 const sha = "a".repeat(40), version = "46459dd0-989d-46dc-ad79-c8b24a867595";
@@ -42,6 +42,7 @@ test("deploy plan omits every escrow override, preserves server bindings and nev
   assert.equal(plan.keep_vars, true);
   assert.ok(Object.keys(plan.vars).every(k => !k.startsWith("POA_ESCROW_")));
   assert.equal(config.vars.POA_ESCROW_ENABLED, "false"); assert.equal(config.vars.POA_ESCROW_NETWORK_WRITES, "false");
+  assert.equal(config.vars.POA_ESCROW_NEW_NAMES, "false");
   assert.deepEqual(plan.durable_objects, config.durable_objects); assert.deepEqual(plan.migrations, config.migrations);
   assert.ok(!plan.routes?.some(r => r.custom_domain), "grok.me is not a zone in this account");
   for (const flag of [true, false]) {
@@ -64,7 +65,7 @@ test("all public production policy is mandatory and must match both settings and
     assert.throws(() => assertBindings(bindings.filter(b => b.name !== key), expected), /LIVE_POLICY_MISMATCH/);
   }
   for (const [key, value] of [["POA_ESCROW_ENABLED", "false"], ["POA_ESCROW_NETWORK_WRITES", "false"],
-    ["POA_ESCROW_ADDRESS", "different"], ["POA_ESCROW_PER_TX", "0"], ["POA_ESCROW_ENGINE_SHA256", "not-a-pin"]])
+    ["POA_ESCROW_NEW_NAMES", "false"], ["POA_ESCROW_ADDRESS", "different"], ["POA_ESCROW_PER_TX", "0"], ["POA_ESCROW_ENGINE_SHA256", "not-a-pin"]])
     assert.throws(() => expectedPolicy({ ...expected, [key]: value }));
   assert.throws(() => assertBindings(undefined, expected), /MISSING_LIVE_BINDINGS/);
   assert.throws(() => assertBindings([...bindings, bindings[0]], expected), /DUPLICATE_LIVE_BINDING/);
@@ -154,6 +155,34 @@ test("production host is allowlisted; discovery paths run Worker first; all erro
   assert.ok(readFileSync("cloudflare/test/integration.mjs", "utf8").includes('"--local-upstream", "poadomains.grok.me"'));
   const coverage = JSON.parse(readFileSync(".c8rc.json", "utf8"));
   assert.ok(coverage.src.includes("scripts")); assert.ok(coverage.include.includes("scripts/worker-deploy.mjs"));
+});
+
+test("checkout enable (Max t136u): missing live binding is written once; already-on is kept; a wrong value is refused", async () => {
+  assert.deepEqual(checkoutPlan(expected, bindings.filter(b => b.name !== "POA_ESCROW_NEW_NAMES")), { POA_ESCROW_NEW_NAMES: "approved-v1" });
+  assert.equal(checkoutPlan(expected, bindings), null);
+  assert.throws(() => checkoutPlan({ ...expected, POA_ESCROW_NEW_NAMES: "false" }, []), /UNSAFE_PRODUCTION_POLICY/);
+  assertBindings(bindings.filter(b => b.name !== "POA_ESCROW_NEW_NAMES"), expected, { allowMissing: ["POA_ESCROW_NEW_NAMES"] });
+  assert.throws(() => assertBindings(bindings.filter(b => b.name !== "POA_ESCROW_NEW_NAMES"), expected), /LIVE_POLICY_MISMATCH/);
+  assert.throws(() => assertBindings(bindings.map(b => b.name === "POA_ESCROW_NEW_NAMES" ? { ...b, text: "false" } : b), expected, { allowMissing: ["POA_ESCROW_NEW_NAMES"] }), /LIVE_POLICY_MISMATCH/);
+  const without = bindings.filter(b => b.name !== "POA_ESCROW_NEW_NAMES");
+  const p = provider({ "/settings": { success: true, result: { bindings: without } },
+    [`/versions/${version}`]: { success: true, result: { id: version, resources: { bindings: without } } } });
+  const plans = []; let deployed = false;
+  const newBindings = [...without, { name: "POA_ESCROW_NEW_NAMES", type: "plain_text", text: "approved-v1" }];
+  const fetchImpl = async (url, o) => {
+    const r = await p.fetchImpl(url, o);
+    if (!deployed || !(url.endsWith("/settings") || url.includes("/versions/"))) return r;
+    const body = await r.json(); if (body.result.bindings) body.result.bindings = newBindings; else body.result.resources.bindings = newBindings;
+    return { ok: true, json: async () => body };
+  };
+  const run = (_exe, args) => { const plan = JSON.parse(readFileSync(args[args.indexOf("--config") + 1], "utf8"));
+    plans.push(Object.keys(plan.vars).filter(k => k.startsWith("POA_ESCROW_")).sort()); if (!args.includes("--dry-run")) deployed = true; return { status: 0 }; };
+  await runDeployment({ dryRun: false, env: { ...env, DEPLOY_POSTCHECK_DELAY_MS: "0" }, fetchImpl, run });
+  assert.deepEqual(plans, [["POA_ESCROW_NEW_NAMES"], ["POA_ESCROW_NEW_NAMES"]]);
+  // A later deploy, when the live binding is already approved-v1, writes no escrow overrides.
+  plans.length = 0; deployed = false;
+  await runDeployment({ dryRun: false, env: { ...env, DEPLOY_POSTCHECK_DELAY_MS: "0" }, fetchImpl: provider().fetchImpl, run });
+  assert.deepEqual(plans, [[], []]);
 });
 
 test("repin (Max t108s1102): validated, advertised + client-hash verified, writes only the two pins, post-checks new pins", async () => {

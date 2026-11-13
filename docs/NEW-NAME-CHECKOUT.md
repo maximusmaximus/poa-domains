@@ -1,8 +1,8 @@
-# POA new-name checkout (built, OFF)
+# POA new-name checkout
 
-Status: **OFF**. `/v1/escrow/capabilities` → `newNameCheckout: {status:"off", priceRule}`. It turns on only
-when the Worker binding `POA_ESCROW_NEW_NAMES=approved-v1` exists, which needs Max's go and a reviewed deploy-script
-change (the live escrow-binding check rejects an unreviewed `POA_ESCROW_*` binding).
+Status: **ON** after Max's approval on Nov 13 2026 (t136u, 3:20 PM PT), when the live Worker binding
+`POA_ESCROW_NEW_NAMES=approved-v1` is present. `/v1/escrow/capabilities` → `newNameCheckout: {status:"on", priceRule}`.
+The committed Wrangler default remains `false`. Payments still follow escrow's current enabled, paused and held state.
 
 ## Flow: deposit → credit → issue
 1. The buyer signs `intent` {amount}, sends that exact POA amount with the memo `poadomains:<intent>`, then signs `detect` {intent, txid}.

@@ -11,7 +11,7 @@ export const ACCOUNT = "b1c96174cb665cac086ca06434ded1f2";
 export const WORKER = "poadomains-registry";
 export const REPO = "maximusmaximus/poa-domains";
 export const ADDRESS = "poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf";
-export const POLICY = ["POA_ESCROW_ENABLED", "POA_ESCROW_NETWORK_WRITES", "POA_ESCROW_ADDRESS",
+export const POLICY = ["POA_ESCROW_ENABLED", "POA_ESCROW_NETWORK_WRITES", "POA_ESCROW_NEW_NAMES", "POA_ESCROW_ADDRESS",
   "POA_ESCROW_PER_TX", "POA_ESCROW_DAILY", "POA_ESCROW_ENGINE_SHA256", "POA_ESCROW_PARAMS_SHA256"];
 const fail = code => { throw Error(code); };
 export function parseConfig(source) {
@@ -27,6 +27,7 @@ export function productionConfig(config) {
   assert.deepEqual(config.migrations, [{ tag: "v1-sqlite", new_sqlite_classes: ["PoaRegistry"] }]);
   assert.equal(config.vars.POA_ESCROW_ENABLED, "false");
   assert.equal(config.vars.POA_ESCROW_NETWORK_WRITES, "false");
+  assert.equal(config.vars.POA_ESCROW_NEW_NAMES, "false");
   // --keep-vars becomes API keep_bindings:[plain_text,json]. Omitting ALL escrow vars
   // means the server retains them, rather than re-writing an earlier observed value.
   // Secrets are retained by Wrangler's normal deployment; no secret value is fetched.
@@ -39,7 +40,8 @@ export function expectedPolicy(env) {
     return [key, env[key]];
   }));
   if (policy.POA_ESCROW_ENABLED !== "true" || policy.POA_ESCROW_NETWORK_WRITES !== "approved-v1" ||
-      policy.POA_ESCROW_ADDRESS !== ADDRESS) fail("UNSAFE_PRODUCTION_POLICY");
+      policy.POA_ESCROW_NEW_NAMES !== "approved-v1" || policy.POA_ESCROW_ADDRESS !== ADDRESS)
+    fail("UNSAFE_PRODUCTION_POLICY");
   for (const key of ["POA_ESCROW_PER_TX", "POA_ESCROW_DAILY"])
     if (!/^[1-9][0-9]*\.[0-9]{6}$/.test(policy[key])) fail("INVALID_PRODUCTION_LIMIT");
   for (const key of ["POA_ESCROW_ENGINE_SHA256", "POA_ESCROW_PARAMS_SHA256"])
@@ -56,6 +58,14 @@ export function repinPlan(env, expected) {
   if (!/^[0-9a-f]{64}$/.test(engine) || !/^[0-9a-f]{64}$/.test(params)) fail("INVALID_REPIN");
   if (expected && engine === expected.POA_ESCROW_ENGINE_SHA256 && params === expected.POA_ESCROW_PARAMS_SHA256) fail("REPIN_NOOP");
   return { POA_ESCROW_ENGINE_SHA256: engine, POA_ESCROW_PARAMS_SHA256: params };
+}
+// Max-approved POA new-name checkout (t136u, 3:20 PM PT Nov 13 2026). Write the binding only
+// when live does not yet have it; --keep-vars then preserves it on later deploys. A wrong live
+// value is refused by the exact precheck, not overwritten here.
+export function checkoutPlan(expected, liveBindings) {
+  if (expected.POA_ESCROW_NEW_NAMES !== "approved-v1") fail("UNSAFE_PRODUCTION_POLICY");
+  if (!Array.isArray(liveBindings)) fail("MISSING_LIVE_BINDINGS");
+  return liveBindings.some(b => b.name === "POA_ESCROW_NEW_NAMES") ? null : { POA_ESCROW_NEW_NAMES: "approved-v1" };
 }
 // Refuse a repin unless the official network advertises exactly these pins AND the served client hashes to the engine pin.
 // Full 381,139-byte download of client/poa.mjs (Last-Modified 2026-11-12T02:30:51Z) hashed on the box
@@ -88,8 +98,9 @@ export async function assertAdvertised(pins, fetchImpl) {
   if (REPIN_CLIENT_EVIDENCE[pins.POA_ESCROW_ENGINE_SHA256] !== true) fail("REPIN_CLIENT_UNAVAILABLE");
   return "client-hash-from-reviewed-evidence";
 }
-export function assertBindings(bindings, expected) {
+export function assertBindings(bindings, expected, options = {}) {
   if (!Array.isArray(bindings)) fail("MISSING_LIVE_BINDINGS");
+  const allowMissing = options.allowMissing ?? [];
   const map = new Map();
   for (const b of bindings) {
     if (map.has(b.name)) fail("DUPLICATE_LIVE_BINDING");
@@ -99,6 +110,7 @@ export function assertBindings(bindings, expected) {
   }
   for (const key of POLICY) {
     const binding = map.get(key);
+    if (!binding && allowMissing.includes(key)) continue;
     if (binding?.type !== "plain_text" || binding.text !== expected[key]) fail("LIVE_POLICY_MISMATCH:" + key);
   }
   for (const key of ["POA_ESCROW_KEY", "ESCROW_ADMIN_TOKEN"])
@@ -134,7 +146,7 @@ export async function assertGitHub(env, fetchImpl) {
       run.repository?.full_name !== REPO || run.status !== "completed" || run.conclusion !== "success")
     fail("DEPLOY_REQUIRES_CURRENT_GREEN_MAIN");
 }
-export async function liveSnapshot(expected, token, fetchImpl) {
+export async function inspectLive(token, fetchImpl) {
   const base = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/workers/scripts/${WORKER}`;
   const cf = async path => {
     const response = await get(base + path, token, fetchImpl);
@@ -147,8 +159,12 @@ export async function liveSnapshot(expected, token, fetchImpl) {
       !/^[0-9a-f-]{36}$/.test(active.versions[0].version_id)) fail("AMBIGUOUS_LIVE_VERSION");
   const version = await cf(`/versions/${active.versions[0].version_id}`);
   if (version.id !== active.versions[0].version_id) fail("LIVE_VERSION_MISMATCH");
-  assertBindings(settings.bindings, expected); assertBindings(version.resources?.bindings, expected);
-  return `${active.id}:${version.id}`;
+  return { id: `${active.id}:${version.id}`, bindings: settings.bindings, versionBindings: version.resources?.bindings };
+}
+export async function liveSnapshot(expected, token, fetchImpl, options) {
+  const live = await inspectLive(token, fetchImpl);
+  assertBindings(live.bindings, expected, options); assertBindings(live.versionBindings, expected, options);
+  return live.id;
 }
 export function wranglerArgs(configPath, dryRun) {
   return ["node_modules/wrangler/bin/wrangler.js", "deploy", "--config", configPath, "--keep-vars", "--strict",
@@ -162,7 +178,14 @@ export async function runDeployment({ dryRun, env = process.env, fetchImpl = fet
     repin = repinPlan(env, expected);
     if (!env.CLOUDFLARE_API_TOKEN) fail("MISSING_CLOUDFLARE_API_TOKEN");
     await assertGitHub(env, fetchImpl);
-    before = await liveSnapshot(expected, env.CLOUDFLARE_API_TOKEN, fetchImpl); // precheck: live == current pins
+    const pre = await inspectLive(env.CLOUDFLARE_API_TOKEN, fetchImpl);
+    // Precheck keeps current policy exact, but allows the checkout binding to be absent so this
+    // deploy can introduce POA_ESCROW_NEW_NAMES=approved-v1. A wrong present value still fails.
+    assertBindings(pre.bindings, expected, { allowMissing: ["POA_ESCROW_NEW_NAMES"] });
+    assertBindings(pre.versionBindings, expected, { allowMissing: ["POA_ESCROW_NEW_NAMES"] });
+    before = pre.id;
+    const checkout = checkoutPlan(expected, pre.bindings);
+    if (checkout) config.vars = { ...config.vars, ...checkout };
     if (repin) { console.log("REPIN advertised by network-facts; " + await assertAdvertised(repin, fetchImpl)); config.vars = { ...config.vars, ...repin }; }
   }
   const path = resolve(root, `.wrangler-production-${randomUUID()}.json`);
@@ -181,7 +204,7 @@ export async function runDeployment({ dryRun, env = process.env, fetchImpl = fet
     if (!dryRun) {
       // Approval applies to this exact green SHA. Refuse drift during the local dry-run.
       await assertGitHub(env, fetchImpl);
-      if (await liveSnapshot(expected, env.CLOUDFLARE_API_TOKEN, fetchImpl) !== before) fail("LIVE_VERSION_CHANGED");
+      if (await liveSnapshot(expected, env.CLOUDFLARE_API_TOKEN, fetchImpl, { allowMissing: ["POA_ESCROW_NEW_NAMES"] }) !== before) fail("LIVE_VERSION_CHANGED");
       execute(false);
       // Post-check: the new live version carries exactly the expected policy (new pins after a repin).
       const after = { ...expected, ...(repin ?? {}) };

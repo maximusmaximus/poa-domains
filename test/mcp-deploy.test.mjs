@@ -15,6 +15,7 @@ test("first MCP deploy keeps disabled committed defaults, live-binding preservat
   assert.deepEqual(original, copy);
   assert.equal(original.vars.POA_ESCROW_ENABLED, "false");
   assert.equal(original.vars.POA_ESCROW_NETWORK_WRITES, "false");
+  assert.equal(original.vars.POA_ESCROW_NEW_NAMES, "false");
   assert.equal(safe.keep_vars, true);
   assert.ok(Object.keys(safe.vars).every((k) => !k.startsWith("POA_ESCROW_")));
   assert.deepEqual(safe.ratelimits, [
@@ -27,6 +28,7 @@ test("first MCP deploy keeps disabled committed defaults, live-binding preservat
   const live = {
     POA_ESCROW_ENABLED: "true",
     POA_ESCROW_NETWORK_WRITES: "approved-v1",
+    POA_ESCROW_NEW_NAMES: "approved-v1",
     POA_ESCROW_ADDRESS: ADDRESS,
     POA_ESCROW_PER_TX: "250000.000000",
     POA_ESCROW_DAILY: "1000000.000000",

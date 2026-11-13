@@ -101,7 +101,7 @@ Command parameter schemas (all fields required; no extras):
 | `cancel` / `expire` | `auction` |
 | `withdraw` | `amount` (original payer only; no redirect) |
 | `settle` / `repair-title` | `auction`, `transfer` (seller-signed existing registry transfer packet) |
-| `issue` | `name`, `amount`, `registration` (buyer-signed `issueFromTreasury`; **OFF** unless `POA_ESCROW_NEW_NAMES=approved-v1`; see NEW-NAME-CHECKOUT.md) |
+| `issue` | `name`, `amount`, `registration` (buyer-signed `issueFromTreasury`; on when `POA_ESCROW_NEW_NAMES=approved-v1`; see NEW-NAME-CHECKOUT.md) |
 
 Outbid/cancel/expiry create original-payer refund obligations. Pausing or a network
 hold does not erase liabilities. Expiry without executable seller consent refunds
