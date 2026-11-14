@@ -1610,6 +1610,12 @@
       "retryable": false
     },
     {
+      "code": "POA_ONLY",
+      "httpStatus": 409,
+      "message": "This registry is priced in POA. Buy, bid, list and resell names with POA checkout: read /v1/escrow/capabilities. No registry change was made.",
+      "retryable": false
+    },
+    {
       "code": "POLICY_UNSET",
       "httpStatus": 400,
       "message": "Policy unset. Check the documented inputs and current state.",

@@ -229,11 +229,22 @@ export function rootAuctionPolicy(cap, info, asset = "POA") {
     throw Error("🤷 Prices unavailable. Tap 🔄 Refresh first.");
   return { reserve, window: timing.window, quiet: timing.quiet };
 }
+/** Production is POA-only: every price, bid, purchase, resale and refund is POA through POA checkout. */
+export function poaOnlyMode(cap) { return cap?.poaOnly?.status === "on"; }
+/** POA checkout price for a new root name, as the exact 6-decimal string from capabilities. */
+export function poaNewNamePrice(cap, info) {
+  const price = cap?.poaOnly?.newNames?.[info.tier === "premium" ? "premium" : "standard"] ?? cap?.poaNewNamePrices?.[info.tier === "premium" ? "premium" : "standard"];
+  if (typeof price !== "string" || !/^[0-9]+\.[0-9]{6}$/.test(price)) throw Error("🤷 Prices unavailable. Tap 🔄 Refresh first.");
+  return price;
+}
+/** "100.000000" → "100", "0.500000" → "0.5". Display only. */
+export function poaShort(value) { return String(value).replace(/(\.[0-9]*?)0+$/, "$1").replace(/\.$/, ""); }
 export function compactAmount(value) {
   const n = BigInt(value);
   return n >= 1000n && n % 1000n === 0n ? `${n / 1000n}k` : n.toString();
 }
 export function cartMinimum(item, cap, state) {
+  if (item.action === "poaCheckout") return poaNewNamePrice(cap, inspectName(item.name, cap.emojiManifest));
   if (item.action === "announceAuction+bid") return rootAuctionPolicy(cap, inspectName(item.name, cap.emojiManifest), item.asset).reserve;
   if (item.action === "bid") {
     const auction = state?.auctions?.[item.params.auctionId];
@@ -243,6 +254,8 @@ export function cartMinimum(item, cap, state) {
 }
 export function cartSummary(item) {
   const p = item.params;
+  if (item.action === "poaCheckout")
+    return `🪙 Buy "${item.name}" for ${poaShort(item.amount)} POA with POA checkout.`;
   if (item.action === "announceAuction+bid")
     return `Request root auction announcement for "${item.name}" (reserve=${p.reserve} ${registryUnit(item.asset)}) and place opening bid up to maxTotal=${item.amount} ${registryUnit(item.asset)}.`;
   if (item.action === "bid")
@@ -255,6 +268,7 @@ export function cartSummary(item) {
 }
 export function editCartAmount(item, raw, cap, state) {
   const amount = String(raw).trim();
+  if (item.action === "poaCheckout") { if (amount !== item.amount) throw Error(`⚠️ Fixed price is ${poaShort(item.amount)} POA.`); return { ...item }; }
   if (!/^[1-9][0-9]{0,38}$/.test(amount)) throw Error("⚠️ Enter a positive whole-number amount.");
   const minimum = cartMinimum(item, cap, state);
   if (BigInt(amount) < BigInt(minimum)) throw Error(`⚠️ Minimum bid is ${minimum} ${registryUnit(item.asset)}.`);
@@ -280,7 +294,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA } from "./agent-cart.js?v=1c042d35a226";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=f6b94cbcb2f0";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -1212,6 +1226,16 @@ export function cartReview(item, cap, state) {
   try {
     if (!state) throw Error("No state");
     const info = inspectName(item.name, cap.emojiManifest), entry = state.names?.[info.canonical];
+    if (item.action === "poaCheckout") {
+      const price = poaNewNamePrice(cap, info);
+      const conflict = ownershipConflict(state, item.name, cap.emojiManifest, buildOwnershipIndex(cap.emojiOwnership));
+      const auction = entry?.auctionId || Object.values(state.auctions ?? {}).find(a => a.name === item.name && a.status === "live")?.id;
+      if (!poaOnlyMode(cap) || !info.isRoot || entry?.activeId || auction || conflict || cap.reservedCatalog?.split(",").includes(item.name))
+        stop("This name is no longer available. Remove it and check Find again.");
+      if (price !== item.amount) stop(`The POA price is now ${poaShort(price)} POA. Remove it and add it again only if you agree.`);
+      facts = { price, activeId: entry?.activeId ?? null, auction: auction ?? null, conflict };
+      return { signature: JSON.stringify(facts), issues, minimum: price, params: proposed, canAcknowledge: !blocked && !item.validationError };
+    }
     if (item.action === "announceAuction+bid") {
       const policy = rootAuctionPolicy(cap, info, item.asset);
       minimum = policy.reserve; proposed.reserve = minimum; proposed.maxBid = item.amount;
@@ -1281,7 +1305,10 @@ export function buildCartItem(input, cap, state) {
   if (!state) throw Error("Refresh registry data before adding an item.");
   const info = inspectName(input.name, cap.emojiManifest), name = info.canonical, action = input.action;
   let asset, amount, params;
-  if (action === "announceAuction+bid") {
+  if (action === "poaCheckout") {
+    if (!poaOnlyMode(cap) || !info.isRoot) throw Error("Check this name in Find again.");
+    asset = "POA"; amount = poaNewNamePrice(cap, info); params = { name, price: amount };
+  } else if (action === "announceAuction+bid") {
     asset = "POA"; const reserve = rootAuctionPolicy(cap, info).reserve;
     amount = input.amount ?? reserve;
     params = { name, asset, reserve, maxBid: amount, expectedDeedId: null, expectedVersion: 0 };
@@ -1306,7 +1333,7 @@ export function buildCartItem(input, cap, state) {
   return recheckCartItem(item, cap, state);
 }
 
-/** Registry display units are never the native POA currency, even with the legacy wire asset ID. */
+/** Local registry display units (non-production only). Production is POA-only. */
 export const registryUnit = (asset = "POA") => asset === "POA" ? "registry units" : `${asset} registry units`;
 export function unavailableKey(text) { let n=14695981039346656037n; for(const c of text){n=BigInt.asUintN(64,(n^BigInt(c.codePointAt(0)))*1099511628211n);} return n.toString(16).padStart(16,"0"); }
 export function publicNameUnavailable(name,cap) {

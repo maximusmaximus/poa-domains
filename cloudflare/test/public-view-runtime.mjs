@@ -8,7 +8,7 @@ let outbound=0,id=0,calls=0;const mf=new Miniflare(convertV4MiniflareOptions({ho
 async function rpc(host,method,params={}){calls++;const r=await mf.dispatchFetch('https://'+host+'/mcp',{method:'POST',headers:{'content-type':'application/json',accept:'application/json, text/event-stream','mcp-protocol-version':'2025-11-25'},body:JSON.stringify({jsonrpc:'2.0',id:++id,method,params})});assert.equal(r.status,200);return r.json();}
 async function tool(host,name,args={},code){const r=await rpc(host,'tools/call',{name,arguments:args});assert.ok(!r.error,JSON.stringify(r));const d=r.result.structuredContent;if(code){assert.equal(r.result.isError,true);assert.equal(d.code,code);assert.ok(!d.name&&!d.deed&&!d.owner&&!d.intentId);}else assert.equal(r.result.isError,false,JSON.stringify(r));return d;}
 try{for(const host of ['poadomains.grok.me','poadomains-registry.maxinfeld-artshow.workers.dev']){
- const cap=await tool(host,'read_capabilities');assert.equal(cap.livePoA,false);assert.equal(cap.registryUnits.nativePayment,false);
+ const cap=await tool(host,'read_capabilities');assert.equal(cap.livePoA,false);assert.equal(cap.registryUnits,undefined);assert.equal(cap.poaOnly.status,'on');assert.equal(cap.pricing.currency,'POA');assert.ok(!('announceAuction' in cap.actions));
  assert.equal((await rpc(host,'tools/list')).result.tools.length,9);
  const state=await tool(host,'read_state');assert.equal(state.stateHash,snapshot.stateHash);assert.equal(state.state.sequence,16);for(const k of ['names','deeds','auctions','offers','bids','balances','credits','receipts','requests','nonces'])assert.deepEqual(state.state[k],{});
  for(const name of [...HIDDEN.names,'👩🏿‍🦰','child.nexus']){
@@ -17,7 +17,7 @@ try{for(const host of ['poadomains.grok.me','poadomains-registry.maxinfeld-artsh
  for(const key of HIDDEN.receipts)await tool(host,'get_receipt',{id:key},'PUBLIC_RECORD_WITHHELD');
  for(const signer of HIDDEN.accounts)await tool(host,'get_nonce',{signer},'PUBLIC_RECORD_WITHHELD');
  for(const [method,params]of [['resources/read',{uri:'poa://names/nexus'}],['resources/read',{uri:'poa://receipts/'+HIDDEN.receipts[0]}],['prompts/get',{name:'buy_a_domain',arguments:{name:'nexus'}}]]){const r=await rpc(host,method,params);assert.ok(r.error);assert.ok(!JSON.stringify(r).includes(HIDDEN.deeds[0]));}
- const q=await tool(host,'quote_domain',{name:'newpublicname',action:'announceAuction'});assert.equal(q.registryUnits.nativePayment,false);assert.ok(q.params);assert.ok((await tool(host,'build_metadata_witness',{name:'newpublicname'})).cid);
+ const q=await tool(host,'quote_domain',{name:'newpublicname',action:'announceAuction'});assert.equal(q.poaPrice,'100.000000');assert.equal(q.blockedBy,'POA_ONLY');assert.equal(q.params,null);assert.ok((await tool(host,'build_metadata_witness',{name:'newpublicname'})).cid);
  // No signature is manufactured: malformed signed-tool inputs fail before dispatch.
  for(const name of ['simulate_intent','submit_intent']){const r=await rpc(host,'tools/call',{name,arguments:{}});assert.equal(r.error.code,-32602);}
  const after=await tool(host,'read_state');assert.equal(after.stateHash,snapshot.stateHash);

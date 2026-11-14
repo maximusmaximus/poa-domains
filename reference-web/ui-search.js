@@ -1,10 +1,10 @@
-import { publicNameUnavailable } from "./shared.js?v=1c042d35a226";
-import { registryUnit } from "./shared.js?v=1c042d35a226";
-import { ui } from "./ui-state.js?v=1c042d35a226";
-import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=1c042d35a226";
-import { add, el, person, variantOwner } from "./ui-core.js?v=1c042d35a226";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=1c042d35a226";
-import { addToCart } from "./ui-cart.js?v=1c042d35a226";
+import { publicNameUnavailable } from "./shared.js?v=f6b94cbcb2f0";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaShort } from "./shared.js?v=f6b94cbcb2f0";
+import { ui } from "./ui-state.js?v=f6b94cbcb2f0";
+import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=f6b94cbcb2f0";
+import { add, el, person, variantOwner } from "./ui-core.js?v=f6b94cbcb2f0";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=f6b94cbcb2f0";
+import { addToCart } from "./ui-cart.js?v=f6b94cbcb2f0";
 
 export function runSearch(rawQuery, remember = true) {
     if (remember) {
@@ -57,6 +57,11 @@ export function runSearch(rawQuery, remember = true) {
     const liveAuction = entry?.auctionId && s.auctions[entry.auctionId]?.status === "live"
         ? s.auctions[entry.auctionId]
         : Object.values(s.auctions).find((a) => a.name === name && a.status === "live");
+    const poa = poaOnlyMode(ui.cap);
+    if (liveAuction && poa) {
+        add(card, "p", "⏳ Not available right now", "badge");
+        return;
+    }
     if (liveAuction) {
         const minBid = liveAuction.high
             ? minimumNextBid(liveAuction.high.amount, ui.cap.increment)
@@ -102,7 +107,7 @@ export function runSearch(rawQuery, remember = true) {
             !o.cancelled &&
             o.uses < o.maxUses &&
             s.time < o.validUntil);
-        if (resaleOffer) {
+        if (resaleOffer && !poa) {
             add(card, "p", `💰 For sale: ${resaleOffer.price} ${registryUnit(resaleOffer.asset)} (until ${formatClock(resaleOffer.validUntil)}) — Active fixed-price resale listing: ${resaleOffer.price} ${registryUnit(resaleOffer.asset)}`, "badge-ok");
             const btn = add(card, "button", "Add to cart", "small");
             btn.id = "addToCartBtn";
@@ -131,6 +136,10 @@ export function runSearch(rawQuery, remember = true) {
                 s.time < o.validUntil &&
                 (o.labels === null || o.labels.includes(info.childLabel)))
             : null;
+        if (poa) {
+            add(card, "p", "⚪ Subnames aren't for sale right now", "badge");
+            return;
+        }
         if (childOffer) {
             const nextGen = (entry?.generation ?? 0) + 1;
             add(card, "p", `🟢 Child offer open (${childOffer.price} ${registryUnit(childOffer.asset)})`, "badge-ok");
@@ -149,6 +158,20 @@ export function runSearch(rawQuery, remember = true) {
         else {
             add(card, "p", "⚪ Child not minted — no open offer", "badge");
         }
+        return;
+    }
+    if (poa) {
+        let price;
+        try { price = poaNewNamePrice(ui.cap, info); }
+        catch (error) { add(card, "p", error.message, "badge-warn"); return; }
+        add(card, "p", "🟢 Available", "badge-ok");
+        add(card, "p", `🪙 ${poaShort(price)} POA`, "badge-ok");
+        add(card, "p", `Yours forever for ${poaShort(price)} POA. Your agent pays with POA checkout after you approve. Nothing is paid here.`).setAttribute("data-info-description", "");
+        const btn = add(card, "button", "Add to cart", "small");
+        btn.id = "addToCartBtn";
+        btn.type = "button";
+        btn.setAttribute("aria-label", `Add ${name} to cart for ${poaShort(price)} POA`);
+        btn.addEventListener("click", () => addToCart({ name, action: "poaCheckout" }));
         return;
     }
     let pricing;

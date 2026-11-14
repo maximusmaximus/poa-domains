@@ -1082,6 +1082,10 @@ HTTP 400; retryable: false. Permanent deed. Check the documented inputs and curr
 
 HTTP 400; retryable: false. Permanent ownership only. Check the documented inputs and current state.
 
+## POA_ONLY
+
+HTTP 409; retryable: false. This registry is priced in POA. Buy, bid, list and resell names with POA checkout: read /v1/escrow/capabilities. No registry change was made.
+
 ## POLICY_UNSET
 
 HTTP 400; retryable: false. Policy unset. Check the documented inputs and current state.
