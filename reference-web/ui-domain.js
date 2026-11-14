@@ -1,11 +1,11 @@
-import { publicNameUnavailable, unavailableKey } from "./shared.js?v=1c042d35a226";
-import { registryUnit } from "./shared.js?v=1c042d35a226";
-import { actionLabel } from "./ui-copy.js?v=1c042d35a226";
-import { ui } from "./ui-state.js?v=1c042d35a226";
-import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=1c042d35a226";
-import { add, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=1c042d35a226";
-import { nameLink, ownerLink } from "./ui-router.js?v=1c042d35a226";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=1c042d35a226";
+import { publicNameUnavailable, unavailableKey } from "./shared.js?v=f6b94cbcb2f0";
+import { registryUnit, poaOnlyMode } from "./shared.js?v=f6b94cbcb2f0";
+import { actionLabel } from "./ui-copy.js?v=f6b94cbcb2f0";
+import { ui } from "./ui-state.js?v=f6b94cbcb2f0";
+import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=f6b94cbcb2f0";
+import { add, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=f6b94cbcb2f0";
+import { nameLink, ownerLink } from "./ui-router.js?v=f6b94cbcb2f0";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=f6b94cbcb2f0";
 
 export function renderDomainPage(name) {
     if (!ui.latestState || !name)
@@ -33,16 +33,17 @@ export function renderDomainPage(name) {
     else {
         ownerNode.textContent = "No owner yet";
     }
+    const poa = poaOnlyMode(ui.cap);
     const listingBox = el("domainListing");
-    listingBox.hidden = !view.listing;
+    listingBox.hidden = !view.listing || poa;
     listingBox.replaceChildren();
-    if (view.listing) {
+    if (view.listing && !poa) {
         add(listingBox, "p", `💰 Listed for ${view.listing.price} ${registryUnit(view.listing.asset)}`, "badge-ok");
         add(listingBox, "p", `Until ${formatClock(view.listing.validUntil)} · offer ${view.listing.id.slice(0, 18)}…`);
     }
     const actions = el("domainActions");
     actions.replaceChildren();
-    if (view.auction && view.auction.status === "live" && view.auctionBucket === "current") {
+    if (!poa && view.auction && view.auction.status === "live" && view.auctionBucket === "current") {
         const minBid = view.auction.high
             ? minimumNextBid(view.auction.high.amount, ui.cap.increment)
             : view.auction.reserve;
@@ -58,7 +59,7 @@ export function renderDomainPage(name) {
             setFloatingCartOpen(true);
         });
     }
-    if (view.listing && view.listing.asset === "POA") {
+    if (!poa && view.listing && view.listing.asset === "POA") {
         const buyBtn = add(actions, "button", `🛒 Buy ${view.listing.price} registry units`);
         buyBtn.type = "button";
         buyBtn.addEventListener("click", () => {
@@ -72,7 +73,7 @@ export function renderDomainPage(name) {
         });
     }
     if (view.status === "available") {
-        const startBtn = add(actions, "button", "🟢 Start auction (add to cart)");
+        const startBtn = add(actions, "button", poa ? "🛒 Add to cart" : "🟢 Start auction (add to cart)");
         startBtn.type = "button";
         startBtn.addEventListener("click", () => {
             addDetailToCart({ name, kind: "available" });
@@ -81,6 +82,8 @@ export function renderDomainPage(name) {
     }
     const tools = el("domainOwnerTools");
     tools.hidden = !view.deed;
+    if (el("poaSellTools")) el("poaSellTools").hidden = !poa;
+    if (el("unitSellTools")) el("unitSellTools").hidden = poa;
     el("listingPromptStatus").textContent = "";
     if (view.listing?.price)
         el("listPriceInput").value = view.listing.price;
@@ -117,7 +120,7 @@ export function renderOwnerPage(ownerId) {
         nameLink(h, n.name);
         add(card, "p", d.rights.kind, "badge");
     }
-    const listings = activeResaleOffers(ui.latestState).filter((x) => x.offer.owner === ownerId && x.asset === "POA");
+    const listings = poaOnlyMode(ui.cap) ? [] : activeResaleOffers(ui.latestState).filter((x) => x.offer.owner === ownerId && x.asset === "POA");
     if (!listings.length)
         add(listBox, "p", "No active listings", "muted");
     for (const row of listings) {
