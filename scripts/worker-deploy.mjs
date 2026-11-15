@@ -13,6 +13,9 @@ export const REPO = "maximusmaximus/poa-domains";
 export const ADDRESS = "poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf";
 export const POLICY = ["POA_ESCROW_ENABLED", "POA_ESCROW_NETWORK_WRITES", "POA_ESCROW_NEW_NAMES", "POA_ESCROW_ADDRESS",
   "POA_ESCROW_PER_TX", "POA_ESCROW_DAILY", "POA_ESCROW_ENGINE_SHA256", "POA_ESCROW_PARAMS_SHA256"];
+// Optional reviewed escrow switches: absent means OFF. When present live, the value must equal the
+// production environment variable exactly, so a later deploy never silently keeps or drops it.
+export const OPTIONAL_SWITCHES = ["POA_ESCROW_SUBNAMES"];
 const fail = code => { throw Error(code); };
 export function parseConfig(source) {
   const errors = [];
@@ -28,6 +31,7 @@ export function productionConfig(config) {
   assert.equal(config.vars.POA_ESCROW_ENABLED, "false");
   assert.equal(config.vars.POA_ESCROW_NETWORK_WRITES, "false");
   assert.equal(config.vars.POA_ESCROW_NEW_NAMES, "false");
+  assert.equal(config.vars.POA_ESCROW_SUBNAMES, "false");
   // --keep-vars becomes API keep_bindings:[plain_text,json]. Omitting ALL escrow vars
   // means the server retains them, rather than re-writing an earlier observed value.
   // Secrets are retained by Wrangler's normal deployment; no secret value is fetched.
@@ -47,6 +51,32 @@ export function expectedPolicy(env) {
   for (const key of ["POA_ESCROW_ENGINE_SHA256", "POA_ESCROW_PARAMS_SHA256"])
     if (!/^[0-9a-f]{64}$/.test(policy[key])) fail("INVALID_PRODUCTION_PIN");
   return policy;
+}
+/** Optional switches from the production environment: unset => OFF; the only ON value is approved-v1. */
+export function expectedSwitches(env) {
+  return Object.fromEntries(OPTIONAL_SWITCHES.map(key => {
+    const v = env[key] ?? "";
+    if (v !== "" && v !== "approved-v1") fail("INVALID_PRODUCTION_SWITCH:" + key);
+    return [key, v || null];
+  }));
+}
+// POA subname sales (Max t140s1306): write the switch only when the environment turns it on and live
+// does not have it yet. Turning it off again is a separate reviewed change, so a live switch without the
+// matching environment value is refused by assertSwitches instead of being dropped here.
+export function switchesPlan(switches, liveBindings) {
+  if (!Array.isArray(liveBindings)) fail("MISSING_LIVE_BINDINGS");
+  const plan = {};
+  for (const [key, value] of Object.entries(switches))
+    if (value && !liveBindings.some(b => b.name === key)) plan[key] = value;
+  return Object.keys(plan).length ? plan : null;
+}
+export function assertSwitches(bindings, switches, options = {}) {
+  if (!Array.isArray(bindings)) fail("MISSING_LIVE_BINDINGS");
+  for (const key of OPTIONAL_SWITCHES) {
+    const live = bindings.find(b => b.name === key), want = switches[key] ?? null;
+    if (!live) { if (want && !options.allowMissingOn) fail("LIVE_SWITCH_MISMATCH:" + key); continue; }
+    if (live.type !== "plain_text" || live.text !== want) fail("LIVE_SWITCH_MISMATCH:" + key);
+  }
 }
 export const NETWORK_FACTS = "https://minepoa.com/chain/poa-mainnet-1/api/network-facts";
 export const NETWORK_CLIENT = "https://minepoa.com/chain/poa-mainnet-1/client/poa.mjs";
@@ -111,7 +141,7 @@ export function assertBindings(bindings, expected, options = {}) {
   for (const b of bindings) {
     if (map.has(b.name)) fail("DUPLICATE_LIVE_BINDING");
     map.set(b.name, b);
-    if (b.name?.startsWith("POA_ESCROW_") && !POLICY.includes(b.name) && b.name !== "POA_ESCROW_KEY")
+    if (b.name?.startsWith("POA_ESCROW_") && !POLICY.includes(b.name) && !OPTIONAL_SWITCHES.includes(b.name) && b.name !== "POA_ESCROW_KEY")
       fail("UNREVIEWED_ESCROW_BINDING");
   }
   for (const key of POLICY) {
@@ -170,6 +200,7 @@ export async function inspectLive(token, fetchImpl) {
 export async function liveSnapshot(expected, token, fetchImpl, options) {
   const live = await inspectLive(token, fetchImpl);
   assertBindings(live.bindings, expected, options); assertBindings(live.versionBindings, expected, options);
+  if (options?.switches) { assertSwitches(live.bindings, options.switches, options); assertSwitches(live.versionBindings, options.switches, options); }
   return live.id;
 }
 export function wranglerArgs(configPath, dryRun) {
@@ -178,9 +209,9 @@ export function wranglerArgs(configPath, dryRun) {
 }
 export async function runDeployment({ dryRun, env = process.env, fetchImpl = fetch, run = spawnSync, root = process.cwd() }) {
   const config = productionConfig(parseConfig(readFileSync(resolve(root, "wrangler.jsonc"), "utf8")));
-  let expected, before, repin = null;
+  let expected, before, repin = null, switches = null;
   if (!dryRun) {
-    expected = expectedPolicy(env);
+    expected = expectedPolicy(env); switches = expectedSwitches(env);
     repin = repinPlan(env, expected);
     if (!env.CLOUDFLARE_API_TOKEN) fail("MISSING_CLOUDFLARE_API_TOKEN");
     await assertGitHub(env, fetchImpl);
@@ -189,9 +220,12 @@ export async function runDeployment({ dryRun, env = process.env, fetchImpl = fet
     // deploy can introduce POA_ESCROW_NEW_NAMES=approved-v1. A wrong present value still fails.
     assertBindings(pre.bindings, expected, { allowMissing: ["POA_ESCROW_NEW_NAMES"] });
     assertBindings(pre.versionBindings, expected, { allowMissing: ["POA_ESCROW_NEW_NAMES"] });
+    assertSwitches(pre.bindings, switches, { allowMissingOn: true }); assertSwitches(pre.versionBindings, switches, { allowMissingOn: true });
     before = pre.id;
     const checkout = checkoutPlan(expected, pre.bindings);
     if (checkout) config.vars = { ...config.vars, ...checkout };
+    const optional = switchesPlan(switches, pre.bindings);
+    if (optional) config.vars = { ...config.vars, ...optional };
     if (repin) { console.log("REPIN advertised by network-facts; " + await assertAdvertised(repin, fetchImpl)); config.vars = { ...config.vars, ...repin }; }
   }
   const path = resolve(root, `.wrangler-production-${randomUUID()}.json`);
@@ -210,12 +244,12 @@ export async function runDeployment({ dryRun, env = process.env, fetchImpl = fet
     if (!dryRun) {
       // Approval applies to this exact green SHA. Refuse drift during the local dry-run.
       await assertGitHub(env, fetchImpl);
-      if (await liveSnapshot(expected, env.CLOUDFLARE_API_TOKEN, fetchImpl, { allowMissing: ["POA_ESCROW_NEW_NAMES"] }) !== before) fail("LIVE_VERSION_CHANGED");
+      if (await liveSnapshot(expected, env.CLOUDFLARE_API_TOKEN, fetchImpl, { allowMissing: ["POA_ESCROW_NEW_NAMES"], switches, allowMissingOn: true }) !== before) fail("LIVE_VERSION_CHANGED");
       execute(false);
       // Post-check: the new live version carries exactly the expected policy (new pins after a repin).
       const after = { ...expected, ...(repin ?? {}) };
       for (let attempt = 1; ; attempt++) {
-        try { await liveSnapshot(after, env.CLOUDFLARE_API_TOKEN, fetchImpl); break; }
+        try { await liveSnapshot(after, env.CLOUDFLARE_API_TOKEN, fetchImpl, { switches }); break; }
         catch (e) { if (attempt >= 6) throw e; await new Promise(r => setTimeout(r, env.DEPLOY_POSTCHECK_DELAY_MS === "0" ? 0 : 5000)); }
       }
     }

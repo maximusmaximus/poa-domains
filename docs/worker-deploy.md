@@ -194,3 +194,11 @@ and clears that halt in one journal entry (`reviewed-credit`). It refuses, with 
 halt code, intent, sender, amount, memo, PoA finality, a fresh aligned cut and the exact wallet
 balance all match. It runs once, never changes pause, and keeps the quarantine record as history.
 It needs fresh network reads, so it only works after the repin.
+
+## POA subname sales switch
+
+`POA_ESCROW_SUBNAMES` is off unless the production environment variable is set to `approved-v1`
+(the committed Wrangler default stays `false` and is never sent). Subname sales use the existing escrow
+fee (`feeBps`). When the variable is set, the next gated deploy writes only that binding and post-checks
+it. A live binding without the matching environment value is refused before any deploy; turning it off
+again is a separate reviewed change.
