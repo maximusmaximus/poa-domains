@@ -4,7 +4,7 @@ import { marketView, publicCommand } from "./escrow-public.js";
 import { registryTitles } from "./escrow-titles.js";
 import { DurableObject } from "cloudflare:workers";
 import { createPrivateKey, generateKeyPairSync, KeyObject } from "node:crypto";
-import { Escrow, Policy, SQLiteEscrowJournal, EscrowArchive, exportEscrow, restoreEscrow, replay as replayEscrow } from "./escrow.js";
+import { Escrow, Policy, SQLiteEscrowJournal, EscrowArchive, exportEscrow, restoreEscrow, reviewedCredit, replay as replayEscrow } from "./escrow.js";
 import { WorkerSecretSigner, verifyCommand, digest } from "./escrow-codec.js";
 import { PoaHttpNetwork, MAINNET_ENGINE_SHA256, MAINNET_PARAMS_SHA256, PILOT_PER_TX, PILOT_DAILY } from "./escrow-network.js";
 import { nativePrincipal } from "../src/auth.js";
@@ -215,7 +215,7 @@ export class PoaRegistry extends DurableObject<Env> {
   async escrowAdmin(packetText: string): Promise<RegistryReply> {
     try {
       need(String(this.env.POA_ESCROW_ENABLED) === "true", "ESCROW_DISABLED");
-      const value = parseJSON(packetText), v = exact(value, ["action"], ["packet", "paused"]), escrow = this.escrow();
+      const value = parseJSON(packetText), v = exact(value, ["action"], ["packet", "paused", "review"]), escrow = this.escrow();
       if (String(this.env.POA_ESCROW_NETWORK_WRITES) === "approved-v1") await this.ctx.storage.setAlarm(Date.now() + 60000);
       switch (v.action) {
         case "status": exact(value, ["action"]); return { status: 200, jsonText: JSON.stringify(escrow.state()) };
@@ -223,6 +223,7 @@ export class PoaRegistry extends DurableObject<Env> {
         case "reconcile": exact(value, ["action"]); await escrow.reconcile(); break;
         case "tick": exact(value, ["action"]); await escrow.tick(); break;
         case "rebroadcast": exact(value, ["action"]); await escrow.rebroadcast(); break;
+        case "credit-reviewed": exact(value, ["action", "review"]); await escrow.creditReviewed(reviewedCredit(v.review)); break;
         case "command": exact(value, ["action", "packet"]); await escrow.command(verifyCommand(v.packet, this.engine.registryId, Math.floor(Date.now()/1000))); break;
         default: need(false, "ESCROW_ACTION");
       }

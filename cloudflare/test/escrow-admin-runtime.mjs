@@ -49,6 +49,8 @@ try{
  await call(mf,"top-level duplicate key rejected before serialization",{body:'{"action":"status","action":"reconcile"}'},400,"DUPLICATE_KEY");
  await call(mf,"nested duplicate key rejected before serialization",{body:'{"action":"command","packet":{"command":{"action":"x","action":"y"},"signature":"1"}}'},400,"DUPLICATE_KEY");
  await call(mf,"invalid action reaches DO validation, not 404",{body:'{"action":"invalid"}'},409,"ESCROW_ACTION");
+await call(mf,"reviewed credit needs a committed review id",{body:'{"action":"credit-reviewed","review":"other"}'},409,"ESCROW_REVIEW");
+await call(mf,"reviewed credit refuses when escrow is not held with that halt",{body:'{"action":"credit-reviewed","review":"dt1-deposit-2026-11-13"}'},409,"ESCROW_REVIEW_STATE");
  stale=true;await call(mf,"24-hour-old source still holds reconcile",{body:'{"action":"reconcile"}'},409,"ESCROW_NETWORK_HELD");stale=false;
  redirect=true;await call(mf,"redirect is held, never followed",{body:'{"action":"reconcile"}'},409,"ESCROW_NETWORK_HELD");redirect=false;
  await call(mf,"fresh reconcile recovers without clearing or bypassing a hold",{body:'{"action":"reconcile"}'});

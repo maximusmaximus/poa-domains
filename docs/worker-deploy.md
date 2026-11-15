@@ -182,3 +182,15 @@ paused/held behavior.
 | Variable | Expected value |
 | --- | --- |
 | `POA_ESCROW_NEW_NAMES` | `approved-v1` |
+
+## Reviewed deposit credit
+
+Approved by Max on Nov 14 2026 (t140s1299). DT1's 1 POA deposit
+`e0c05f6b24f5bcd85abacb078ada23367fc5b98eeec35088b73d2d6f84585123` to its own intent
+`659ff32af83914966fa9f16edf23a21857aafca06b50a16d8d4e092f55d0a9fc` reached the escrow wallet while
+escrow was held, so reconcile quarantined with `ASSET_LIABILITY_MISMATCH`. The authenticated admin
+action `{"action":"credit-reviewed","review":"dt1-deposit-2026-11-13"}` credits exactly that deposit
+and clears that halt in one journal entry (`reviewed-credit`). It refuses, with no write, unless the
+halt code, intent, sender, amount, memo, PoA finality, a fresh aligned cut and the exact wallet
+balance all match. It runs once, never changes pause, and keeps the quarantine record as history.
+It needs fresh network reads, so it only works after the repin.

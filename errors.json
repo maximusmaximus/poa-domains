@@ -722,6 +722,30 @@
       "retryable": false
     },
     {
+      "code": "ESCROW_REVIEW",
+      "httpStatus": 409,
+      "message": "Escrow review. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_REVIEW_INTENT",
+      "httpStatus": 409,
+      "message": "Escrow review intent. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_REVIEW_STATE",
+      "httpStatus": 409,
+      "message": "Escrow review state. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_REVIEW_USED",
+      "httpStatus": 409,
+      "message": "Escrow review used. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
       "code": "ESCROW_ROUTE",
       "httpStatus": 404,
       "message": "Escrow route. Check the documented inputs and current state.",

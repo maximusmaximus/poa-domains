@@ -36,6 +36,23 @@ export interface TitleStore {
   validateIssue?(packet: Packet, name: string, buyer: string, price: string): void;
   issue?(packet: Packet): void;
 }
+/** One owner-reviewed credit for a deposit that arrived while escrow was held.
+ * Bound to one exact txid, sender, amount and intent; usable once; never pauses or unpauses. */
+export interface ReviewedCredit { id: string; txid: string; from: string; amount: string; intent: string; halt: string; }
+/** Reviewed by Max (t140s1299, Nov 14 2026): DT1's 1 POA deposit to its own intent, received while held. */
+export const REVIEWED_CREDITS: Readonly<Record<string, ReviewedCredit>> = Object.freeze({
+  "dt1-deposit-2026-11-13": Object.freeze({
+    id: "dt1-deposit-2026-11-13",
+    txid: "e0c05f6b24f5bcd85abacb078ada23367fc5b98eeec35088b73d2d6f84585123",
+    from: "poa15kUYz7V59rd1zY12bp1Kvnx5HWjYhTeS6o74uu9KUXCC",
+    amount: "1.000000",
+    intent: "659ff32af83914966fa9f16edf23a21857aafca06b50a16d8d4e092f55d0a9fc",
+    halt: "ASSET_LIABILITY_MISMATCH",
+  }),
+});
+export function reviewedCredit(id: unknown): ReviewedCredit {
+  const key = text(id, 80); need(Object.hasOwn(REVIEWED_CREDITS, key), "ESCROW_REVIEW"); return REVIEWED_CREDITS[key]!;
+}
 export interface Policy { wallet: string; treasury: string; perTx: string; daily: string; feeBps: number; maxAgeMs: number; }
 type PayStatus = "READY" | "SIGNED" | "UNKNOWN" | "FINAL";
 export interface Payment {
@@ -54,6 +71,8 @@ export interface State {
   available: Record<string,string>; deposits: Record<string,Deposit>; credited: Record<string,Transfer>;
   auctions: Record<string,Auction>; payments: Record<string,Payment>; settlements: Record<string,Settlement>;
   requests: Record<string,{ fingerprint: string; result: unknown }>;
+  /** Owner-reviewed one-shot credits (absent in older journals). */
+  reviews?: Record<string,{ txid: string; intent: string; height: number; root: string; observed: string; at: number }>;
 }
 export interface Entry { sequence: number; previous: string; event: string; payload: unknown; state: State; checksum: string; }
 export interface Journal { load(): State; append(event: string, payload: unknown, change: (s: State) => void): State; }
@@ -247,6 +266,46 @@ export class Escrow {
     }
     invariant(s);
   }
+  /** Owner-reviewed one-shot credit, then clear the matching halt only if the wallet now reconciles exactly.
+   * Fails closed (no journal write) on any mismatch: halt code, intent, txid, sender, amount, memo,
+   * finality, cut alignment or balance. Pause state is never changed. */
+  creditReviewed(r: ReviewedCredit): Promise<State> { return this.serial(async()=>{
+    need(this.enabled(),"ESCROW_DISABLED");
+    exact(r,["id","txid","from","amount","intent","halt"]); text(r.id,80);
+    need(/^[0-9a-f]{64}$/.test(r.txid) && /^[0-9a-f]{64}$/.test(r.intent) && micros(r.amount)>0n && /^[A-Z_]+$/.test(r.halt),"ESCROW_REVIEW");
+    need(address(r.from)!==this.policy.wallet,"ESCROW_SELF_DEPOSIT");
+    const check=(s:State)=>{
+      need(!s.reviews?.[r.id],"ESCROW_REVIEW_USED");
+      need(s.halt===r.halt,"ESCROW_REVIEW_STATE");
+      const dep=s.deposits[r.intent];
+      need(!!dep && dep.payer===r.from && dep.amount===r.amount && !dep.tx,"ESCROW_REVIEW_INTENT");
+      need(!s.credited[r.txid],"ESCROW_DEPOSIT_DUPLICATE");
+    };
+    check(this.state());
+    const status=await this.fresh();
+    const o=await this.network.lookup(r.txid); need(o,"ESCROW_UNKNOWN_DEPOSIT"); this.final(o,r.txid);
+    need(o.body.to===this.policy.wallet && o.body.from===r.from && o.body.amount===r.amount && o.body.memo===`poadomains:${r.intent}`,"ESCROW_DEPOSIT_BINDING");
+    const s=this.state(); check(s);
+    need(!Object.values(s.credited).some(b=>(b.from===o.body.from&&b.nonce===o.body.nonce)||b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
+    // Reconcile as if this one deposit were credited. Anything else unexplained keeps the halt.
+    const ids=[...Object.keys(s.credited),r.txid,...Object.values(s.payments).flatMap(p=>p.txid?[p.txid]:[])];
+    const cut=await this.network.cut(this.policy.wallet,ids,status);
+    need(cut.chain===CHAIN && cut.height===status.height && cut.root===status.root,"ESCROW_UNALIGNED_CUT");
+    need(new Set(cut.covered).size===cut.covered.length && cut.covered.every(id=>ids.includes(id)) && cut.covered.includes(r.txid),"ESCROW_CUT");
+    let expected=micros(r.amount);
+    for(const [id,b] of Object.entries(s.credited)) if(cut.covered.includes(id)) expected+=micros(b.amount);
+    for(const p of Object.values(s.payments)) if(p.txid && cut.covered.includes(p.txid)) expected-=BigInt(p.amount);
+    need(expected===micros(cut.balance),"ESCROW_RECONCILIATION_MISMATCH");
+    this.journal.append("reviewed-credit",{review:r.id,txid:r.txid,intent:r.intent,height:cut.height,root:cut.root,observed:cut.balance},next=>{
+      need(this.enabled(),"ESCROW_DISABLED"); check(next);
+      const d=next.deposits[r.intent]!; d.tx=r.txid; next.credited[r.txid]=o.body;
+      next.assets=String(BigInt(next.assets)+micros(r.amount));
+      next.available[r.from]=String(BigInt(next.available[r.from]??"0")+micros(r.amount));
+      (next.reviews??={})[r.id]={txid:r.txid,intent:r.intent,height:cut.height,root:cut.root,observed:cut.balance,at:this.now()};
+      next.halt=null;
+    });
+    return this.state();
+  }); }
   private validateCommand(c:Command): void {
     const p=obj(c.params);
     switch(c.action){

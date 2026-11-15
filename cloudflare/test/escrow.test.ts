@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { sign, verify, createPublicKey, createPrivateKey } from "node:crypto";
 import { base58 } from "../../src/native-crypto.js";
 import { canonical } from "../../src/core.js";
-import { Escrow, PILOT_ADMISSION_LIMIT, PILOT_JOURNAL_LIMIT, invariant, nextEntry, recoveryReserve, replay } from "../escrow.js";
+import { Escrow, PILOT_ADMISSION_LIMIT, PILOT_JOURNAL_LIMIT, REVIEWED_CREDITS, invariant, nextEntry, recoveryReserve, replay, reviewedCredit } from "../escrow.js";
 import { CHAIN, WorkerSecretSigner, digest, micros, decimal, txid, verifyCommand, verifyTransfer } from "../escrow-codec.js";
 import { PoaHttpNetwork, MAINNET_ENGINE_SHA256, MAINNET_PARAMS_SHA256, PILOT_PER_TX, PILOT_DAILY } from "../escrow-network.js";
 import { MockNetwork, MemoryJournal, policy, who, key, seed, signer, command, depositBody, root, parents } from "./escrow-fixture.js";
@@ -730,4 +730,60 @@ test("locked PoA chain status holds as ESCROW_NODE_AUTH, not a misleading identi
  }) as typeof fetch;
  await assert.rejects(new PoaHttpNetwork(()=>false,request).status(),/ESCROW_NODE_AUTH/);
  await assert.rejects(new PoaHttpNetwork(()=>false,request).displayStatus(),/ESCROW_NODE_AUTH/);
+});
+
+// Owner-reviewed one-shot credit (Max t140s1299): a deposit that arrived while held, then clear the halt.
+async function heldDeposit(attestations=5,covered=true){
+ const f=fixture();await fund(f);
+ const r=await f.e.command(command(who(4),"intent-held","intent",{amount:"1.000000"})) as any;
+ const id=f.net.add(depositBody(4,policy.wallet,"1.000000",r.intent),attestations,covered);
+ // The wallet holds 1 POA nobody credited: reconcile quarantines with ASSET_LIABILITY_MISMATCH.
+ f.net.mismatch=micros("1.000000");await assert.rejects(f.e.reconcile(),/MISMATCH/);f.net.mismatch=0n;
+ assert.equal(f.e.state().halt,"ASSET_LIABILITY_MISMATCH");
+ return {f,review:{id:"held-1",txid:id,from:who(4),amount:"1.000000",intent:r.intent,halt:"ASSET_LIABILITY_MISMATCH"}};
+}
+test("reviewed credit: credits the exact held deposit, clears the halt, keeps pause, and cannot be reused",async()=>{
+ const {f,review}=await heldDeposit();const before=f.e.state();
+ const s=await f.e.creditReviewed(review);
+ assert.equal(s.halt,null);assert.equal(s.paused,before.paused);
+ assert.equal(s.deposits[review.intent]!.tx,review.txid);assert.ok(s.credited[review.txid]);
+ assert.equal(s.available[who(4)],"1000000");assert.equal(BigInt(s.assets),BigInt(before.assets)+1000000n);
+ assert.equal(s.reviews![review.id]!.txid,review.txid);
+ assert.deepEqual(Object.keys(s.quarantine),Object.keys(before.quarantine),"the quarantine record stays as history");
+ assert.equal(f.journal.rows.at(-1)!.event,"reviewed-credit");
+ await assert.rejects(f.e.creditReviewed(review),/ESCROW_REVIEW_USED/);
+ await assert.rejects(f.e.creditReviewed({...review,id:"held-2"}),/ESCROW_REVIEW_STATE/,"a second id cannot run once the halt is gone");
+ await f.e.reconcile();assert.equal(f.e.state().halt,null,"the wallet now reconciles");
+ replay(f.journal.rows,policy);
+});
+test("reviewed credit fails closed on any fact that does not match, with no journal write",async()=>{
+ const {f,review}=await heldDeposit();const rows=f.journal.rows.length;
+ const other=f.net.add(depositBody(3,policy.wallet,"1.000000","x".repeat(64),9));
+ for(const [bad,code] of [
+  [{amount:"2.000000"},/ESCROW_REVIEW_INTENT/],[{from:who(3)},/ESCROW_REVIEW_INTENT/],[{intent:"0".repeat(64)},/ESCROW_REVIEW_INTENT/],
+  [{txid:other},/ESCROW_DEPOSIT_BINDING/],[{txid:"f".repeat(64)},/ESCROW_UNKNOWN_DEPOSIT/],[{halt:"ESCROW_OTHER"},/ESCROW_REVIEW_STATE/],
+  [{txid:"nothex"},/ESCROW_REVIEW/],[{extra:1},/./]] as const)
+  await assert.rejects(f.e.creditReviewed({...review,...bad} as any),code,JSON.stringify(bad));
+ f.net.mismatch=micros("0.500000");await assert.rejects(f.e.creditReviewed(review),/ESCROW_RECONCILIATION_MISMATCH/,"other unexplained funds keep the halt");f.net.mismatch=0n;
+ f.net.badCut=true;await assert.rejects(f.e.creditReviewed(review),/ESCROW_UNALIGNED_CUT/);f.net.badCut=false;
+ assert.equal(f.journal.rows.length,rows);assert.equal(f.e.state().halt,"ASSET_LIABILITY_MISMATCH");
+ f.disable();await assert.rejects(f.e.creditReviewed(review),/ESCROW_DISABLED/);
+});
+test("reviewed credit needs PoA finality and a fresh network read",async()=>{
+ { const {f,review}=await heldDeposit(1,false);const rows=f.journal.rows.length;
+   await assert.rejects(f.e.creditReviewed(review),/ESCROW_NOT_FINAL/);assert.equal(f.journal.rows.length,rows); }
+ const {f,review}=await heldDeposit();const rows=f.journal.rows.length;
+ f.net.stale=true;await assert.rejects(f.e.creditReviewed(review),/ESCROW_(STALE|NETWORK_HELD)/);f.net.stale=false;
+ f.net.down=true;await assert.rejects(f.e.creditReviewed(review),/ESCROW_NETWORK_HELD/);f.net.down=false;
+ assert.equal(f.journal.rows.length,rows);
+ await f.e.creditReviewed(review);assert.equal(f.e.state().halt,null);
+});
+test("committed reviewed credit is exactly DT1's 1 POA deposit to its own intent",()=>{
+ assert.deepEqual(Object.keys(REVIEWED_CREDITS),["dt1-deposit-2026-11-13"]);
+ const r=reviewedCredit("dt1-deposit-2026-11-13");
+ assert.equal(r.txid,"e0c05f6b24f5bcd85abacb078ada23367fc5b98eeec35088b73d2d6f84585123");
+ assert.equal(r.from,"poa15kUYz7V59rd1zY12bp1Kvnx5HWjYhTeS6o74uu9KUXCC");
+ assert.equal(r.amount,"1.000000");assert.equal(r.intent,"659ff32af83914966fa9f16edf23a21857aafca06b50a16d8d4e092f55d0a9fc");
+ assert.equal(r.halt,"ASSET_LIABILITY_MISMATCH");assert.ok(Object.isFrozen(r)&&Object.isFrozen(REVIEWED_CREDITS));
+ for(const id of ["__proto__","constructor","toString","",1])assert.throws(()=>reviewedCredit(id),/ESCROW_REVIEW|./);
 });
