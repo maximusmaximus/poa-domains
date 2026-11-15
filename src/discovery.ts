@@ -27,7 +27,7 @@ export const GATEWAY_ROUTES = Object.freeze([
   ["POST", "/v1/search-log"],
   ["GET", "/v1/network-status"],
   ["HEAD", "/v1/network-status"],
-  ...["capabilities", "market", "domain", "intent"].map((p) => [
+  ...["capabilities", "market", "domain", "subnames", "intent"].map((p) => [
     "GET",
     "/v1/escrow/" + p,
   ]),
@@ -184,6 +184,8 @@ function params(method: string, path: string): any[] {
       }),
       parameter("cursor", "query", S),
     );
+  if (path === "/v1/escrow/subnames")
+    list.push(parameter("parent", "query", { type: "string", minLength: 1, maxLength: 256 }));
   if (path === "/v1/escrow/intent")
     list.push(
       parameter("id", "query", ID, true),

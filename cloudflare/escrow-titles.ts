@@ -37,5 +37,20 @@ export function registryTitles(e: Engine): TitleStore {
         need(e.previewEscrowIssue(packet).status === "succeeded", "ESCROW_ISSUE_NOT_READY");
       },
       issue: (packet: Packet) => { need(e.submitEscrowIssue(packet).status === "succeeded", "ESCROW_ISSUE_COMMIT"); },
+      // POA subname sales: only the current holder of a permanent, unlocked, unretired root may sell.
+      subTerms: (parent, seller) => {
+        const s = e.snapshot(), d = s.deeds[s.names[parent]?.activeId ?? ""];
+        need(d && d.owner === seller && !d.parentId && !d.lock && d.rights.kind === "permanent" && !d.retired, "ESCROW_TITLE");
+        need(normalizeName(parent, e.normalizationMode).labels.length === 1, "ESCROW_TITLE");
+        return { parentDeedId: d.id, ownerVersion: d.ownerVersion };
+      },
+      validateSub: (packet: Packet, name, buyer, price, listing) => {
+        const b = packet.body, q = b.params as Record<string, unknown>;
+        need(b.action === "issueSubname" && b.signer === buyer && q.name === name && q.asset === "POA" && q.price === price &&
+          q.parentDeedId === listing.parentDeedId && q.parentOwnerVersion === listing.ownerVersion &&
+          b.maxTotal === "0" && b.maxNetworkFee === "0" && b.coSigners.length === 0, "ESCROW_SUB_CONSENT");
+        need(e.previewEscrowIssue(packet).status === "succeeded", "ESCROW_SUB_NOT_READY");
+      },
+      issueSub: (packet: Packet) => { need(e.submitEscrowIssue(packet).status === "succeeded", "ESCROW_SUB_COMMIT"); },
   };
 }

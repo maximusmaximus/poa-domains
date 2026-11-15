@@ -1,6 +1,6 @@
-import { ui } from "./ui-state.js?v=f6b94cbcb2f0";
-import { el, endpointBase, ownershipView } from "./ui-core.js?v=f6b94cbcb2f0";
-import { buildListingPrompt, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=f6b94cbcb2f0";
+import { ui } from "./ui-state.js?v=9cc246d22980";
+import { el, endpointBase, ownershipView } from "./ui-core.js?v=9cc246d22980";
+import { buildListingPrompt, buildSubnameListingPrompt, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=9cc246d22980";
 
 export function clearHandoff() {
     ui.generation++;
@@ -62,4 +62,15 @@ export function copyDomainListingPrompt(kind) {
     }, () => {
         el("listingPromptStatus").textContent = "Clipboard unavailable — copy from the box";
     });
+}
+
+/** Owner-side POA subname listing: copies an unsigned agent request; nothing submits here. */
+export function copySubnameListing() {
+    const box = el("subnamePromptBox"), status = el("subnamePromptStatus");
+    let text;
+    try { text = buildSubnameListingPrompt({ parent: ui.currentDomainName, price: el("subnamePriceInput").value, endpointUrl: endpointBase() }); }
+    catch (error) { status.textContent = error.message; el("subnamePriceInput").setAttribute("aria-invalid", "true"); return; }
+    el("subnamePriceInput").removeAttribute("aria-invalid");
+    box.textContent = text; box.hidden = false;
+    navigator.clipboard.writeText(text).then(() => { status.textContent = "📋 Copied"; }, () => { status.textContent = "📋 Copy from the box"; });
 }

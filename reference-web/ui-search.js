@@ -1,10 +1,10 @@
-import { publicNameUnavailable } from "./shared.js?v=f6b94cbcb2f0";
-import { registryUnit, poaOnlyMode, poaNewNamePrice, poaShort } from "./shared.js?v=f6b94cbcb2f0";
-import { ui } from "./ui-state.js?v=f6b94cbcb2f0";
-import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=f6b94cbcb2f0";
-import { add, el, person, variantOwner } from "./ui-core.js?v=f6b94cbcb2f0";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=f6b94cbcb2f0";
-import { addToCart } from "./ui-cart.js?v=f6b94cbcb2f0";
+import { publicNameUnavailable } from "./shared.js?v=9cc246d22980";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaShort, buildSubnamePurchasePrompt } from "./shared.js?v=9cc246d22980";
+import { ui } from "./ui-state.js?v=9cc246d22980";
+import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=9cc246d22980";
+import { add, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=9cc246d22980";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=9cc246d22980";
+import { addToCart } from "./ui-cart.js?v=9cc246d22980";
 
 export function runSearch(rawQuery, remember = true) {
     if (remember) {
@@ -137,7 +137,7 @@ export function runSearch(rawQuery, remember = true) {
                 (o.labels === null || o.labels.includes(info.childLabel)))
             : null;
         if (poa) {
-            add(card, "p", "⚪ Subnames aren't for sale right now", "badge");
+            poaSubnameCard(card, name, info.parent, parentDeed);
             return;
         }
         if (childOffer) {
@@ -217,4 +217,29 @@ export function runSearch(rawQuery, remember = true) {
         const text=q&&line?`${q}: ${line.textContent}`:"";
         if(status && status.textContent!==text)status.textContent=text;
     }
+}
+
+/** POA subname: shows the parent holder's open escrow price, if any, and copies an agent request. */
+function poaSubnameCard(card, name, parent, parentDeed) {
+    const status = add(card, "p", "⏳ Checking subname price…", "badge");
+    if (!parentDeed) { status.textContent = "⚪ Subnames aren't for sale right now"; return; }
+    const base = endpointBase();
+    json(`${base}/v1/escrow/subnames?parent=${encodeURIComponent(parent)}`).then((r) => {
+        const l = (Array.isArray(r?.items) ? r.items : []).find((x) => x && x.status === "OPEN" && x.parent === parent &&
+            x.seller === parentDeed.owner && typeof x.price === "string" && /^[0-9]+\.[0-9]{6}$/.test(x.price) && /^[0-9a-f]{64}$/.test(x.id));
+        if (!l) { status.textContent = "⚪ Subnames aren't for sale right now"; return; }
+        status.textContent = "🟢 Available"; status.className = "badge-ok";
+        add(card, "p", `🪙 ${poaShort(l.price)} POA`, "badge-ok");
+        add(card, "p", `Price set by the holder of ${parent}. Your agent pays with POA checkout after you approve, and the holder is paid from escrow. Nothing is paid here.`).setAttribute("data-info-description", "");
+        const btn = add(card, "button", "🤖 Copy agent request", "small");
+        btn.id = "copySubnameRequestBtn"; btn.type = "button";
+        btn.setAttribute("aria-label", `Copy agent request to buy ${name} for ${poaShort(l.price)} POA`);
+        const box = add(card, "pre", "", "prompt-box"); box.hidden = true;
+        const note = add(card, "p", "", "muted"); note.setAttribute("role", "status");
+        btn.addEventListener("click", () => {
+            const text = buildSubnamePurchasePrompt({ name, listing: l.id, price: l.price, endpointUrl: base });
+            box.textContent = text; box.hidden = false;
+            navigator.clipboard?.writeText(text).then(() => { note.textContent = "📋 Copied"; }, () => { note.textContent = "📋 Copy from the box"; });
+        });
+    }).catch(() => { status.textContent = "⚪ Subnames aren't for sale right now"; });
 }

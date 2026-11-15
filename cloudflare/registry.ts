@@ -1,6 +1,6 @@
 import { publicRegistryRoute } from "./public-registry-view.js";
 import { registryRoute, type RegistryCall, type RegistryReply } from "../src/registry-routes.js";
-import { marketView, publicCommand } from "./escrow-public.js";
+import { marketView, publicCommand, subnameView } from "./escrow-public.js";
 import { registryTitles } from "./escrow-titles.js";
 import { DurableObject } from "cloudflare:workers";
 import { createPrivateKey, generateKeyPairSync, KeyObject } from "node:crypto";
@@ -39,6 +39,9 @@ export type { RegistryCall, RegistryReply } from "../src/registry-routes.js";
 
 /** POA new-name checkout (primary issuance via escrow). */
 export const NEW_NAME_PRICE_RULE=POA_NEW_NAME_PRICE_RULE;
+export function subnameSales(env:{POA_ESCROW_SUBNAMES?:string}):{status:"on"|"off";rule:string}{
+  return {status:String(env.POA_ESCROW_SUBNAMES)==="approved-v1"?"on":"off",rule:"Parent holders set one fixed POA price for new subnames; buyers pay through POA checkout; holder proceeds are paid out from escrow"};
+}
 export function newNameCheckout(env:{POA_ESCROW_NEW_NAMES?:string}):{status:"on"|"off";priceRule:string;prices:typeof POA_NEW_NAME_PRICES}{
   return {status:String(env.POA_ESCROW_NEW_NAMES)==="approved-v1"?"on":"off",priceRule:NEW_NAME_PRICE_RULE,prices:POA_NEW_NAME_PRICES};
 }
@@ -169,7 +172,7 @@ export class PoaRegistry extends DurableObject<Env> {
     const titles = registryTitles(e);
     this.escrowService = new Escrow(new SQLiteEscrowJournal(this.ctx.storage, policy), new PoaHttpNetwork(signing, fetch, { engine: this.env.POA_ESCROW_ENGINE_SHA256 ?? MAINNET_ENGINE_SHA256, params: this.env.POA_ESCROW_PARAMS_SHA256 ?? MAINNET_PARAMS_SHA256 }, Date.now, this.env.POA_API_TOKEN),
       new WorkerSecretSigner(policy.wallet, () => this.env.POA_ESCROW_KEY, signing), titles, policy, () => Date.now(), enabled,
-      undefined, () => newNameCheckout(this.env).status === "on");
+      undefined, () => newNameCheckout(this.env).status === "on", () => subnameSales(this.env).status === "on");
     return this.escrowService;
   }
   async escrowRead(path:string,query:Record<string,string>):Promise<unknown>{
@@ -179,10 +182,11 @@ export class PoaRegistry extends DurableObject<Env> {
       const freshness=await escrow.readiness(),s=escrow.state();const configured=String(this.env.POA_ESCROW_NETWORK_WRITES)==="approved-v1"&&!!this.env.POA_ESCROW_KEY&&(this.env.ESCROW_ADMIN_TOKEN?.length??0)>=32;
       return {enabled:true,paused:s.paused,held:s.paused||!!s.halt||freshness.held||!configured,
         holdReason:s.halt??(s.paused?"POA payments paused":!configured?"POA payments held for operator setup":freshness.reason),
-        address:escrow.policy.wallet,limits:{perTransaction:escrow.policy.perTx,daily:escrow.policy.daily},newNameCheckout:newNameCheckout(this.env),freshness,serverTime:Date.now(),registryId:this.engine.registryId};
+        address:escrow.policy.wallet,limits:{perTransaction:escrow.policy.perTx,daily:escrow.policy.daily},newNameCheckout:newNameCheckout(this.env),subnameSales:subnameSales(this.env),freshness,serverTime:Date.now(),registryId:this.engine.registryId};
     }
     if(path==="intent")return escrow.depositView(query.id!,query.txid);
     if(path==="market"||path==="domain")return {items:marketView(escrow.state(),path==="domain"?query.name:undefined),serverTime:Date.now()};
+    if(path==="subnames")return {items:subnameView(escrow.state(),query.parent),serverTime:Date.now()};
     need(false,"ESCROW_ROUTE");
   }
   async escrowCommand(packet:string,endpoint:string):Promise<unknown>{

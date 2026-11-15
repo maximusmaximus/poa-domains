@@ -2,7 +2,7 @@
 import { Escrow, State } from "./escrow.js";
 import { verifyCommand, address, decimal, micros } from "./escrow-codec.js";
 import { exact, need, parseJSON } from "../src/core.js";
-const PUBLIC_ACTIONS=new Set(["intent","detect","withdraw","open","list","bid","buy","cancel","expire","settle","repair-title","issue","view"]);
+const PUBLIC_ACTIONS=new Set(["intent","detect","withdraw","open","list","bid","buy","cancel","expire","settle","repair-title","issue","list-sub","cancel-sub","buy-sub","view"]);
 export function marketView(s: State, name?: string) {
   return Object.values(s.auctions).filter(a=>name===undefined||a.name===name).slice(-100).map(a=>({
     id:a.id,name:a.name,seller:a.seller,kind:a.kind??"auction",price:decimal(BigInt(a.reserve)),
@@ -10,6 +10,12 @@ export function marketView(s: State, name?: string) {
     high:a.high?{payer:a.high.payer,amount:decimal(BigInt(a.high.amount))}:null,
     settlement:s.settlements[a.id]?.status??null,
     history:(a.history??[{event:a.status,at:a.createdAt??0}]).slice(-100).map(h=>({...h,...(h.amount?{amount:decimal(BigInt(h.amount))}:{})})),
+  }));
+}
+export function subnameView(s: State, parent?: string) {
+  return Object.values(s.subListings??{}).filter(l=>parent===undefined||l.parent===parent).slice(-100).map(l=>({
+    id:l.id,parent:l.parent,seller:l.seller,price:decimal(BigInt(l.price)),status:l.status,createdAt:l.createdAt,
+    sold:l.sold.slice(-100).map(x=>({name:x.name,buyer:x.buyer,at:x.at})),
   }));
 }
 export function accountView(s:State,payer:string){address(payer);return {

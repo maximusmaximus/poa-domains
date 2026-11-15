@@ -9,6 +9,8 @@ interface __BaseEnv_Env {
   POA_ESCROW_PARAMS_SHA256?: string;
   /** POA new-name checkout; live value approved-v1 turns it on, any other value is off. */
   POA_ESCROW_NEW_NAMES?: string;
+  /** POA subname sales; live value approved-v1 turns it on, any other value is off. */
+  POA_ESCROW_SUBNAMES?: string;
   POA_ESCROW_PER_TX?: string;
   POA_ESCROW_DAILY?: string;
 }

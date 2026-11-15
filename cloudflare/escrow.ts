@@ -35,6 +35,10 @@ export interface TitleStore {
   issueTerms?(name: string): { price: string };
   validateIssue?(packet: Packet, name: string, buyer: string, price: string): void;
   issue?(packet: Packet): void;
+  /** POA subname sales (optional; absent => OFF). The seller must hold the permanent, unlocked root. */
+  subTerms?(parent: string, seller: string): { parentDeedId: string; ownerVersion: number };
+  validateSub?(packet: Packet, name: string, buyer: string, price: string, listing: SubListing): void;
+  issueSub?(packet: Packet): void;
 }
 /** One owner-reviewed credit for a deposit that arrived while escrow was held.
  * Bound to one exact txid, sender, amount and intent; usable once; never pauses or unpauses. */
@@ -73,6 +77,12 @@ export interface State {
   requests: Record<string,{ fingerprint: string; result: unknown }>;
   /** Owner-reviewed one-shot credits (absent in older journals). */
   reviews?: Record<string,{ txid: string; intent: string; height: number; root: string; observed: string; at: number }>;
+  /** POA subname listings set by a parent holder (absent in older journals). */
+  subListings?: Record<string,SubListing>;
+}
+export interface SubListing {
+  id: string; parent: string; parentDeedId: string; ownerVersion: number; seller: string; price: string;
+  status: "OPEN" | "CANCELLED"; createdAt: number; sold: { name: string; buyer: string; at: number; payments: string[] }[];
 }
 export interface Entry { sequence: number; previous: string; event: string; payload: unknown; state: State; checksum: string; }
 export interface Journal { load(): State; append(event: string, payload: unknown, change: (s: State) => void): State; }
@@ -159,7 +169,7 @@ export class SQLiteEscrowJournal implements Journal {
 export class Escrow {
   constructor(readonly journal: Journal, private network: Network, private signer: Signer,
     private titles: TitleStore, readonly policy: Policy, private now=()=>Date.now(), private enabled=()=>false,
-    private crash: (point:string)=>void=()=>{}, private newNames: ()=>boolean=()=>false) {
+    private crash: (point:string)=>void=()=>{}, private newNames: ()=>boolean=()=>false, private subnames: ()=>boolean=()=>false) {
     need(journal.load().policy===digest(policy) && signer.address===policy.wallet,"ESCROW_POLICY_CHANGED");
   }
   private serial<T>(fn:()=>Promise<T>): Promise<T> {
@@ -323,6 +333,19 @@ export class Escrow {
         need(integer(packet.body.notBefore)<=nowSec && integer(packet.body.deadline)>=nowSec+600,"ESCROW_CONSENT_EXPIRING");
         break;
       }
+      case "list-sub": {
+        need(this.subnames(),"ESCROW_SUBNAMES_OFF");
+        exact(p,["parent","price"]); text(p.parent,256); need(micros(p.price)>0n && micros(p.price)<=micros(this.policy.perTx),"ESCROW_AMOUNT"); break;
+      }
+      case "cancel-sub": exact(p,["listing"]); text(p.listing,64); break;
+      case "buy-sub": {
+        need(this.subnames(),"ESCROW_SUBNAMES_OFF");
+        exact(p,["listing","name","amount","registration"]); text(p.listing,64); text(p.name,256);
+        need(micros(p.amount)>0n && micros(p.amount)<=micros(this.policy.perTx),"ESCROW_AMOUNT");
+        const packet=authenticate(p.registration), nowSec=Math.floor(this.now()/1000);
+        need(integer(packet.body.notBefore)<=nowSec && integer(packet.body.deadline)>=nowSec+600,"ESCROW_CONSENT_EXPIRING");
+        break;
+      }
       case "settle": case "repair-title": {
         exact(p,["auction","transfer"]); text(p.auction,64);
         const packet=authenticate(p.transfer), nowSec=Math.floor(this.now()/1000);
@@ -339,7 +362,7 @@ export class Escrow {
     if(old) {need(old.fingerprint===fingerprint,"ESCROW_IDEMPOTENCY_CONFLICT"); return structuredClone(old.result);}
     this.validateCommand(c);
     // Cancel/expiry only reclassify obligations; no money leaves during pause/holds.
-    const local=c.action==="cancel"||c.action==="expire";
+    const local=c.action==="cancel"||c.action==="expire"||c.action==="cancel-sub";
     if(!local) { this.gate(); await this.fresh(); this.gate(); }
     const p=c.params; let result:unknown={ok:true};
     if(c.action==="detect") {
@@ -432,6 +455,49 @@ export class Escrow {
           invariant(s);need(BigInt(s.sequence+1)+recoveryReserve(s,this.policy)<=BigInt(PILOT_JOURNAL_LIMIT),"ESCROW_JOURNAL_CAPACITY");
           this.titles.issue!(packet);
           result={issued:name,price:decimal(n),payment:id};break;
+        }
+        case "list-sub": {
+          // The parent holder sets one fixed POA price for new subnames under a root they hold.
+          need(this.subnames()&&this.titles.subTerms&&this.titles.validateSub&&this.titles.issueSub,"ESCROW_SUBNAMES_OFF");
+          need(s.sequence<PILOT_ADMISSION_LIMIT,"ESCROW_JOURNAL_CAPACITY");
+          exact(p,["parent","price"]);const parent=text(p.parent,256),t=this.titles.subTerms!(parent,c.actor);
+          const listings=(s.subListings??={});
+          need(!Object.values(listings).some(l=>l.parent===parent&&l.status==="OPEN"),"ESCROW_SUB_LISTED");
+          const id=digest([rk,c]);
+          listings[id]={id,parent,parentDeedId:t.parentDeedId,ownerVersion:t.ownerVersion,seller:c.actor,price:String(micros(p.price)),status:"OPEN",createdAt:this.now(),sold:[]};
+          result={listing:id};break;
+        }
+        case "cancel-sub": {
+          exact(p,["listing"]);const l=s.subListings?.[text(p.listing,64)];
+          need(l&&l.status==="OPEN","ESCROW_SUB_CLOSED");need(l.seller===c.actor,"ESCROW_CANCEL_NOT_ALLOWED");
+          l.status="CANCELLED";break;
+        }
+        case "buy-sub": {
+          // deposit -> credit -> buy: the buyer's credited POA buys label.parent at the holder's price.
+          need(this.subnames()&&this.titles.subTerms&&this.titles.validateSub&&this.titles.issueSub,"ESCROW_SUBNAMES_OFF");
+          need(s.sequence<PILOT_JOURNAL_LIMIT-32,"ESCROW_JOURNAL_CAPACITY");
+          exact(p,["listing","name","amount","registration"]);
+          const l=s.subListings?.[text(p.listing,64)];need(l&&l.status==="OPEN","ESCROW_SUB_CLOSED");
+          const name=text(p.name,256),n=micros(p.amount);
+          need(name.endsWith("."+l.parent)&&name.length>l.parent.length+1,"ESCROW_SUB_NAME");
+          need(n===BigInt(l.price),"ESCROW_PRICE");need(n<=micros(this.policy.perTx),"ESCROW_PAYOUT_LIMIT");
+          need(c.actor!==l.seller,"ESCROW_SELF_SALE");
+          // The seller must still hold the same root, unchanged since listing (same rule as child offers).
+          const t=this.titles.subTerms!(l.parent,l.seller);
+          need(t.parentDeedId===l.parentDeedId&&t.ownerVersion===l.ownerVersion,"ESCROW_SUB_STALE");
+          need(BigInt(s.available[c.actor]??"0")>=n,"ESCROW_INSUFFICIENT_FUNDS");
+          const packet=authenticate(p.registration);this.titles.validateSub!(packet,name,c.actor,String(n),l);
+          const fee=n*BigInt(this.policy.feeBps)/10000n, net=n-fee, payments:string[]=[];
+          s.available[c.actor]=String(BigInt(s.available[c.actor]??"0")-n);
+          // Proceeds wait in escrow as READY payouts until the payout sender runs.
+          for(const [kind,to,v] of [["seller",l.seller,net],["fee",this.policy.treasury,fee]] as const) if(v>0n){
+            const id=`sub-${kind}-${digest([rk,c])}`;need(!s.payments[id],"ESCROW_DUPLICATE");
+            s.payments[id]={id,kind,to,amount:String(v),status:"READY",day:null,body:null,txid:null};payments.push(id);
+          }
+          l.sold.push({name,buyer:c.actor,at:this.now(),payments});l.sold=l.sold.slice(-100);
+          invariant(s);need(BigInt(s.sequence+1)+recoveryReserve(s,this.policy)<=BigInt(PILOT_JOURNAL_LIMIT),"ESCROW_JOURNAL_CAPACITY");
+          this.titles.issueSub!(packet);
+          result={issued:name,price:decimal(n),payments};break;
         }
         case "repair-title": {
           exact(p,["auction","transfer"]);const a=s.auctions[text(p.auction,64)], st=s.settlements[String(p.auction)];

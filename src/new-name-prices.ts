@@ -32,4 +32,6 @@ export const POA_CHECKOUT_STEPS =
   "2) sign a registry packet issueFromTreasury {name, asset:\"POA\", price:<micros>, expectedDeedId:null, expectedVersion:0, metadata from build_metadata_witness} with maxTotal \"0\", maxNetworkFee \"0\" and a deadline at least 10 minutes ahead (do not submit it to /v1/intents); " +
   "3) sign escrow issue {name, amount, registration:<that packet>} and POST {command,signature} to /v1/escrow/command. " +
   "Sell or auction a name you own with escrow list/open; buy or bid with buy/bid; take unused POA back with withdraw (paid only to the original payer). " +
+  "Subnames, when /v1/escrow/capabilities shows subnameSales on: the parent holder sets one fixed POA price with escrow list-sub {parent, price} (stop with cancel-sub {listing}); open listings are at GET /v1/escrow/subnames?parent=<name>. " +
+  "A buyer pays the same way, then signs a registry packet issueSubname {name, parentDeedId, parentOwnerVersion, asset:\"POA\", price:<micros>, expectedGeneration, metadata} with maxTotal \"0\" and escrow buy-sub {listing, name, amount, registration}. The holder's share is paid out from escrow. " +
   "Registry auctions, bids and offers are closed and return POA_ONLY. Read /v1/escrow/capabilities first; if it is held or paused, wait.";

@@ -4,7 +4,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { parse } from "yaml";
 import { endpoint } from "../dist/src/client.js";
 import { ACCOUNT, WORKER, REPO, ADDRESS, POLICY, parseConfig, productionConfig, expectedPolicy,
-  assertBindings, assertProductionEnvironment, assertGitHub, liveSnapshot, wranglerArgs, runDeployment, repinPlan, checkoutPlan, assertAdvertised, NETWORK_FACTS, NETWORK_CLIENT } from "../scripts/worker-deploy.mjs";
+  assertBindings, assertProductionEnvironment, assertGitHub, liveSnapshot, wranglerArgs, runDeployment, repinPlan, checkoutPlan, assertAdvertised, expectedSwitches, switchesPlan, assertSwitches, OPTIONAL_SWITCHES, NETWORK_FACTS, NETWORK_CLIENT } from "../scripts/worker-deploy.mjs";
 const config = parseConfig(readFileSync("wrangler.jsonc", "utf8"));
 const expected = { ...Object.fromEntries(POLICY.map(k => [k, config.vars[k]])),
   POA_ESCROW_ENABLED: "true", POA_ESCROW_NETWORK_WRITES: "approved-v1", POA_ESCROW_NEW_NAMES: "approved-v1", POA_ESCROW_ADDRESS: ADDRESS };
@@ -243,4 +243,44 @@ test("repin (Max t108s1102): validated, advertised + client-hash verified, write
   real = 0;
   await assert.rejects(runDeployment({ dryRun: false, env: { ...repinEnv, POA_ESCROW_REPIN_PARAMS_SHA256: "d".repeat(64) }, fetchImpl, run: (_e, args) => { if (!args.includes("--dry-run")) real++; return { status: 0 }; } }), /REPIN_NOT_ADVERTISED/);
   assert.equal(real, 0);
+});
+
+test("subname switch (Max t140s1306): off unless approved-v1; written once when turned on; never silently kept or dropped", async () => {
+  assert.deepEqual(OPTIONAL_SWITCHES, ["POA_ESCROW_SUBNAMES"]);
+  assert.equal(config.vars.POA_ESCROW_SUBNAMES, "false", "committed default stays off");
+  assert.ok(!Object.keys(productionConfig(config).vars).some(k => k.startsWith("POA_ESCROW_")), "deploy plan never sends the committed default");
+  assert.deepEqual(expectedSwitches({}), { POA_ESCROW_SUBNAMES: null });
+  assert.deepEqual(expectedSwitches({ POA_ESCROW_SUBNAMES: "approved-v1" }), { POA_ESCROW_SUBNAMES: "approved-v1" });
+  for (const bad of ["true", "false", "on", "approved-v2"]) assert.throws(() => expectedSwitches({ POA_ESCROW_SUBNAMES: bad }), /INVALID_PRODUCTION_SWITCH/);
+  const on = { POA_ESCROW_SUBNAMES: "approved-v1" }, off = { POA_ESCROW_SUBNAMES: null };
+  const live = [...bindings, { name: "POA_ESCROW_SUBNAMES", type: "plain_text", text: "approved-v1" }];
+  assert.deepEqual(switchesPlan(on, bindings), on); assert.equal(switchesPlan(on, live), null); assert.equal(switchesPlan(off, bindings), null);
+  assertBindings(live, expected); assert.throws(() => assertBindings([...bindings, { name: "POA_ESCROW_OTHER", type: "plain_text", text: "x" }], expected), /UNREVIEWED_ESCROW_BINDING/);
+  assertSwitches(bindings, off); assertSwitches(live, on); assertSwitches(bindings, on, { allowMissingOn: true });
+  assert.throws(() => assertSwitches(bindings, on), /LIVE_SWITCH_MISMATCH/, "post-check needs the switch live");
+  assert.throws(() => assertSwitches(live, off), /LIVE_SWITCH_MISMATCH/, "a live switch without the environment value is refused");
+  assert.throws(() => assertSwitches(live.map(b => b.name === "POA_ESCROW_SUBNAMES" ? { ...b, text: "true" } : b), on), /LIVE_SWITCH_MISMATCH/);
+  // Default deploy (switch unset): no escrow overrides, exactly as before.
+  const plans = [];
+  const run = (_exe, args) => { const plan = JSON.parse(readFileSync(args[args.indexOf("--config") + 1], "utf8"));
+    plans.push(Object.keys(plan.vars).filter(k => k.startsWith("POA_ESCROW_")).sort()); if (!args.includes("--dry-run")) deployed = true; return { status: 0 }; };
+  let deployed = false;
+  await runDeployment({ dryRun: false, env: { ...env, DEPLOY_POSTCHECK_DELAY_MS: "0" }, fetchImpl: provider().fetchImpl, run });
+  assert.deepEqual(plans, [[], []]);
+  // Turned on: the plan writes only the switch, and the post-check sees it live.
+  plans.length = 0; deployed = false;
+  const p = provider();
+  const fetchImpl = async (url, o) => {
+    const r = await p.fetchImpl(url, o);
+    if (!deployed || !(url.endsWith("/settings") || url.includes("/versions/"))) return r;
+    const body = await r.json(); if (body.result.bindings) body.result.bindings = live; else body.result.resources.bindings = live;
+    return { ok: true, json: async () => body };
+  };
+  await runDeployment({ dryRun: false, env: { ...env, ...on, DEPLOY_POSTCHECK_DELAY_MS: "0" }, fetchImpl, run });
+  assert.deepEqual(plans, [["POA_ESCROW_SUBNAMES"], ["POA_ESCROW_SUBNAMES"]]);
+  // Live has it but the environment does not: refused before any deploy.
+  plans.length = 0;
+  const q = provider({ "/settings": { success: true, result: { bindings: live } }, [`/versions/${version}`]: { success: true, result: { id: version, resources: { bindings: live } } } });
+  await assert.rejects(runDeployment({ dryRun: false, env: { ...env, DEPLOY_POSTCHECK_DELAY_MS: "0" }, fetchImpl: q.fetchImpl, run }), /LIVE_SWITCH_MISMATCH/);
+  assert.deepEqual(plans, []);
 });

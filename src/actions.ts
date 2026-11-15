@@ -68,4 +68,7 @@ export type Action = keyof typeof ACTIONS;
 // discovery/quotes/prepare; public submit and preview refuse it (ESCROW_ONLY).
 export const ESCROW_ONLY_ACTIONS = {
   issueFromTreasury: ["name", "asset", "price", "expectedVersion", "expectedDeedId", "metadata"],
+  // POA subname sale: the parent holder's escrow listing authorizes it; the buyer signs this packet.
+  issueSubname: ["name", "parentDeedId", "parentOwnerVersion", "asset", "price", "expectedGeneration", "metadata"],
 } as const;
+export const ESCROW_ISSUE_ACTIONS: readonly string[] = Object.freeze(Object.keys(ESCROW_ONLY_ACTIONS));

@@ -6,7 +6,7 @@ import {
   principal,
   DOMAIN,
 } from "./auth.js";
-import { ACTIONS, Action, ESCROW_ONLY_ACTIONS } from "./actions.js";
+import { ACTIONS, Action, ESCROW_ISSUE_ACTIONS, ESCROW_ONLY_ACTIONS } from "./actions.js";
 import {
   Config,
   validateConfig,
@@ -196,7 +196,8 @@ export class Engine {
   // in the SAME storage transaction. Public submit/preview refuse issueFromTreasury (ESCROW_ONLY).
   private escrowIssue = false;
   private asEscrowIssue<T>(packet: unknown, run: () => T): T {
-    need((packet as { body?: { action?: unknown } } | null)?.body?.action === "issueFromTreasury", "ESCROW_ISSUE_ACTION");
+    const action = (packet as { body?: { action?: unknown } } | null)?.body?.action;
+    need(typeof action === "string" && ESCROW_ISSUE_ACTIONS.includes(action), "ESCROW_ISSUE_ACTION");
     this.escrowIssue = true;
     try { return run(); } finally { this.escrowIssue = false; }
   }
@@ -216,7 +217,7 @@ export class Engine {
     const body = (value as { body?: { action?: unknown; params?: any } } | null)?.body;
     if (!body || typeof body !== "object") return;
     const { action, params: p } = body;
-    if (action === "issueFromTreasury" && !this.escrowIssue) throw new Fault("ESCROW_ONLY");
+    if (typeof action === "string" && ESCROW_ISSUE_ACTIONS.includes(action) && !this.escrowIssue) throw new Fault("ESCROW_ONLY");
     if (typeof action === "string" && poaOnlyRegistry(this.registryId) && POA_ONLY_CLOSED_ACTIONS.includes(action))
       throw new Fault("POA_ONLY");
     if (this.admission.permanentOnly && (action === "renewLease" || action === "expireLease"))
@@ -225,7 +226,7 @@ export class Engine {
         (p.rights === null || typeof p.rights !== "object" || p.rights.kind !== "permanent"))
       throw new Fault("PERMANENT_OWNERSHIP_ONLY");
     let name: string | null = null;
-    if ((action === "announceAuction" || action === "issueFromTreasury") && typeof p?.name === "string") name = p.name;
+    if ((action === "announceAuction" || action === "issueFromTreasury" || action === "issueSubname") && typeof p?.name === "string") name = p.name;
     if (action === "fillChildOffer" && typeof p?.label === "string" && typeof p?.offerId === "string") {
       const o = this.state.offers[p.offerId];
       if (this.admission.permanentOnly && o?.rights?.kind === "lease")
@@ -850,6 +851,29 @@ export class Engine {
         const m = metadata(p.metadata, n.canonical, rightsHash({ kind: "permanent" }, null));
         const d = this.mint(s, n.canonical, b.signer, { kind: "permanent" }, null, m, time);
         return { deedId: d.id, owner: d.owner };
+      }
+      case "issueSubname": {
+        // POA subname sale through escrow: the parent holder listed it in escrow and the buyer's POA is
+        // already debited there in the SAME storage transaction. No internal units, so the cap is 0.
+        need(this.config.revision === "poa-mainnet-v1", "ESCROW_ISSUE_POLICY");
+        const { n } = this.entry(s, p.name);
+        need(n.labels.length === 2 && n.canonical === p.name, "NON_CANONICAL_NAME");
+        const parent = this.entry(s, n.canonical.slice(n.canonical.indexOf(".") + 1));
+        need(parent.e?.activeId, "NOT_FOUND");
+        const root = s.deeds[parent.e.activeId]!;
+        need(root.id === p.parentDeedId && integer(p.parentOwnerVersion) === root.ownerVersion, "STALE_VERSION");
+        need(!root.parentId && !root.retired && root.rights.kind === "permanent", "ROOT_ONLY");
+        need(!root.lock, "TITLE_LOCKED");
+        need(b.signer !== root.owner, "SELLER_SELF_BID");
+        need(b.maxTotal === "0", "AMOUNT_CAP");
+        need(this.asset(p.asset) === "POA", "ASSET");
+        amount(p.price, true);
+        const r: Rights = { kind: "permanent" };
+        const m = metadata(p.metadata, n.canonical, rightsHash(r, root.id));
+        const d = this.mint(s, n.canonical, b.signer, r, root.id, m, time, integer(p.expectedGeneration, 1));
+        root.encumbranceVersion++;
+        root.version++;
+        return { deedId: d.id, name: d.name, owner: d.owner };
       }
       case "transfer": {
         const d = this.deed(s, p);

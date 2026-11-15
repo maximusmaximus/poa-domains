@@ -1,10 +1,10 @@
-import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=f6b94cbcb2f0";
-import { ui } from "./ui-state.js?v=f6b94cbcb2f0";
-import { add, el } from "./ui-core.js?v=f6b94cbcb2f0";
-import { runSearch } from "./ui-search.js?v=f6b94cbcb2f0";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=f6b94cbcb2f0";
-import { updateTabDots } from "./ui-render.js?v=f6b94cbcb2f0";
-import { syncCartShortcutNow } from "./ui-cart.js?v=f6b94cbcb2f0";
+import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=9cc246d22980";
+import { ui } from "./ui-state.js?v=9cc246d22980";
+import { add, el } from "./ui-core.js?v=9cc246d22980";
+import { runSearch } from "./ui-search.js?v=9cc246d22980";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=9cc246d22980";
+import { updateTabDots } from "./ui-render.js?v=9cc246d22980";
+import { syncCartShortcutNow } from "./ui-cart.js?v=9cc246d22980";
 
 /** Open 🪙 My POA; with a name, prefill it for a POA listing or auction. Your agent signs; nothing is sent here. */
 export function openPoa(name) {
