@@ -1,10 +1,22 @@
-import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=1c042d35a226";
-import { ui } from "./ui-state.js?v=1c042d35a226";
-import { add, el } from "./ui-core.js?v=1c042d35a226";
-import { runSearch } from "./ui-search.js?v=1c042d35a226";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=1c042d35a226";
-import { updateTabDots } from "./ui-render.js?v=1c042d35a226";
-import { syncCartShortcutNow } from "./ui-cart.js?v=1c042d35a226";
+import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=f6b94cbcb2f0";
+import { ui } from "./ui-state.js?v=f6b94cbcb2f0";
+import { add, el } from "./ui-core.js?v=f6b94cbcb2f0";
+import { runSearch } from "./ui-search.js?v=f6b94cbcb2f0";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=f6b94cbcb2f0";
+import { updateTabDots } from "./ui-render.js?v=f6b94cbcb2f0";
+import { syncCartShortcutNow } from "./ui-cart.js?v=f6b94cbcb2f0";
+
+/** Open 🪙 My POA; with a name, prefill it for a POA listing or auction. Your agent signs; nothing is sent here. */
+export function openPoa(name) {
+    navigateHome();
+    setSectionTab("escrow");
+    if (typeof name === "string" && name) {
+        const field = el("escrowName"), amount = el("escrowAmount"), message = el("escrowMessage");
+        if (field) field.value = name;
+        if (amount) amount.focus?.();
+        if (message) message.textContent = "🏷️ Enter your POA price, then tap List my name for POA or Open my POA auction.";
+    }
+}
 
 export function writeViewURL(path = location.pathname) {
     const next = viewPath(path, ui.lastSearch, ui.activeSectionTab);

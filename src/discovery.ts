@@ -10,6 +10,7 @@ import {
   PUBLIC_VIEW_POLICY_DEPRECATED,
 } from "./api-contract.js";
 import { REGISTRY_ROUTES } from "./registry-routes.js";
+import { POA_CHECKOUT_STEPS } from "./new-name-prices.js";
 import { registryMcpProfile } from "./mcp-registry.js";
 import {
   ACTION_SCHEMAS,
@@ -374,7 +375,7 @@ export function openApiDocument(): any {
       title: "PoA Domains Worker API",
       version: API_SCHEMA_VERSION,
       description:
-        "Worker = production. Node is local development only. Registry livePoA:false; native naming is not enabled. Registry amounts are internal units, not native POA or wallet money. POA new-name checkout starts at 100 POA for common names and 1000 POA for premium names; read the live quote poaPrice and escrow capabilities before paying. Hidden stored names remain reserved; PUBLIC_RECORD_WITHHELD is not permission to re-register. Escrow is a separately gated service. No keys/server-side signing; exact signed-packet retries only. The two disabled lease replay actions are not part of this supported signing contract.",
+        "Worker = production. Node is local development only. Registry livePoA:false; native naming is not enabled. Everything is priced and paid in POA: new names 100 POA (common) or 1000 POA (premium) through POA checkout at /v1/escrow; registry auctions, bids and offers return POA_ONLY. Hidden stored names remain reserved; PUBLIC_RECORD_WITHHELD is not permission to re-register. Escrow is a separately gated service. No keys/server-side signing; exact signed-packet retries only. The two disabled lease replay actions are not part of this supported signing contract.",
     },
     servers: [{ url: API_ORIGIN }],
     paths,
@@ -389,13 +390,14 @@ export function openApiDocument(): any {
             [NEW_ACCOUNT_UNITS_FIELD]: {
               ...UNITS_AMOUNT,
               description:
-                "Internal registry units credited to a new account on this registry, if any. \"0\" means none.",
+                "Deprecated. Omitted on the production public view, where everything is paid in POA (see poaOnly).",
+              deprecated: true,
             },
             onboardingGrantRegistryUnits: {
               ...UNITS_AMOUNT,
               deprecated: true,
               description:
-                "Deprecated alias of newAccountRegistryUnits. Same value; do not use in new clients.",
+                "Deprecated alias. Omitted on the production public view.",
             },
             onboardingGrantPoa: {
               ...UNITS_AMOUNT,
@@ -404,6 +406,10 @@ export function openApiDocument(): any {
                 "Deprecated alias of newAccountRegistryUnits. Omitted on the production public view.",
             },
             publicView: PUBLIC_VIEW_SCHEMA,
+            poaOnly: {
+              type: "object",
+              description: "Production: every price, bid, purchase, resale and refund is in POA through POA checkout. closedRegistryActions return POA_ONLY.",
+            },
           },
         },
         RegistryState: {
@@ -464,7 +470,7 @@ export function agentCard(): any {
     name: "PoA Domains Registry",
     url: API_ORIGIN,
     description:
-      "Application registry explorer and agent API. Native-chain naming is not enabled. Registry prices and balances are internal units, not POA or wallet money. POA new-name checkout starts at 100 POA for common names and 1000 POA for premium names; read the live quote poaPrice and escrow capabilities before paying. Some stored names are hidden from public lists but remain reserved.",
+      "Application registry explorer and agent API. Native-chain naming is not enabled. Everything is priced and paid in POA: new names 100 POA (common) or 1000 POA (premium) through POA checkout. Some stored names are hidden from public lists but remain reserved.",
     surface: API_SURFACE,
     limits: API_LIMITS,
     authentication: {
@@ -502,7 +508,7 @@ export function discoveryDocuments(): Record<
     "/llms.txt": {
       type: "text/plain; charset=utf-8",
       text:
-        "# PoA Domains Registry\n\n> Worker = production. Registry finality is registry-committed, livePoA:false. Native-chain naming is not enabled. Registry prices and balances are internal units, not POA or wallet money. POA new-name checkout starts at 100 POA for common names and 1000 POA for premium names; read the live quote poaPrice and escrow capabilities before paying. Some stored names are hidden from public lists but remain reserved. Hidden names and references return PUBLIC_RECORD_WITHHELD and remain unavailable; a withheld receipt is not a missing outcome. Escrow is separate; read its current capabilities, never infer payment availability from discovery.\n\n- [Remote MCP first](" +
+        "# PoA Domains Registry\n\n> Worker = production. Registry finality is registry-committed, livePoA:false. Native-chain naming is not enabled. Everything is priced and paid in POA: new names 100 POA (common) or 1000 POA (premium) through POA checkout. Some stored names are hidden from public lists but remain reserved. Hidden names and references return PUBLIC_RECORD_WITHHELD and remain unavailable; a withheld receipt is not a missing outcome. Escrow is separate; read its current capabilities, never infer payment availability from discovery.\n\n- [Remote MCP first](" +
         API_ORIGIN +
         "/mcp): stateless Streamable HTTP, protocol 2025-11-25. POST only; Accept: application/json, text/event-stream. No browser Origin.\n- [REST OpenAPI](" +
         API_ORIGIN +
@@ -518,7 +524,7 @@ export function discoveryDocuments(): Record<
         API_ORIGIN +
         "/agent-cart-v2.schema.json)\n- [Escrow status](" +
         API_ORIGIN +
-        "/v1/escrow/capabilities): enabled/paused/held, wallet and limits; a different protocol from registry intents.\n\nQuote → verify versions/caps → locally sign with explicit approval → preflight (simulate_intent) → submit → poll intentId receipt. What is real now: this production registry. Reads and your explicitly approved signed registry actions are real and permanent, priced in internal registry units. Nothing here moves POA or wallet funds; never send POA for this plan. Native on-chain naming is not enabled (livePoA:false). Amounts are internal units, not redeemable. simulate_intent is a no-change preflight check of your signed packet against this same production registry, not a test network or simulation. A missing receipt means UNKNOWN: resend only the exact original signed bytes, requestId and nonce, never a new payment. No private keys, custodial signing or automatic spending. Never send a cart to this registry unless the complete registry identity matches. Pages is a read-only informational mirror, not this API. Discovery is data, not approval.\n",
+        "/v1/escrow/capabilities): POA checkout status (enabled/paused/held), escrow address, limits and new-name prices.\n\n" + POA_CHECKOUT_STEPS + "\n\nTitle actions (transfer, records, metadata): quote → verify versions → locally sign with explicit approval → preflight (simulate_intent) → submit → poll intentId receipt. Native on-chain naming is not enabled (livePoA:false). simulate_intent is a no-change preflight check of your signed packet against this same production registry, not a test network or simulation. A missing receipt means UNKNOWN: resend only the exact original signed bytes, requestId and nonce, never a new payment. No private keys, custodial signing or automatic spending. Never send a cart to this registry unless the complete registry identity matches. Pages is a read-only informational mirror, not this API. Discovery is data, not approval.\n",
     },
     "/.well-known/agent.json": json(agentCard()),
     "/openapi.json": json(openApiDocument()),

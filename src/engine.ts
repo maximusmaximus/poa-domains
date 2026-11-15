@@ -84,6 +84,20 @@ export const ONBOARDING_GRANT_FINAL_SEQUENCE = 16;
 export function onboardingGrantOpen(registry: string, sequenceBefore: number): boolean {
   return registry !== PRODUCTION_REGISTRY_ID || sequenceBefore < ONBOARDING_GRANT_FINAL_SEQUENCE;
 }
+/**
+ * Production registry is POA-only (Max, Nov 13 2026). Every price, bid, purchase, resale and refund
+ * goes through POA checkout (/v1/escrow). Registry-unit actions that would create or move internal
+ * units are refused for NEW submissions only; replay of recorded history never runs admission, so
+ * policyHash, registryId, journal and every old record stay byte-identical. Title-only actions
+ * (transfer, records, metadata, revoke) and closing old offers/auctions stay open.
+ */
+export const POA_ONLY_CLOSED_ACTIONS: readonly string[] = Object.freeze([
+  "announceAuction", "bid", "finalize", "withdrawRefund",
+  "createChildOffer", "fillChildOffer", "sellFixed", "buyFixed",
+]);
+export function poaOnlyRegistry(registry: string): boolean {
+  return registry === PRODUCTION_REGISTRY_ID;
+}
 
 export class Engine {
   readonly config: Config;
@@ -203,6 +217,8 @@ export class Engine {
     if (!body || typeof body !== "object") return;
     const { action, params: p } = body;
     if (action === "issueFromTreasury" && !this.escrowIssue) throw new Fault("ESCROW_ONLY");
+    if (typeof action === "string" && poaOnlyRegistry(this.registryId) && POA_ONLY_CLOSED_ACTIONS.includes(action))
+      throw new Fault("POA_ONLY");
     if (this.admission.permanentOnly && (action === "renewLease" || action === "expireLease"))
       throw new Fault("PERMANENT_OWNERSHIP_ONLY");
     if (this.admission.permanentOnly && action === "createChildOffer" && p && typeof p === "object" &&

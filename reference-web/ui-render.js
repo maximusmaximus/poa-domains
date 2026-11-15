@@ -1,13 +1,13 @@
-import { registryUnit } from "./shared.js?v=1c042d35a226";
-import { drawTicker } from "./ui-ticker.js?v=1c042d35a226";
-import { actionLabel } from "./ui-copy.js?v=1c042d35a226";
-import { returnFocus } from "./ui-a11y.js?v=1c042d35a226";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=1c042d35a226";
-import { ui } from "./ui-state.js?v=1c042d35a226";
-import { add, el, person, namedText } from "./ui-core.js?v=1c042d35a226";
-import { nameLink, navigateDomain, ownerLink } from "./ui-router.js?v=1c042d35a226";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=1c042d35a226";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=1c042d35a226";
+import { registryUnit, poaOnlyMode } from "./shared.js?v=f6b94cbcb2f0";
+import { drawTicker } from "./ui-ticker.js?v=f6b94cbcb2f0";
+import { actionLabel } from "./ui-copy.js?v=f6b94cbcb2f0";
+import { returnFocus } from "./ui-a11y.js?v=f6b94cbcb2f0";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=f6b94cbcb2f0";
+import { ui } from "./ui-state.js?v=f6b94cbcb2f0";
+import { add, el, person, namedText } from "./ui-core.js?v=f6b94cbcb2f0";
+import { nameLink, navigateDomain, ownerLink, openPoa } from "./ui-router.js?v=f6b94cbcb2f0";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=f6b94cbcb2f0";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=f6b94cbcb2f0";
 
 export function updateTabDots(state) {
     const marks = tabWatermarks(state);
@@ -98,7 +98,18 @@ export function openDetail(item) {
     el("detailClose").focus();
 }
 
+function poaPointer(box, text) {
+    add(box, "p", text, "muted");
+    const go = add(box, "button", "🪙 Open My POA", "secondary small");
+    go.type = "button";
+    go.addEventListener("click", () => openPoa());
+}
 export function renderAuctions(s) {
+    if (poaOnlyMode(ui.cap)) {
+        el("auctions").replaceChildren();
+        poaPointer(el("auctions"), "🪙 Auctions are in POA. Open My POA to bid or start one.");
+        return;
+    }
     const groups = partitionAuctions(Object.values(s.auctions ?? {}), s.time);
     const list = groups[ui.auctionTab] ?? [];
     el("auctions").replaceChildren();
@@ -158,6 +169,10 @@ export function renderMarketplace(s) {
     if (!box)
         return;
     box.replaceChildren();
+    if (poaOnlyMode(ui.cap)) {
+        poaPointer(box, "🪙 Names for sale are priced in POA. Open My POA to buy or list one.");
+        return;
+    }
     const listings = activeResaleOffers(s).filter((x) => x.asset === "POA");
     if (!listings.length) {
         add(box, "p", "No public listings right now", "muted");
@@ -233,7 +248,7 @@ export function render(payload) {
             `${bids.length} / ${receipts.length}`,
             "recorded bids / committed receipts",
         ],
-        [settledVolume.toString(), "Registry bids + filled offers (internal units, not on-chain volume)"],
+        ...(poaOnlyMode(ui.cap) ? [] : [[settledVolume.toString(), "Registry bids + filled offers (local registry units, not on-chain volume)"]]),
         [
             `${ui.cap.emojiAliases ?? "unknown"} / ${ui.reservedSet.size || (ui.cap.reservedCount ?? "unknown")}`,
             "emoji sequences / reserved roots",

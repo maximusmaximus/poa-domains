@@ -1,7 +1,7 @@
-import { ui } from "./ui-state.js?v=1c042d35a226";
-import { add, el, endpointBase } from "./ui-core.js?v=1c042d35a226";
-import { nameLink } from "./ui-router.js?v=1c042d35a226";
-import { actionLabel } from "./ui-copy.js?v=1c042d35a226";
+import { ui } from "./ui-state.js?v=f6b94cbcb2f0";
+import { add, el, endpointBase } from "./ui-core.js?v=f6b94cbcb2f0";
+import { nameLink, openPoa } from "./ui-router.js?v=f6b94cbcb2f0";
+import { actionLabel } from "./ui-copy.js?v=f6b94cbcb2f0";
 export function managedNames(state,owner){return Object.values(state?.names??{}).map(n=>state.deeds?.[n.activeId]).filter(d=>d&&!d.retired&&d.owner===owner);}
 export function managementPlan(action,deed,state,owner,price="100",hours="168"){
  if(deed.owner!==owner||deed.retired)throw Error("This address is not the active registry holder.");
@@ -17,7 +17,8 @@ export function renderManagement(){const box=el("manageNames"),owner=el("manageO
  if(!/^(poa1[1-9A-HJ-NP-Za-km-z]{30,60}|ed25519:[0-9a-f]{64})$/.test(owner)){add(box,"p","Use a public owner address only — never a private key.","badge-warn");return;}
  const names=managedNames(ui.latestState,owner);if(!names.length){add(box,"p","No active names for this address in the current registry snapshot.","muted");return;}
  for(const d of names){const card=add(box,"article","","card"),h=add(card,"h4","");nameLink(h,d.name);add(card,"p",d.parentId?"Subdomain · application-registry record":"Root domain · application-registry record","badge");if(d.parentId){const p=add(card,"p","Child of ");nameLink(p,ui.latestState.deeds[d.parentId]?.name??"");}
-  const label=add(card,"label","Listing / subdomain price (registry units)"),price=add(label,"input","");price.value="100";price.inputMode="numeric";price.setAttribute("aria-label","Registry-unit listing price for "+d.name);
+  const poa=ui.cap?.poaOnly?.status==="on";if(poa){const sell=add(card,"button","🏷️ Sell for POA","secondary small");sell.type="button";sell.setAttribute("aria-label","Sell "+d.name+" for POA");sell.addEventListener("click",()=>openPoa(d.name));}
+  const label=add(card,"label","Listing / subdomain price (registry units)"),price=add(label,"input","");price.value="100";price.inputMode="numeric";price.setAttribute("aria-label","Registry-unit listing price for "+d.name);label.hidden=poa;
   const controls=add(card,"div","","button-row");for(const action of ["sellFixed",d.parentId?"revokeChild":"createChildOffer"]){if(ui.cap?.ownership?.disabledActions?.includes(action)||!ui.cap?.actions?.[action])continue;const b=add(controls,"button","Prepare: "+actionLabel(action),"secondary small");b.type="button";b.addEventListener("click",()=>{try{if(ui.registryReadFailed)throw Error("Refresh registry data before preparing a request.");const fresh=ui.latestState.deeds[d.id];const plan=managementPlan(action,fresh,ui.latestState,owner,price.value);el("managePrompt").textContent=[actionLabel(action)+" — unsigned request for your agent.","Endpoint: "+endpointBase(),"Re-quote, preview and verify current ownership before signing. Ask me before submitting. No action was sent.",action==="createChildOffer"?"Offers one permanent direct subdomain; the buyer chooses its label. Existing subdomains do not disappear.":action==="revokeChild"?"Retiring requires the child holder AND parent owner's signatures. A permanent path stays reserved; it does not become available again.":"This prepares a registry-unit listing only; it does not sell the name now.",JSON.stringify(plan,null,2)].join("\n");}catch(e){el("managePrompt").textContent=e.message;}});}
   for(const o of Object.values(ui.latestState.offers??{}).filter(o=>o.parentId===d.id&&!o.cancelled&&o.uses<o.maxUses&&o.validUntil>ui.latestState.time)){const p=add(card,"p",(o.kind==="child"?"Open subdomain offer":"Open sale listing")+": "+o.price+" POA. ");const b=add(p,"button","Prepare removal","secondary small");b.type="button";b.addEventListener("click",()=>{el("managePrompt").textContent="Remove listing — unsigned. Ask the owner's agent to re-quote and preview, then request approval before submitting. Nothing was sent.\n"+JSON.stringify({action:"cancelOffer",signer:owner,params:{offerId:o.id,expectedVersion:o.version}},null,2);});}
  }

@@ -1,6 +1,7 @@
 /** Public projection only. Never passed to Engine, persistence, escrow or backups. */
 import { OWNERSHIP_TOKEN } from "../src/emoji-ownership.js";
-import { Engine, onboardingGrantOpen } from "../src/engine.js";
+import { Engine, POA_ONLY_CLOSED_ACTIONS, poaOnlyRegistry } from "../src/engine.js";
+import { POA_NEW_NAME_PRICES } from "../src/new-name-prices.js";
 import { PUBLIC_VIEW_POLICY } from "../src/api-contract.js";
 import { normalizeName } from "../src/names.js";
 import { parseJSON } from "../src/core.js";
@@ -79,11 +80,25 @@ export const HIDDEN = {
     "approved-practice-emoji-20261109"
   ]
 } as const;
-export const REGISTRY_UNITS = Object.freeze({
-  label: "internal registry units", nativePayment: false, redeemable: false,
-  legacyAssetId: "POA", legacyAssetIdIsNativeCurrency: false,
-  notice: "Registry amounts are internal accounting units, not POA or wallet money. New names can also be bought with POA through escrow, starting at 100 POA for common names and 1000 POA for premium names; read /v1/escrow/capabilities for current enabled, paused and held status before any payment. Native naming is not enabled.",
+/** Production pricing: everything is POA through POA checkout. Shown on every public registry reply. */
+export const POA_PRICING = Object.freeze({
+  currency: "POA", decimals: 6, payWith: "POA checkout",
+  newNames: Object.freeze({ standard: POA_NEW_NAME_PRICES.standard, premium: POA_NEW_NAME_PRICES.premium }),
+  checkout: "/v1/escrow/capabilities", market: "/v1/escrow/market", account: "/v1/escrow/account", command: "/v1/escrow/command",
+  closedRegistryActions: POA_ONLY_CLOSED_ACTIONS,
+  notice: "🪙 Prices, bids, purchases, resales and refunds are in POA through POA checkout. New names: 100 POA (common) or 1000 POA (premium). Read /v1/escrow/capabilities for live status before paying.",
 });
+/** Every closed action still answers a quote, but with the POA price and checkout path instead of a signable plan. */
+function poaQuote(data: any, e: Engine): any {
+  const tier = (()=>{ try { return normalizeName(data.name, e.normalizationMode).tier; } catch { return "standard"; } })();
+  return { name: data.name, action: data.action, asset: "POA", currency: "POA", available: data.available,
+    ownershipConflict: data.ownershipConflict ?? null, owner: data.owner ?? null,
+    poaPrice: data.poaPrice ?? null, tier: tier === "premium" ? "premium" : "standard",
+    reserve: null, minimumNextBid: null, price: null, fee: null, requiredMaxTotal: null, expectedVersion: null,
+    params: null, requiredInputs: [], blockedBy: "POA_ONLY", payWith: POA_PRICING,
+    requiresSignedPreview: true, observedServerTime: data.observedServerTime, registryTime: data.registryTime,
+    sequence: data.sequence, stateHash: data.stateHash, finality: data.finality };
+}
 // UI hint only, not an authorization or privacy boundary. Backend checks remain authoritative.
 export function unavailableKey(text: string): string { let n=14695981039346656037n; for(const c of text){n=BigInt.asUintN(64,(n^BigInt(c.codePointAt(0)!))*1099511628211n);} return n.toString(16).padStart(16,"0"); }
 function hintNameKey(e: Engine, name: string): string {
@@ -138,12 +153,17 @@ export function publicRegistryRoute(e: Engine, call: RegistryCall, options: Regi
       state[key]=Object.fromEntries(Object.entries(state[key]??{}).filter(([k,v])=>!hiddenReference(k)&&!hiddenReference(v)));
     data.publicView={filtered:true,policy:PUBLIC_VIEW_POLICY,stateHashScope:"complete-stored-state",sequenceScope:"complete-stored-state"};
   } else if(call.path==="/v1/capabilities") {
-    delete data.onboardingGrantPoa;
-    const units=onboardingGrantOpen(e.registryId,e.sequence)?"10000000":"0";
-    data.newAccountRegistryUnits=units;
-    data.onboardingGrantRegistryUnits=units; // deprecated alias
+    // No internal-unit fields on the production view: new accounts start empty and pay in POA.
+    for(const k of ["onboardingGrantPoa","onboardingGrantRegistryUnits","newAccountRegistryUnits"]) delete data[k];
     data.publicView={filtered:true,policy:PUBLIC_VIEW_POLICY,hiddenNamesRemainReserved:true,unavailableNameKeys:HIDDEN.names.map(n=>unavailableKey(hintNameKey(e,n))),unavailableAccountKeys:HIDDEN.accounts.map(unavailableKey)};
-    data.assets=Object.fromEntries(Object.entries(data.assets).map(([k,v])=>[k,{...(v as object),kind:"internal-registry-units",nativePayment:false,label:"internal registry units"}]));
+    if(poaOnlyRegistry(e.registryId)) {
+      data.assets=Object.fromEntries(Object.entries(data.assets).map(([k])=>[k,{decimals:6,kind:"poa",payWith:"POA checkout",newNamePrices:POA_PRICING.newNames}]));
+      data.actions=Object.fromEntries(Object.entries(data.actions).filter(([k])=>!POA_ONLY_CLOSED_ACTIONS.includes(k)));
+      if(data.surface?.rest) data.surface.rest.enabledSigningActions=data.surface.rest.enabledSigningActions.filter((k:string)=>!POA_ONLY_CLOSED_ACTIONS.includes(k));
+      data.poaOnly={status:"on",...POA_PRICING};
+    }
+  } else if(call.path==="/v1/quote" && poaOnlyRegistry(e.registryId) && POA_ONLY_CLOSED_ACTIONS.includes(data.action)) {
+    const q=poaQuote(data,e);q.pricing=POA_PRICING;return {status:original.status,jsonText:JSON.stringify(q)};
   } else if(call.path==="/v1/auctions" || call.path==="/v1/offers") {
     // Page over the public collection, not a private page: no hidden-ID cursors.
     const kind=call.path.endsWith("auctions")?"auctions":"offers";
@@ -153,6 +173,6 @@ export function publicRegistryRoute(e: Engine, call: RegistryCall, options: Regi
     data.items=values.slice(at,at+data.limit);
     data.nextCursor=at+data.limit<values.length?`v1:${kind}:${data.sequence}:${data.stateHash}:${data.items.at(-1).id}`:null;
   } else if(hiddenReference(data)) return denied(call);
-  data.registryUnits=REGISTRY_UNITS;
+  data.pricing=POA_PRICING;
   return {status:original.status,jsonText:JSON.stringify(data)};
 }

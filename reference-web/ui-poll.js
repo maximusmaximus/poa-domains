@@ -1,16 +1,16 @@
-import { publicNameUnavailable } from "./shared.js?v=1c042d35a226";
-import { installHelp } from "./ui-help.js?v=1c042d35a226";
-import { renderManagement } from "./ui-manage.js?v=1c042d35a226";
-import { actionLabel } from "./ui-copy.js?v=1c042d35a226";
-import { cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=1c042d35a226";
-import { ui } from "./ui-state.js?v=1c042d35a226";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=1c042d35a226";
-import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=1c042d35a226";
-import { render, updateTabDots } from "./ui-render.js?v=1c042d35a226";
-import { runSearch } from "./ui-search.js?v=1c042d35a226";
-import { renderIdeas } from "./ui-ideas.js?v=1c042d35a226";
-import { mountEscrow } from "./escrow.js?v=1c042d35a226";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=1c042d35a226";
+import { publicNameUnavailable } from "./shared.js?v=f6b94cbcb2f0";
+import { installHelp } from "./ui-help.js?v=f6b94cbcb2f0";
+import { renderManagement } from "./ui-manage.js?v=f6b94cbcb2f0";
+import { actionLabel } from "./ui-copy.js?v=f6b94cbcb2f0";
+import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=f6b94cbcb2f0";
+import { ui } from "./ui-state.js?v=f6b94cbcb2f0";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=f6b94cbcb2f0";
+import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=f6b94cbcb2f0";
+import { render, updateTabDots } from "./ui-render.js?v=f6b94cbcb2f0";
+import { runSearch } from "./ui-search.js?v=f6b94cbcb2f0";
+import { renderIdeas } from "./ui-ideas.js?v=f6b94cbcb2f0";
+import { mountEscrow } from "./escrow.js?v=f6b94cbcb2f0";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=f6b94cbcb2f0";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -163,6 +163,7 @@ export function renderNetworkStatus() {
 export function applyNetworkHold() {
     const hold = shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level) || !!ui.networkStatus.hold;
     const heldIds = [
+        "poaSellBtn",
         "copyCheckoutBtn",
         "copyCartPrompt",
         "downloadCartJSON",
@@ -264,6 +265,11 @@ export async function loadRegistry() {
         }
         for (const [id, tier, label] of [["premiumPolicy", "premium", "Single emoji"], ["standardPolicy", "standard", "Standard roots"]]) {
             try {
+                if (poaOnlyMode(ui.cap)) {
+                    el(id).textContent = `${label}: ${poaShort(poaNewNamePrice(ui.cap, { tier }))} POA`;
+                    el(id).title = "Price for a new name, paid in POA with POA checkout. Live status is checked before any payment.";
+                    continue;
+                }
                 const policy = rootAuctionPolicy(ui.cap, { tier });
                 const poa = ui.cap?.poaNewNamePrices?.[tier];
                 const poaLabel = typeof poa === "string" ? poa.replace(/\.0+$/, "") + " POA starting price" : null;
@@ -278,7 +284,15 @@ export async function loadRegistry() {
         }
         // Keep stored cart data; omit withheld entries from this public session.
         ui.cart=ui.cart.filter(item=>!publicNameUnavailable(item.name,ui.cap));
+        // Production is POA-only: saved registry-unit plans can't be completed there, so they are left out.
+        ui.cart=ui.cart.filter(item=>poaOnlyMode(ui.cap)?item.action==="poaCheckout":item.action!=="poaCheckout");
         for (const item of ui.cart) {
+            if (item.action === "poaCheckout") {
+                try { item.minimumAmount = cartMinimum(item, ui.cap, null); item.summary = cartSummary(item);
+                    if (item.minimumAmount !== item.amount) throw Error("⚠️ The POA price changed. Remove it and add it again."); }
+                catch (error) { item.validationError = error.message; }
+                continue;
+            }
             // Repair old saved carts affected by the amount/maxBid mismatch, without raising any cap.
             try {
                 if (!item.params || typeof item.params !== "object")

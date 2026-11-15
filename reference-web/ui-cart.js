@@ -1,11 +1,11 @@
-import { publicNameUnavailable } from "./shared.js?v=1c042d35a226";
-import { registryUnit } from "./shared.js?v=1c042d35a226";
-import { actionLabel } from "./ui-copy.js?v=1c042d35a226";
-import { trapDialog } from "./ui-a11y.js?v=1c042d35a226";
-import { ui } from "./ui-state.js?v=1c042d35a226";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=1c042d35a226";
-import { add, el, endpointBase } from "./ui-core.js?v=1c042d35a226";
-import { nameLink } from "./ui-router.js?v=1c042d35a226";
+import { publicNameUnavailable } from "./shared.js?v=f6b94cbcb2f0";
+import { registryUnit } from "./shared.js?v=f6b94cbcb2f0";
+import { actionLabel } from "./ui-copy.js?v=f6b94cbcb2f0";
+import { trapDialog } from "./ui-a11y.js?v=f6b94cbcb2f0";
+import { ui } from "./ui-state.js?v=f6b94cbcb2f0";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=f6b94cbcb2f0";
+import { add, el, endpointBase } from "./ui-core.js?v=f6b94cbcb2f0";
+import { nameLink } from "./ui-router.js?v=f6b94cbcb2f0";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
@@ -45,7 +45,8 @@ export function clearAllCart() {
 
 let handoffGeneration=0;
 export function updateHandoffAge(){
-    const text=ui.handoffData?"🧾 Agent Cart Handoff v2 · "+updatedAge(ui.handoffData.generatedAt).replace("updated","generated"):"🧾 Agent Cart Handoff v2 · "+(ui.handoffPending?"building…":ui.handoffError?"not ready: "+ui.handoffError:"not ready");
+    const label=poaOnlyMode(ui.cap)?"🧾 POA checkout · ":"🧾 Agent Cart Handoff v2 · ";
+    const text=ui.handoffData?label+updatedAge(ui.handoffData.generatedAt).replace("updated","generated"):label+(ui.handoffPending?"building…":ui.handoffError?"not ready: "+ui.handoffError:"not ready");
     for(const id of ["cartHandoffMeta","floatingHandoffMeta"])if(el(id))el(id).textContent=text;
 }
 export async function updatePromptText() {
@@ -63,9 +64,11 @@ export async function updatePromptText() {
     ui.handoffPending=true;updateHandoffAge();updateCartCopyState();
     el("cartPrompt").textContent="🧾 Building your handoff…";
     try{
-        const data=await buildAgentCartHandoff(structuredClone(ui.cart),ui.cap,"",endpointBase(),ui.configMode,structuredClone(ui.rawSnapshot));
+        const poa=poaOnlyMode(ui.cap);
+        const data=poa?buildPoaCheckoutHandoff(structuredClone(ui.cart),ui.cap,endpointBase(),structuredClone(ui.rawSnapshot))
+            :await buildAgentCartHandoff(structuredClone(ui.cart),ui.cap,"",endpointBase(),ui.configMode,structuredClone(ui.rawSnapshot));
         if(generation!==handoffGeneration||cartCopyBlocked())return;
-        ui.handoffData=data;el("cartPrompt").textContent=renderAgentCartHandoff(data);
+        ui.handoffData=data;el("cartPrompt").textContent=poa?renderPoaCheckoutHandoff(data):renderAgentCartHandoff(data);
     }catch(error){
         if(generation===handoffGeneration){ui.handoffError=String(error?.message||error).slice(0,200);el("cartPrompt").textContent="😕 Couldn't build your handoff. Tap 🔄 Refresh and try again. Nothing was sent.";}
     }finally{
@@ -75,7 +78,7 @@ export async function updatePromptText() {
 export function downloadCartJSON(){
     if(!ui.handoffData||ui.handoffPending||cartCopyBlocked())return;
     const blob=new Blob([JSON.stringify(ui.handoffData,null,2)+"\n"],{type:"application/json"}),url=URL.createObjectURL(blob),link=document.createElement("a");
-    link.href=url;link.download="poa-domains-cart-v2.json";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    link.href=url;link.download=poaOnlyMode(ui.cap)?"poa-domains-poa-checkout.json":"poa-domains-cart-v2.json";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
     el("cartStatus").textContent="📥 JSON downloaded — unsigned, nothing submitted.";
 }
 
@@ -138,7 +141,7 @@ export function renderFloatingCart() {
         const card = add(list, "div", "", "card cart-item");
         const h = add(card, "h3", "");
         nameLink(h, item.name);
-        add(card, "p", `${actionLabel(item.action)} · ${item.amount} ${registryUnit(item.asset)}`, "badge");
+        add(card, "p", item.action === "poaCheckout" ? `🪙 ${poaShort(item.amount)} POA` : `${actionLabel(item.action)} · ${item.amount} ${registryUnit(item.asset)}`, "badge");
         add(card, "p", item.summary);
         if (item.needsReview)
             add(card, "p", "⚠️ " + item.reviewMessage + " Open Find to review your cart.", "badge-warn");
@@ -197,6 +200,14 @@ export function renderCart() {
         }
         const errorNode = add(card, "p", item.validationError || "", "badge-warn");
         errorNode.setAttribute("role", "alert");
+        if (item.action === "poaCheckout") {
+            add(card, "p", `🪙 ${poaShort(item.amount)} POA`, "badge-ok");
+            const removePoa = add(card, "button", "✖️", "secondary small cart-remove");
+            removePoa.setAttribute("aria-label", "Remove " + item.name + " from cart");
+            removePoa.type = "button";
+            removePoa.addEventListener("click", () => removeCartAt(index));
+            return;
+        }
         const controls = add(card, "div", "", "inline-controls");
         const amountInput = document.createElement("input");
         amountInput.value = item.amount;
@@ -282,6 +293,11 @@ export function addDetailToCart(item) {
             amount: minBid,
             auctionId: liveAuction.id
         });
+        return;
+    }
+    if (poaOnlyMode(ui.cap)) {
+        if (info.isRoot && !s.names[name]?.activeId && !s.names[name]?.auctionId && !ui.reservedSet.has(name))
+            try { addToCart({ name, action: "poaCheckout" }); } catch (error) { el("ideasStatus").textContent = error.message; }
         return;
     }
     if (info.isRoot && !s.names[name]?.activeId && !ui.reservedSet.has(name)) {
