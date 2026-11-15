@@ -70,7 +70,12 @@ export function checkoutPlan(expected, liveBindings) {
 // Refuse a repin unless the official network advertises exactly these pins AND the served client hashes to the engine pin.
 // Full 381,139-byte download of client/poa.mjs (Last-Modified 2026-11-12T02:30:51Z) hashed on the box
 // at ~7:16 PM PST Nov 11 2026; recorded in PR #73.
-export const REPIN_CLIENT_EVIDENCE = Object.freeze({ "e01abd959dd0439dd89af8e8c187d1bed3897deb2a855a615e7dfa2d0222f1fb": true });
+// Full 398,883-byte download of client/poa.mjs hashed on the box at ~9:07 PM PST Nov 14 2026, while
+// network-facts advertised engine 92658c61… / params bc823648…; reviewed against e01abd95… in the repin PR.
+export const REPIN_CLIENT_EVIDENCE = Object.freeze({
+  "e01abd959dd0439dd89af8e8c187d1bed3897deb2a855a615e7dfa2d0222f1fb": true,
+  "92658c61bc75d24572b8eef6182af27436a4f00019854718dcf0de3c6d2b54f6": true,
+});
 export async function assertAdvertised(pins, fetchImpl) {
   // minepoa.com serves the ~380 KB client slowly (20-60 s seen on Nov 11). Bound each whole read
   // (headers + body) and retry; any failure still fails closed before anything is deployed.
