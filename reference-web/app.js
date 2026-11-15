@@ -1,17 +1,17 @@
-import { installHelp } from "./ui-help.js?v=f6b94cbcb2f0";
-import { wireManagement } from "./ui-manage.js?v=f6b94cbcb2f0";
-import { logSubmittedSearch } from "./ui-search-log.js?v=f6b94cbcb2f0";
-import { bindTabKeys } from "./ui-a11y.js?v=f6b94cbcb2f0";
-import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=f6b94cbcb2f0";
-import { ui } from "./ui-state.js?v=f6b94cbcb2f0";
-import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=f6b94cbcb2f0";
-import { navigateHome, openPoa, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=f6b94cbcb2f0";
-import { el, endpointBase } from "./ui-core.js?v=f6b94cbcb2f0";
-import { clearHandoff, copyDomainListingPrompt } from "./ui-handoff.js?v=f6b94cbcb2f0";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=f6b94cbcb2f0";
-import { runSearch } from "./ui-search.js?v=f6b94cbcb2f0";
-import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=f6b94cbcb2f0";
-import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=f6b94cbcb2f0";
+import { installHelp } from "./ui-help.js?v=9cc246d22980";
+import { wireManagement } from "./ui-manage.js?v=9cc246d22980";
+import { logSubmittedSearch } from "./ui-search-log.js?v=9cc246d22980";
+import { bindTabKeys } from "./ui-a11y.js?v=9cc246d22980";
+import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=9cc246d22980";
+import { ui } from "./ui-state.js?v=9cc246d22980";
+import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=9cc246d22980";
+import { navigateHome, openPoa, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=9cc246d22980";
+import { el, endpointBase } from "./ui-core.js?v=9cc246d22980";
+import { clearHandoff, copyDomainListingPrompt, copySubnameListing } from "./ui-handoff.js?v=9cc246d22980";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=9cc246d22980";
+import { runSearch } from "./ui-search.js?v=9cc246d22980";
+import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=9cc246d22980";
+import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=9cc246d22980";
 
 try {
     ui.statusPanelDismissed = false; // New page visits show status; closing lasts for this page only.
@@ -50,6 +50,7 @@ try {
         navigateHome();
     });
     el("poaSellBtn")?.addEventListener("click", () => openPoa(ui.currentDomainName));
+    el("poaSubnameBtn")?.addEventListener("click", copySubnameListing);
     el("copyListPromptBtn")?.addEventListener("click", () => copyDomainListingPrompt("list"));
     el("copyChangePromptBtn")?.addEventListener("click", () => copyDomainListingPrompt("change"));
     el("copyUnlistPromptBtn")?.addEventListener("click", () => copyDomainListingPrompt("unlist"));

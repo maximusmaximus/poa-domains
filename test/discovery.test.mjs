@@ -92,7 +92,7 @@ test("all actual registry, gateway and discovery API methods appear exactly once
     ["POST", "/v1/search-log"],
     ["GET", "/v1/network-status"],
     ["HEAD", "/v1/network-status"],
-    ...["capabilities", "market", "domain", "intent"].map((p) => [
+    ...["capabilities", "market", "domain", "subnames", "intent"].map((p) => [
       "GET",
       "/v1/escrow/" + p,
     ]),

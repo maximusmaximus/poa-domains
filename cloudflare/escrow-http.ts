@@ -8,14 +8,15 @@ export async function escrowHttp(request:Request,env:PublicEnv,rpc:()=>PublicRpc
   let dispatched=false;
   try{
     const u=new URL(request.url),part=u.pathname.slice("/v1/escrow/".length);
-    need(u.pathname.startsWith("/v1/escrow/")&&["capabilities","market","domain","intent","withdraw","command","account"].includes(part),"ESCROW_ROUTE");
+    need(u.pathname.startsWith("/v1/escrow/")&&["capabilities","market","domain","subnames","intent","withdraw","command","account"].includes(part),"ESCROW_ROUTE");
     const keys=[...u.searchParams.keys()];need(new Set(keys).size===keys.length,"DUPLICATE_QUERY");
     if(env.POA_ESCROW_ENABLED!=="true")return part==="capabilities"&&request.method==="GET"?reply(200,{enabled:false,paused:true,held:true,holdReason:"POA payments not open",address:null,limits:{perTransaction:env.POA_ESCROW_PER_TX??"250000.000000",daily:env.POA_ESCROW_DAILY??"1000000.000000"}}):reply(404,{code:"NOT_FOUND"});
     if(request.method==="GET"){
-      need(["capabilities","market","domain","intent"].includes(part),"METHOD_NOT_ALLOWED");
-      const allowed=part==="domain"?["name"]:part==="intent"?["id","txid"]:[];
+      need(["capabilities","market","domain","subnames","intent"].includes(part),"METHOD_NOT_ALLOWED");
+      const allowed=part==="domain"?["name"]:part==="subnames"?["parent"]:part==="intent"?["id","txid"]:[];
       need(keys.every(k=>allowed.includes(k)),"QUERY_NOT_ALLOWED");
       const query=Object.fromEntries(u.searchParams);if(part==="domain")need(typeof query.name==="string"&&query.name.length>0&&query.name.length<=256,"ESCROW_NAME");
+      if(part==="subnames"&&query.parent!==undefined)need(query.parent.length>0&&query.parent.length<=256,"ESCROW_NAME");
       if(part==="intent"){need(/^[0-9a-f]{64}$/.test(query.id??""),"ESCROW_DEPOSIT_INTENT");if(query.txid)need(/^[0-9a-f]{64}$/.test(query.txid),"ESCROW_TXID");}
       return reply(200,await rpc().escrowRead(part,query));
     }

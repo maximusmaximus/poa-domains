@@ -1,11 +1,11 @@
-import { publicNameUnavailable, unavailableKey } from "./shared.js?v=f6b94cbcb2f0";
-import { registryUnit, poaOnlyMode } from "./shared.js?v=f6b94cbcb2f0";
-import { actionLabel } from "./ui-copy.js?v=f6b94cbcb2f0";
-import { ui } from "./ui-state.js?v=f6b94cbcb2f0";
-import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=f6b94cbcb2f0";
-import { add, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=f6b94cbcb2f0";
-import { nameLink, ownerLink } from "./ui-router.js?v=f6b94cbcb2f0";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=f6b94cbcb2f0";
+import { publicNameUnavailable, unavailableKey } from "./shared.js?v=9cc246d22980";
+import { registryUnit, poaOnlyMode } from "./shared.js?v=9cc246d22980";
+import { actionLabel } from "./ui-copy.js?v=9cc246d22980";
+import { ui } from "./ui-state.js?v=9cc246d22980";
+import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=9cc246d22980";
+import { add, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=9cc246d22980";
+import { nameLink, ownerLink } from "./ui-router.js?v=9cc246d22980";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=9cc246d22980";
 
 export function renderDomainPage(name) {
     if (!ui.latestState || !name)
@@ -83,6 +83,7 @@ export function renderDomainPage(name) {
     const tools = el("domainOwnerTools");
     tools.hidden = !view.deed;
     if (el("poaSellTools")) el("poaSellTools").hidden = !poa;
+    if (el("poaSubnameTools")) el("poaSubnameTools").hidden = !poa || String(ui.currentDomainName ?? "").includes(".");
     if (el("unitSellTools")) el("unitSellTools").hidden = poa;
     el("listingPromptStatus").textContent = "";
     if (view.listing?.price)

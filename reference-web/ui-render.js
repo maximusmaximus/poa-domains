@@ -1,13 +1,13 @@
-import { registryUnit, poaOnlyMode } from "./shared.js?v=f6b94cbcb2f0";
-import { drawTicker } from "./ui-ticker.js?v=f6b94cbcb2f0";
-import { actionLabel } from "./ui-copy.js?v=f6b94cbcb2f0";
-import { returnFocus } from "./ui-a11y.js?v=f6b94cbcb2f0";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=f6b94cbcb2f0";
-import { ui } from "./ui-state.js?v=f6b94cbcb2f0";
-import { add, el, person, namedText } from "./ui-core.js?v=f6b94cbcb2f0";
-import { nameLink, navigateDomain, ownerLink, openPoa } from "./ui-router.js?v=f6b94cbcb2f0";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=f6b94cbcb2f0";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=f6b94cbcb2f0";
+import { registryUnit, poaOnlyMode } from "./shared.js?v=9cc246d22980";
+import { drawTicker } from "./ui-ticker.js?v=9cc246d22980";
+import { actionLabel } from "./ui-copy.js?v=9cc246d22980";
+import { returnFocus } from "./ui-a11y.js?v=9cc246d22980";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=9cc246d22980";
+import { ui } from "./ui-state.js?v=9cc246d22980";
+import { add, el, person, namedText } from "./ui-core.js?v=9cc246d22980";
+import { nameLink, navigateDomain, ownerLink, openPoa } from "./ui-router.js?v=9cc246d22980";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=9cc246d22980";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=9cc246d22980";
 
 export function updateTabDots(state) {
     const marks = tabWatermarks(state);

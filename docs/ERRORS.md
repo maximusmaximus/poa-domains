@@ -546,6 +546,38 @@ HTTP 400; retryable: false. Escrow signing disabled. Check the documented inputs
 
 HTTP 409; retryable: true. Escrow stale. Check the documented inputs and current state.
 
+## ESCROW_SUBNAMES_OFF
+
+HTTP 409; retryable: false. POA subname sales are not open right now. No POA was moved.
+
+## ESCROW_SUB_CLOSED
+
+HTTP 409; retryable: false. This subname listing is closed. Read /v1/escrow/subnames for open listings. No POA was moved.
+
+## ESCROW_SUB_COMMIT
+
+HTTP 409; retryable: false. Escrow sub commit. Check the documented inputs and current state.
+
+## ESCROW_SUB_CONSENT
+
+HTTP 409; retryable: false. Escrow sub consent. Check the documented inputs and current state.
+
+## ESCROW_SUB_LISTED
+
+HTTP 409; retryable: false. This name already has an open subname listing. Cancel it before setting a new price.
+
+## ESCROW_SUB_NAME
+
+HTTP 409; retryable: false. Choose a subname directly under the listed parent, like label.parent.
+
+## ESCROW_SUB_NOT_READY
+
+HTTP 409; retryable: false. Escrow sub not ready. Check the documented inputs and current state.
+
+## ESCROW_SUB_STALE
+
+HTTP 409; retryable: false. The parent name changed since it was listed, so this listing no longer applies. No POA was moved.
+
 ## ESCROW_TITLE
 
 HTTP 400; retryable: false. Escrow title. Check the documented inputs and current state.

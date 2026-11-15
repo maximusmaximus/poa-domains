@@ -167,7 +167,7 @@ const gateway = {
       }
       if (u.pathname.startsWith("/v1/escrow/")) {
         const part=u.pathname.slice("/v1/escrow/".length);
-        if(String(env.POA_ESCROW_ENABLED)!=="true"&&["capabilities","market","domain","intent","withdraw","command","account"].includes(part)&&!(part==="capabilities"&&request.method==="GET"))
+        if(String(env.POA_ESCROW_ENABLED)!=="true"&&["capabilities","market","domain","subnames","intent","withdraw","command","account"].includes(part)&&!(part==="capabilities"&&request.method==="GET"))
           return fail(503,{code:"ESCROW_DISABLED",accepted:false});
         return envelopeResponse(await escrowHttp(request,env,()=>env.REGISTRY.getByName(SINGLETON)),requestId);
       }

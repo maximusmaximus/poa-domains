@@ -787,3 +787,90 @@ test("committed reviewed credit is exactly DT1's 1 POA deposit to its own intent
  assert.equal(r.halt,"ASSET_LIABILITY_MISMATCH");assert.ok(Object.isFrozen(r)&&Object.isFrozen(REVIEWED_CREDITS));
  for(const id of ["__proto__","constructor","toString","",1])assert.throws(()=>reviewedCredit(id),/ESCROW_REVIEW|./);
 });
+// ---- POA subname sales: parent holder lists, buyer pays through escrow, proceeds wait as READY payouts ----
+import { registryTitles } from "../escrow-titles.js";
+function subRegistration(e:Engine,buyer:number,name:string,price:string,overrides:Record<string,unknown>={},tag="sub"):any{
+ const s=e.snapshot(),root=s.deeds[s.names[name.split(".").at(-1)!]!.activeId!]!;
+ const b={domain:"poa-domains.local.intent.v1",revision:e.config.revision,chainId:CHAIN,genesisHash:e.config.genesisHash,registryId:e.registryId,policyHash:e.policyHash,normalizationHash:e.config.normalizationHash,
+  signer:who(buyer),coSigners:[],requestId:(tag+"-"+name+"-"+buyer).replace(/[^a-zA-Z0-9_-]/g,"_"),nonce:e.nextNonce(who(buyer)),notBefore:0,deadline:2000000000,maxTotal:"0",maxNetworkFee:"0",action:"issueSubname",
+  params:{name,parentDeedId:root.id,parentOwnerVersion:root.ownerVersion,asset:"POA",price,expectedGeneration:1,metadata:buildMetadataWitness(name,{kind:"permanent"},root.id)},...overrides};
+ return signBody(b,[key(buyer)]);
+}
+function subFixture(on=true){
+ const journal=new MemoryJournal(policy),net=new MockNetwork();let subnames=on;
+ const engine=new Engine(mainnetConfig(who(6),who(5),[who(2),who(3),who(4)]),{now:()=>Math.floor(net.now/1000)});
+ assert.equal(engine.submitEscrowIssue(registration(2,"parent",poaNewNamePriceMicros("standard"))).status,"succeeded");
+ const e=new Escrow(journal,net,signer(),registryTitles(engine),policy,()=>net.now,()=>true,()=>{},()=>false,()=>subnames);e.pause(false);
+ return {e,net,engine,journal,setOn:(v:boolean)=>{subnames=v;}};
+}
+const owner=(e:Engine,name:string)=>{const s=e.snapshot(),id=s.names[name]?.activeId;return id?s.deeds[id]!.owner:null;};
+test("subnames OFF: list and buy are refused before any state, network or title read",async()=>{
+ const f=subFixture(false);await f.e.pause(false);const before=f.e.state();
+ await assert.rejects(f.e.command(command(who(2),"l","list-sub",{parent:"parent",price:"5.000000"})),/ESCROW_SUBNAMES_OFF/);
+ await assert.rejects(f.e.command(command(who(3),"b","buy-sub",{listing:"0".repeat(64),name:"shop.parent",amount:"5.000000",registration:subRegistration(f.engine,3,"shop.parent","5000000")})),/ESCROW_SUBNAMES_OFF/);
+ assert.deepEqual(f.e.state(),before);
+});
+test("subnames: only the parent holder lists; buyer pays the exact price; child minted; proceeds held as READY payouts",async()=>{
+ const f=subFixture();await fund(f as any,3,"20.000000");
+ await assert.rejects(f.e.command(command(who(3),"x","list-sub",{parent:"parent",price:"5.000000"})),/ESCROW_TITLE/,"non-holder cannot list");
+ await assert.rejects(f.e.command(command(who(2),"y","list-sub",{parent:"missing",price:"5.000000"})),/ESCROW_TITLE/);
+ const {listing}=await f.e.command(command(who(2),"l","list-sub",{parent:"parent",price:"5.000000"})) as any;
+ await assert.rejects(f.e.command(command(who(2),"l2","list-sub",{parent:"parent",price:"6.000000"})),/ESCROW_SUB_LISTED/);
+ const reg=subRegistration(f.engine,3,"shop.parent","5000000");
+ await assert.rejects(f.e.command(command(who(3),"p","buy-sub",{listing,name:"shop.parent",amount:"4.000000",registration:reg})),/ESCROW_PRICE/);
+ await assert.rejects(f.e.command(command(who(3),"n","buy-sub",{listing,name:"shop.other",amount:"5.000000",registration:reg})),/ESCROW_SUB_NAME/);
+ await assert.rejects(f.e.command(command(who(3),"c","buy-sub",{listing,name:"shop.parent",amount:"5.000000",registration:subRegistration(f.engine,3,"shop.parent","5000000",{maxTotal:"1"})})),/ESCROW_SUB_CONSENT/);
+ await assert.rejects(f.e.command(command(who(2),"s","buy-sub",{listing,name:"own.parent",amount:"5.000000",registration:subRegistration(f.engine,2,"own.parent","5000000")})),/ESCROW_SELF_SALE/);
+ assert.equal(f.e.state().available[who(3)],"20000000","no failed attempt moved POA");
+ const r=await f.e.command(command(who(3),"ok","buy-sub",{listing,name:"shop.parent",amount:"5.000000",registration:reg})) as any;
+ assert.equal(owner(f.engine,"shop.parent"),who(3));assert.equal(r.issued,"shop.parent");
+ const s=f.e.state();assert.equal(s.available[who(3)],"15000000");invariant(s);
+ const pays=r.payments.map((id:string)=>s.payments[id]!);
+ assert.deepEqual(pays.map((p:any)=>[p.kind,p.to,p.amount,p.status]),[["seller",who(2),"4875000","READY"],["fee",policy.treasury,"125000","READY"]]);
+ assert.deepEqual(s.subListings![listing]!.sold.map(x=>x.name),["shop.parent"]);
+ const child=f.engine.snapshot().deeds[f.engine.snapshot().names["shop.parent"]!.activeId!]!;
+ assert.equal(child.rights.kind,"permanent");assert.equal(child.parentId,f.engine.snapshot().names.parent!.activeId);
+ await assert.rejects(f.e.command(command(who(4),"dup","buy-sub",{listing,name:"shop.parent",amount:"5.000000",registration:subRegistration(f.engine,4,"shop.parent","5000000")})),/ESCROW_SUB_NOT_READY|ESCROW_INSUFFICIENT_FUNDS/);
+ assert.deepEqual(await f.e.command(command(who(3),"ok","buy-sub",{listing,name:"shop.parent",amount:"5.000000",registration:reg})),r,"same signed request is idempotent");
+ assert.equal(f.e.state().available[who(3)],"15000000","no second debit");
+});
+test("subnames: a parent that changed hands voids the listing; the holder can cancel; nothing moves",async()=>{
+ const f=subFixture();await fund(f as any,3,"20.000000");
+ const {listing}=await f.e.command(command(who(2),"l","list-sub",{parent:"parent",price:"5.000000"})) as any;
+ await assert.rejects(f.e.command(command(who(4),"c","cancel-sub",{listing})),/ESCROW_CANCEL_NOT_ALLOWED/);
+ // Parent holder transfers the root to who(4): ownerVersion changes, so the old listing no longer applies.
+ const s0=f.engine.snapshot(),root=s0.deeds[s0.names.parent!.activeId!]!;
+ const t={domain:"poa-domains.local.intent.v1",revision:f.engine.config.revision,chainId:CHAIN,genesisHash:f.engine.config.genesisHash,registryId:f.engine.registryId,policyHash:f.engine.policyHash,normalizationHash:f.engine.config.normalizationHash,
+  signer:who(2),coSigners:[],requestId:"move-parent",nonce:f.engine.nextNonce(who(2)),notBefore:0,deadline:2000000000,maxTotal:"0",maxNetworkFee:"0",action:"transfer",params:{name:"parent",expectedDeedId:root.id,expectedVersion:root.version,recipient:who(4)}};
+ assert.equal(f.engine.submit(signBody(t,[key(2)])).status,"succeeded");
+ await assert.rejects(f.e.command(command(who(3),"b","buy-sub",{listing,name:"shop.parent",amount:"5.000000",registration:subRegistration(f.engine,3,"shop.parent","5000000")})),/ESCROW_TITLE|ESCROW_SUB_STALE/);
+ assert.equal(f.e.state().available[who(3)],"20000000");assert.equal(owner(f.engine,"shop.parent"),null);
+ await f.e.command(command(who(2),"c2","cancel-sub",{listing}));assert.equal(f.e.state().subListings![listing]!.status,"CANCELLED");
+ await assert.rejects(f.e.command(command(who(3),"b2","buy-sub",{listing,name:"shop.parent",amount:"5.000000",registration:subRegistration(f.engine,3,"shop.parent","5000000",{},"b2")})),/ESCROW_SUB_CLOSED/);
+});
+test("subnames: network hold and pause apply to buying; a failed registry write moves no POA",async()=>{
+ const f=subFixture();await fund(f as any,3,"20.000000");
+ const {listing}=await f.e.command(command(who(2),"l","list-sub",{parent:"parent",price:"5.000000"})) as any;
+ f.net.stale=true;await assert.rejects(f.e.command(command(who(3),"h","buy-sub",{listing,name:"shop.parent",amount:"5.000000",registration:subRegistration(f.engine,3,"shop.parent","5000000")})),/ESCROW_STALE|ESCROW_NETWORK_HELD/);f.net.stale=false;
+ await f.e.pause(true);await assert.rejects(f.e.command(command(who(3),"p","buy-sub",{listing,name:"shop.parent",amount:"5.000000",registration:subRegistration(f.engine,3,"shop.parent","5000000")})),/ESCROW_PAUSED/);await f.e.pause(false);
+ const before=f.e.state();
+ await assert.rejects(f.e.command(command(who(3),"g","buy-sub",{listing,name:"shop.parent",amount:"5.000000",registration:subRegistration(f.engine,3,"shop.parent","5000000",{params:{...subRegistration(f.engine,3,"shop.parent","5000000").body.params,expectedGeneration:2}})})),/ESCROW_SUB_NOT_READY/);
+ assert.deepEqual(f.e.state(),before);
+});
+test("engine: issueSubname is escrow-only, permanent, cap 0, and keeps child rules (revoke needs the parent)",()=>{
+ const e=new Engine(mainnetConfig(who(6),who(5),[who(2),who(3),who(4)]),{now:()=>1});
+ assert.equal(e.submitEscrowIssue(registration(2,"parent",poaNewNamePriceMicros("standard"))).status,"succeeded");
+ const reg=subRegistration(e,3,"shop.parent","5000000");
+ assert.throws(()=>e.submit(reg),/ESCROW_ONLY/);assert.throws(()=>e.preview(reg),/ESCROW_ONLY/);
+ assert.equal(e.previewEscrowIssue(subRegistration(e,2,"own.parent","5000000")).status,"rejected","the parent holder cannot buy from themself");
+ assert.equal(e.previewEscrowIssue(subRegistration(e,3,"deep.shop.parent","5000000")).status,"rejected","one level only");
+ assert.equal(e.previewEscrowIssue(subRegistration(e,3,"shop.parent","5000000",{maxTotal:"5"})).status,"rejected");
+ { const rr=e.submitEscrowIssue(reg);assert.equal(rr.status,"succeeded",JSON.stringify(rr)); }
+ assert.equal(e.submitEscrowIssue(subRegistration(e,4,"shop.parent","5000000")).status,"rejected","a sold subname cannot be sold twice");
+ const s=e.snapshot(),child=s.deeds[s.names["shop.parent"]!.activeId!]!,root=s.deeds[s.names.parent!.activeId!]!;
+ const revoke=(co:string[])=>signBody({domain:"poa-domains.local.intent.v1",revision:e.config.revision,chainId:CHAIN,genesisHash:e.config.genesisHash,registryId:e.registryId,policyHash:e.policyHash,normalizationHash:e.config.normalizationHash,
+  signer:who(3),coSigners:co,requestId:"revoke-"+co.length,nonce:e.nextNonce(who(3)),notBefore:0,deadline:2000000000,maxTotal:"0",maxNetworkFee:"0",action:"revokeChild",
+  params:{name:"shop.parent",expectedDeedId:child.id,expectedVersion:child.version,parentOwnerVersion:root.ownerVersion}},co.length?[key(3),key(2)]:[key(3)]);
+ assert.equal(e.preview(revoke([])).status,"rejected","the child holder alone cannot revoke");
+ assert.equal(e.preview(revoke([who(2)])).status,"succeeded","child holder plus parent holder can revoke, as before");
+});

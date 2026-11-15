@@ -1,16 +1,16 @@
-import { publicNameUnavailable } from "./shared.js?v=f6b94cbcb2f0";
-import { installHelp } from "./ui-help.js?v=f6b94cbcb2f0";
-import { renderManagement } from "./ui-manage.js?v=f6b94cbcb2f0";
-import { actionLabel } from "./ui-copy.js?v=f6b94cbcb2f0";
-import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=f6b94cbcb2f0";
-import { ui } from "./ui-state.js?v=f6b94cbcb2f0";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=f6b94cbcb2f0";
-import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=f6b94cbcb2f0";
-import { render, updateTabDots } from "./ui-render.js?v=f6b94cbcb2f0";
-import { runSearch } from "./ui-search.js?v=f6b94cbcb2f0";
-import { renderIdeas } from "./ui-ideas.js?v=f6b94cbcb2f0";
-import { mountEscrow } from "./escrow.js?v=f6b94cbcb2f0";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=f6b94cbcb2f0";
+import { publicNameUnavailable } from "./shared.js?v=9cc246d22980";
+import { installHelp } from "./ui-help.js?v=9cc246d22980";
+import { renderManagement } from "./ui-manage.js?v=9cc246d22980";
+import { actionLabel } from "./ui-copy.js?v=9cc246d22980";
+import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=9cc246d22980";
+import { ui } from "./ui-state.js?v=9cc246d22980";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=9cc246d22980";
+import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=9cc246d22980";
+import { render, updateTabDots } from "./ui-render.js?v=9cc246d22980";
+import { runSearch } from "./ui-search.js?v=9cc246d22980";
+import { renderIdeas } from "./ui-ideas.js?v=9cc246d22980";
+import { mountEscrow } from "./escrow.js?v=9cc246d22980";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=9cc246d22980";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -164,6 +164,7 @@ export function applyNetworkHold() {
     const hold = shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level) || !!ui.networkStatus.hold;
     const heldIds = [
         "poaSellBtn",
+        "poaSubnameBtn",
         "copyCheckoutBtn",
         "copyCartPrompt",
         "downloadCartJSON",

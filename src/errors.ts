@@ -137,6 +137,14 @@ ESCROW_SIGNATURE
 ESCROW_SIGNER
 ESCROW_SIGNING_DISABLED
 ESCROW_STALE
+ESCROW_SUBNAMES_OFF
+ESCROW_SUB_CLOSED
+ESCROW_SUB_COMMIT
+ESCROW_SUB_CONSENT
+ESCROW_SUB_LISTED
+ESCROW_SUB_NAME
+ESCROW_SUB_NOT_READY
+ESCROW_SUB_STALE
 ESCROW_TITLE
 ESCROW_TITLE_COMMIT
 ESCROW_TITLE_CONSENT
@@ -362,10 +370,16 @@ const statuses:Record<string,number> = {
  // Deployed financial business-state errors retain their existing status contract.
  ESCROW_PAUSED:409, ESCROW_STALE:409, ESCROW_NETWORK_HELD:409, ESCROW_NOT_FINAL:409, ESCROW_ACTION:409,
  ESCROW_REVIEW:409, ESCROW_REVIEW_INTENT:409, ESCROW_REVIEW_STATE:409, ESCROW_REVIEW_USED:409,
+ ESCROW_SUBNAMES_OFF:409, ESCROW_SUB_CLOSED:409, ESCROW_SUB_COMMIT:409, ESCROW_SUB_CONSENT:409, ESCROW_SUB_LISTED:409, ESCROW_SUB_NAME:409, ESCROW_SUB_NOT_READY:409, ESCROW_SUB_STALE:409,
 };
 const retry = new Set(['SEARCH_LOG_RATE_LIMITED','SEARCH_LOG_LIMITER_UNAVAILABLE','SEARCH_LOG_DISABLED','SEARCH_LOG_FAILED','NATIVE_READ_FAILED','NATIVE_HTTP','NATIVE_BUSY','NATIVE_STALE_CACHE','NETWORK_ERROR','NETWORK_HELD','REGISTRY_UNAVAILABLE','ESCROW_DISABLED','ESCROW_UNAVAILABLE','ESCROW_HELD','ESCROW_PAUSED','ESCROW_STALE','ESCROW_NETWORK_HELD','ESCROW_NOT_FINAL','DURABILITY_UNKNOWN_RESTART_AND_QUERY','UNKNOWN_OUTCOME','OUTCOME_UNKNOWN']);
 const messages:Record<string,string> = {
  PUBLIC_RECORD_WITHHELD:'This stored record is not public. The name or reference remains unavailable; it is not free to register. No new action was dispatched. Hidden receipts are not reported as missing: keep the original packet and do not replace its nonce or request ID.',
+ ESCROW_SUBNAMES_OFF:'POA subname sales are not open right now. No POA was moved.',
+ ESCROW_SUB_CLOSED:'This subname listing is closed. Read /v1/escrow/subnames for open listings. No POA was moved.',
+ ESCROW_SUB_LISTED:'This name already has an open subname listing. Cancel it before setting a new price.',
+ ESCROW_SUB_NAME:'Choose a subname directly under the listed parent, like label.parent.',
+ ESCROW_SUB_STALE:'The parent name changed since it was listed, so this listing no longer applies. No POA was moved.',
  POA_ONLY:'This registry is priced in POA. Buy, bid, list and resell names with POA checkout: read /v1/escrow/capabilities. No registry change was made.',
  PAGE_LIMIT:'Choose a whole-number page limit from 1 to 100.',
  PAGE_CURSOR:'Use the unchanged nextCursor from this collection.',

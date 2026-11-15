@@ -806,6 +806,54 @@
       "retryable": true
     },
     {
+      "code": "ESCROW_SUBNAMES_OFF",
+      "httpStatus": 409,
+      "message": "POA subname sales are not open right now. No POA was moved.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_SUB_CLOSED",
+      "httpStatus": 409,
+      "message": "This subname listing is closed. Read /v1/escrow/subnames for open listings. No POA was moved.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_SUB_COMMIT",
+      "httpStatus": 409,
+      "message": "Escrow sub commit. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_SUB_CONSENT",
+      "httpStatus": 409,
+      "message": "Escrow sub consent. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_SUB_LISTED",
+      "httpStatus": 409,
+      "message": "This name already has an open subname listing. Cancel it before setting a new price.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_SUB_NAME",
+      "httpStatus": 409,
+      "message": "Choose a subname directly under the listed parent, like label.parent.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_SUB_NOT_READY",
+      "httpStatus": 409,
+      "message": "Escrow sub not ready. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_SUB_STALE",
+      "httpStatus": 409,
+      "message": "The parent name changed since it was listed, so this listing no longer applies. No POA was moved.",
+      "retryable": false
+    },
+    {
       "code": "ESCROW_TITLE",
       "httpStatus": 400,
       "message": "Escrow title. Check the documented inputs and current state.",
