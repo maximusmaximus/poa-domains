@@ -103,9 +103,12 @@ export function checkoutPlan(expected, liveBindings) {
 // Full 398,883-byte download of client/poa.mjs (Last-Modified 2026-11-14T09:04:49Z) hashed on the box at ~9:07 PM PST Nov 14 2026, while
 // network-facts advertised engine 92658c61… / params bc823648…; re-downloaded and re-hashed at ~11:05 PM PST.
 // Reviewed against e01abd95… in the repin PR.
+// Full 429,830-byte download of client/poa.mjs hashed on the box on Nov 19 2026 while network-facts advertised
+// engine ed86480c… (params unchanged, bc823648…). Reviewed against 92658c61…: transfer body, txid, signing and receipt code is unchanged.
 export const REPIN_CLIENT_EVIDENCE = Object.freeze({
   "e01abd959dd0439dd89af8e8c187d1bed3897deb2a855a615e7dfa2d0222f1fb": true,
   "92658c61bc75d24572b8eef6182af27436a4f00019854718dcf0de3c6d2b54f6": true,
+  "ed86480cd46a8c2df2dbf395f75838f9939120b930cc821c777adf91f5d3d67d": true,
 });
 export async function assertAdvertised(pins, fetchImpl) {
   // minepoa.com serves the ~380 KB client slowly (20-60 s seen on Nov 11). Bound each whole read
