@@ -139,7 +139,7 @@ variables** (these are not secrets or deployment overrides):
 | `POA_ESCROW_ADDRESS` | `poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf` |
 | `POA_ESCROW_PER_TX` | `250000.000000` |
 | `POA_ESCROW_DAILY` | `1000000.000000` |
-| `POA_ESCROW_ENGINE_SHA256` | `92658c61bc75d24572b8eef6182af27436a4f00019854718dcf0de3c6d2b54f6` |
+| `POA_ESCROW_ENGINE_SHA256` | `ed86480cd46a8c2df2dbf395f75838f9939120b930cc821c777adf91f5d3d67d` |
 | `POA_ESCROW_PARAMS_SHA256` | `bc823648e0efa9343e62b153a61d74180a32dca8581f1856376616c1e8e0a15f` |
 
 Re-read live policy at approval time; do not replay this observation over a later
