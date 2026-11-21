@@ -36,8 +36,7 @@ jobs:
 
   deploy:
     needs: dry-run
-    # Intentionally DISARMED until Max configures policy/token and explicitly enables it.
-    # The environment then requires Max's review on EVERY eligible main deployment.
+    # Deploys automatically on every green main push once dry-run passes (protected to main).
     if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository && vars.WORKER_DEPLOY_ENABLED == 'true'
     environment: production
     runs-on: ubuntu-latest

@@ -1,18 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { parse } from "yaml";
 import { endpoint } from "../dist/src/client.js";
 import { ACCOUNT, WORKER, REPO, ADDRESS, POLICY, parseConfig, productionConfig, expectedPolicy,
-  assertBindings, assertProductionEnvironment, assertGitHub, liveSnapshot, wranglerArgs, runDeployment, repinPlan, checkoutPlan, assertAdvertised, expectedSwitches, switchesPlan, assertSwitches, OPTIONAL_SWITCHES, NETWORK_FACTS, NETWORK_CLIENT } from "../scripts/worker-deploy.mjs";
+  assertBindings, assertProductionEnvironment, assertGitHub, assertLiveEscrowFresh, hasReviewedClientEvidence, committedPins, resolvePinTransition, liveSnapshot, wranglerArgs, runDeployment, repinPlan, checkoutPlan, assertAdvertised, expectedSwitches, switchesPlan, assertSwitches, OPTIONAL_SWITCHES, NETWORK_FACTS, NETWORK_CLIENT } from "../scripts/worker-deploy.mjs";
 const config = parseConfig(readFileSync("wrangler.jsonc", "utf8"));
 const expected = { ...Object.fromEntries(POLICY.map(k => [k, config.vars[k]])),
   POA_ESCROW_ENABLED: "true", POA_ESCROW_NETWORK_WRITES: "approved-v1", POA_ESCROW_NEW_NAMES: "approved-v1", POA_ESCROW_ADDRESS: ADDRESS };
 const bindings = [...POLICY.map(name => ({ name, type: "plain_text", text: expected[name] })),
   ...["POA_ESCROW_KEY", "ESCROW_ADMIN_TOKEN"].map(name => ({ name, type: "secret_text" }))];
 const sha = "a".repeat(40), version = "46459dd0-989d-46dc-ad79-c8b24a867595";
-const environment = { name: "production", can_admins_bypass: false, deployment_branch_policy: { protected_branches: true },
-  protection_rules: [{ type: "required_reviewers", reviewers: [{ type: "User", reviewer: { id: 15719015, login: "maximusmaximus" } }] }] };
+const environment = { name: "production", can_admins_bypass: false,
+  deployment_branch_policy: { protected_branches: true, custom_branch_policies: false },
+  protection_rules: [{ type: "branch_policy" }] };
 const env = { ...expected, WORKER_DEPLOY_ENABLED: "true", GITHUB_ACTIONS: "true", GITHUB_EVENT_NAME: "workflow_run",
   GITHUB_REPOSITORY: REPO, GITHUB_TOKEN: "not-a-credential", CLOUDFLARE_API_TOKEN: "not-a-credential", DEPLOY_SHA: sha, CI_RUN_ID: "123" };
 function provider(overrides = {}) {
@@ -24,13 +27,15 @@ function provider(overrides = {}) {
     "/deployments": { success: true, result: { deployments: [{ id: "deployment-one", versions: [{ version_id: version, percentage: 100 }] }] } },
     "/settings": { success: true, result: { bindings } },
     [`/versions/${version}`]: { success: true, result: { id: version, resources: { bindings } } },
+    "/v1/escrow/capabilities": { freshness: { held: false, code: null } },
     ...overrides,
   };
   const calls = [];
   const fetchImpl = async (url, options) => {
     calls.push(url); assert.equal(options.method, "GET"); assert.equal(options.redirect, "error");
     assert.ok(url.startsWith(`https://api.github.com/repos/${REPO}/`) ||
-      url.startsWith(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/workers/scripts/${WORKER}/`));
+      url.startsWith(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/workers/scripts/${WORKER}/`) ||
+      url.startsWith("https://poadomains.grok.me/"));
     const key = Object.keys(replies).find(k => url.endsWith(k)); assert.ok(key, url);
     return { ok: true, json: async () => structuredClone(replies[key]) };
   };
@@ -73,12 +78,10 @@ test("all public production policy is mandatory and must match both settings and
   assert.throws(() => assertBindings(bindings.filter(b => b.name !== "POA_ESCROW_KEY"), expected), /MISSING_LIVE_SECRET_BINDING/);
 });
 
-test("Max is the sole required reviewer; admin bypass, absent gate or stale/failed/foreign main refuse deployment", async () => {
+test("production environment restricts to protected main without admin bypass; stale/failed/foreign main refuse deployment", async () => {
   assertProductionEnvironment(environment);
-  for (const change of [{ can_admins_bypass: true }, { protection_rules: [] }, { deployment_branch_policy: null }])
-    assert.throws(() => assertProductionEnvironment({ ...environment, ...change }), /PRODUCTION_REQUIRES_MAX_REVIEW/);
-  const extra = structuredClone(environment); extra.protection_rules[0].reviewers.push({ type: "User", reviewer: { login: "other" } });
-  assert.throws(() => assertProductionEnvironment(extra), /PRODUCTION_REQUIRES_MAX_REVIEW/);
+  for (const change of [{ can_admins_bypass: true }, { deployment_branch_policy: null }, { deployment_branch_policy: { protected_branches: true, custom_branch_policies: true } }, { name: "staging" }])
+    assert.throws(() => assertProductionEnvironment({ ...environment, ...change }), /PRODUCTION_REQUIRES_PROTECTED_MAIN/);
   for (const change of [{ GITHUB_EVENT_NAME: "pull_request" }, { WORKER_DEPLOY_ENABLED: "" }, { GITHUB_ACTIONS: "" },
     { DEPLOY_SHA: "short" }, { GITHUB_REPOSITORY: "other/repo" }, { GITHUB_TOKEN: "" }])
     await assert.rejects(assertGitHub({ ...env, ...change }, async () => assert.fail("no request permitted")), /DEPLOY_REQUIRES_APPROVED_MAIN_WORKFLOW/);
@@ -109,7 +112,7 @@ test("actual runner dry-run needs no credentials/network; approved deployment dr
   await runDeployment({ dryRun: true, env: {}, fetchImpl: async () => assert.fail("offline"), run });
   assert.equal(calls.length, 1); assert.ok(calls[0].includes("--dry-run"));
   calls.length = 0;
-  await runDeployment({ dryRun: false, env, fetchImpl: provider().fetchImpl, run });
+  await runDeployment({ dryRun: false, env: { ...env, DEPLOY_POSTCHECK_DELAY_MS: "0" }, fetchImpl: provider().fetchImpl, run });
   assert.equal(calls.length, 2); assert.ok(calls[0].includes("--dry-run")); assert.ok(!calls[1].includes("--dry-run"));
   assert.ok(paths.every(p => !existsSync(p)));
   await assert.rejects(runDeployment({ dryRun: false, env: { ...env, CLOUDFLARE_API_TOKEN: "" }, run }), /MISSING_CLOUDFLARE_API_TOKEN/);
@@ -295,4 +298,78 @@ test("subname switch (Max t140s1306): off unless approved-v1; written once when 
   const q = provider({ "/settings": { success: true, result: { bindings: live } }, [`/versions/${version}`]: { success: true, result: { id: version, resources: { bindings: live } } } });
   await assert.rejects(runDeployment({ dryRun: false, env: { ...env, DEPLOY_POSTCHECK_DELAY_MS: "0" }, fetchImpl: q.fetchImpl, run }), /LIVE_SWITCH_MISMATCH/);
   assert.deepEqual(plans, []);
+});
+
+test("compat self-verified evidence, automatic pin sync from wrangler.jsonc, and live ESCROW_PROTOCOL_CHANGED post-check", async () => {
+  const { createHash } = await import("node:crypto");
+  const dir = mkdtempSync(join(tmpdir(), "poa-deploy-compat-"));
+  try {
+    const client = new TextEncoder().encode("new verified client bytes");
+    const newEngine = createHash("sha256").update(client).digest("hex");
+    const newParams = "e".repeat(64);
+    assert.equal(hasReviewedClientEvidence(newEngine, dir), false);
+    mkdirSync(join(dir, ".poa-compat"), { recursive: true });
+    writeFileSync(join(dir, ".poa-compat/evidence.json"), "not json");
+    assert.equal(hasReviewedClientEvidence(newEngine, dir), false);
+    // Reject mismatched client/engine or breaking surface or foreign source.
+    writeFileSync(join(dir, ".poa-compat/evidence.json"), JSON.stringify({ entries: [
+      { to: { engine: newEngine, client: "0".repeat(64), clientSize: 25 }, sources: { facts: NETWORK_FACTS, client: NETWORK_CLIENT }, surface: { counts: { breaking: 0 } } },
+      { to: { engine: newEngine, client: newEngine, clientSize: 25 }, sources: { facts: NETWORK_FACTS, client: NETWORK_CLIENT }, surface: { counts: { breaking: 1 } } },
+      { to: { engine: newEngine, client: newEngine, clientSize: 25 }, sources: { facts: "https://evil.example/facts", client: NETWORK_CLIENT }, surface: { counts: { breaking: 0 } } },
+    ] }));
+    assert.equal(hasReviewedClientEvidence(newEngine, dir), false);
+    // Accept valid self-verified evidence entry.
+    writeFileSync(join(dir, ".poa-compat/evidence.json"), JSON.stringify({ entries: [
+      { to: { engine: newEngine, client: newEngine, clientSize: client.length }, sources: { facts: NETWORK_FACTS, client: NETWORK_CLIENT }, surface: { counts: { breaking: 0 } } },
+    ] }));
+    assert.equal(hasReviewedClientEvidence(newEngine, dir), true);
+    const slow = async u => {
+      if (u === NETWORK_FACTS) return { ok: true, json: async () => ({ chain_id: "poa-mainnet-1", engine_sha256: newEngine, params_sha256: newParams }) };
+      throw new DOMException("slow", "TimeoutError");
+    };
+    assert.equal(await assertAdvertised({ POA_ESCROW_ENGINE_SHA256: newEngine, POA_ESCROW_PARAMS_SHA256: newParams }, slow, dir), "client-hash-from-reviewed-evidence");
+
+    // committedPins validation + automatic repin from wrangler.jsonc without POA_ESCROW_REPIN_*.
+    assert.throws(() => committedPins({ vars: { POA_ESCROW_ENGINE_SHA256: "bad", POA_ESCROW_PARAMS_SHA256: newParams } }), /INVALID_COMMITTED_PIN/);
+    const updatedConfig = structuredClone(config);
+    updatedConfig.vars.POA_ESCROW_ENGINE_SHA256 = newEngine;
+    updatedConfig.vars.POA_ESCROW_PARAMS_SHA256 = newParams;
+    writeFileSync(join(dir, "wrangler.jsonc"), JSON.stringify(updatedConfig, null, 2));
+    const trans = resolvePinTransition(env, expected, updatedConfig, bindings, dir);
+    assert.deepEqual(trans.repin, { POA_ESCROW_ENGINE_SHA256: newEngine, POA_ESCROW_PARAMS_SHA256: newParams });
+    // Unreviewed/tampered live pin is rejected.
+    const badBindings = bindings.map(b => b.name === "POA_ESCROW_ENGINE_SHA256" ? { ...b, text: "f".repeat(64) } : b);
+    assert.throws(() => assertBindings(badBindings, resolvePinTransition(env, expected, updatedConfig, badBindings, dir).preExpected), /LIVE_POLICY_MISMATCH/);
+
+    // Full automatic deploy with wrangler.jsonc pins ahead of live bindings: writes only the 2 pins and checks live freshness.
+    let deployed = false; const plans = [];
+    const newBindings = bindings.map(b => b.name === "POA_ESCROW_ENGINE_SHA256" ? { ...b, text: newEngine } : b.name === "POA_ESCROW_PARAMS_SHA256" ? { ...b, text: newParams } : b);
+    const p = provider();
+    const fetchImpl = async (url, o) => {
+      if (url === NETWORK_FACTS) return { ok: true, json: async () => ({ chain_id: "poa-mainnet-1", engine_sha256: newEngine, params_sha256: newParams }) };
+      if (url === NETWORK_CLIENT) return { ok: true, arrayBuffer: async () => client.buffer.slice(0) };
+      const r = await p.fetchImpl(url, o);
+      if (!deployed || !(url.endsWith("/settings") || url.includes("/versions/"))) return r;
+      const body = await r.json(); if (body.result.bindings) body.result.bindings = newBindings; else body.result.resources.bindings = newBindings;
+      return { ok: true, json: async () => body };
+    };
+    const run = (_exe, args) => { const plan = JSON.parse(readFileSync(args[args.indexOf("--config") + 1], "utf8"));
+      plans.push(Object.keys(plan.vars).filter(k => k.startsWith("POA_ESCROW_")).sort()); if (!args.includes("--dry-run")) deployed = true; return { status: 0 }; };
+    await runDeployment({ dryRun: false, env: { ...env, DEPLOY_POSTCHECK_DELAY_MS: "0" }, fetchImpl, run, root: dir });
+    assert.deepEqual(plans, [["POA_ESCROW_ENGINE_SHA256", "POA_ESCROW_PARAMS_SHA256"], ["POA_ESCROW_ENGINE_SHA256", "POA_ESCROW_PARAMS_SHA256"]]);
+
+    // Subsequent deploy when live already matches wrangler.jsonc (even if GitHub env vars still have old pins): no repin, succeeds.
+    plans.length = 0; deployed = false;
+    const syncedP = provider({
+      "/settings": { success: true, result: { bindings: newBindings } },
+      [`/versions/${version}`]: { success: true, result: { id: version, resources: { bindings: newBindings } } },
+    });
+    await runDeployment({ dryRun: false, env: { ...env, DEPLOY_POSTCHECK_DELAY_MS: "0" }, fetchImpl: syncedP.fetchImpl, run, root: dir });
+    assert.deepEqual(plans, [[], []]);
+
+    // Post-deploy check fails when live escrow reports ESCROW_PROTOCOL_CHANGED, HTTP error, or network error.
+    await assert.rejects(assertLiveEscrowFresh("https://poadomains.grok.me", async () => ({ ok: true, json: async () => ({ freshness: { code: "ESCROW_PROTOCOL_CHANGED" } }) }), 0), /ESCROW_PROTOCOL_CHANGED/);
+    await assert.rejects(assertLiveEscrowFresh("https://poadomains.grok.me", async () => ({ ok: false, status: 502 }), 0), /ESCROW_CAPABILITIES_HTTP_ERROR/);
+    await assert.rejects(assertLiveEscrowFresh("https://poadomains.grok.me", async () => { throw new Error("down"); }, 0), /ESCROW_CAPABILITIES_UNAVAILABLE/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

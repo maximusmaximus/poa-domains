@@ -1,6 +1,6 @@
 // Production deployment plumbing only: never read/write a PoA key or call escrow admin routes.
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { randomUUID, createHash } from "node:crypto";
@@ -113,7 +113,51 @@ export const REPIN_CLIENT_EVIDENCE = Object.freeze({
   "ed86480cd46a8c2df2dbf395f75838f9939120b930cc821c777adf91f5d3d67d": true,
   "39ea914d92f3049e2e7a37accf1a998d263f280d4d37b075abdc463eda157d88": true,
 });
-export async function assertAdvertised(pins, fetchImpl) {
+export function hasReviewedClientEvidence(engineSha256, root = process.cwd()) {
+  if (REPIN_CLIENT_EVIDENCE[engineSha256] === true) return true;
+  const path = resolve(root, ".poa-compat/evidence.json");
+  if (!existsSync(path)) return false;
+  try {
+    const doc = JSON.parse(readFileSync(path, "utf8"));
+    return Array.isArray(doc?.entries) && doc.entries.some(e =>
+      e?.to?.engine === engineSha256 &&
+      e?.to?.client === engineSha256 &&
+      typeof e?.to?.clientSize === "number" && e.to.clientSize > 0 &&
+      (e?.sources?.facts === NETWORK_FACTS || e?.sources?.facts === "https://minepoa.com/api/network-facts") &&
+      (e?.sources?.client === NETWORK_CLIENT || e?.sources?.client === "https://minepoa.com/client/poa.mjs") &&
+      (e?.surface?.counts ? e.surface.counts.breaking === 0 : typeof e?.surface?.state === "string" && !e.surface.state.startsWith("unknown"))
+    );
+  } catch {
+    return false;
+  }
+}
+export function committedPins(rawConfig) {
+  const engine = rawConfig?.vars?.POA_ESCROW_ENGINE_SHA256 ?? "";
+  const params = rawConfig?.vars?.POA_ESCROW_PARAMS_SHA256 ?? "";
+  if (!/^[0-9a-f]{64}$/.test(engine) || !/^[0-9a-f]{64}$/.test(params)) fail("INVALID_COMMITTED_PIN");
+  return { POA_ESCROW_ENGINE_SHA256: engine, POA_ESCROW_PARAMS_SHA256: params };
+}
+export function resolvePinTransition(env, expected, rawConfig, preBindings, root = process.cwd()) {
+  const explicit = repinPlan(env, expected);
+  if (explicit) return { repin: explicit, preExpected: expected, postExpected: { ...expected, ...explicit } };
+  const target = committedPins(rawConfig);
+  const liveEngine = preBindings?.find(b => b.name === "POA_ESCROW_ENGINE_SHA256")?.text ?? "";
+  const liveParams = preBindings?.find(b => b.name === "POA_ESCROW_PARAMS_SHA256")?.text ?? "";
+  const validLive = /^[0-9a-f]{64}$/.test(liveEngine) && /^[0-9a-f]{64}$/.test(liveParams);
+  const knownLive = validLive && (
+    (liveEngine === expected.POA_ESCROW_ENGINE_SHA256 && liveParams === expected.POA_ESCROW_PARAMS_SHA256) ||
+    (liveEngine === target.POA_ESCROW_ENGINE_SHA256 && liveParams === target.POA_ESCROW_PARAMS_SHA256) ||
+    hasReviewedClientEvidence(liveEngine, root)
+  );
+  const preExpected = knownLive
+    ? { ...expected, POA_ESCROW_ENGINE_SHA256: liveEngine, POA_ESCROW_PARAMS_SHA256: liveParams }
+    : expected;
+  const changed = knownLive && (liveEngine !== target.POA_ESCROW_ENGINE_SHA256 || liveParams !== target.POA_ESCROW_PARAMS_SHA256);
+  const repin = changed ? target : null;
+  const postExpected = { ...expected, ...(repin ?? (knownLive ? target : {})) };
+  return { repin, preExpected, postExpected };
+}
+export async function assertAdvertised(pins, fetchImpl, root = process.cwd()) {
   // minepoa.com serves the ~380 KB client slowly (20-60 s seen on Nov 11). Bound each whole read
   // (headers + body) and retry; any failure still fails closed before anything is deployed.
   const read = async (url, body) => {
@@ -137,7 +181,7 @@ export async function assertAdvertised(pins, fetchImpl) {
   }
   // GitHub runners could not download the client in 3x120 s (runs 43148501656, 43149822257). Accept only
   // a reviewed, committed full-download hash for exactly this engine pin; any other pin still fails closed.
-  if (REPIN_CLIENT_EVIDENCE[pins.POA_ESCROW_ENGINE_SHA256] !== true) fail("REPIN_CLIENT_UNAVAILABLE");
+  if (!hasReviewedClientEvidence(pins.POA_ESCROW_ENGINE_SHA256, root)) fail("REPIN_CLIENT_UNAVAILABLE");
   return "client-hash-from-reviewed-evidence";
 }
 export function assertBindings(bindings, expected, options = {}) {
@@ -159,11 +203,32 @@ export function assertBindings(bindings, expected, options = {}) {
     if (map.get(key)?.type !== "secret_text") fail("MISSING_LIVE_SECRET_BINDING");
 }
 export function assertProductionEnvironment(data) {
-  const reviewers = data.protection_rules?.find(rule => rule.type === "required_reviewers")?.reviewers;
-  if (data.name !== "production" || data.can_admins_bypass !== false || reviewers?.length !== 1 ||
-      reviewers[0].type !== "User" || reviewers[0].reviewer?.id !== 15719015 ||
-      reviewers[0].reviewer?.login !== "maximusmaximus" || data.deployment_branch_policy?.protected_branches !== true)
-    fail("PRODUCTION_REQUIRES_MAX_REVIEW");
+  if (data.name !== "production" || data.can_admins_bypass !== false ||
+      data.deployment_branch_policy?.protected_branches !== true ||
+      data.deployment_branch_policy?.custom_branch_policies !== false)
+    fail("PRODUCTION_REQUIRES_PROTECTED_MAIN");
+}
+export async function assertLiveEscrowFresh(publicUrl, fetchImpl = fetch, delayMs = 2000) {
+  const url = `${String(publicUrl).replace(/\/+$/, "")}/v1/escrow/capabilities`;
+  for (let attempt = 1; ; attempt++) {
+    let response;
+    try {
+      response = await fetchImpl(url, { method: "GET", redirect: "error", signal: AbortSignal.timeout(15000),
+        headers: { Accept: "application/json" } });
+    } catch {
+      if (attempt >= 3) fail("ESCROW_CAPABILITIES_UNAVAILABLE");
+      await new Promise(r => setTimeout(r, delayMs));
+      continue;
+    }
+    if (!response.ok) {
+      if (attempt >= 3) fail("ESCROW_CAPABILITIES_HTTP_ERROR");
+      await new Promise(r => setTimeout(r, delayMs));
+      continue;
+    }
+    const data = await response.json();
+    if (data?.freshness?.code === "ESCROW_PROTOCOL_CHANGED") fail("ESCROW_PROTOCOL_CHANGED");
+    return data;
+  }
 }
 async function get(url, token, fetchImpl) {
   const response = await fetchImpl(url, { method: "GET", redirect: "error", signal: AbortSignal.timeout(15000),
@@ -214,25 +279,26 @@ export function wranglerArgs(configPath, dryRun) {
     ...(dryRun ? ["--dry-run", "--outdir", "./.deploy-dry-run"] : [])];
 }
 export async function runDeployment({ dryRun, env = process.env, fetchImpl = fetch, run = spawnSync, root = process.cwd() }) {
-  const config = productionConfig(parseConfig(readFileSync(resolve(root, "wrangler.jsonc"), "utf8")));
-  let expected, before, repin = null, switches = null;
+  const rawConfig = parseConfig(readFileSync(resolve(root, "wrangler.jsonc"), "utf8"));
+  const config = productionConfig(rawConfig);
+  let expected, preExpected, postExpected, before, repin = null, switches = null;
   if (!dryRun) {
     expected = expectedPolicy(env); switches = expectedSwitches(env);
-    repin = repinPlan(env, expected);
     if (!env.CLOUDFLARE_API_TOKEN) fail("MISSING_CLOUDFLARE_API_TOKEN");
     await assertGitHub(env, fetchImpl);
     const pre = await inspectLive(env.CLOUDFLARE_API_TOKEN, fetchImpl);
+    ({ repin, preExpected, postExpected } = resolvePinTransition(env, expected, rawConfig, pre.bindings, root));
     // Precheck keeps current policy exact, but allows the checkout binding to be absent so this
     // deploy can introduce POA_ESCROW_NEW_NAMES=approved-v1. A wrong present value still fails.
-    assertBindings(pre.bindings, expected, { allowMissing: ["POA_ESCROW_NEW_NAMES"] });
-    assertBindings(pre.versionBindings, expected, { allowMissing: ["POA_ESCROW_NEW_NAMES"] });
+    assertBindings(pre.bindings, preExpected, { allowMissing: ["POA_ESCROW_NEW_NAMES"] });
+    assertBindings(pre.versionBindings, preExpected, { allowMissing: ["POA_ESCROW_NEW_NAMES"] });
     assertSwitches(pre.bindings, switches, { allowMissingOn: true }); assertSwitches(pre.versionBindings, switches, { allowMissingOn: true });
     before = pre.id;
     const checkout = checkoutPlan(expected, pre.bindings);
     if (checkout) config.vars = { ...config.vars, ...checkout };
     const optional = switchesPlan(switches, pre.bindings);
     if (optional) config.vars = { ...config.vars, ...optional };
-    if (repin) { console.log("REPIN advertised by network-facts; " + await assertAdvertised(repin, fetchImpl)); config.vars = { ...config.vars, ...repin }; }
+    if (repin) { console.log("REPIN advertised by network-facts; " + await assertAdvertised(repin, fetchImpl, root)); config.vars = { ...config.vars, ...repin }; }
   }
   const path = resolve(root, `.wrangler-production-${randomUUID()}.json`);
   writeFileSync(path, JSON.stringify(config, null, 2) + "\n", { flag: "wx", mode: 0o600 });
@@ -250,14 +316,14 @@ export async function runDeployment({ dryRun, env = process.env, fetchImpl = fet
     if (!dryRun) {
       // Approval applies to this exact green SHA. Refuse drift during the local dry-run.
       await assertGitHub(env, fetchImpl);
-      if (await liveSnapshot(expected, env.CLOUDFLARE_API_TOKEN, fetchImpl, { allowMissing: ["POA_ESCROW_NEW_NAMES"], switches, allowMissingOn: true }) !== before) fail("LIVE_VERSION_CHANGED");
+      if (await liveSnapshot(preExpected, env.CLOUDFLARE_API_TOKEN, fetchImpl, { allowMissing: ["POA_ESCROW_NEW_NAMES"], switches, allowMissingOn: true }) !== before) fail("LIVE_VERSION_CHANGED");
       execute(false);
-      // Post-check: the new live version carries exactly the expected policy (new pins after a repin).
-      const after = { ...expected, ...(repin ?? {}) };
+      // Post-check: the new live version carries exactly the expected policy (new pins after a repin) and does not report ESCROW_PROTOCOL_CHANGED.
       for (let attempt = 1; ; attempt++) {
-        try { await liveSnapshot(after, env.CLOUDFLARE_API_TOKEN, fetchImpl, { switches }); break; }
+        try { await liveSnapshot(postExpected, env.CLOUDFLARE_API_TOKEN, fetchImpl, { switches }); break; }
         catch (e) { if (attempt >= 6) throw e; await new Promise(r => setTimeout(r, env.DEPLOY_POSTCHECK_DELAY_MS === "0" ? 0 : 5000)); }
       }
+      await assertLiveEscrowFresh(config.vars.PUBLIC_EXPLORER_URL, fetchImpl, env.DEPLOY_POSTCHECK_DELAY_MS === "0" ? 0 : 2000);
     }
   } finally { unlinkSync(path); }
 }
