@@ -1,0 +1,48 @@
+{
+  "project": "poa-domains",
+  "network": {
+    "origin": "https://minepoa.com",
+    "chainId": "poa-mainnet-1",
+    "clientMustMatch": "engine",
+    "expectFacts": { "chain_id": "poa-mainnet-1", "economics.K": 5 },
+    "expectStatus": { "K": 5 }
+  },
+  "failClosedOnPinMismatch": true,
+  "pins": [
+    { "id": "wrangler engine", "tracks": "engine", "file": "wrangler.jsonc", "json": "vars.POA_ESCROW_ENGINE_SHA256" },
+    { "id": "wrangler params", "tracks": "params", "file": "wrangler.jsonc", "json": "vars.POA_ESCROW_PARAMS_SHA256" },
+    { "id": "code engine", "tracks": "engine", "file": "cloudflare/escrow-network.ts", "regex": "MAINNET_ENGINE_SHA256 = \"([0-9a-f]{64})\"" },
+    { "id": "code params", "tracks": "params", "file": "cloudflare/escrow-network.ts", "regex": "MAINNET_PARAMS_SHA256 = \"([0-9a-f]{64})\"" },
+    { "tracks": "engine", "file": "worker-configuration.d.ts", "replaceAll": true },
+    { "tracks": "params", "file": "worker-configuration.d.ts", "replaceAll": true },
+    { "tracks": "engine", "file": "docs/worker-deploy.md", "replaceAll": true },
+    { "tracks": "params", "file": "docs/worker-deploy.md", "replaceAll": true },
+    { "tracks": "engine", "file": "cloudflare/test/display-freshness-runtime.mjs", "replaceAll": true },
+    { "tracks": "params", "file": "cloudflare/test/display-freshness-runtime.mjs", "replaceAll": true },
+    { "tracks": "engine", "file": "cloudflare/test/escrow-admin-runtime.mjs", "replaceAll": true },
+    { "tracks": "params", "file": "cloudflare/test/escrow-admin-runtime.mjs", "replaceAll": true }
+  ],
+  "surface": {
+    "snapshot": ".poa-compat/surface.json",
+    "uses": {
+      "exports": ["canonical", "txidOf", "signBody", "verifyBody", "addrOf", "pubOfAddr", "b58enc", "b58dec", "sha256hex", "toMicros", "fromMicros", "buildTx"],
+      "critical": ["canonical", "txidOf", "signBody", "verifyBody", "addrOf", "pubOfAddr", "b58enc", "b58dec", "toMicros", "fromMicros"],
+      "txTypes": ["transfer"],
+      "fields": { "body": ["type", "from", "to", "amount", "memo", "nonce", "parents", "ts", "cid", "sig"] },
+      "constants": ["B58"]
+    }
+  },
+  "evidence": ".poa-compat/evidence.json",
+  "tests": [
+    "npm ci --ignore-scripts --no-audit --no-fund",
+    "npm run build",
+    "npm run cf:typecheck",
+    "node scripts/cloudflare-prepare.mjs",
+    "node scripts/ci-bundles.mjs",
+    "node --test dist/escrow-tests/unit.mjs dist/escrow-tests/public.mjs",
+    "node scripts/errors-generate.mjs --check",
+    "node --test test/worker-deploy.test.mjs"
+  ],
+  "testTimeoutMinutes": 30,
+  "pr": { "base": "main", "branch": "poa-compat/update", "titlePrefix": "PoA core update", "labels": ["poa-compat"] }
+}
