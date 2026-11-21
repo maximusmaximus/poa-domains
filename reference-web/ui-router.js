@@ -1,10 +1,10 @@
-import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=9cc246d22980";
-import { ui } from "./ui-state.js?v=9cc246d22980";
-import { add, el } from "./ui-core.js?v=9cc246d22980";
-import { runSearch } from "./ui-search.js?v=9cc246d22980";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=9cc246d22980";
-import { updateTabDots } from "./ui-render.js?v=9cc246d22980";
-import { syncCartShortcutNow } from "./ui-cart.js?v=9cc246d22980";
+import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=4e6b6590ba50";
+import { ui } from "./ui-state.js?v=4e6b6590ba50";
+import { add, el } from "./ui-core.js?v=4e6b6590ba50";
+import { runSearch } from "./ui-search.js?v=4e6b6590ba50";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=4e6b6590ba50";
+import { updateTabDots } from "./ui-render.js?v=4e6b6590ba50";
+import { syncCartShortcutNow } from "./ui-cart.js?v=4e6b6590ba50";
 
 /** Open 🪙 My POA; with a name, prefill it for a POA listing or auction. Your agent signs; nothing is sent here. */
 export function openPoa(name) {
@@ -64,7 +64,13 @@ export function ownerLink(parent, ownerId, label) {
     return a;
 }
 
+function closeOverlaysBeforeNavigate() {
+    if (el("floatingCartPanel") && !el("floatingCartPanel").hidden) el("floatingCartClose")?.click();
+    if (el("detailView") && !el("detailView").hidden) el("detailClose")?.click();
+}
+
 export function navigateHome() {
+    closeOverlaysBeforeNavigate();
     ui.route = { kind: "home" };
     ui.currentDomainName = null;
     ui.currentOwnerId = null;
@@ -73,6 +79,7 @@ export function navigateHome() {
 }
 
 export function navigateDomain(name) {
+    closeOverlaysBeforeNavigate();
     ui.route = { kind: "domain", name };
     ui.currentDomainName = name;
     ui.currentOwnerId = null;
@@ -81,6 +88,7 @@ export function navigateDomain(name) {
 }
 
 export function navigateOwner(ownerId) {
+    closeOverlaysBeforeNavigate();
     ui.route = { kind: "owner", ownerId };
     ui.currentOwnerId = ownerId;
     ui.currentDomainName = null;

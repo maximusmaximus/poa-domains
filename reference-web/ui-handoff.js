@@ -1,16 +1,18 @@
-import { ui } from "./ui-state.js?v=9cc246d22980";
-import { el, endpointBase, ownershipView } from "./ui-core.js?v=9cc246d22980";
-import { buildListingPrompt, buildSubnameListingPrompt, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=9cc246d22980";
+import { copyText } from "./ui-copy.js?v=4e6b6590ba50";
+import { ui } from "./ui-state.js?v=4e6b6590ba50";
+import { el, endpointBase, ownershipView } from "./ui-core.js?v=4e6b6590ba50";
+import { buildListingPrompt, buildSubnameListingPrompt, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=4e6b6590ba50";
 
 export function clearHandoff() {
     ui.generation++;
+    if (el("handoffCopyStatus")) el("handoffCopyStatus").textContent = "";
     ui.copy = "";
     for (const id of ["body", "instructions", "digest"])
         el(id).textContent = "";
     el("copy").disabled = true;
 }
 
-export function copyDomainListingPrompt(kind) {
+export async function copyDomainListingPrompt(kind) {
     if (ui.registryReadFailed) {
         el("listingPromptStatus").textContent = "🔄 Refresh registry data first.";
         return;
@@ -56,21 +58,20 @@ export function copyDomainListingPrompt(kind) {
         validUntil,
         endpointUrl: endpointBase(),
     });
-    el("listingPromptBox").textContent = text;
-    navigator.clipboard.writeText(text).then(() => {
-        el("listingPromptStatus").textContent = "Copied";
-    }, () => {
-        el("listingPromptStatus").textContent = "Clipboard unavailable — copy from the box";
-    });
+    const box = el("listingPromptBox");
+    box.textContent = text;
+    const res = await copyText(text, box);
+    el("listingPromptStatus").textContent = res.ok ? "✅ Copied" : "📋 Press Ctrl/Cmd+C to copy from the box.";
 }
 
 /** Owner-side POA subname listing: copies an unsigned agent request; nothing submits here. */
-export function copySubnameListing() {
+export async function copySubnameListing() {
     const box = el("subnamePromptBox"), status = el("subnamePromptStatus");
     let text;
     try { text = buildSubnameListingPrompt({ parent: ui.currentDomainName, price: el("subnamePriceInput").value, endpointUrl: endpointBase() }); }
     catch (error) { status.textContent = error.message; el("subnamePriceInput").setAttribute("aria-invalid", "true"); return; }
     el("subnamePriceInput").removeAttribute("aria-invalid");
     box.textContent = text; box.hidden = false;
-    navigator.clipboard.writeText(text).then(() => { status.textContent = "📋 Copied"; }, () => { status.textContent = "📋 Copy from the box"; });
+    const res = await copyText(text, box);
+    status.textContent = res.ok ? "✅ Copied" : "📋 Press Ctrl/Cmd+C to copy from the box.";
 }
