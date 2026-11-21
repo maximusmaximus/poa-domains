@@ -1294,3 +1294,5 @@ main#homeMain, main#homeMain > section, .ideas, .ideas-strip { min-width: 0; max
   .section-tab { min-width: 0; }
   .tab-age { font-size: .63rem; }
 }
+
+#floatingCartPrompt { max-height: 12rem; margin-top: 0.65rem; font-size: 0.8rem; }

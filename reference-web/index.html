@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=4976fd8eaa05" />
+    <link rel="stylesheet" href="/style.css?v=a13bd7a9b500" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -201,7 +201,7 @@
         <pre id="body"></pre>
         <h3>Digest</h3>
         <pre id="digest"></pre>
-        <button type="button" id="copy" disabled>Copy unsigned request</button>
+        <div class="button-row"><button type="button" id="copy" disabled>Copy unsigned request</button><span id="handoffCopyStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></span></div>
         </details>
       </section>
 
@@ -307,9 +307,10 @@
         <button type="button" id="floatingCartClear" class="secondary" disabled>Clear</button>
         <button type="button" id="copyCheckoutBtn" disabled>Copy checkout for agent</button>
       </div>
+      <pre id="floatingCartPrompt" class="prompt-box" hidden></pre>
       <p id="floatingCartStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
 
-    <script type="module" src="/app.js?v=9cc246d22980"></script>
+    <script type="module" src="/app.js?v=4e6b6590ba50"></script>
   </body>
 </html>

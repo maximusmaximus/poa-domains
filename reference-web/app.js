@@ -1,17 +1,18 @@
-import { installHelp } from "./ui-help.js?v=9cc246d22980";
-import { wireManagement } from "./ui-manage.js?v=9cc246d22980";
-import { logSubmittedSearch } from "./ui-search-log.js?v=9cc246d22980";
-import { bindTabKeys } from "./ui-a11y.js?v=9cc246d22980";
-import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=9cc246d22980";
-import { ui } from "./ui-state.js?v=9cc246d22980";
-import { renderAgentCartHandoff, canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=9cc246d22980";
-import { navigateHome, openPoa, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=9cc246d22980";
-import { el, endpointBase } from "./ui-core.js?v=9cc246d22980";
-import { clearHandoff, copyDomainListingPrompt, copySubnameListing } from "./ui-handoff.js?v=9cc246d22980";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=9cc246d22980";
-import { runSearch } from "./ui-search.js?v=9cc246d22980";
-import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=9cc246d22980";
-import { cartCopyBlocked, downloadCartJSON, clearAllCart, setFloatingCartOpen } from "./ui-cart.js?v=9cc246d22980";
+import { installHelp } from "./ui-help.js?v=4e6b6590ba50";
+import { wireManagement } from "./ui-manage.js?v=4e6b6590ba50";
+import { logSubmittedSearch } from "./ui-search-log.js?v=4e6b6590ba50";
+import { bindTabKeys } from "./ui-a11y.js?v=4e6b6590ba50";
+import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=4e6b6590ba50";
+import { ui } from "./ui-state.js?v=4e6b6590ba50";
+import { canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=4e6b6590ba50";
+import { navigateHome, openPoa, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=4e6b6590ba50";
+import { el, endpointBase } from "./ui-core.js?v=4e6b6590ba50";
+import { clearHandoff, copyDomainListingPrompt, copySubnameListing } from "./ui-handoff.js?v=4e6b6590ba50";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=4e6b6590ba50";
+import { runSearch } from "./ui-search.js?v=4e6b6590ba50";
+import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=4e6b6590ba50";
+import { copyText, flashCopied, selectElementText } from "./ui-copy.js?v=4e6b6590ba50";
+import { cartCopyBlocked, downloadCartJSON, clearAllCart, renderCurrentCartHandoff, setFloatingCartOpen } from "./ui-cart.js?v=4e6b6590ba50";
 
 try {
     ui.statusPanelDismissed = false; // New page visits show status; closing lasts for this page only.
@@ -70,15 +71,17 @@ try {
             el("cartStatus").textContent = "Held ⏸️ until the PoA network is back";
             return;
         }
-        const text = renderAgentCartHandoff(ui.handoffData);
-        if (!text || !ui.cart.length || cartCopyBlocked() || ui.handoffPending || !ui.handoffData)
+        if (!ui.cart.length || cartCopyBlocked() || ui.handoffPending || !ui.handoffData)
             return;
-        try {
-            await navigator.clipboard.writeText(text);
-            el("cartStatus").textContent = "Copied";
-        }
-        catch {
-            el("cartStatus").textContent = "Clipboard unavailable";
+        const text = renderCurrentCartHandoff();
+        if (!text) return;
+        const res = await copyText(text, el("cartPrompt"));
+        if (res.ok) {
+            flashCopied(el("copyCartPrompt"));
+            el("cartStatus").textContent = "✅ Copied";
+            el("cartStatus").dataset.copiedFor = String(ui.cart.length);
+        } else {
+            el("cartStatus").textContent = res.selected ? "📋 Press Ctrl/Cmd+C to copy the selected prompt." : "📋 Copy from the prompt box above.";
         }
     });
     for (const tab of document.querySelectorAll(".auction-tab")) {
@@ -107,13 +110,16 @@ try {
         }
         if (!ui.cart.length || !ui.cap || cartCopyBlocked() || ui.handoffPending || !ui.handoffData)
             return;
-        const text = renderAgentCartHandoff(ui.handoffData);
-        try {
-            await navigator.clipboard.writeText(text);
-            el("floatingCartStatus").textContent = "Request copied — nothing sent";
-        }
-        catch {
-            el("floatingCartStatus").textContent = "Clipboard unavailable";
+        const text = renderCurrentCartHandoff();
+        if (!text) return;
+        const fp = el("floatingCartPrompt"), res = await copyText(text);
+        if (res.ok) {
+            if (fp) { fp.hidden = true; fp.textContent = ""; }
+            flashCopied(el("copyCheckoutBtn"));
+            el("floatingCartStatus").textContent = "✅ Request copied — nothing sent";
+        } else {
+            if (fp) { fp.textContent = text; fp.hidden = false; selectElementText(fp); }
+            el("floatingCartStatus").textContent = "📋 Press Ctrl/Cmd+C to copy the selected request.";
         }
     });
     document.addEventListener("keydown", (event) => {
@@ -190,14 +196,18 @@ try {
         }
     });
     el("copy").addEventListener("click", async () => {
-        if (ui.copy && !ui.registryReadFailed && !shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level) && !ui.networkStatus.hold)
-            try {
-                await navigator.clipboard.writeText(ui.copy);
+        if (ui.copy && !ui.registryReadFailed && !shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level) && !ui.networkStatus.hold) {
+            const res = await copyText(ui.copy, el("body"));
+            const note = el("handoffCopyStatus");
+            if (res.ok) {
+                flashCopied(el("copy"));
+                if (note) note.textContent = "✅ Copied";
+            } else {
+                selectElementText(el("instructions"));
+                if (note) note.textContent = "📋 Copy the unsigned text manually.";
+                else el("error").textContent = "Clipboard unavailable; copy the inert text manually.";
             }
-            catch {
-                el("error").textContent =
-                    "Clipboard unavailable; copy the inert text manually.";
-            }
+        }
     });
     setInterval(updateFreshness, 60000);
     await loadRegistry();

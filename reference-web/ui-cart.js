@@ -1,11 +1,11 @@
-import { publicNameUnavailable } from "./shared.js?v=9cc246d22980";
-import { registryUnit } from "./shared.js?v=9cc246d22980";
-import { actionLabel } from "./ui-copy.js?v=9cc246d22980";
-import { trapDialog } from "./ui-a11y.js?v=9cc246d22980";
-import { ui } from "./ui-state.js?v=9cc246d22980";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=9cc246d22980";
-import { add, el, endpointBase } from "./ui-core.js?v=9cc246d22980";
-import { nameLink } from "./ui-router.js?v=9cc246d22980";
+import { publicNameUnavailable } from "./shared.js?v=4e6b6590ba50";
+import { registryUnit } from "./shared.js?v=4e6b6590ba50";
+import { actionLabel } from "./ui-copy.js?v=4e6b6590ba50";
+import { trapDialog } from "./ui-a11y.js?v=4e6b6590ba50";
+import { ui } from "./ui-state.js?v=4e6b6590ba50";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=4e6b6590ba50";
+import { add, el, endpointBase } from "./ui-core.js?v=4e6b6590ba50";
+import { nameLink } from "./ui-router.js?v=4e6b6590ba50";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
@@ -20,6 +20,13 @@ export function persistCart() {
     saveCart(globalThis.localStorage, ui.cart);
 }
 
+function resetCopyFeedback() {
+    const cs = el("cartStatus"), fs = el("floatingCartStatus"), fp = el("floatingCartPrompt");
+    if (cs) delete cs.dataset.copiedFor;
+    if (fs) fs.textContent = "";
+    if (fp) { fp.hidden = true; fp.textContent = ""; }
+}
+
 export function addToCart(item) {
     item = buildCartItem(item, ui.cap, ui.latestState);
     const existingIdx = ui.cart.findIndex((x) => x.name === item.name && x.action === item.action);
@@ -27,18 +34,21 @@ export function addToCart(item) {
         ui.cart[existingIdx] = item;
     else
         ui.cart.push(item);
+    resetCopyFeedback();
     persistCart();
     renderCart();
 }
 
 export function removeCartAt(index) {
     ui.cart.splice(index, 1);
+    resetCopyFeedback();
     persistCart();
     renderCart();
 }
 
 export function clearAllCart() {
     ui.cart = [];
+    resetCopyFeedback();
     persistCart();
     renderCart();
 }
@@ -49,6 +59,14 @@ export function updateHandoffAge(){
     const text=ui.handoffData?label+updatedAge(ui.handoffData.generatedAt).replace("updated","generated"):label+(ui.handoffPending?"building…":ui.handoffError?"not ready: "+ui.handoffError:"not ready");
     for(const id of ["cartHandoffMeta","floatingHandoffMeta"])if(el(id))el(id).textContent=text;
 }
+export function renderCurrentCartHandoff() {
+    if (!ui.handoffData || !ui.cap)
+        return "";
+    return poaOnlyMode(ui.cap)
+        ? renderPoaCheckoutHandoff(ui.handoffData)
+        : renderAgentCartHandoff(ui.handoffData);
+}
+
 export async function updatePromptText() {
     const generation=++handoffGeneration;
     el("cartAnchor").classList.toggle("cart-empty",!ui.cart.length);
@@ -68,7 +86,7 @@ export async function updatePromptText() {
         const data=poa?buildPoaCheckoutHandoff(structuredClone(ui.cart),ui.cap,endpointBase(),structuredClone(ui.rawSnapshot))
             :await buildAgentCartHandoff(structuredClone(ui.cart),ui.cap,"",endpointBase(),ui.configMode,structuredClone(ui.rawSnapshot));
         if(generation!==handoffGeneration||cartCopyBlocked())return;
-        ui.handoffData=data;el("cartPrompt").textContent=poa?renderPoaCheckoutHandoff(data):renderAgentCartHandoff(data);
+        ui.handoffData=data;el("cartPrompt").textContent=renderCurrentCartHandoff();
     }catch(error){
         if(generation===handoffGeneration){ui.handoffError=String(error?.message||error).slice(0,200);el("cartPrompt").textContent="😕 Couldn't build your handoff. Tap 🔄 Refresh and try again. Nothing was sent.";}
     }finally{
@@ -165,7 +183,10 @@ export function renderCart() {
         else
             el("copyCartPrompt").classList.remove("action-held");
     }
-    el("cartStatus").textContent = `🛒 Cart: ${ui.cart.length} ${ui.cart.length === 1 ? "item" : "items"}.`;
+    if (el("cartStatus").dataset.copiedFor !== String(ui.cart.length) || !ui.cart.length) {
+        delete el("cartStatus").dataset.copiedFor;
+        el("cartStatus").textContent = `🛒 Cart: ${ui.cart.length} ${ui.cart.length === 1 ? "item" : "items"}.`;
+    }
     const listNode = el("cartList");
     listNode.replaceChildren();
     if (!ui.cart.length) {
@@ -227,6 +248,7 @@ export function renderCart() {
             }
             errorNode.textContent = item.validationError || "";
             amountInput.setAttribute("aria-invalid", item.validationError ? "true" : "false");
+            resetCopyFeedback();
             persistCart();
             updateCartCopyState();
             if (reviewBtn)
@@ -255,7 +277,7 @@ export function setFloatingCartOpen(open) {
     backdrop.hidden = !open;
     btn.setAttribute("aria-expanded", String(open));
     if(open){renderFloatingCart();releaseCartFocus=trapDialog(panel,backdrop,btn);}
-    else{releaseCartFocus?.();releaseCartFocus=null;}
+    else{const fp=el("floatingCartPrompt");if(fp){fp.hidden=true;fp.textContent="";}releaseCartFocus?.();releaseCartFocus=null;}
     syncCartShortcut();
 }
 

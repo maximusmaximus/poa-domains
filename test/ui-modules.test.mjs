@@ -71,3 +71,103 @@ test('all UI modules load without booting a browser, and shared copy guards rema
   ui.demo=true;assert.equal(core.endpointBase(),'http://127.0.0.1:8787');ui.demo=false;ui.base='https://poadomains.grok.me';assert.equal(core.endpointBase(),ui.base);
  }finally{Object.assign(ui,previous);}
 });
+
+test('copyText tries Clipboard API, falls back to execCommand inside dialog/body, and falls back to text selection', async () => {
+ const revision = /app\.js\?v=([a-f0-9]{12})/.exec(readFileSync('reference-web/index.html', 'utf8'))[1];
+ const copyMod = await import(`../reference-web/ui-copy.js?v=${revision}`);
+ const cartMod = await import(`../reference-web/ui-cart.js?v=${revision}`);
+ const stateMod = await import(`../reference-web/ui-state.js?v=${revision}`);
+ const prevNav = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+ const prevDoc = globalThis.document, prevWin = globalThis.window;
+ const setNav = (val) => Object.defineProperty(globalThis, 'navigator', { value: val, configurable: true });
+ try {
+  assert.deepEqual(await copyMod.copyText(''), { ok: false, method: 'empty', selected: false });
+  setNav({ clipboard: { writeText: async (v) => { assert.equal(v, 'hello'); } } });
+  assert.deepEqual(await copyMod.copyText('hello'), { ok: true, method: 'clipboard', selected: false });
+
+  // Clipboard rejects -> execCommand inside dialog container succeeds and restores focus
+  let appendedTo = null, focusedBack = 0, execCalls = 0;
+  const dialog = { nodeName: 'DIALOG' };
+  const btn = { isConnected: true, focus: () => { focusedBack++; }, closest: () => dialog };
+  dialog.append = (node) => { appendedTo = node; };
+  globalThis.document = {
+   activeElement: btn,
+   body: { append: () => { throw Error('should prefer dialog'); } },
+   createElement: () => ({
+    style: {},
+    setAttribute: () => {},
+    focus: () => {},
+    select: () => {},
+    setSelectionRange: () => {},
+    remove: () => {},
+   }),
+   execCommand: (cmd) => { execCalls++; return cmd === 'copy'; },
+   createRange: () => ({ selectNodeContents: () => {} }),
+  };
+  setNav({ clipboard: { writeText: async () => { throw Error('denied'); } } });
+  assert.deepEqual(await copyMod.copyText('poa prompt'), { ok: true, method: 'execCommand', selected: false });
+  assert.equal(execCalls, 1);
+  assert.ok(appendedTo);
+  assert.equal(focusedBack, 1);
+
+  // Navigator.clipboard undefined + execCommand false -> manual select fallback
+  setNav({});
+  let selectedNode = null;
+  globalThis.document.execCommand = () => false;
+  globalThis.window = {
+   getSelection: () => ({ removeAllRanges: () => {}, addRange: (r) => { selectedNode = r; } }),
+  };
+  const node = { textContent: 'manual' };
+  assert.deepEqual(await copyMod.copyText('manual', node), { ok: false, method: 'manual', selected: true });
+  assert.ok(selectedNode);
+
+  // flashCopied updates and restores label cleanly
+  const flashBtn = { textContent: '📋', title: 'Copy prompt', dataset: {} };
+  copyMod.flashCopied(flashBtn);
+  assert.equal(flashBtn.textContent, '✅');
+  assert.equal(flashBtn.title, 'Copied');
+  await new Promise((r) => setTimeout(r, 1700));
+  assert.equal(flashBtn.textContent, '📋');
+  assert.equal(flashBtn.title, 'Copy prompt');
+
+  // renderCurrentCartHandoff handles both poaOnly and standard v2 cart handoff payloads
+  const prevUi = { ...stateMod.ui };
+  try {
+   const { auditedEngine, get } = await import('./fixtures/audited-engine.mjs');
+   const eng = auditedEngine();
+   const poaCap = get(eng, '/v1/capabilities').data;
+   const snap = get(eng, '/v1/state').data;
+   const { buildPoaCheckoutHandoff } = await import(`../reference-web/agent-cart.js?v=${revision}`);
+   stateMod.ui.cap = poaCap;
+   stateMod.ui.handoffData = buildPoaCheckoutHandoff(
+    [{ name: 'freshpoaname', action: 'poaCheckout', amount: '100.000000', tier: 'standard' }],
+    poaCap,
+    'https://poadomains.grok.me',
+    snap,
+    1000000,
+   );
+   assert.match(cartMod.renderCurrentCartHandoff(), /poa-domains\.poa-checkout\.v1/);
+   stateMod.ui.cap = { poaOnly: { status: 'off' } };
+   stateMod.ui.handoffData = {
+    schema: 'poa-domains.agent-cart.v2',
+    generatedAt: 1000000,
+    itemCount: 0,
+    spendingCapByAsset: { POA: '0' },
+    mcp: { url: 'https://example.invalid/mcp', transport: 'streamable-http' },
+    cli: { prepare: 'poa prepare', submit: 'poa submit' },
+    byAction: {},
+    items: [],
+    instructions: ['No items'],
+   };
+   assert.match(cartMod.renderCurrentCartHandoff(), /poa-domains\.agent-cart\.v2/);
+   stateMod.ui.handoffData = null;
+   assert.equal(cartMod.renderCurrentCartHandoff(), '');
+  } finally {
+   Object.assign(stateMod.ui, prevUi);
+  }
+ } finally {
+  if (prevNav) Object.defineProperty(globalThis, 'navigator', prevNav);
+  globalThis.document = prevDoc;
+  globalThis.window = prevWin;
+ }
+});

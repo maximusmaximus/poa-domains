@@ -20,3 +20,59 @@ export function decorateEmojiButton(button) {
  if(!button.hasAttribute("title"))button.title=button.getAttribute("aria-label");
  button.textContent=icon;button.classList.add("emoji-control");
 }
+
+export function selectElementText(node) {
+ if (!node || typeof window === "undefined" || typeof document === "undefined") return false;
+ try {
+  const selection = window.getSelection?.();
+  if (!selection) return false;
+  const range = document.createRange();
+  range.selectNodeContents(node);
+  selection.removeAllRanges();
+  selection.addRange(range);
+  return true;
+ } catch { return false; }
+}
+export async function copyText(text, fallbackNode = null) {
+ const value = String(text ?? "");
+ if (!value) return { ok: false, method: "empty", selected: false };
+ if (globalThis.navigator?.clipboard?.writeText) {
+  try { await globalThis.navigator.clipboard.writeText(value); return { ok: true, method: "clipboard", selected: false }; } catch {}
+ }
+ if (typeof document !== "undefined" && document.body) {
+  let area;
+  try {
+   area = document.createElement("textarea");
+   area.value = value;
+   area.setAttribute("readonly", "");
+   area.setAttribute("aria-hidden", "true");
+   area.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0;pointer-events:none;";
+   const active = document.activeElement;
+   const container = active?.closest?.("dialog, [role='dialog']") || document.body;
+   container.append(area);
+   area.focus({ preventScroll: true });
+   area.select();
+   area.setSelectionRange?.(0, value.length);
+   const copied = document.execCommand?.("copy") === true;
+   area.remove();
+   if (active && active.isConnected && typeof active.focus === "function") active.focus({ preventScroll: true });
+   if (copied) return { ok: true, method: "execCommand", selected: false };
+  } catch { area?.remove(); }
+ }
+ return { ok: false, method: "manual", selected: selectElementText(fallbackNode) };
+}
+const copyFlashTimers = new WeakMap();
+export function flashCopied(button) {
+ if (!button) return;
+ const timer = copyFlashTimers.get(button);
+ if (timer) clearTimeout(timer);
+ if (!button.dataset.copyIdleText) button.dataset.copyIdleText = button.textContent;
+ if (!button.dataset.copyIdleTitle && button.title) button.dataset.copyIdleTitle = button.title;
+ button.textContent = "✅";
+ button.title = "Copied";
+ copyFlashTimers.set(button, setTimeout(() => {
+  button.textContent = button.dataset.copyIdleText;
+  if (button.dataset.copyIdleTitle) button.title = button.dataset.copyIdleTitle;
+  copyFlashTimers.delete(button);
+ }, 1600));
+}

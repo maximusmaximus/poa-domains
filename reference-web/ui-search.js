@@ -1,10 +1,11 @@
-import { publicNameUnavailable } from "./shared.js?v=9cc246d22980";
-import { registryUnit, poaOnlyMode, poaNewNamePrice, poaShort, buildSubnamePurchasePrompt } from "./shared.js?v=9cc246d22980";
-import { ui } from "./ui-state.js?v=9cc246d22980";
-import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=9cc246d22980";
-import { add, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=9cc246d22980";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=9cc246d22980";
-import { addToCart } from "./ui-cart.js?v=9cc246d22980";
+import { copyText } from "./ui-copy.js?v=4e6b6590ba50";
+import { publicNameUnavailable } from "./shared.js?v=4e6b6590ba50";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaShort, buildSubnamePurchasePrompt } from "./shared.js?v=4e6b6590ba50";
+import { ui } from "./ui-state.js?v=4e6b6590ba50";
+import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=4e6b6590ba50";
+import { add, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=4e6b6590ba50";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=4e6b6590ba50";
+import { addToCart } from "./ui-cart.js?v=4e6b6590ba50";
 
 export function runSearch(rawQuery, remember = true) {
     if (remember) {
@@ -236,10 +237,11 @@ function poaSubnameCard(card, name, parent, parentDeed) {
         btn.setAttribute("aria-label", `Copy agent request to buy ${name} for ${poaShort(l.price)} POA`);
         const box = add(card, "pre", "", "prompt-box"); box.hidden = true;
         const note = add(card, "p", "", "muted"); note.setAttribute("role", "status");
-        btn.addEventListener("click", () => {
+        btn.addEventListener("click", async () => {
             const text = buildSubnamePurchasePrompt({ name, listing: l.id, price: l.price, endpointUrl: base });
             box.textContent = text; box.hidden = false;
-            navigator.clipboard?.writeText(text).then(() => { note.textContent = "📋 Copied"; }, () => { note.textContent = "📋 Copy from the box"; });
+            const res = await copyText(text, box);
+            note.textContent = res.ok ? "✅ Copied" : "📋 Press Ctrl/Cmd+C to copy from the box.";
         });
     }).catch(() => { status.textContent = "⚪ Subnames aren't for sale right now"; });
 }
