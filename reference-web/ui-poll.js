@@ -1,16 +1,16 @@
-import { publicNameUnavailable } from "./shared.js?v=4e6b6590ba50";
-import { installHelp } from "./ui-help.js?v=4e6b6590ba50";
-import { renderManagement } from "./ui-manage.js?v=4e6b6590ba50";
-import { actionLabel } from "./ui-copy.js?v=4e6b6590ba50";
-import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=4e6b6590ba50";
-import { ui } from "./ui-state.js?v=4e6b6590ba50";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=4e6b6590ba50";
-import { persistCart, renderCart, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=4e6b6590ba50";
-import { render, updateTabDots } from "./ui-render.js?v=4e6b6590ba50";
-import { runSearch } from "./ui-search.js?v=4e6b6590ba50";
-import { renderIdeas } from "./ui-ideas.js?v=4e6b6590ba50";
-import { mountEscrow } from "./escrow.js?v=4e6b6590ba50";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=4e6b6590ba50";
+import { publicNameUnavailable } from "./shared.js?v=84cf1fca35ea";
+import { installHelp } from "./ui-help.js?v=84cf1fca35ea";
+import { renderManagement } from "./ui-manage.js?v=84cf1fca35ea";
+import { actionLabel } from "./ui-copy.js?v=84cf1fca35ea";
+import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=84cf1fca35ea";
+import { ui } from "./ui-state.js?v=84cf1fca35ea";
+import { el, endpointBase, json, staticURL } from "./ui-core.js?v=84cf1fca35ea";
+import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=84cf1fca35ea";
+import { render, updateTabDots } from "./ui-render.js?v=84cf1fca35ea";
+import { runSearch } from "./ui-search.js?v=84cf1fca35ea";
+import { renderIdeas } from "./ui-ideas.js?v=84cf1fca35ea";
+import { mountEscrow } from "./escrow.js?v=84cf1fca35ea";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=84cf1fca35ea";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -129,6 +129,29 @@ export async function refreshNetworkStatus() {
     }
     renderNetworkStatus();
     applyNetworkHold();
+}
+
+export async function refreshEscrowCaps() {
+    if (ui.demo || !ui.cap || !poaOnlyMode(ui.cap) || !ui.cap.escrow?.enabled)
+        return;
+    try {
+        const response = await fetch(endpointBase() + "/v1/escrow/capabilities", {
+            method: "GET",
+            credentials: "omit",
+            cache: "no-store",
+            signal: globalThis.AbortSignal?.timeout ? AbortSignal.timeout(17000) : undefined,
+        });
+        if (!response.ok)
+            throw Error("escrow-status");
+        const body = await response.json();
+        if (body && typeof body.enabled === "boolean")
+            ui.escrowCaps = body;
+    }
+    catch {
+        if (!ui.escrowCaps)
+            ui.escrowCaps = { enabled: true, held: true, holdReason: "Could not check live POA checkout status" };
+    }
+    renderCartEscrowStatus();
 }
 
 // Keep critical holds visible in a few words; explanations belong in the window's ℹ️ popover.
@@ -334,7 +357,8 @@ export async function loadRegistry() {
         if (!ui.demo && !ui.tickerTimer) {
             ui.tickerTimer = setInterval(refreshRegistry, ui.TICKER_MS);
             refreshNetworkStatus();
-            ui.networkTimer = setInterval(refreshNetworkStatus, ui.NETWORK_MS);
+            refreshEscrowCaps();
+            ui.networkTimer = setInterval(() => { refreshNetworkStatus(); refreshEscrowCaps(); }, ui.NETWORK_MS);
         }
         else if (ui.demo)
             renderNetworkStatus();

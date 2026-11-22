@@ -1213,7 +1213,7 @@ button.box-close { margin:0; }
 .github-mark { flex:none; vertical-align:middle; }
 .footer-links a { display:inline-flex; align-items:center; gap:.45rem; }
 
-#cartAnchor.cart-empty > h4,#cartAnchor.cart-empty > #cartPrompt,#cartAnchor.cart-empty > #cartHandoffMeta { display:none; }
+#cartAnchor.cart-empty > h4,#cartAnchor.cart-empty > #cartPrompt,#cartAnchor.cart-empty > #cartHandoffMeta,#cartAnchor.cart-empty > #cartExpectations { display:none; }
 
 /* One owner for each outer gap: no collapsed child margins or empty-result spacers. */
 :root { --ui-space:12px; --ui-tight:8px; }
@@ -1296,3 +1296,47 @@ main#homeMain, main#homeMain > section, .ideas, .ideas-strip { min-width: 0; max
 }
 
 #floatingCartPrompt { max-height: 12rem; margin-top: 0.65rem; font-size: 0.8rem; }
+
+.cart-escrow-status {
+  margin: 0.6rem 0 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.45rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.cart-expectations {
+  margin-top: 0.85rem;
+  padding: 0.8rem 0.9rem;
+  background: #09131a;
+  border: 1px solid #31535c;
+  border-radius: 0.45rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.cart-expectations h4,
+.cart-expectations .cart-expect-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.92rem;
+}
+.cart-expectations p {
+  margin: 0 0 0.45rem;
+}
+.cart-expect-steps {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+.cart-expect-steps li {
+  margin: 0.3rem 0;
+}
+.cart-expectations-compact {
+  margin: 0.6rem 0 0.45rem;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.82rem;
+}
+.poa-search-expect {
+  margin: 0.45rem 0 0.65rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}

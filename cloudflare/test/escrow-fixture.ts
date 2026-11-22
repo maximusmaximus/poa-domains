@@ -21,10 +21,15 @@ export class MemoryJournal implements Journal {
 }
 export class MockNetwork implements Network {
   now=1800000000000; stale=false; down=false; fee="0.000000"; nonce=1;
-  chain=CHAIN; mismatch=0n; height=10; covered=true; badCut=false;
+  chain=CHAIN; mismatch=0n; height=10; covered=true; badCut=false; autoDiscover=false;
   mode:"normal"|"before-timeout"|"after-timeout"|"delay"|"reject"="normal";
   txs:Record<string,Observation>={}; submitted:Transfer[]=[]; calls=0;
   async status():Promise<Status>{if(this.down)throw Error("offline");return{chain:this.chain,asOf:this.now,stale:this.stale,height:this.height,root,fee:this.fee};}
+  async incoming(wallet:string):Promise<string[]>{
+    if(!this.autoDiscover)return [];
+    if(this.down)throw Error("offline");
+    return Object.entries(this.txs).filter(([,o])=>o.body.to===wallet&&o.body.type==="transfer").map(([id])=>id);
+  }
   async lookup(id:string):Promise<Observation|null>{if(this.down)throw Error("offline");return this.txs[id]??null;}
   async context(){return{nextNonce:this.nonce,parents,cutoff:Math.floor(this.now/1000)-1};}
   async cut(wallet:string,ids:string[],status:Status){

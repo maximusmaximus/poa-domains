@@ -1,7 +1,7 @@
-import { copyText } from "./ui-copy.js?v=4e6b6590ba50";
-import { ui } from "./ui-state.js?v=4e6b6590ba50";
-import { el, endpointBase, ownershipView } from "./ui-core.js?v=4e6b6590ba50";
-import { buildListingPrompt, buildSubnameListingPrompt, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=4e6b6590ba50";
+import { copyText } from "./ui-copy.js?v=84cf1fca35ea";
+import { ui } from "./ui-state.js?v=84cf1fca35ea";
+import { el, endpointBase, ownershipView } from "./ui-core.js?v=84cf1fca35ea";
+import { buildListingPrompt, buildSubnameListingPrompt, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=84cf1fca35ea";
 
 export function clearHandoff() {
     ui.generation++;

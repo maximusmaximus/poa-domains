@@ -32,7 +32,9 @@ export type NetworkStatusSnapshot = {
 
 const CHAIN = "poa-mainnet-1";
 const STATUS_URL = `https://minepoa.com/chain/${CHAIN}/api/status`;
+const FALLBACK_STATUS_URL = "https://minepoa.com/api/status";
 const REQUEST_MS = 10500;
+const PRIMARY_SLOW_TTL_MS = 60_000;
 const CACHE_MS = 20_000;
 const SLOW_MS = 4000;
 const FAIL_THRESHOLD = 2;
@@ -141,49 +143,28 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
   const deadlineMs = requestMs + 1000;
   let inflight: Promise<NetworkStatusSnapshot> | null = null;
   let inflightAt = 0;
+  let primarySlowUntil = 0;
 
-  async function probe(): Promise<NetworkStatusSnapshot> {
-    const started = now();
-    // The abort timer covers headers AND body; previously it was cleared once headers arrived.
+  async function fetchStatusJson(url: string, timeoutMs: number): Promise<{ body: Record<string, unknown> } | { retryable: boolean }> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), requestMs);
+    const timer = setTimeout(() => controller.abort(), Math.max(1, timeoutMs));
     try {
       // Workers Fetch rejects some browser-only init fields; keep this minimal.
-      const response: Response = await fetcher(STATUS_URL, {
+      const response: Response = await fetcher(url, {
         method: "GET",
         redirect: "manual",
         headers: { Accept: "application/json" },
         signal: controller.signal,
       });
-      const latencyMs = Math.max(0, now() - started);
       if (!response || response.status !== 200 || response.status >= 300) {
-        consecutiveFailures += 1;
-        const level = classifyProbe({
-          ok: false,
-          latencyMs,
-          consecutiveFailures,
-          everSucceeded,
-        });
-        return snapshot(level, {
-          checkedAt: now(),
-          failures: consecutiveFailures,
-          latencyMs,
-        });
+        const retryable = !!response && (response.status === 404 || response.status >= 500);
+        await response?.body?.cancel?.().catch(() => {});
+        return { retryable };
       }
       const ctype = response.headers.get("content-type") || "";
       if (!/json/i.test(ctype)) {
-        consecutiveFailures += 1;
-        const level = classifyProbe({
-          ok: false,
-          latencyMs,
-          consecutiveFailures,
-          everSucceeded,
-        });
-        return snapshot(level, {
-          checkedAt: now(),
-          failures: consecutiveFailures,
-          latencyMs,
-        });
+        await response.body?.cancel?.().catch(() => {});
+        return { retryable: false };
       }
       const body = (await Promise.race([
         response.json(),
@@ -192,57 +173,74 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
           controller.signal.addEventListener("abort", () => reject(Error("NETWORK_TIMEOUT")), { once: true });
         }),
       ])) as Record<string, unknown>;
-      let parsed;
-      try { parsed = parseNetworkStatus(body, {availabilityOnly:true, now:started, fail: () => { throw Error("NETWORK_SCHEMA"); }}); }
-      catch { /* Keep the deployed status-only probe failure/hold behavior. */ }
-      if (!parsed) {
-        consecutiveFailures += 1;
-        const level = classifyProbe({
-          ok: false,
-          latencyMs,
-          consecutiveFailures,
-          everSucceeded,
-        });
-        return snapshot(level, {
-          checkedAt: now(),
-          failures: consecutiveFailures,
-          latencyMs,
-        });
-      }
-      consecutiveFailures = 0;
-      everSucceeded = true;
-      const {staleAgeS, ...detail} = parsed;
-      const stale = detail.stale;
-      const level = classifyProbe({
-        ok: true,
-        latencyMs,
-        stale,
-        staleAgeS,
-        consecutiveFailures: 0,
-        everSucceeded: true,
-      });
-      return snapshot(level, {
-        checkedAt: now(),
-        failures: 0,
-        latencyMs,
-        detail,
-      });
-    } catch {
+      return { body };
+    } catch (error) {
+      const timedOut =
+        controller.signal.aborted ||
+        (error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError" || error.message === "NETWORK_TIMEOUT"));
+      return { retryable: timedOut };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async function probe(): Promise<NetworkStatusSnapshot> {
+    const started = now();
+    const fail = () => {
+      const latencyMs = Math.max(0, now() - started);
       consecutiveFailures += 1;
       const level = classifyProbe({
         ok: false,
-        latencyMs: Math.max(0, now() - started),
+        latencyMs,
         consecutiveFailures,
         everSucceeded,
       });
       return snapshot(level, {
         checkedAt: now(),
         failures: consecutiveFailures,
-        latencyMs: Math.max(0, now() - started),
+        latencyMs,
       });
-    } finally {
-      clearTimeout(timer);
+    };
+    const primaryCap = started < primarySlowUntil ? Math.min(2000, Math.floor(requestMs * 0.6)) : Math.floor(requestMs * 0.6);
+    const primary = await fetchStatusJson(STATUS_URL, primaryCap);
+    let body: Record<string, unknown> | null = null;
+    if ("body" in primary) {
+      body = primary.body;
+      primarySlowUntil = 0;
+    } else if (primary.retryable) {
+      const remaining = requestMs - Math.max(0, now() - started);
+      if (remaining > 0) {
+        const fallback = await fetchStatusJson(FALLBACK_STATUS_URL, remaining);
+        if ("body" in fallback) {
+          body = fallback.body;
+          primarySlowUntil = now() + PRIMARY_SLOW_TTL_MS;
+        }
+      }
     }
+    if (!body) return fail();
+    let parsed;
+    try { parsed = parseNetworkStatus(body, {availabilityOnly:true, now:started, fail: () => { throw Error("NETWORK_SCHEMA"); }}); }
+    catch { /* Keep the deployed status-only probe failure/hold behavior. */ }
+    if (!parsed) return fail();
+    const latencyMs = Math.max(0, now() - started);
+    consecutiveFailures = 0;
+    everSucceeded = true;
+    const {staleAgeS, ...detail} = parsed;
+    const stale = detail.stale;
+    const level = classifyProbe({
+      ok: true,
+      latencyMs,
+      stale,
+      staleAgeS,
+      consecutiveFailures: 0,
+      everSucceeded: true,
+    });
+    return snapshot(level, {
+      checkedAt: now(),
+      failures: 0,
+      latencyMs,
+      detail,
+    });
   }
 
   /** Same result a failed probe would give, without mutating counters (the probe itself still records). */

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=a13bd7a9b500" />
+    <link rel="stylesheet" href="/style.css?v=577501e8844b" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -98,6 +98,7 @@
             <h3>🛒 Cart (<span id="cartCount">0</span>)</h3>
             <button id="clearCart" type="button" class="secondary" disabled>Clear</button>
           </div>
+          <p id="cartEscrowStatus" class="cart-escrow-status" role="status" aria-live="polite" hidden></p>
           <div id="cartList" class="cards"></div>
           <h4>Agent prompt</h4>
           <p id="cartRealityNote" data-info-description class="muted">🪙 Your agent pays in POA through POA checkout, only after your approval. Nothing is sent from this page.</p>
@@ -107,6 +108,16 @@
             <button id="copyCartPrompt" type="button" disabled>Copy prompt</button>
             <button id="downloadCartJSON" type="button" class="secondary" disabled>📥 Download JSON</button>
             <span id="cartStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
+          </div>
+          <div id="cartExpectations" class="cart-expectations" hidden>
+            <h4>What happens after your agent sends POA</h4>
+            <p id="cartExpectLead" class="muted"></p>
+            <ol class="cart-expect-steps">
+              <li><strong>Finality first:</strong> Your agent creates an escrow intent and sends the exact POA total with the unique memo. PoA network finality (<code>K=5</code> attestations or checkpoint) is required — <em>seen</em> is not credited yet.</li>
+              <li><strong>Instant permanent mint:</strong> Once final, escrow credits your balance and your agent submits <code>issue</code> for each name. Each domain is minted permanently to your address immediately in that step — no auction or wait for treasury payout.</li>
+              <li><strong>Verify ownership right away:</strong> Open each name’s <code>/d/&lt;name&gt;</code> page or the <strong>Manage domains</strong> tab with your public <code>poa1…</code> address to see <strong>Owned (permanent)</strong>.</li>
+              <li><strong>Safety &amp; unused POA:</strong> If a name is taken first or checkout is held, nothing is minted for it. Any unused POA credit stays in your escrow balance and can be withdrawn back only to your original sending address.</li>
+            </ol>
           </div>
         </div>
       </section>
@@ -301,8 +312,17 @@
         <h2 id="floatingCartHeading">🛒 Cart</h2>
         <button type="button" id="floatingCartClose" class="secondary" aria-label="Close cart">Close</button>
       </div>
+      <p id="floatingCartEscrowStatus" class="cart-escrow-status" role="status" aria-live="polite" hidden></p>
       <p id="floatingHandoffMeta" class="muted">🧾 Agent Cart Handoff v2 · not ready</p>
       <div id="floatingCartList" class="cards"></div>
+      <div id="floatingCartExpectations" class="cart-expectations cart-expectations-compact" hidden>
+        <p class="cart-expect-title"><strong>After your agent sends POA:</strong></p>
+        <ol class="cart-expect-steps">
+          <li>Wait for PoA finality (<code>K=5</code> attestations or checkpoint; <em>seen</em> is not credited yet).</li>
+          <li>Your agent runs <code>issue</code> — each name mints permanently to your address immediately.</li>
+          <li>Verify on <code>/d/&lt;name&gt;</code> or <strong>Manage domains</strong>. Unused POA refunds only to your original address.</li>
+        </ol>
+      </div>
       <div class="button-row">
         <button type="button" id="floatingCartClear" class="secondary" disabled>Clear</button>
         <button type="button" id="copyCheckoutBtn" disabled>Copy checkout for agent</button>
@@ -311,6 +331,6 @@
       <p id="floatingCartStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
 
-    <script type="module" src="/app.js?v=4e6b6590ba50"></script>
+    <script type="module" src="/app.js?v=84cf1fca35ea"></script>
   </body>
 </html>

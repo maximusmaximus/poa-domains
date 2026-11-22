@@ -20,8 +20,14 @@ try {
   await page.route("https://**", (r) => r.abort());
   await page.goto(h.url + "/?q=freshpoaname");
   await page.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(page.locator("#cartExpectations")).toBeHidden();
+  await expect(page.locator("#searchResult")).toContainText("reaches finality and runs issue");
   await page.locator("#addToCartBtn").click();
   await expect(page.locator("#copyCartPrompt")).toBeEnabled();
+  await expect(page.locator("#cartExpectations")).toBeVisible();
+  await expect(page.locator("#cartExpectLead")).toContainText("1 name (100 POA total)");
+  await expect(page.locator("#cartExpectations")).toContainText("Instant permanent mint");
+  await expect(page.locator("#cartExpectations")).toContainText("Verify ownership right away");
   const expectedPrompt = await page.locator("#cartPrompt").textContent();
   assert.match(expectedPrompt, /poa-domains\.poa-checkout\.v1/);
 
@@ -29,16 +35,18 @@ try {
   await expect(page.locator("#cartStatus")).toHaveText("✅ Copied");
   await expect(page.locator("#copyCartPrompt")).toHaveText("✅");
   const clipInline = await page.evaluate(() => navigator.clipboard.readText());
-  assert.equal(clipInline, expectedPrompt);
+  assert.equal(clipInline.replace(/\r\n/g, "\n"), expectedPrompt);
 
   // Open floating cart modal (visible off the Find tab), copy checkout prompt, verify clipboard, then click a link inside modal
   await page.locator("#tabHandoff").click();
   await page.locator("#floatingCartBtn").click();
   await expect(page.locator("#floatingCartPanel")).toBeVisible();
+  await expect(page.locator("#floatingCartExpectations")).toBeVisible();
+  await expect(page.locator("#floatingCartExpectations")).toContainText("mints permanently to your address immediately");
   await page.locator("#copyCheckoutBtn").click();
   await expect(page.locator("#floatingCartStatus")).toHaveText("✅ Request copied — nothing sent");
   const clipFloating = await page.evaluate(() => navigator.clipboard.readText());
-  assert.equal(clipFloating, expectedPrompt);
+  assert.equal(clipFloating.replace(/\r\n/g, "\n"), expectedPrompt);
 
   // Clicking domain link inside floating modal closes the modal & un-inerts main content
   await page.locator('#floatingCartList a[href="/d/freshpoaname"]').click();
@@ -141,7 +149,49 @@ try {
   assert.deepEqual(errorsManual, []);
   await ctxManual.close();
 
-  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback");
+  // 4. Live POA checkout escrow readiness banner in cart & floating cart (held vs open)
+  h.cap = { ...h.cap, escrow: { enabled: true, capabilities: "/v1/escrow/capabilities" } };
+  h.escrowCap = {
+    enabled: true,
+    paused: false,
+    held: true,
+    holdReason: "ASSET_LIABILITY_MISMATCH",
+    freshness: { held: true, code: "ESCROW_NODE_TIMEOUT", reason: "The public network read timed out." },
+    address: "poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf",
+    limits: { perTransaction: "250000.000000", daily: "1000000.000000" },
+    serverTime: Date.now(),
+  };
+  const ctxEscrow = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const pageEscrow = await ctxEscrow.newPage();
+  const errorsEscrow = [];
+  pageEscrow.on("pageerror", (e) => errorsEscrow.push(e.message));
+  await pageEscrow.route("https://**", (r) => r.abort());
+  await pageEscrow.goto(h.url + "/?q=freshpoaname");
+  await pageEscrow.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageEscrow.locator("#cartEscrowStatus")).toBeVisible();
+  await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("currently on hold");
+  await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("reconciliation hold");
+  await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("public PoA network read timed out");
+  await pageEscrow.locator("#addToCartBtn").click();
+  await pageEscrow.locator("#tabHandoff").click();
+  await pageEscrow.locator("#floatingCartBtn").click();
+  await expect(pageEscrow.locator("#floatingCartEscrowStatus")).toBeVisible();
+  await expect(pageEscrow.locator("#floatingCartEscrowStatus")).toContainText("stop at step 0");
+  await pageEscrow.locator("#floatingCartClose").click();
+
+  h.escrowCap = {
+    ...h.escrowCap,
+    held: false,
+    holdReason: null,
+    freshness: { held: false, code: null, reason: null },
+  };
+  await pageEscrow.reload();
+  await pageEscrow.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("🟢 POA checkout open");
+  assert.deepEqual(errorsEscrow, []);
+  await ctxEscrow.close();
+
+  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations & escrow readiness banner");
 } finally {
   await h.close();
   await browser.close();

@@ -1,11 +1,11 @@
-import { publicNameUnavailable } from "./shared.js?v=4e6b6590ba50";
-import { registryUnit } from "./shared.js?v=4e6b6590ba50";
-import { actionLabel } from "./ui-copy.js?v=4e6b6590ba50";
-import { trapDialog } from "./ui-a11y.js?v=4e6b6590ba50";
-import { ui } from "./ui-state.js?v=4e6b6590ba50";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=4e6b6590ba50";
-import { add, el, endpointBase } from "./ui-core.js?v=4e6b6590ba50";
-import { nameLink } from "./ui-router.js?v=4e6b6590ba50";
+import { publicNameUnavailable } from "./shared.js?v=84cf1fca35ea";
+import { registryUnit } from "./shared.js?v=84cf1fca35ea";
+import { actionLabel } from "./ui-copy.js?v=84cf1fca35ea";
+import { trapDialog } from "./ui-a11y.js?v=84cf1fca35ea";
+import { ui } from "./ui-state.js?v=84cf1fca35ea";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=84cf1fca35ea";
+import { add, el, endpointBase } from "./ui-core.js?v=84cf1fca35ea";
+import { nameLink } from "./ui-router.js?v=84cf1fca35ea";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
@@ -132,8 +132,80 @@ function observeCartArea() {
     syncCartShortcut();
 }
 
+function formatEscrowHoldReason(caps) {
+    const map = {
+        ASSET_LIABILITY_MISMATCH: "reconciliation hold awaiting operator review",
+        ESCROW_NODE_TIMEOUT: "public PoA network read timed out",
+        ESCROW_NODE_AUTH: "PoA ledger is temporarily locked",
+        ESCROW_STALE: "PoA network status is stale",
+    };
+    const parts = [];
+    const primary = typeof caps.holdReason === "string" && caps.holdReason.trim() ? caps.holdReason.trim() : "";
+    if (primary)
+        parts.push(map[primary] ?? primary);
+    else if (caps.paused)
+        parts.push("POA payments paused");
+    const fCode = typeof caps.freshness?.code === "string" ? caps.freshness.code : "";
+    const fText = fCode ? (map[fCode] ?? caps.freshness?.reason ?? fCode) : (caps.freshness?.held && typeof caps.freshness?.reason === "string" ? caps.freshness.reason : "");
+    if (fText && !parts.some((p) => p.toLowerCase().includes(fText.toLowerCase())))
+        parts.push(fText);
+    return parts.join("; ") || "temporarily paused";
+}
+
+export function renderCartEscrowStatus() {
+    const show = Boolean(ui.cap && poaOnlyMode(ui.cap) && ui.escrowCaps?.enabled);
+    const caps = ui.escrowCaps;
+    const isHeld = Boolean(caps && (caps.held || caps.paused || caps.freshness?.held));
+    const text = show
+        ? (isHeld
+            ? `⏸️ POA checkout is currently on hold (${formatEscrowHoldReason(caps)}). You can plan your cart now, but wait before sending POA — your agent will stop at step 0 and send nothing until checkout reopens.`
+            : "🟢 POA checkout open — ready when you approve your agent.")
+        : "";
+    for (const id of ["cartEscrowStatus", "floatingCartEscrowStatus"]) {
+        const node = el(id);
+        if (!node)
+            continue;
+        node.hidden = !show;
+        node.textContent = text;
+        node.className = "cart-escrow-status " + (isHeld ? "badge-warn" : "badge-ok");
+    }
+}
+
+function poaCartTotalShort(items) {
+    let total = 0n;
+    for (const item of items) {
+        const m = /^([0-9]{1,12})\.([0-9]{6})$/.exec(item?.amount ?? "");
+        if (!m)
+            return null;
+        total += BigInt(m[1]) * 1000000n + BigInt(m[2]);
+    }
+    const whole = total / 1000000n;
+    const frac = (total % 1000000n).toString().padStart(6, "0");
+    return poaShort(`${whole}.${frac}`);
+}
+
+export function renderCartExpectations() {
+    const show = Boolean(ui.cap && poaOnlyMode(ui.cap) && ui.cart.length > 0);
+    const inlineBox = el("cartExpectations");
+    const floatingBox = el("floatingCartExpectations");
+    if (inlineBox)
+        inlineBox.hidden = !show;
+    if (floatingBox)
+        floatingBox.hidden = !show;
+    const lead = el("cartExpectLead");
+    if (lead && show) {
+        const total = poaCartTotalShort(ui.cart);
+        const count = `${ui.cart.length} ${ui.cart.length === 1 ? "name" : "names"}`;
+        lead.textContent = total
+            ? `For ${count} (${total} POA total) — nothing is paid or minted until you approve your agent.`
+            : `For ${count} — nothing is paid or minted until you approve your agent.`;
+    }
+}
+
 export function renderFloatingCart() {
     observeCartArea();
+    renderCartEscrowStatus();
+    renderCartExpectations();
     const badge = el("floatingCartBadge");
     const list = el("floatingCartList");
     const clearBtn = el("floatingCartClear");
@@ -173,6 +245,8 @@ export function renderFloatingCart() {
 export function renderCart() {
     if(!ui.cap)return;
     syncIdeaMarks();
+    renderCartEscrowStatus();
+    renderCartExpectations();
     el("cartCount").textContent = String(ui.cart.length);
     el("clearCart").disabled = ui.cart.length === 0;
     {

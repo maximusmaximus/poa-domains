@@ -1,10 +1,10 @@
-import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=4e6b6590ba50";
-import { ui } from "./ui-state.js?v=4e6b6590ba50";
-import { add, el } from "./ui-core.js?v=4e6b6590ba50";
-import { runSearch } from "./ui-search.js?v=4e6b6590ba50";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=4e6b6590ba50";
-import { updateTabDots } from "./ui-render.js?v=4e6b6590ba50";
-import { syncCartShortcutNow } from "./ui-cart.js?v=4e6b6590ba50";
+import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=84cf1fca35ea";
+import { ui } from "./ui-state.js?v=84cf1fca35ea";
+import { add, el } from "./ui-core.js?v=84cf1fca35ea";
+import { runSearch } from "./ui-search.js?v=84cf1fca35ea";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=84cf1fca35ea";
+import { updateTabDots } from "./ui-render.js?v=84cf1fca35ea";
+import { syncCartShortcutNow } from "./ui-cart.js?v=84cf1fca35ea";
 
 /** Open 🪙 My POA; with a name, prefill it for a POA listing or auction. Your agent signs; nothing is sent here. */
 export function openPoa(name) {
