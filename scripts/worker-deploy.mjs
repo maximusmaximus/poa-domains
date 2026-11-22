@@ -107,11 +107,15 @@ export function checkoutPlan(expected, liveBindings) {
 // engine ed86480c… (params unchanged, bc823648…). Reviewed against 92658c61…: transfer body, txid, signing and receipt code is unchanged.
 // Full 431,221-byte download of client/poa.mjs hashed on the box on Nov 20 2026 while network-facts advertised
 // engine 39ea914d… / params a4c1e8ce…. Reviewed against 92658c61…: canonical encoding, signBody/verifyBody, txidOf, transfer body and receipt code is unchanged.
+// Full 433,752-byte download of client/poa.mjs (Last-Modified 2026-11-22T12:05:05Z) hashed on the box on Nov 22 2026 while
+// network-facts advertised engine a5feae08… / params a4c1e8ce… (unchanged). Structural diff against the 39ea914d surface snapshot: 0 breaking;
+// canonical encoding, signBody/verifyBody, txidOf, transfer body and receipt code unchanged; one new export (_mergeExtrasBS, ledger replay internals).
 export const REPIN_CLIENT_EVIDENCE = Object.freeze({
   "e01abd959dd0439dd89af8e8c187d1bed3897deb2a855a615e7dfa2d0222f1fb": true,
   "92658c61bc75d24572b8eef6182af27436a4f00019854718dcf0de3c6d2b54f6": true,
   "ed86480cd46a8c2df2dbf395f75838f9939120b930cc821c777adf91f5d3d67d": true,
   "39ea914d92f3049e2e7a37accf1a998d263f280d4d37b075abdc463eda157d88": true,
+  "a5feae08cbd1fabf38f15637ca113a03ffa2b5b9ce3107dca7cbc84cb8c229a2": true,
 });
 export function hasReviewedClientEvidence(engineSha256, root = process.cwd()) {
   if (REPIN_CLIENT_EVIDENCE[engineSha256] === true) return true;
