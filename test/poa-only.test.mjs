@@ -105,6 +105,9 @@ test("POA cart: fixed POA price, review catches a taken name, handoff totals exa
   const text = renderPoaCheckoutHandoff(handoff);
   assert.match(text, /Total 1100\.000000 POA/);
   assert.match(text, /issueFromTreasury/);
+  assert.match(text, /K=5 attestations or checkpoint/);
+  assert.match(text, /mints permanent ownership to my address immediately/);
+  assert.match(text, /\/v1\/resolve\?name=<name>/);
   assert.doesNotMatch(text, /registry units|internal/);
   assert.throws(() => buildPoaCheckoutHandoff([{ ...a, action: "bid" }], cap, "https://poadomains.grok.me", payload, 1));
   assert.throws(() => buildCartItem({ name: "newpublicname", action: "poaCheckout" }, { ...cap, poaOnly: undefined }, state));

@@ -874,3 +874,76 @@ test("engine: issueSubname is escrow-only, permanent, cap 0, and keeps child rul
  assert.equal(e.preview(revoke([])).status,"rejected","the child holder alone cannot revoke");
  assert.equal(e.preview(revoke([who(2)])).status,"succeeded","child holder plus parent holder can revoke, as before");
 });
+
+test("primary status timeout falls back to live /api/status shape and snapshot cutoff; stale and 401 still fail closed",async()=>{
+ const now=NOW_V2;
+ const liveFresh={network:"PoA prototype",K:5,txs:5664,final:5349,invalid:0,epochs_closed:111,as_of:new Date(now-5000).toISOString(),checkpoint_height:1445570,state_root:root};
+ const facts={chain_id:CHAIN,open_epoch:111,engine_sha256:MAINNET_ENGINE_SHA256,params_sha256:MAINNET_PARAMS_SHA256,economics:{K:5}};
+ const afterTx=signedV2(3,policy.wallet,"1.000000","poadomains:open-window",1,CUTOFF_V2+30),afterId=txid(afterTx);
+ const paths:string[]=[];
+ const request=(async(input:any)=>{
+  const p=new URL(String(input)).pathname;paths.push(p);
+  if(p===`/chain/${CHAIN}/api/status`)throw new DOMException("primary hung","TimeoutError");
+  if(p==="/api/status")return Response.json(liveFresh);
+  if(p===`/chain/${CHAIN}/api/network-facts`)return Response.json(facts);
+  if(p===`/api/explorer/address/${policy.wallet}`)return Response.json({address:policy.wallet,balance:"0.000000",balance_as_of:{checkpoint_height:1445570},
+   txs:[{id:afterId,type:"transfer",from_addr:who(3),to_addr:policy.wallet,amount:"1.000000",ts:afterTx.ts},{id:afterId,type:"transfer",from_addr:who(3),to_addr:policy.wallet,amount:"1.000000",ts:afterTx.ts},{id:"f".repeat(64),type:"transfer",from_addr:policy.wallet,to_addr:who(4),amount:"1.000000",ts:afterTx.ts}]});
+  if(p===`/api/explorer/tx/${afterId}`)return Response.json(explorerV2(afterTx,{checkpoint_height:1445570}));
+  if(p===`/api/receipt/${afterId}`)return Response.json(receiptV2(afterId));
+  if(p==="/api/snapshot")return Response.json({params:{chain_id:CHAIN},checkpoint:{height:1445570,cutoff:{ts:CUTOFF_V2}}});
+  return new Response(null,{status:404});
+ }) as typeof fetch;
+ const net=new PoaHttpNetwork(()=>false,request,undefined,()=>now);
+ const d=await net.displayStatus();assert.equal(d.stale,false);assert.equal(d.height,1445570);assert.equal(d.root,root);
+ const s=await net.status();assert.equal(s.stale,false);assert.equal(s.height,1445570);assert.equal(s.root,root);
+ assert.deepEqual(await net.incoming(policy.wallet),[afterId],"deduplicates explorer address rows and filters to incoming transfers");
+ const cut=await net.cut(policy.wallet,[afterId],s);
+ assert.deepEqual(cut.covered,[],"post-cutoff open-window tx resolved via snapshot cutoff without halting");
+ assert.ok(paths.includes("/api/snapshot"));
+ // Stale /api/status (explicit stale:true, old as_of, or non-boolean stale) still fails closed.
+ for(const bad of [{...liveFresh,stale:true,stale_age_s:222},{...liveFresh,as_of:new Date(now-150000).toISOString()},{...liveFresh,stale:"no"}]){
+  const staleReq=(async(input:any)=>{const p=new URL(String(input)).pathname;
+   if(p===`/chain/${CHAIN}/api/status`)throw new DOMException("primary hung","TimeoutError");
+   if(p==="/api/status")return Response.json(bad);
+   return Response.json(facts);}) as typeof fetch;
+  await assert.rejects(new PoaHttpNetwork(()=>false,staleReq,undefined,()=>now).status(),/ESCROW_STALE/);
+ }
+ // 401 on primary chain status STILL fails closed as ESCROW_NODE_AUTH even if /api/status is fresh.
+ const authReq=(async(input:any)=>{const p=new URL(String(input)).pathname;
+  if(p===`/chain/${CHAIN}/api/status`)return new Response(JSON.stringify({error:"Unauthorized"}),{status:401});
+  if(p==="/api/status")return Response.json(liveFresh);
+  return Response.json(facts);}) as typeof fetch;
+ await assert.rejects(new PoaHttpNetwork(()=>false,authReq,undefined,()=>now).status(),/ESCROW_NODE_AUTH/);
+ await assert.rejects(new PoaHttpNetwork(()=>false,authReq,undefined,()=>now).displayStatus(),/ESCROW_NODE_AUTH/);
+});
+
+test("auto-sweep credits finalized matching open intents before reconciliation without halting; unsolicited funds still halt",async()=>{
+ const f=issueFixture();f.net.autoDiscover=true;
+ const r=await f.e.command(command(who(3),"auto-intent","intent",{amount:"2.000000"})) as any;
+ const depId=f.net.add(depositBody(3,policy.wallet,"2.000000",r.intent),5,true);
+ // Checkpoint closes before buyer calls detect: tick/reconcile sweeps the exact open intent instead of halting.
+ await f.e.tick();
+ assert.equal(f.e.state().halt,null);
+ assert.equal(f.e.state().available[who(3)],"2000000");
+ assert.equal(f.e.state().deposits[r.intent]!.tx,depId);
+ // Buyer's subsequent detect confirms cleanly without double-crediting.
+ const det=await f.e.command(command(who(3),"auto-detect","detect",{intent:r.intent,txid:depId})) as any;
+ assert.deepEqual(det,{ok:true,alreadyCredited:true});
+ assert.equal(f.e.state().available[who(3)],"2000000");
+ assert.equal(f.e.state().assets,"2000000");
+ // Buyer can immediately issue a domain using the auto-credited funds.
+ const issued=await f.e.command(command(who(3),"auto-issue","issue",{name:"sweptname",amount:"2.000000",registration:registration(3,"sweptname")})) as any;
+ assert.equal(issued.issued,"sweptname");assert.equal(f.issued.sweptname,who(3));
+ // Paused escrow never auto-sweeps open intents.
+ const rPaused=await f.e.command(command(who(4),"paused-intent","intent",{amount:"1.000000"})) as any;
+ await f.e.pause(true);
+ f.net.add(depositBody(4,policy.wallet,"1.000000",rPaused.intent),5,true);
+ await assert.rejects(f.e.reconcile(),/MISMATCH/);
+ assert.equal(f.e.state().halt,"ASSET_LIABILITY_MISMATCH");
+ assert.equal(f.e.state().deposits[rPaused.intent]!.tx,null,"paused deposit is not auto-credited");
+ // Unsolicited deposit (wrong memo / no open intent) on open escrow still quarantines with ASSET_LIABILITY_MISMATCH.
+ const g=fixture();g.net.autoDiscover=true;
+ g.net.add(depositBody(4,policy.wallet,"1.000000","0".repeat(64)),5,true);
+ await assert.rejects(g.e.reconcile(),/MISMATCH/);
+ assert.equal(g.e.state().halt,"ASSET_LIABILITY_MISMATCH");
+});

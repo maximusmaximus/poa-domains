@@ -1,4 +1,4 @@
-import { decorateEmojiButton } from "./ui-copy.js?v=4e6b6590ba50";
+import { decorateEmojiButton } from "./ui-copy.js?v=84cf1fca35ea";
 // Native nonmodal popovers provide touch/keyboard dismissal and do not trap page focus.
 const watched=new WeakSet();
 export function decoratePoaFields(){
@@ -25,7 +25,8 @@ export function installHelp(){
  for(const container of document.querySelectorAll("#cartList,#floatingCartList")){
   for(const [i,card]of [...container.querySelectorAll(".cart-item")].entries()){
    if(card.querySelector(":scope > .module-info"))continue;
-   addHelp(card,container.id+"-item-"+i,"This is one unsigned planning item, not a purchase. Edit its maximum registry-unit amount to update the request and totals. Remove it with ✖️; no signed action or payment is sent.",[...card.querySelectorAll(".amount-label > small")]);
+   const isPoaItem=!card.querySelector(".amount-label");
+   addHelp(card,container.id+"-item-"+i,isPoaItem?"This is one unsigned POA checkout item, not a payment. Your agent checks live escrow status, pays the exact POA total after your approval, waits for PoA finality, and mints the permanent name to your address. Remove it with ✖️.":"This is one unsigned planning item, not a purchase. Edit its maximum registry-unit amount to update the request and totals. Remove it with ✖️; no signed action or payment is sent.",[...card.querySelectorAll(".amount-label > small")]);
   }
  }
 }

@@ -23,6 +23,8 @@ export interface Network {
   status(): Promise<Status>;
   /** Optional display-only observation; NEVER authorizes a financial operation. */
   displayStatus?(): Promise<Status>;
+  /** Optional incoming transfer txids to the escrow wallet, used to auto-credit open intents before reconciliation. */
+  incoming?(wallet: string): Promise<string[]>;
   lookup(id: string): Promise<Observation | null>;
   context(wallet: string, knownTxid?: string): Promise<Context>; cut(wallet: string, ids: string[], status: Status): Promise<Cut>;
   submit(body: Transfer): Promise<void>;
@@ -63,7 +65,7 @@ export interface Payment {
   id: string; kind: "refund" | "seller" | "fee"; to: string; amount: string; status: PayStatus;
   day: string | null; body: Transfer | null; txid: string | null;
 }
-interface Deposit { payer: string; amount: string; tx: string | null; createdAt?: number; }
+interface Deposit { payer: string; amount: string; tx: string | null; createdAt?: number; auto?: boolean; }
 interface Auction {
   id: string; name: string; seller: string; reserve: string; closes: number; quiet: number; kind?: "auction" | "fixed"; createdAt?: number; history?: {event:string;at:number;amount?:string}[];
   high: { payer: string; amount: string } | null; status: "OPEN" | "CANCELLED" | "SETTLING" | "COMPLETE";
@@ -260,7 +262,47 @@ export class Escrow {
   reconcile(): Promise<State> { return this.serial(async()=>{
     need(this.enabled(),"ESCROW_DISABLED"); const status=await this.fresh(); await this.reconcileAt(status); return this.state();
   }); }
+  /** Credit any finalized incoming transfer that exactly matches an open deposit intent while escrow is open.
+   * Never runs while paused or halted, never clears a halt, and never credits unsolicited or mismatched transfers. */
+  private async sweepPendingDeposits(): Promise<void> {
+    if(!this.network.incoming)return;
+    const s0=this.state();
+    if(!this.enabled()||s0.paused||pendingPauses.has(this.journal)||s0.halt)return;
+    const open=Object.entries(s0.deposits).filter(([,d])=>!d.tx);
+    if(!open.length)return;
+    const byMemo=new Map(open.map(([intent,d])=>[`poadomains:${intent}`,{intent,d}]));
+    let txids:string[];
+    try { txids=await this.network.incoming(this.policy.wallet); }
+    catch { return; }
+    for(const id of txids) {
+      const cur=this.state();
+      if(!this.enabled()||cur.paused||pendingPauses.has(this.journal)||cur.halt)return;
+      if(!/^[0-9a-f]{64}$/.test(id)||cur.credited[id])continue;
+      let o:Observation|null;
+      try { o=await this.network.lookup(id); } catch { continue; }
+      if(!o)continue;
+      try { this.final(o,id); } catch { continue; }
+      const match=byMemo.get(o.body.memo);
+      if(!match)continue;
+      const {intent,d}=match;
+      if(o.body.to!==this.policy.wallet||o.body.from!==d.payer||o.body.amount!==d.amount)continue;
+      if(cur.deposits[intent]?.tx)continue;
+      if(Object.values(cur.credited).some(b=>(b.from===o.body.from&&b.nonce===o.body.nonce)||b.memo===o.body.memo))continue;
+      this.journal.append("deposit",{auto:true,intent,id},next=>{
+        need(this.enabled(),"ESCROW_DISABLED");need(!next.paused,"ESCROW_PAUSED");need(!next.halt,"ESCROW_HALTED");
+        const target=next.deposits[intent];
+        need(!!target&&!target.tx&&!next.credited[id],"ESCROW_DEPOSIT_DUPLICATE");
+        need(!Object.values(next.credited).some(b=>(b.from===o.body.from&&b.nonce===o.body.nonce)||b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
+        target.tx=id;target.auto=true;next.credited[id]=o.body;
+        next.assets=String(BigInt(next.assets)+micros(target.amount));
+        next.available[target.payer]=String(BigInt(next.available[target.payer]??"0")+micros(target.amount));
+      });
+      byMemo.delete(o.body.memo);
+      if(!byMemo.size)break;
+    }
+  }
   private async reconcileAt(status:Status): Promise<void> {
+    await this.sweepPendingDeposits();
     const s=this.state(), ids=[...Object.keys(s.credited),...Object.values(s.payments).flatMap(p=>p.txid?[p.txid]:[])];
     const cut=await this.network.cut(this.policy.wallet,ids,status);
     need(cut.chain===CHAIN && cut.height===status.height && cut.root===status.root,"ESCROW_UNALIGNED_CUT");
@@ -368,6 +410,7 @@ export class Escrow {
     if(c.action==="detect") {
       exact(p,["intent","txid"]); const id=text(p.txid,64); need(/^[0-9a-f]{64}$/.test(id),"ESCROW_TXID");
       const s=this.state(),dep=s.deposits[text(p.intent,80)]; need(dep && dep.payer===c.actor,"ESCROW_DEPOSIT_INTENT");
+      if(dep.tx===id && dep.auto===true && s.credited[id]) return {ok:true,alreadyCredited:true};
       need(!dep.tx && !s.credited[id],"ESCROW_DEPOSIT_DUPLICATE");
       const o=await this.network.lookup(id); need(o,"ESCROW_UNKNOWN_DEPOSIT"); this.final(o,id);
       need(o.body.to===this.policy.wallet && o.body.from===dep.payer && o.body.amount===dep.amount && o.body.memo===`poadomains:${p.intent}`,"ESCROW_DEPOSIT_BINDING");

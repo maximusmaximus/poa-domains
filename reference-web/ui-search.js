@@ -1,11 +1,11 @@
-import { copyText } from "./ui-copy.js?v=4e6b6590ba50";
-import { publicNameUnavailable } from "./shared.js?v=4e6b6590ba50";
-import { registryUnit, poaOnlyMode, poaNewNamePrice, poaShort, buildSubnamePurchasePrompt } from "./shared.js?v=4e6b6590ba50";
-import { ui } from "./ui-state.js?v=4e6b6590ba50";
-import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=4e6b6590ba50";
-import { add, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=4e6b6590ba50";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=4e6b6590ba50";
-import { addToCart } from "./ui-cart.js?v=4e6b6590ba50";
+import { copyText } from "./ui-copy.js?v=84cf1fca35ea";
+import { publicNameUnavailable } from "./shared.js?v=84cf1fca35ea";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaShort, buildSubnamePurchasePrompt } from "./shared.js?v=84cf1fca35ea";
+import { ui } from "./ui-state.js?v=84cf1fca35ea";
+import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=84cf1fca35ea";
+import { add, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=84cf1fca35ea";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=84cf1fca35ea";
+import { addToCart } from "./ui-cart.js?v=84cf1fca35ea";
 
 export function runSearch(rawQuery, remember = true) {
     if (remember) {
@@ -167,7 +167,8 @@ export function runSearch(rawQuery, remember = true) {
         catch (error) { add(card, "p", error.message, "badge-warn"); return; }
         add(card, "p", "🟢 Available", "badge-ok");
         add(card, "p", `🪙 ${poaShort(price)} POA`, "badge-ok");
-        add(card, "p", `Yours forever for ${poaShort(price)} POA. Your agent pays with POA checkout after you approve. Nothing is paid here.`).setAttribute("data-info-description", "");
+        add(card, "p", `Permanent name for ${poaShort(price)} POA. Add to cart to copy your agent checkout plan — once your agent’s POA transfer reaches finality and runs issue, ownership mints to your address right away.`, "muted poa-search-expect");
+        add(card, "p", `Yours forever for ${poaShort(price)} POA. After your agent sends POA and it reaches PoA finality (K=5 attestations or checkpoint), escrow credits your balance and your agent mints the name permanently in one step. Unused POA stays refundable only to your original address. Nothing is paid here.`).setAttribute("data-info-description", "");
         const btn = add(card, "button", "Add to cart", "small");
         btn.id = "addToCartBtn";
         btn.type = "button";

@@ -9,9 +9,14 @@ export const PILOT_PER_TX = "250000.000000";
 export const PILOT_DAILY = "1000000.000000";
 /** K=5 peer attestations: the same threshold Escrow.final() requires for open-window money. */
 const PEER_FINAL_ATTESTATIONS = 5;
+const PRIMARY_SLOW_TTL_MS = 60_000;
+function isTimeoutError(e: unknown): boolean {
+  return e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
+}
 export class PoaHttpNetwork implements Network {
   private lastHeight?: number;
   private lastCutoff?: number;
+  private primaryStatusSlowUntil = 0;
   constructor(private writesAllowed:()=>boolean, private request:typeof fetch=fetch,
     private pins:{engine:string;params:string}={engine:MAINNET_ENGINE_SHA256,params:MAINNET_PARAMS_SHA256},
     private clock:()=>number=Date.now, private apiToken?:string) {
@@ -42,19 +47,50 @@ export class PoaHttpNetwork implements Network {
   private async getFirst(paths:string[], limit=2000000, displaySignal?:AbortSignal):Promise<any> {
     return (await this.getFirstTracked(paths,limit,displaySignal)).value;
   }
-  /** Same as getFirst, but also reports whether an earlier path was refused (401/403) before a fallback answered. */
-  private async getFirstTracked(paths:string[], limit=2000000, displaySignal?:AbortSignal):Promise<{value:any;refused:boolean}> {
-    let lastErr:unknown;let refused=false;
-    for(const path of paths){
-      try{const v=await this.get(path,limit,displaySignal);if(v!==null)return {value:v,refused};}
-      catch(e){
+  /** Same as getFirst, but also reports whether an earlier path was refused (401/403) or timed out before a fallback answered. */
+  private async getFirstTracked(
+    paths:string[],
+    limit=2000000,
+    displaySignal?:AbortSignal,
+    firstPathTimeoutMs?:number,
+    startedAt?:number,
+  ):Promise<{value:any;refused:boolean;timedOutFirst:boolean}> {
+    let lastErr:unknown;let refused=false;let timedOutFirst=false;
+    for(let i=0;i<paths.length;i++){
+      const path=paths[i]!;
+      const isFallbackCapable=i===0&&paths.length>1;
+      try{
+        let v:any;
+        if(isFallbackCapable&&firstPathTimeoutMs!==undefined&&firstPathTimeoutMs>0){
+          if(displaySignal){
+            // Keep one shared AbortSignal across display aliases while still letting a hung primary fall back.
+            const attempt=this.get(path,limit,displaySignal);
+            attempt.catch(()=>{});
+            let timer:ReturnType<typeof setTimeout>|undefined;
+            const cap=new Promise<never>((_,reject)=>{
+              timer=setTimeout(()=>reject(new DOMException("Primary route timed out","TimeoutError")),firstPathTimeoutMs);
+            });
+            try{v=await Promise.race([attempt,cap]);}
+            finally{clearTimeout(timer);}
+          }else{
+            v=await this.get(path,limit,AbortSignal.timeout(firstPathTimeoutMs));
+          }
+        }else if(!displaySignal&&i>0&&startedAt!==undefined){
+          const remaining=Math.max(1000,12000-Math.max(0,this.clock()-startedAt));
+          v=await this.get(path,limit,AbortSignal.timeout(remaining));
+        }else{
+          v=await this.get(path,limit,displaySignal);
+        }
+        if(v!==null)return {value:v,refused,timedOutFirst};
+      }catch(e){
         if(e instanceof Error&&e.message==="ESCROW_NODE_AUTH"){refused=true;lastErr=e;continue;}
         if(e instanceof Error&&e.message==="ESCROW_NODE_HTTP"){lastErr=e;continue;}
+        if(isFallbackCapable&&isTimeoutError(e)&&!displaySignal?.aborted){timedOutFirst=true;lastErr=e;continue;}
         throw e;
       }
     }
     if(lastErr)throw lastErr;
-    return {value:null,refused};
+    return {value:null,refused,timedOutFirst};
   }
   async status():Promise<Status> { return this.readStatus(false); }
   /** Read-only observation using the SAME protocol and rollback checks.
@@ -66,7 +102,8 @@ export class PoaHttpNetwork implements Network {
   private async readStatus(display:boolean):Promise<Status> {
     const started=integer(this.clock());
     const timing:ReadTiming={statusMs:null,factsMs:null,totalMs:0};
-    const displaySignal=display?AbortSignal.timeout(15000):undefined;
+    const displaySignal=display?AbortSignal.timeout(17000):undefined;
+    const primaryCap=started<this.primaryStatusSlowUntil?2000:(display?11800:6000);
     const read=async(paths:string[],kind:"statusMs"|"factsMs")=>{
       try{return await this.getFirst(paths,2000000,displaySignal);}
       finally{if(display)timing[kind]=Math.max(0,this.clock()-started);}
@@ -75,10 +112,12 @@ export class PoaHttpNetwork implements Network {
       // If PoA refuses the chain status route, its public summary is not a substitute: it is a
       // stale digest without a chain id. Hold honestly as "ledger locked" (ESCROW_NODE_AUTH)
       // instead of reporting a misleading network-identity mismatch.
+      let timedOutFirst=false;
       const statusRead=(async()=>{
         try{
-          const r=await this.getFirstTracked([`/chain/${CHAIN}/api/status`,"/api/status"],2000000,displaySignal);
+          const r=await this.getFirstTracked([`/chain/${CHAIN}/api/status`,"/api/status"],2000000,displaySignal,primaryCap,started);
           if(r.refused&&!(r.value&&typeof r.value==="object"&&r.value.chain_id===CHAIN))throw new Error("ESCROW_NODE_AUTH");
+          timedOutFirst=r.timedOutFirst;
           return r.value;
         }finally{if(display)timing.statusMs=Math.max(0,this.clock()-started);}
       })();
@@ -109,15 +148,23 @@ export class PoaHttpNetwork implements Network {
     if(cutoff!==undefined)need(cutoff*1000<=observedAt+300000,"ESCROW_FUTURE_CHECKPOINT");
     if(this.lastHeight!==undefined)need(height>=this.lastHeight,"ESCROW_CHECKPOINT_ROLLBACK");
     if(cutoff!==undefined&&this.lastCutoff!==undefined)need(cutoff>=this.lastCutoff&&(height!==this.lastHeight||cutoff===this.lastCutoff),"ESCROW_CHECKPOINT_ROLLBACK");
+    const hasStateRoot=typeof s.state_root==="string"&&/^[0-9a-f]{64}$/.test(s.state_root);
     const age=s.stale_age_s;
     const ageInvalid=age!==undefined&&(!Number.isSafeInteger(age)||age<0||age>120);
     const hasExplicitFreshness=s.as_of!==undefined||s.stale!==undefined;
     const asOf=typeof s.as_of==="string"?Date.parse(s.as_of):(!hasExplicitFreshness&&cutoff!==undefined&&observedAt-cutoff*1000<=43200000?observedAt:Number.NaN);
-    const stale=(hasExplicitFreshness?s.stale!==false:false) || !Number.isSafeInteger(asOf) ||
+    // Live /api/status omits `stale` when fresh (emitting `stale: true` only when stale) and carries
+    // a fresh `as_of` + 64-hex `state_root`. Keep requiring explicit `stale: false` whenever `stale`
+    // is present or when freshness is paired with an unrooted/old checkpoint cutoff.
+    const implicitFreshStatus=s.stale===undefined&&typeof s.as_of==="string"&&hasStateRoot&&
+      (cutoff===undefined||observedAt-cutoff*1000<=43200000);
+    const staleFlagBad=hasExplicitFreshness&&!implicitFreshStatus&&s.stale!==false;
+    const stale=staleFlagBad || !Number.isSafeInteger(asOf) ||
       asOf>observedAt+5000 || observedAt-asOf>120000 || ageInvalid;
     need(!stale,"ESCROW_STALE");
+    this.primaryStatusSlowUntil=timedOutFirst?observedAt+PRIMARY_SLOW_TTL_MS:0;
     this.lastHeight=height;if(cutoff!==undefined)this.lastCutoff=cutoff;
-    const root=typeof s.state_root==="string"&&/^[0-9a-f]{64}$/.test(s.state_root)?s.state_root:(cutoff!==undefined?digest(["poa-checkpoint-cut/v1",CHAIN,height,cutoff]):"");
+    const root=hasStateRoot?s.state_root:(cutoff!==undefined?digest(["poa-checkpoint-cut/v1",CHAIN,height,cutoff]):"");
     return {chain:f.chain_id,asOf,stale,height,root, ...(cutoff!==undefined?{cutoff}:{}),
       // Native transfers are documented fee-free; if exposed, a contrary node fee fails closed.
       fee:s.transfer_fee ?? "0.000000", ...(display?{readTiming:{...timing,totalMs:Math.max(0,this.clock()-started)}}:{})};
@@ -162,9 +209,22 @@ export class PoaHttpNetwork implements Network {
     return {o:{id,body:t.body,chain:t.body.cid,valid:r.status==="included"&&(legacyValid||explorerFinal),
       attestations,checkpoint},legacy,receipt:r,explorer:t};
   }
+  async incoming(wallet:string):Promise<string[]> {
+    address(wallet);
+    const b=await this.getFirst([`/api/explorer/address/${wallet}`,`/chain/${CHAIN}/api/explorer/address/${wallet}`]);
+    if(!b||b.address!==wallet||!Array.isArray(b.txs))return [];
+    const seen=new Set<string>();
+    for(const t of b.txs){
+      if(t&&typeof t==="object"&&t.to_addr===wallet&&t.type==="transfer"&&
+        typeof t.id==="string"&&/^[0-9a-f]{64}$/.test(t.id))seen.add(t.id);
+    }
+    return [...seen];
+  }
   async cut(wallet:string,ids:string[],status:Status):Promise<Cut> {
     address(wallet);const b=await this.getFirst([`/api/explorer/address/${wallet}`,`/chain/${CHAIN}/api/explorer/address/${wallet}`]);
     need(b?.address===wallet&&b.balance_as_of?.checkpoint_height===status.height,"ESCROW_UNALIGNED_CUT");
+    let cutoff=status.cutoff!==undefined?integer(status.cutoff):undefined;
+    let cutoffTried=cutoff!==undefined;
     const covered:string[]=[];
     for(const id of ids){
       const seen=await this.observe(id),o=seen?.o;
@@ -179,8 +239,15 @@ export class PoaHttpNetwork implements Network {
         // baked. Contradictions and anything else hold; nothing is guessed.
         const t=seen.explorer,ts=integer(o!.body.ts,1);
         const cpHeight=t.checkpointed!==undefined&&t.checkpointed!==null?integer(t.checkpointed.height):undefined;
-        const cutoff=status.cutoff!==undefined?integer(status.cutoff):undefined;
         const byCheckpoint=cpHeight!==undefined&&cpHeight<=status.height;
+        if(!byCheckpoint&&!cutoffTried){
+          cutoffTried=true;
+          try{
+            const snap=await this.getFirst(["/api/snapshot",`/chain/${CHAIN}/api/snapshot`],8000000);
+            if(snap?.params?.chain_id===CHAIN&&snap.checkpoint&&integer(snap.checkpoint.height)===status.height&&snap.checkpoint.cutoff?.ts!==undefined)
+              cutoff=integer(snap.checkpoint.cutoff.ts);
+          }catch{/* No snapshot cutoff available; fail closed below as ESCROW_CHECKPOINT_DETAILS_REQUIRED. */}
+        }
         const afterCutoff=cutoff!==undefined&&ts>cutoff;
         const byCutoff=cutoff!==undefined&&ts<cutoff;
         need(!(byCheckpoint&&afterCutoff),"ESCROW_CHECKPOINT_DETAILS_REQUIRED");

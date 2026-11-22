@@ -1,11 +1,11 @@
-import { publicNameUnavailable, unavailableKey } from "./shared.js?v=4e6b6590ba50";
-import { registryUnit, poaOnlyMode } from "./shared.js?v=4e6b6590ba50";
-import { actionLabel } from "./ui-copy.js?v=4e6b6590ba50";
-import { ui } from "./ui-state.js?v=4e6b6590ba50";
-import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=4e6b6590ba50";
-import { add, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=4e6b6590ba50";
-import { nameLink, ownerLink } from "./ui-router.js?v=4e6b6590ba50";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=4e6b6590ba50";
+import { publicNameUnavailable, unavailableKey } from "./shared.js?v=84cf1fca35ea";
+import { registryUnit, poaOnlyMode } from "./shared.js?v=84cf1fca35ea";
+import { actionLabel } from "./ui-copy.js?v=84cf1fca35ea";
+import { ui } from "./ui-state.js?v=84cf1fca35ea";
+import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=84cf1fca35ea";
+import { add, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=84cf1fca35ea";
+import { nameLink, ownerLink } from "./ui-router.js?v=84cf1fca35ea";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=84cf1fca35ea";
 
 export function renderDomainPage(name) {
     if (!ui.latestState || !name)

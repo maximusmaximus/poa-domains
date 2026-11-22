@@ -210,7 +210,7 @@ const gateway = {
 // Worker-first deep links. Assets served before the Worker use matching _headers.
 export default {
   scheduled: gateway.scheduled,
-  async fetch(request: Request, env: Env): Promise<Response> {
-    return secureUiResponse(await gateway.fetch(request,env), new URL(request.url));
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
+    return secureUiResponse(await gateway.fetch(request, env, ctx), new URL(request.url));
   },
 } satisfies ExportedHandler<Env>;

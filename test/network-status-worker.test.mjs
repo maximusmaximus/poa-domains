@@ -176,3 +176,40 @@ test("last known: a failed first check in a cold isolate does not hide the store
   assert.equal((await noStore.getStatus({ shared: memoryStore() })).level, "checking");
   assert.equal(calls, before, "empty store: cached checking is reused, no re-probe");
 });
+
+test("monitor: falls back to /api/status when chain status route times out or returns 503", async () => {
+  const seen = [];
+  let stale = false;
+  const monitor = createNetworkStatusMonitor({
+    requestMs: 80,
+    fetch: async (url, init) => {
+      const p = new URL(String(url)).pathname;
+      seen.push(p);
+      if (p === "/chain/poa-mainnet-1/api/status") {
+        return await new Promise((_, reject) => {
+          init.signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+        });
+      }
+      if (p === "/api/status") {
+        return new Response(JSON.stringify({
+          epochs_closed: 111,
+          agents_joined: 10000,
+          txs: 5664,
+          final: 5349,
+          checkpoint_height: 1445570,
+          ...(stale ? { stale: true, stale_age_s: 222 } : {}),
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return new Response(null, { status: 404 });
+    },
+  });
+  const ok = await monitor.getStatus({ bypassCache: true });
+  assert.equal(ok.level, "online");
+  assert.equal(ok.hold, false);
+  assert.equal(ok.detail.checkpointHeight, 1445570);
+  assert.deepEqual(seen, ["/chain/poa-mainnet-1/api/status", "/api/status"]);
+  stale = true;
+  const degraded = await monitor.getStatus({ bypassCache: true });
+  assert.equal(degraded.level, "degraded");
+  assert.equal(degraded.hold, false);
+});
