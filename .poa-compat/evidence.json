@@ -39,6 +39,50 @@
         "cloudflare/test/escrow-admin-runtime.mjs",
         ".poa-compat/surface.json"
       ]
+    },
+    {
+      "at": "2026-11-23T20:25:21.362Z",
+      "classification": "breaking",
+      "reasons": [
+        "pinned engine no longer match the network, and this project refuses to run on unpinned values"
+      ],
+      "from": {
+        "engine": "a5feae08cbd1fabf38f15637ca113a03ffa2b5b9ce3107dca7cbc84cb8c229a2",
+        "params": "3491bd2694213e2cdd092f3b0e3e4053e3c4634ba3e531f6a175e9cac67d1623",
+        "client": "a5feae08cbd1fabf38f15637ca113a03ffa2b5b9ce3107dca7cbc84cb8c229a2",
+        "release": "v0.128.5a-att-log-f1-revert"
+      },
+      "to": {
+        "engine": "1560caead346fe3d66d0ce1a796c273c069dd7e6cdbcc73200428ed5f58997e5",
+        "params": "3491bd2694213e2cdd092f3b0e3e4053e3c4634ba3e531f6a175e9cac67d1623",
+        "client": "1560caead346fe3d66d0ce1a796c273c069dd7e6cdbcc73200428ed5f58997e5",
+        "clientSize": 440103,
+        "clientLastModified": "Mon, 23 Nov 2026 19:17:07 GMT",
+        "release": "v0.129-bundle2",
+        "releaseTxid": "4e651c380b1981e700e1411aa67a3c6b7ac6d1ae2eea091ee8a249cbbe81e1ce"
+      },
+      "sources": {
+        "facts": "https://minepoa.com/chain/poa-mainnet-1/api/network-facts",
+        "release": "https://minepoa.com/api/release",
+        "client": "https://minepoa.com/chain/poa-mainnet-1/client/poa.mjs"
+      },
+      "surface": {
+        "counts": {
+          "breaking": 0,
+          "review": 0,
+          "info": 1
+        },
+        "breaking": []
+      },
+      "files": [
+        "wrangler.jsonc",
+        "cloudflare/escrow-network.ts",
+        "worker-configuration.d.ts",
+        "docs/worker-deploy.md",
+        "cloudflare/test/display-freshness-runtime.mjs",
+        "cloudflare/test/escrow-admin-runtime.mjs",
+        ".poa-compat/surface.json"
+      ]
     }
   ],
   "selftestAt": "2026-11-21T23:44:00.280Z"
