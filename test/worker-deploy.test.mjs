@@ -237,6 +237,12 @@ test("repin (Max t108s1102): validated, advertised + client-hash verified, write
     const noClient5 = async u => { if (u === NETWORK_CLIENT) throw new DOMException("slow", "TimeoutError"); return adv5(u); };
     assert.equal(await assertAdvertised(next5, noClient5), "client-hash-from-reviewed-evidence");
     await assert.rejects(assertAdvertised(next5, adv5), /REPIN_CLIENT_HASH_MISMATCH/, "served bytes must still hash to the pin"); }
+  { // Nov 23 2026 repin evidence: engine 1560caea, params unchanged (3491bd26).
+    const E6 = "1560caead346fe3d66d0ce1a796c273c069dd7e6cdbcc73200428ed5f58997e5", P6 = "3491bd2694213e2cdd092f3b0e3e4053e3c4634ba3e531f6a175e9cac67d1623";
+    const next6 = { POA_ESCROW_ENGINE_SHA256: E6, POA_ESCROW_PARAMS_SHA256: P6 }, adv6 = network({ chain_id: "poa-mainnet-1", engine_sha256: E6, params_sha256: P6 });
+    const noClient6 = async u => { if (u === NETWORK_CLIENT) throw new DOMException("slow", "TimeoutError"); return adv6(u); };
+    assert.equal(await assertAdvertised(next6, noClient6), "client-hash-from-reviewed-evidence");
+    await assert.rejects(assertAdvertised(next6, adv6), /REPIN_CLIENT_HASH_MISMATCH/, "served bytes must still hash to the pin"); }
   { // Nov 23 2026 repin: engine a5feae08 unchanged, params 3491bd26 (adds att_log_from_epoch).
     const E6 = "a5feae08cbd1fabf38f15637ca113a03ffa2b5b9ce3107dca7cbc84cb8c229a2", P6 = "3491bd2694213e2cdd092f3b0e3e4053e3c4634ba3e531f6a175e9cac67d1623";
     const next6 = { POA_ESCROW_ENGINE_SHA256: E6, POA_ESCROW_PARAMS_SHA256: P6 }, adv6 = network({ chain_id: "poa-mainnet-1", engine_sha256: E6, params_sha256: P6 });
