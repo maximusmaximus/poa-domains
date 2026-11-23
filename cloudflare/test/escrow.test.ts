@@ -917,6 +917,43 @@ test("primary status timeout falls back to live /api/status shape and snapshot c
  await assert.rejects(new PoaHttpNetwork(()=>false,authReq,undefined,()=>now).displayStatus(),/ESCROW_NODE_AUTH/);
 });
 
+test("hung chain receipt falls back to /api/receipt; mismatched fallback binding still fails closed",async()=>{
+ const now=NOW_V2;
+ const body=signedV2(3,policy.wallet,"1.000000","poadomains:receipt-fallback",1,CUTOFF_V2+30),id=txid(body);
+ const paths:string[]=[];
+ const request=(receipt:any,primary:"timeout"|"auth"|"http")=>(async(input:any)=>{
+  const p=new URL(String(input)).pathname;paths.push(p);
+  if(p===`/chain/${CHAIN}/api/receipt/${id}`){
+   if(primary==="auth")return new Response(JSON.stringify({error:"Unauthorized"}),{status:401});
+   if(primary==="http")return new Response(JSON.stringify({error:"paused"}),{status:503});
+   throw new DOMException("primary hung","TimeoutError");
+  }
+  if(p===`/api/receipt/${id}`)return Response.json(receipt);
+  if(p===`/api/explorer/tx/${id}`)return Response.json(explorerV2(body));
+  return new Response(null,{status:404});
+ }) as typeof fetch;
+ const net=(receipt:any,primary:"timeout"|"auth"|"http"="timeout")=>
+  new PoaHttpNetwork(()=>false,request(receipt,primary),{engine:root,params:root},()=>now);
+ // Hung /chain/.../api/receipt falls back to a bound /api/receipt.
+ const ok=await net(receiptV2(id)).lookup(id);
+ assert.equal(ok?.valid,true);assert.equal(ok?.attestations,5);assert.deepEqual(ok?.body,body);
+ assert.ok(paths.includes(`/chain/${CHAIN}/api/receipt/${id}`));
+ assert.ok(paths.includes(`/api/receipt/${id}`));
+ // Fallback receipt with a mismatched txid still fails closed.
+ paths.length=0;
+ await assert.rejects(net(receiptV2(id,{txid:"f".repeat(64)})).lookup(id),/ESCROW_TX_BINDING/);
+ assert.ok(paths.includes(`/api/receipt/${id}`));
+ // Fallback receipt with a mismatched legacy sender still fails closed.
+ await assert.rejects(net(receiptV2(id,{from:who(4),type:"transfer",checkpoint_covered:true})).lookup(id),/ESCROW_RECEIPT_BINDING/);
+ // 401 and 503 on the primary chain receipt still fall through to /api/receipt.
+ paths.length=0;
+ assert.equal((await net(receiptV2(id),"auth").lookup(id))?.valid,true);
+ assert.ok(paths.includes(`/api/receipt/${id}`));
+ paths.length=0;
+ assert.equal((await net(receiptV2(id),"http").lookup(id))?.valid,true);
+ assert.ok(paths.includes(`/api/receipt/${id}`));
+});
+
 test("auto-sweep credits finalized matching open intents before reconciliation without halting; unsolicited funds still halt",async()=>{
  const f=issueFixture();f.net.autoDiscover=true;
  const r=await f.e.command(command(who(3),"auto-intent","intent",{amount:"2.000000"})) as any;
