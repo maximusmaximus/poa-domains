@@ -10,6 +10,8 @@ export const PILOT_DAILY = "1000000.000000";
 /** K=5 peer attestations: the same threshold Escrow.final() requires for open-window money. */
 const PEER_FINAL_ATTESTATIONS = 5;
 const PRIMARY_SLOW_TTL_MS = 60_000;
+/** Same cap readStatus uses on the uncached financial path before a fallback alias. */
+const PRIMARY_READ_TIMEOUT_MS = 6000;
 function isTimeoutError(e: unknown): boolean {
   return e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
 }
@@ -46,6 +48,18 @@ export class PoaHttpNetwork implements Network {
   }
   private async getFirst(paths:string[], limit=2000000, displaySignal?:AbortSignal):Promise<any> {
     return (await this.getFirstTracked(paths,limit,displaySignal)).value;
+  }
+  /** Receipt reads cap a hung /chain/.../api/receipt route at the same primary timeout as
+   * uncached status, then fall back to /api/receipt within the 12s financial budget.
+   * Binding checks stay on the caller; 401/503 handling stays fail-closed in getFirstTracked. */
+  private async getReceipt(id:string):Promise<any> {
+    return (await this.getFirstTracked(
+      [`/chain/${CHAIN}/api/receipt/${id}`,`/api/receipt/${id}`],
+      2000000,
+      undefined,
+      PRIMARY_READ_TIMEOUT_MS,
+      this.clock(),
+    )).value;
   }
   /** Same as getFirst, but also reports whether an earlier path was refused (401/403) or timed out before a fallback answered. */
   private async getFirstTracked(
@@ -103,7 +117,7 @@ export class PoaHttpNetwork implements Network {
     const started=integer(this.clock());
     const timing:ReadTiming={statusMs:null,factsMs:null,totalMs:0};
     const displaySignal=display?AbortSignal.timeout(17000):undefined;
-    const primaryCap=started<this.primaryStatusSlowUntil?2000:(display?11800:6000);
+    const primaryCap=started<this.primaryStatusSlowUntil?2000:(display?11800:PRIMARY_READ_TIMEOUT_MS);
     const read=async(paths:string[],kind:"statusMs"|"factsMs")=>{
       try{return await this.getFirst(paths,2000000,displaySignal);}
       finally{if(display)timing[kind]=Math.max(0,this.clock()-started);}
@@ -179,7 +193,7 @@ export class PoaHttpNetwork implements Network {
     need(/^[0-9a-f]{64}$/.test(id),"ESCROW_TXID");
     const [t,r]=await Promise.all([
       this.getFirst([`/api/explorer/tx/${id}`,`/chain/${CHAIN}/api/explorer/tx/${id}`]),
-      this.getFirst([`/chain/${CHAIN}/api/receipt/${id}`,`/api/receipt/${id}`]),
+      this.getReceipt(id),
     ]);
     if(!t||!r)return null;
     need(typeof t==="object"&&typeof r==="object","ESCROW_TX_BINDING");
@@ -260,7 +274,7 @@ export class PoaHttpNetwork implements Network {
       else if(o&&o.attestations>=PEER_FINAL_ATTESTATIONS){
         // Legacy receipt: peer-final open-window money is excluded from checkpoint-only
         // reconciliation only on an explicit checkpoint_covered:false.
-        const r=await this.getFirst([`/chain/${CHAIN}/api/receipt/${id}`,`/api/receipt/${id}`]);
+        const r=await this.getReceipt(id);
         need(r?.txid===id&&r.status==="included","ESCROW_TX_BINDING");
         need(r.checkpoint_covered===false,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
       }
@@ -284,15 +298,16 @@ export class PoaHttpNetwork implements Network {
     for(let i=1;i<own.txs.length;i++)need(Number.isSafeInteger(own.txs[i]?.ts)&&Number.isSafeInteger(own.txs[i-1]?.ts)&&own.txs[i].ts<=own.txs[i-1].ts,"ESCROW_NONCE_CONTEXT");
     const explorerTxId=own.txs.find((t:any)=>t?.from_addr===wallet)?.id;
     const candidateIds=[explorerTxId,knownTxid].filter((x):x is string=>typeof x==="string"&&/^[0-9a-f]{64}$/.test(x));
-    need(candidateIds.length>0,"ESCROW_ENROLLED_SENDER_REQUIRED");
-    const first=await this.getFirst([`/chain/${CHAIN}/api/receipt/${candidateIds[0]}`,`/api/receipt/${candidateIds[0]}`]);
+    const firstId=candidateIds[0];
+    need(typeof firstId==="string","ESCROW_ENROLLED_SENDER_REQUIRED");
+    const first=await this.getReceipt(firstId);
     const legacy=first!==null&&typeof first==="object"&&(first.from!==undefined||first.next_nonce!==undefined);
     const nextNonce=legacy?await this.legacyNonce(wallet,candidateIds):await this.explorerNonce(wallet,own.txs,knownTxid);
     const list=await this.getFirst(["/api/explorer/txs",`/chain/${CHAIN}/api/explorer/txs`]);
     need(Array.isArray(list),"ESCROW_PARENTS");const parents:string[]=[];
     for(const t of list.slice(0,8)){
       if(!t||typeof t!=="object"||typeof t.id!=="string"||!/^[0-9a-f]{64}$/.test(t.id)||parents.includes(t.id))continue;
-      const receipt=await this.getFirst([`/chain/${CHAIN}/api/receipt/${t.id}`,`/api/receipt/${t.id}`]);
+      const receipt=await this.getReceipt(t.id);
       if(!(receipt?.txid===t.id&&receipt.status==="included"))continue;
       const legacyOk=receipt.valid_in_open_window===true||receipt.checkpoint_covered===true;
       // Current receipt shape: the explorer listing must show the parent final.
@@ -306,7 +321,7 @@ export class PoaHttpNetwork implements Network {
   private async legacyNonce(wallet:string,candidateIds:string[]):Promise<number> {
     let nextNonce=0;
     for(const txId of new Set(candidateIds)){
-      const r=await this.getFirst([`/chain/${CHAIN}/api/receipt/${txId}`,`/api/receipt/${txId}`]);
+      const r=await this.getReceipt(txId);
       need(r?.status==="included"&&r.from===wallet&&(r.valid_in_open_window===true||r.checkpoint_covered===true),"ESCROW_NONCE_CONTEXT");
       nextNonce=Math.max(nextNonce,integer(r.next_nonce,1));
     }
@@ -324,7 +339,7 @@ export class PoaHttpNetwork implements Network {
     const id=latest.id;
     const [t,r]=await Promise.all([
       this.getFirst([`/api/explorer/tx/${id}`,`/chain/${CHAIN}/api/explorer/tx/${id}`]),
-      this.getFirst([`/chain/${CHAIN}/api/receipt/${id}`,`/api/receipt/${id}`]),
+      this.getReceipt(id),
     ]);
     need(t&&typeof t==="object"&&r&&typeof r==="object","ESCROW_NONCE_CONTEXT");
     need(r.txid===id&&r.status==="included"&&r.from===undefined&&r.next_nonce===undefined,"ESCROW_NONCE_CONTEXT");
