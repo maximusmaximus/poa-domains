@@ -4,7 +4,7 @@ import { integer, need } from "../src/core.js";
 import { CHAIN, Transfer, address, digest, micros, txid, verifyTransfer } from "./escrow-codec.js";
 import { Context, Cut, Network, Observation, Status } from "./escrow.js";
 export const MAINNET_ENGINE_SHA256 = "a5feae08cbd1fabf38f15637ca113a03ffa2b5b9ce3107dca7cbc84cb8c229a2";
-export const MAINNET_PARAMS_SHA256 = "a4c1e8ce83f28fed9a16cad024023c79fc01f6110812521df931bf3c7044659d";
+export const MAINNET_PARAMS_SHA256 = "3491bd2694213e2cdd092f3b0e3e4053e3c4634ba3e531f6a175e9cac67d1623";
 export const PILOT_PER_TX = "250000.000000";
 export const PILOT_DAILY = "1000000.000000";
 /** K=5 peer attestations: the same threshold Escrow.final() requires for open-window money. */
