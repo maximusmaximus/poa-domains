@@ -20,3 +20,5 @@ await build({entryPoints:[resolve("cloudflare/treasury.ts")],bundle:true,platfor
 await build({entryPoints:[resolve("cloudflare/feedback.ts")],bundle:true,platform:"node",format:"esm",sourcemap:"inline",outfile:resolve("dist/feedback.mjs")});
 
 await build({entryPoints:[resolve("cloudflare/terms.ts")],bundle:true,platform:"node",format:"esm",sourcemap:"inline",outfile:resolve("dist/terms.mjs")});
+
+await build({entryPoints:[resolve("cloudflare/profiles-storage.ts")],bundle:true,platform:"node",format:"esm",sourcemap:"inline",outfile:resolve("dist/profiles-storage.mjs")});

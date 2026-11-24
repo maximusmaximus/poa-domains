@@ -570,4 +570,40 @@ test("Ownership transfer drops attached records & profile fields, archives previ
   assert.equal(replayed.stateHash(), recEngine.stateHash());
   assert.equal(replayed.snapshot().deeds[orbDeed.id].previousFields.length, 1);
   assert.deepEqual(replayed.snapshot().deeds[orbDeed.id].records, []);
+
+  // Cover superseded profile version, archived prior metadata, and POA auction/fixed/past sales discovery
+  const multiMetaDeed = {
+    id: "f".repeat(64),
+    name: "orbit",
+    owner: SAMPLE_POA,
+    ownerVersion: 3,
+    rightsHash: orbDeed.rightsHash,
+    records: [],
+    profileResetAt: 2,
+    metadata: [
+      { cid: "b" + "a".repeat(58), document: { schema: "poa-domains.metadata.v1", description: "Original genesis note" } },
+      { cid: "b" + "b".repeat(58), document: { schema: PROFILE_SCHEMA_V1, version: 1, name: "orbit", rightsHash: orbDeed.rightsHash, poa: SAMPLE_POA, btc: null, eth: null, description: "Prior holder profile", image: null } },
+      { cid: "b" + "c".repeat(58), document: { schema: PROFILE_SCHEMA_V1, version: 1, name: "orbit", rightsHash: orbDeed.rightsHash, poa: SAMPLE_POA, btc: null, eth: null, description: "Current holder v1", image: null } },
+      { cid: "b" + "d".repeat(58), document: { schema: PROFILE_SCHEMA_V1, version: 1, name: "orbit", rightsHash: orbDeed.rightsHash, poa: SAMPLE_POA, btc: null, eth: null, description: "Current holder v2", image: null } },
+    ],
+  };
+  const prevRecords = collectPreviousDomainFields(multiMetaDeed);
+  assert.ok(prevRecords.some((r) => r.status === "previous-version" && r.profile?.description === "Current holder v1"));
+  assert.ok(prevRecords.some((r) => r.status === "archived-metadata" && r.profile?.description === "Prior holder profile"));
+  assert.ok(prevRecords.some((r) => r.status === "archived-metadata" && r.description === "Original genesis note"));
+
+  const nowMs = Date.now();
+  const poaSales = findDomainSalesAndAuctions({
+    name: "orbit",
+    deed: multiMetaDeed,
+    escrowMarket: [
+      { id: "1".repeat(64), name: "orbit", kind: "fixed", status: "OPEN", price: "50.000000", closes: nowMs + 60000, seller: SAMPLE_POA },
+      { id: "2".repeat(64), name: "orbit", kind: "auction", status: "COMPLETE", price: "25.000000", closes: nowMs - 60000, seller: SAMPLE_POA },
+    ],
+    nowMs,
+  });
+  assert.equal(poaSales.listedForSale, true);
+  assert.equal(poaSales.kind, "poa-fixed");
+  assert.equal(poaSales.activePoaSales.length, 1);
+  assert.equal(poaSales.pastPoaItems.length, 1);
 });
