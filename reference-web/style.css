@@ -1340,3 +1340,58 @@ main#homeMain, main#homeMain > section, .ideas, .ideas-strip { min-width: 0; max
   font-size: 0.88rem;
   line-height: 1.4;
 }
+
+.poa-addr-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.poa-addr-row {
+  display: inline-flex;
+  margin: 0.25rem 0;
+}
+.poa-addr-text {
+  font-family: ui-monospace, "SFMono-Regular", "Roboto Mono", monospace;
+  white-space: nowrap;
+}
+.card code.poa-addr-text,
+code.escrow-value.poa-addr-text {
+  display: inline;
+  margin: 0;
+}
+.poa-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.65rem;
+  height: 1.65rem;
+  min-width: 1.65rem;
+  min-height: 1.65rem;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+  background: #173242;
+  color: #dfecf5;
+  border: 1px solid #4d6f82;
+  border-radius: 0.3rem;
+  vertical-align: middle;
+}
+.poa-copy-btn:hover {
+  background: #22465b;
+  border-color: #65cfa8;
+  color: #9cffe0;
+}
+.poa-copy-btn.is-copied {
+  background: #123b2e;
+  border-color: #65cfa8;
+  color: #9cffe0;
+}
+.poa-copy-icon {
+  display: block;
+  width: 0.9rem;
+  height: 0.9rem;
+  pointer-events: none;
+}

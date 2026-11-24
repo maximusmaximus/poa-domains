@@ -16,6 +16,11 @@ for(const [name,launcher] of [['chromium',chromium],['firefox',firefox],['webkit
   await expect(page.locator('#history h4 a[href="/d/seed.nexus"]')).toHaveCount(1);await expect(page.locator('#balances .badge-ok a[href="/d/nexus"]')).toHaveCount(1);
   await page.locator('#searchInput').fill('new.nexus');await page.locator('#searchBtn').click();await expect(page.locator('#searchResult p a[href="/d/nexus"]')).toHaveCount(1);
   await page.locator('#searchResult p a[href="/d/nexus"]').click();await expect(page.locator('#domainMain')).toBeVisible();assert.ok(await page.locator('#domainHistory a[href="/d/nexus"]').count());
+  await expect(page.locator('#domainOwner .poa-addr-text')).toHaveText('poa1...1111');
+  await expect(page.locator('#domainOwner .poa-copy-btn')).toHaveAttribute('data-copy-address',owner);
+  await page.locator('#domainOwner a.poa-addr-text').click();await expect(page.locator('#ownerMain')).toBeVisible();
+  await expect(page.locator('#ownerPrincipal .poa-addr-text')).toHaveText('poa1...1111');
+  await expect(page.locator('#ownerPrincipal .poa-copy-btn')).toHaveAttribute('data-copy-address',owner);
   assert.deepEqual(errors,[]);assert.deepEqual(h.writes,[]);assert.ok(requests.every(r=>r.startsWith('GET '+h.url)));
   console.log('PASS',name,'390px actual rendered parent/history/receipt/refund domain links; no browser errors or writes');
  }catch(error){const pages=context.pages();const cause=pages.length?await pages[0].evaluate(async payload=>{try{const steps=[["ui-render.js","render",[payload]],["ui-cart.js","renderCart",[]],["ui-manage.js","renderManagement",[]],["ui-help.js","installHelp",[]],["ui-ideas.js","renderIdeas",[]]];for(const [file,fn,args]of steps){try{(await import("/"+file))[fn](...args);}catch(error){return file+" "+error.stack;}}return "all draw steps succeeded";}catch(e){return e.stack;}},h.payload):"closed";console.error(JSON.stringify({browser:name,errors,cause,body:pages.length?await pages[0].locator("body").innerText():"closed"},null,2));throw error;}finally{await context.close();await browser.close();await h.close();}

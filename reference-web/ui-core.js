@@ -1,6 +1,6 @@
-import { decorateEmojiButton } from "./ui-copy.js?v=84cf1fca35ea";
-import { buildOwnershipIndex, ownershipConflict, safeObject } from "./shared.js?v=84cf1fca35ea";
-import { ui } from "./ui-state.js?v=84cf1fca35ea";
+import { createPoaCopyButton, decorateEmojiButton } from "./ui-copy.js?v=9e3528a22292";
+import { buildOwnershipIndex, isPoaAddress, ownershipConflict, safeObject, shortenPoaAddress } from "./shared.js?v=9e3528a22292";
+import { ui } from "./ui-state.js?v=9e3528a22292";
 
 export const el = (id) => document.getElementById(id);
 
@@ -42,7 +42,94 @@ export function add(parent, tag, text, css) {
 
 export function person(id) {
     const role = Object.keys(ui.details.roles ?? {}).find((x) => ui.details.roles[x] === id);
-    return role ? "Demo " + role : id.slice(0, 18) + "…";
+    if (role)
+        return "Demo " + role;
+    return isPoaAddress(id) ? shortenPoaAddress(id) : id.slice(0, 18) + "…";
+}
+
+export function appendPoaAddress(parent, value, { code = false, ariaLabel, onCopy } = {}) {
+    if (!isPoaAddress(value)) {
+        if (code)
+            add(parent, "code", String(value ?? ""));
+        else
+            parent.append(String(value ?? ""));
+        return parent;
+    }
+    const wrap = document.createElement("span");
+    wrap.className = "poa-addr-inline";
+    const text = document.createElement(code ? "code" : "span");
+    text.className = "poa-addr-text";
+    text.textContent = shortenPoaAddress(value);
+    text.title = value;
+    wrap.append(text, createPoaCopyButton(value, { ariaLabel, onCopy }));
+    parent.append(wrap);
+    return wrap;
+}
+
+export function appendPrincipal(parent, id, opts = {}) {
+    const role = Object.keys(ui.details.roles ?? {}).find((x) => ui.details.roles[x] === id);
+    if (role) {
+        parent.append("Demo " + role);
+        return parent;
+    }
+    if (isPoaAddress(id))
+        return appendPoaAddress(parent, id, opts);
+    parent.append(String(id ?? "").slice(0, 18) + "…");
+    return parent;
+}
+
+const POA_ADDR_IN_TEXT = /\bpoa1[1-9A-HJ-NP-Za-km-z]{20,60}\b/g;
+const SKIP_ADDR_TAGS = new Set(["PRE", "INPUT", "TEXTAREA", "BUTTON", "SCRIPT", "STYLE"]);
+
+export function enhancePoaAddressesIn(root, { onCopy } = {}) {
+    if (!root || typeof document === "undefined")
+        return;
+    for (const codeNode of [...root.querySelectorAll("code")]) {
+        if (codeNode.closest(".poa-addr-inline, pre, button"))
+            continue;
+        const raw = codeNode.textContent?.trim() ?? "";
+        if (!isPoaAddress(raw))
+            continue;
+        const wrap = document.createElement("span");
+        wrap.className = "poa-addr-inline poa-addr-row";
+        codeNode.textContent = shortenPoaAddress(raw);
+        codeNode.title = raw;
+        codeNode.classList.add("poa-addr-text");
+        const next = codeNode.nextElementSibling;
+        if (next && next.tagName === "BUTTON" && next.textContent?.trim() === "📋 Copy to")
+            next.remove();
+        codeNode.replaceWith(wrap);
+        wrap.append(codeNode, createPoaCopyButton(raw, { onCopy }));
+    }
+    const walker = document.createTreeWalker(root, 4);
+    const matches = [];
+    let textNode;
+    while ((textNode = walker.nextNode())) {
+        const parent = textNode.parentElement;
+        if (!parent || SKIP_ADDR_TAGS.has(parent.tagName) || parent.closest(".poa-addr-inline, pre, button, input, textarea"))
+            continue;
+        const val = textNode.nodeValue ?? "";
+        if (!val.includes("poa1"))
+            continue;
+        POA_ADDR_IN_TEXT.lastIndex = 0;
+        if (POA_ADDR_IN_TEXT.test(val))
+            matches.push(textNode);
+    }
+    for (const node of matches) {
+        const val = node.nodeValue ?? "";
+        POA_ADDR_IN_TEXT.lastIndex = 0;
+        const frag = document.createDocumentFragment();
+        let last = 0, m;
+        while ((m = POA_ADDR_IN_TEXT.exec(val))) {
+            if (m.index > last)
+                frag.append(val.slice(last, m.index));
+            appendPoaAddress(frag, m[0], { onCopy });
+            last = m.index + m[0].length;
+        }
+        if (last < val.length)
+            frag.append(val.slice(last));
+        node.replaceWith(frag);
+    }
 }
 
 export function endpointBase() {

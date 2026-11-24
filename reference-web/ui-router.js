@@ -1,10 +1,11 @@
-import { domainPath, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, tabWatermarks, viewPath } from "./shared.js?v=84cf1fca35ea";
-import { ui } from "./ui-state.js?v=84cf1fca35ea";
-import { add, el } from "./ui-core.js?v=84cf1fca35ea";
-import { runSearch } from "./ui-search.js?v=84cf1fca35ea";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=84cf1fca35ea";
-import { updateTabDots } from "./ui-render.js?v=84cf1fca35ea";
-import { syncCartShortcutNow } from "./ui-cart.js?v=84cf1fca35ea";
+import { domainPath, isPoaAddress, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=9e3528a22292";
+import { ui } from "./ui-state.js?v=9e3528a22292";
+import { createPoaCopyButton } from "./ui-copy.js?v=9e3528a22292";
+import { add, el } from "./ui-core.js?v=9e3528a22292";
+import { runSearch } from "./ui-search.js?v=9e3528a22292";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=9e3528a22292";
+import { updateTabDots } from "./ui-render.js?v=9e3528a22292";
+import { syncCartShortcutNow } from "./ui-cart.js?v=9e3528a22292";
 
 /** Open 🪙 My POA; with a name, prefill it for a POA listing or auction. Your agent signs; nothing is sent here. */
 export function openPoa(name) {
@@ -52,15 +53,28 @@ export function nameLink(parent, name, css = "domain-link") {
 }
 
 export function ownerLink(parent, ownerId, label) {
+    const short = isPoaAddress(ownerId) ? shortenPoaAddress(ownerId) : null;
+    const display = label && !isPoaAddress(label) ? label : (short ?? (ownerId.slice(0, 18) + "…"));
+    const showCopy = Boolean(short && display === short);
     const a = document.createElement("a");
     a.href = "/p/" + encodeURIComponent(ownerId);
-    a.className = "domain-link";
-    a.textContent = label || ownerId.slice(0, 18) + "…";
+    a.className = showCopy ? "domain-link poa-addr-text" : "domain-link";
+    a.textContent = display;
+    if (short)
+        a.title = ownerId;
     a.addEventListener("click", (event) => {
         event.preventDefault();
         navigateOwner(ownerId);
     });
-    parent.append(a);
+    if (showCopy) {
+        const wrap = document.createElement("span");
+        wrap.className = "poa-addr-inline";
+        wrap.append(a, createPoaCopyButton(ownerId));
+        parent.append(wrap);
+    }
+    else {
+        parent.append(a);
+    }
     return a;
 }
 

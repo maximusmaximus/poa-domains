@@ -1,3 +1,5 @@
+import { shortenPoaAddress } from "./shared.js?v=9e3528a22292";
+
 // Human labels only. Machine action enums and signed payloads remain unchanged.
 const labels = {poaCheckout:"🪙 Buy with POA","announceAuction+bid":"Start auction + place bid",announceAuction:"Start an auction",bid:"Place a bid",finalize:"Finish auction",closeNoBid:"Close auction with no bids",cancelAuction:"Cancel auction",withdrawRefund:"Claim bid refund",createChildOffer:"Offer subdomains",fillChildOffer:"Buy a subdomain",cancelOffer:"Remove listing",sellFixed:"List for sale",buyFixed:"Buy at listed price",transfer:"Transfer a name",setRecords:"Update records",setMetadata:"Update description",revokeChild:"Retire a subdomain"};
 export function actionLabel(value) { return labels[value] ?? String(value ?? "").replace(/([a-z])([A-Z])/g,"$1 $2").replace(/[+_-]/g," "); }
@@ -75,4 +77,66 @@ export function flashCopied(button) {
   if (button.dataset.copyIdleTitle) button.title = button.dataset.copyIdleTitle;
   copyFlashTimers.delete(button);
  }, 1600));
+}
+const SVG_NS = "http://www.w3.org/2000/svg";
+function svgEl(tag, attrs) {
+ const node = document.createElementNS(SVG_NS, tag);
+ for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+ return node;
+}
+export function createCopyIconSvg(copied = false) {
+ const svg = svgEl("svg", {
+  viewBox: "0 0 16 16",
+  width: "14",
+  height: "14",
+  fill: "none",
+  stroke: "currentColor",
+  "stroke-width": "1.6",
+  "stroke-linecap": "round",
+  "stroke-linejoin": "round",
+  "aria-hidden": "true",
+  focusable: "false",
+  class: "poa-copy-icon",
+ });
+ if (copied) {
+  svg.append(svgEl("path", { d: "M3 8.5l3.2 3.2L13 4.5" }));
+ } else {
+  svg.append(
+   svgEl("rect", { x: "5.5", y: "5.5", width: "8", height: "8", rx: "1.5" }),
+   svgEl("path", { d: "M3.5 10.5H3a1.5 1.5 0 0 1-1.5-1.5V3A1.5 1.5 0 0 1 3 1.5h6A1.5 1.5 0 0 1 10.5 3v.5" }),
+  );
+ }
+ return svg;
+}
+const poaCopyTimers = new WeakMap();
+export function createPoaCopyButton(address, { ariaLabel, onCopy } = {}) {
+ const value = String(address ?? "");
+ const short = shortenPoaAddress(value);
+ const btn = document.createElement("button");
+ btn.type = "button";
+ btn.className = "poa-copy-btn";
+ btn.setAttribute("aria-label", ariaLabel || `Copy address ${short}`);
+ btn.title = "Copy full address";
+ btn.dataset.copyAddress = value;
+ btn.append(createCopyIconSvg(false));
+ btn.addEventListener("click", async (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  const res = await copyText(value);
+  if (res.ok) {
+   const prev = poaCopyTimers.get(btn);
+   if (prev) clearTimeout(prev);
+   btn.classList.add("is-copied");
+   btn.title = "Copied";
+   btn.replaceChildren(createCopyIconSvg(true));
+   poaCopyTimers.set(btn, setTimeout(() => {
+    btn.classList.remove("is-copied");
+    btn.title = "Copy full address";
+    btn.replaceChildren(createCopyIconSvg(false));
+    poaCopyTimers.delete(btn);
+   }, 1600));
+  }
+  onCopy?.(res);
+ });
+ return btn;
 }

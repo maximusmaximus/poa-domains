@@ -328,7 +328,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=84cf1fca35ea";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=9e3528a22292";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -346,6 +346,12 @@ export function validPrincipal(s) {
   const bodyLen = Math.ceil(hex.length / 2);
   const leadingOnes = payload.length - payload.replace(/^1+/, "").length;
   return leadingOnes + bodyLen === 32;
+}
+export function isPoaAddress(value) {
+  return typeof value === "string" && /^poa1[1-9A-HJ-NP-Za-km-z]{8,60}$/.test(value);
+}
+export function shortenPoaAddress(value) {
+  return isPoaAddress(value) ? `${value.slice(0, 4)}...${value.slice(-4)}` : String(value ?? "");
 }
 export function makeBody(input, cap) {
   safeObject(input);

@@ -1,16 +1,16 @@
-import { publicNameUnavailable } from "./shared.js?v=84cf1fca35ea";
-import { installHelp } from "./ui-help.js?v=84cf1fca35ea";
-import { renderManagement } from "./ui-manage.js?v=84cf1fca35ea";
-import { actionLabel } from "./ui-copy.js?v=84cf1fca35ea";
-import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=84cf1fca35ea";
-import { ui } from "./ui-state.js?v=84cf1fca35ea";
-import { el, endpointBase, json, staticURL } from "./ui-core.js?v=84cf1fca35ea";
-import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=84cf1fca35ea";
-import { render, updateTabDots } from "./ui-render.js?v=84cf1fca35ea";
-import { runSearch } from "./ui-search.js?v=84cf1fca35ea";
-import { renderIdeas } from "./ui-ideas.js?v=84cf1fca35ea";
-import { mountEscrow } from "./escrow.js?v=84cf1fca35ea";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=84cf1fca35ea";
+import { publicNameUnavailable } from "./shared.js?v=9e3528a22292";
+import { installHelp } from "./ui-help.js?v=9e3528a22292";
+import { renderManagement } from "./ui-manage.js?v=9e3528a22292";
+import { actionLabel } from "./ui-copy.js?v=9e3528a22292";
+import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=9e3528a22292";
+import { ui } from "./ui-state.js?v=9e3528a22292";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=9e3528a22292";
+import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=9e3528a22292";
+import { render, updateTabDots } from "./ui-render.js?v=9e3528a22292";
+import { runSearch } from "./ui-search.js?v=9e3528a22292";
+import { renderIdeas } from "./ui-ideas.js?v=9e3528a22292";
+import { mountEscrow } from "./escrow.js?v=9e3528a22292";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=9e3528a22292";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -18,6 +18,32 @@ export function updateFreshness() {
     for (const node of document.querySelectorAll(".tab-age"))
         node.textContent = text;
     el("registryAge").textContent = "Registry data " + text + " · POA payments refresh separately.";
+}
+
+function observeEscrowAddresses(root) {
+    if (!root || typeof MutationObserver === "undefined" || root.dataset.poaAddrObserved === "1")
+        return;
+    root.dataset.poaAddrObserved = "1";
+    let busy = false;
+    const onCopy = (res) => {
+        const msg = el("escrowMessage");
+        if (msg)
+            msg.textContent = res.ok ? "Copied ✅" : "Select the text to copy it.";
+    };
+    const apply = () => {
+        if (busy)
+            return;
+        busy = true;
+        try {
+            enhancePoaAddressesIn(root, { onCopy });
+        }
+        finally {
+            busy = false;
+        }
+    };
+    const observer = new MutationObserver(apply);
+    observer.observe(root, { childList: true, subtree: true, characterData: true });
+    apply();
 }
 
 export function pageStatus(error = "", loading = false) {
@@ -349,9 +375,12 @@ export async function loadRegistry() {
             el("action").append(option);
         }
         el("keys").textContent = JSON.stringify(ui.cap.actions[el("action").value]);
-        if (!ui.escrowUI)
+        if (!ui.escrowUI) {
             ui.escrowUI = mountEscrow({ base: ui.base, capability: ui.cap.escrow, registryId: ui.cap.registryId,
                 section: el("escrowPayments"), domain: el("escrowDomain"), selectTab: () => { navigateHome(); setSectionTab("escrow"); } });
+            observeEscrowAddresses(el("escrowPayments"));
+            observeEscrowAddresses(el("escrowDomain"));
+        }
         applyRoute();
         renderCart();
         if (!ui.demo && !ui.tickerTimer) {
