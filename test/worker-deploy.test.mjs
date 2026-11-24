@@ -248,6 +248,12 @@ test("repin (Max t108s1102): validated, advertised + client-hash verified, write
     const next6 = { POA_ESCROW_ENGINE_SHA256: E6, POA_ESCROW_PARAMS_SHA256: P6 }, adv6 = network({ chain_id: "poa-mainnet-1", engine_sha256: E6, params_sha256: P6 });
     const noClient6 = async u => { if (u === NETWORK_CLIENT) throw new DOMException("slow", "TimeoutError"); return adv6(u); };
     assert.equal(await assertAdvertised(next6, noClient6), "client-hash-from-reviewed-evidence"); }
+  { // Nov 23 2026 repin evidence: engine d6c58f54, params 34345309 (v0.130-f2c).
+    const E7 = "d6c58f54d698965bc7473403e417bb2963a0e4d1b9fc04099164317cce3f2cfe", P7 = "34345309000008c583a918944472a337928d043ffc299152285ee962a4f78cd1";
+    const next7 = { POA_ESCROW_ENGINE_SHA256: E7, POA_ESCROW_PARAMS_SHA256: P7 }, adv7 = network({ chain_id: "poa-mainnet-1", engine_sha256: E7, params_sha256: P7 });
+    const noClient7 = async u => { if (u === NETWORK_CLIENT) throw new DOMException("slow", "TimeoutError"); return adv7(u); };
+    assert.equal(await assertAdvertised(next7, noClient7), "client-hash-from-reviewed-evidence");
+    await assert.rejects(assertAdvertised(next7, adv7), /REPIN_CLIENT_HASH_MISMATCH/, "served bytes must still hash to the pin"); }
   await assert.rejects(assertAdvertised(pins, network({ chain_id: "poa-mainnet-1", engine_sha256: engine, params_sha256: "c".repeat(64) })), /REPIN_NOT_ADVERTISED/);
   await assert.rejects(assertAdvertised(pins, network({ chain_id: "poa-mainnet-1", engine_sha256: engine, params_sha256: params }, new TextEncoder().encode("truncated"))), /REPIN_CLIENT_HASH_MISMATCH/);
   // Full deploy: precheck old pins, deploy plan carries ONLY the two new pin vars, post-check sees new pins.
