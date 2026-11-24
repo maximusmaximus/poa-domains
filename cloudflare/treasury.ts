@@ -4,7 +4,7 @@ import { correlationId, errorEnvelope } from "../src/errors.js";
 export const POASCAN_HOME_URL = "https://poascan.io/";
 export const CHAIN = "poa-mainnet-1";
 const CACHE_TTL_MS = 60_000;
-const FETCH_TIMEOUT_MS = 8_000;
+const FETCH_TIMEOUT_MS = 4_000;
 const POA_ADDR_RE = /^poa1[1-9A-HJ-NP-Za-km-z]{32,56}$/;
 const POA_AMOUNT_RE = /^([0-9]{1,12})\.([0-9]{6})$/;
 
@@ -77,14 +77,16 @@ async function fetchAddressBalance(
       });
       if (res.status !== 200) {
         await res.body?.cancel?.().catch(() => {});
-        continue;
+        if (res.status === 404) continue;
+        return null;
       }
       const data = (await res.json()) as { address?: unknown; balance?: unknown };
       if (data?.address === address && parsePoaMicros(data.balance) !== null) {
         return String(data.balance).trim();
       }
+      return null;
     } catch {
-      /* try fallback path */
+      return null;
     }
   }
   return null;

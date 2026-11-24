@@ -101,6 +101,14 @@ try {
     assert.equal(net.body.chainId, "poa-mainnet-1");
     assert.ok(typeof net.body.message === "string" && net.body.message.length > 0);
   });
+  const treas = await api("/v1/treasury");
+  check("treasury endpoint shape", () => {
+    assert.equal(treas.status, 200);
+    assert.equal(treas.body.poascanHomeUrl, "https://poascan.io/");
+    assert.equal(treas.body.treasury?.address, first.principals.treasury);
+    assert.equal(treas.body.treasury?.poascanUrl, `https://poascan.io/address/${first.principals.treasury}`);
+    assert.equal(typeof treas.body.checkedAt, "number");
+  });
   const domainPage = await fetch(base + "/d/nexus"); const domainHtml = await domainPage.text();
   check("SPA domain page serves HTML shell", () => { assert.equal(domainPage.status, 200); assert.ok(domainHtml.includes('id="domainMain"')); assert.ok(domainHtml.includes('id="siteTitle"')); });
     for (const asset of ["/app.js","/shared.js","/style.css","/config.json","/icon.svg"]) { const status=(await fetch(base+asset)).status; check(`asset ${asset}`,()=>assert.equal(status,200)); }
