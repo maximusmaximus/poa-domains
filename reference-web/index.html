@@ -394,7 +394,7 @@
         </div>
         <div class="feedback-captcha-box">
           <div class="feedback-captcha-row">
-            <img id="feedbackCaptchaImg" class="feedback-captcha-img" width="180" height="56" alt="Verification code" hidden />
+            <div id="feedbackCaptchaSlot" class="feedback-captcha-slot"></div>
             <button type="button" id="feedbackRefreshCaptcha" class="secondary small" title="Get a new verification code">🔄 New code</button>
           </div>
           <label for="feedbackCaptchaAnswer">Verification code (CAPTCHA)
@@ -402,12 +402,12 @@
           </label>
         </div>
         <div class="button-row">
-          <button type="submit" id="feedbackSubmit">📨 Submit for review</button>
+          <button type="button" id="feedbackSubmit">📨 Submit for review</button>
         </div>
         <p id="feedbackStatus" class="muted feedback-status" role="status" aria-live="polite"></p>
       </form>
     </div>
 
-    <script type="module" src="/app.js?v=59cd045a6589"></script>
+    <script type="module" src="/app.js?v=9fe77daffcb5"></script>
   </body>
 </html>

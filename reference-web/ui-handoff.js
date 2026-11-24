@@ -1,8 +1,8 @@
-import { copyText } from "./ui-copy.js?v=59cd045a6589";
-import { trapDialog } from "./ui-a11y.js?v=59cd045a6589";
-import { ui } from "./ui-state.js?v=59cd045a6589";
-import { el, endpointBase, ownershipView } from "./ui-core.js?v=59cd045a6589";
-import { buildListingPrompt, buildSubnameListingPrompt, isPoaAddress, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=59cd045a6589";
+import { copyText } from "./ui-copy.js?v=9fe77daffcb5";
+import { trapDialog } from "./ui-a11y.js?v=9fe77daffcb5";
+import { ui } from "./ui-state.js?v=9fe77daffcb5";
+import { el, endpointBase, ownershipView } from "./ui-core.js?v=9fe77daffcb5";
+import { buildListingPrompt, buildSubnameListingPrompt, isPoaAddress, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=9fe77daffcb5";
 
 export function clearHandoff() {
     ui.generation++;
@@ -154,14 +154,15 @@ function setFeedbackStatus(text, tone = "muted", link = null) {
     }
 }
 
+function clearFeedbackCaptchaImg() {
+    el("feedbackCaptchaSlot")?.replaceChildren();
+}
+
 export async function loadFeedbackChallenge() {
-    const img = el("feedbackCaptchaImg");
+    const slot = el("feedbackCaptchaSlot");
     const submitBtn = el("feedbackSubmit");
     feedbackChallenge = null;
-    if (img) {
-        img.hidden = true;
-        img.removeAttribute("src");
-    }
+    clearFeedbackCaptchaImg();
     if (ui.demo) {
         if (submitBtn) submitBtn.disabled = true;
         setFeedbackStatus("🧪 Static demo mode has no backend. Use poadomains.grok.me or GitHub to submit feedback.");
@@ -178,9 +179,15 @@ export async function loadFeedbackChallenge() {
         const body = await res.json();
         if (!res.ok) throw Error(body?.message || "Could not load verification code.");
         feedbackChallenge = { ...body, loadedAt: Date.now() };
-        if (img && typeof body.captchaUrl === "string" && body.captchaUrl.startsWith("/v1/feedback/captcha/")) {
+        if (slot && typeof body.captchaUrl === "string" && body.captchaUrl.startsWith("/v1/feedback/captcha/")) {
+            const img = document.createElement("img");
+            img.id = "feedbackCaptchaImg";
+            img.className = "feedback-captcha-img";
+            img.width = 180;
+            img.height = 56;
+            img.alt = "Verification code";
             img.src = endpointBase() + body.captchaUrl;
-            img.hidden = false;
+            slot.replaceChildren(img);
         }
         if (submitBtn) submitBtn.disabled = body.enabled === false;
         if (body.enabled === false) {
@@ -213,6 +220,7 @@ export function setFeedbackModalOpen(open) {
         releaseFeedbackFocus = trapDialog(modal, backdrop, opener);
         void loadFeedbackChallenge();
     } else {
+        clearFeedbackCaptchaImg();
         releaseFeedbackFocus?.();
         releaseFeedbackFocus = null;
     }
@@ -240,8 +248,8 @@ export function wireFeedbackModal() {
         ans?.focus();
     });
 
-    form.addEventListener("submit", async (event) => {
-        event.preventDefault();
+    const submitFeedback = async (event) => {
+        event?.preventDefault();
         if (feedbackBusy) return;
         const kind = form.querySelector('input[name="feedbackKind"]:checked')?.value === "feature" ? "feature" : "bug";
         const poaAddress = el("feedbackPoa")?.value.trim() ?? "";
@@ -319,11 +327,7 @@ export function wireFeedbackModal() {
             if (el("feedbackDetails")) el("feedbackDetails").value = "";
             if (el("feedbackCaptchaAnswer")) el("feedbackCaptchaAnswer").value = "";
             feedbackChallenge = null;
-            const img = el("feedbackCaptchaImg");
-            if (img) {
-                img.hidden = true;
-                img.removeAttribute("src");
-            }
+            clearFeedbackCaptchaImg();
             setFeedbackStatus(
                 "✅ Submitted to the repository for review!",
                 "ok",
@@ -337,5 +341,7 @@ export function wireFeedbackModal() {
             feedbackBusy = false;
             if (submitBtn && !ui.demo) submitBtn.disabled = false;
         }
-    });
+    };
+    form.addEventListener("submit", submitFeedback);
+    el("feedbackSubmit")?.addEventListener("click", submitFeedback);
 }
