@@ -1,17 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=db30cf79d161";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=db30cf79d161";
-import { renderManagement } from "./ui-manage.js?v=db30cf79d161";
-import { actionLabel } from "./ui-copy.js?v=db30cf79d161";
-import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=db30cf79d161";
-import { ui } from "./ui-state.js?v=db30cf79d161";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=db30cf79d161";
-import { createPoaCopyButton } from "./ui-copy.js?v=db30cf79d161";
-import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=db30cf79d161";
-import { render, updateTabDots } from "./ui-render.js?v=db30cf79d161";
-import { runSearch } from "./ui-search.js?v=db30cf79d161";
-import { renderIdeas } from "./ui-ideas.js?v=db30cf79d161";
-import { mountEscrow } from "./escrow.js?v=db30cf79d161";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=db30cf79d161";
+import { publicNameUnavailable } from "./shared.js?v=03149c4be992";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=03149c4be992";
+import { renderManagement } from "./ui-manage.js?v=03149c4be992";
+import { actionLabel } from "./ui-copy.js?v=03149c4be992";
+import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=03149c4be992";
+import { ui } from "./ui-state.js?v=03149c4be992";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=03149c4be992";
+import { createPoaCopyButton } from "./ui-copy.js?v=03149c4be992";
+import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=03149c4be992";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=03149c4be992";
+import { renderDomainPage } from "./ui-domain.js?v=03149c4be992";
+import { runSearch } from "./ui-search.js?v=03149c4be992";
+import { renderIdeas } from "./ui-ideas.js?v=03149c4be992";
+import { mountEscrow } from "./escrow.js?v=03149c4be992";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=03149c4be992";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -191,18 +192,42 @@ export function preserveInputs(draw) {
     }
 }
 
+async function fetchEscrowMarketData() {
+    if (ui.demo || !ui.cap || !ui.cap.escrow?.enabled)
+        return false;
+    try {
+        const response = await fetch(endpointBase() + "/v1/escrow/market", {
+            method: "GET",
+            credentials: "omit",
+            cache: "no-store",
+            signal: globalThis.AbortSignal?.timeout ? AbortSignal.timeout(15000) : undefined,
+        });
+        if (!response.ok)
+            return false;
+        const body = await response.json();
+        if (!body || !Array.isArray(body.items))
+            return false;
+        ui.escrowMarket = body.items;
+        ui.escrowMarketServerTime = Number.isSafeInteger(body.serverTime) ? body.serverTime : Date.now();
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
+
 export async function refreshRegistry() {
     if (ui.refreshing || !ui.readState)
         return;
     ui.refreshing = true;
     pageStatus("", true);
     try {
-        const payload = await ui.readState();
+        const [payload] = await Promise.all([ui.readState(), fetchEscrowMarketData()]);
         const viewState = registryViewState(payload);
         ui.registryReadFailed = false;
         ui.lastLoadedAt = Date.now();
         preserveInputs(() => {
-            ui.cart = ui.cart.map(item => recheckCartItem(item, ui.cap, viewState));
+            ui.cart = ui.cart.map(item => recheckCartItem(item, ui.cap, viewState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now()));
             persistCart();
             render(payload);
             renderCart();
@@ -287,6 +312,30 @@ export async function refreshEscrowCaps() {
             ui.escrowCaps = { enabled: true, held: true, holdReason: "Could not check live POA checkout status" };
     }
     renderCartEscrowStatus();
+}
+
+export async function refreshEscrowMarket() {
+    if (!(await fetchEscrowMarketData()))
+        return;
+    if (ui.latestState) {
+        preserveInputs(() => {
+            ui.cart = ui.cart.map((item) =>
+                recheckCartItem(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime),
+            );
+            persistCart();
+            renderAuctions(ui.latestState);
+            renderMarketplace(ui.latestState);
+            renderTicker(ui.latestState);
+            updateLiveAuctionsBadge(ui.latestState);
+            renderCart();
+            if (ui.lastSearch)
+                runSearch(ui.lastSearch, false);
+            if (ui.route.kind === "domain" && ui.currentDomainName)
+                renderDomainPage(ui.currentDomainName);
+        });
+    } else {
+        updateLiveAuctionsBadge(null);
+    }
 }
 
 export function renderTreasuryFooter() {
@@ -544,12 +593,24 @@ export async function loadRegistry() {
         // Keep stored cart data; omit withheld entries from this public session.
         ui.cart=ui.cart.filter(item=>!publicNameUnavailable(item.name,ui.cap));
         // Production is POA-only: saved registry-unit plans can't be completed there, so they are left out.
-        ui.cart=ui.cart.filter(item=>poaOnlyMode(ui.cap)?item.action==="poaCheckout":item.action!=="poaCheckout");
+        ui.cart=ui.cart.filter(item=>poaOnlyMode(ui.cap)?(item.action==="poaCheckout"||item.action==="poaBid"):(item.action!=="poaCheckout"&&item.action!=="poaBid"));
         for (const item of ui.cart) {
             if (item.action === "poaCheckout") {
                 try { item.minimumAmount = cartMinimum(item, ui.cap, null); item.summary = cartSummary(item);
                     if (item.minimumAmount !== item.amount) throw Error("⚠️ The POA price changed. Remove it and add it again."); }
                 catch (error) { item.validationError = error.message; }
+                continue;
+            }
+            if (item.action === "poaBid") {
+                try {
+                    if (!item.params || !/^[0-9a-f]{64}$/.test(item.params.auctionId ?? ""))
+                        throw Error("⚠️ Remove this invalid saved auction bid.");
+                    item.amount = poaAmount(item.amount);
+                    item.minimumAmount = cartMinimum(item, ui.cap, null, ui.escrowMarket);
+                    if (poaToMicros(item.amount) < poaToMicros(item.minimumAmount))
+                        throw Error(`⚠️ Minimum bid is ${poaShort(item.minimumAmount)} POA.`);
+                    item.summary = cartSummary(item);
+                } catch (error) { item.validationError = error.message; }
                 continue;
             }
             // Repair old saved carts affected by the amount/maxBid mismatch, without raising any cap.
@@ -597,7 +658,7 @@ export async function loadRegistry() {
             ui.tickerTimer = setInterval(refreshRegistry, ui.TICKER_MS);
             refreshNetworkStatus();
             refreshEscrowCaps();
-            ui.networkTimer = setInterval(() => { refreshNetworkStatus(); refreshEscrowCaps(); refreshTreasury(); }, ui.NETWORK_MS);
+            ui.networkTimer = setInterval(() => { refreshNetworkStatus(); refreshEscrowCaps(); refreshEscrowMarket(); refreshTreasury(); }, ui.NETWORK_MS);
         }
         else if (ui.demo)
             renderNetworkStatus();

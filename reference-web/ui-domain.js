@@ -1,11 +1,11 @@
-import { extractDomainProfile, profileImageMediaPath, publicNameUnavailable, unavailableKey } from "./shared.js?v=db30cf79d161";
-import { registryUnit, poaOnlyMode } from "./shared.js?v=db30cf79d161";
-import { actionLabel, createPoaCopyButton } from "./ui-copy.js?v=db30cf79d161";
-import { ui } from "./ui-state.js?v=db30cf79d161";
-import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=db30cf79d161";
-import { add, appendPoaAddress, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=db30cf79d161";
-import { nameLink, openManageDomain, ownerLink } from "./ui-router.js?v=db30cf79d161";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=db30cf79d161";
+import { extractDomainProfile, profileImageMediaPath, publicNameUnavailable, unavailableKey } from "./shared.js?v=03149c4be992";
+import { registryUnit, poaOnlyMode, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, poaAuctionOutbidStatus } from "./shared.js?v=03149c4be992";
+import { actionLabel, createPoaCopyButton } from "./ui-copy.js?v=03149c4be992";
+import { ui } from "./ui-state.js?v=03149c4be992";
+import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=03149c4be992";
+import { add, appendPoaAddress, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=03149c4be992";
+import { nameLink, openManageDomain, ownerLink } from "./ui-router.js?v=03149c4be992";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=03149c4be992";
 
 function appendCopyableValue(parent, value, ariaLabel) {
     const wrap = document.createElement("span");
@@ -108,15 +108,42 @@ export function renderDomainPage(name) {
     }
     renderDomainProfileCard(view.deed);
     const poa = poaOnlyMode(ui.cap);
+    const poaAuction = poa ? findOpenPoaAuctionByName(ui.escrowMarket, name, ui.escrowMarketServerTime || Date.now()) : null;
     const listingBox = el("domainListing");
-    listingBox.hidden = !view.listing || poa;
+    listingBox.hidden = (!view.listing || poa) && !poaAuction;
     listingBox.replaceChildren();
+    if (poaAuction) {
+        const awaiting = isPoaAuctionAwaitingFirstBid(poaAuction);
+        const minNext = poaMinimumNextBid(poaAuction);
+        const cartItem = ui.cart.find((x) => x.action === "poaBid" && x.params?.auctionId === poaAuction.id) ?? null;
+        const outbidInfo = poaAuctionOutbidStatus(poaAuction, { bidderAddress: ui.bidderAddress, cartItem });
+        add(listingBox, "p", awaiting ? "⏳ POA Auction queued — timer starts on first bid" : `🔥 Live POA Auction · High bid ${poaShort(poaAuction.high?.amount ?? poaAuction.price)} POA`, awaiting ? "badge" : "badge-ok");
+        add(listingBox, "p", `Minimum ${awaiting ? "opening" : "next"} bid: ${poaShort(minNext)} POA${!awaiting && poaAuction.closes > 0 ? ` · Closes ${formatClock(Math.floor(poaAuction.closes / 1000))}` : ""}`);
+        if (outbidInfo.status === "leading")
+            add(listingBox, "p", outbidInfo.message, "auction-leading-badge");
+        else if (outbidInfo.status === "outbid" || outbidInfo.status === "outbid-covered")
+            add(listingBox, "p", outbidInfo.message, "auction-outbid-badge");
+    }
     if (view.listing && !poa) {
         add(listingBox, "p", `💰 Listed for ${view.listing.price} ${registryUnit(view.listing.asset)}`, "badge-ok");
         add(listingBox, "p", `Until ${formatClock(view.listing.validUntil)} · offer ${view.listing.id.slice(0, 18)}…`);
     }
     const actions = el("domainActions");
     actions.replaceChildren();
+    if (poaAuction) {
+        const minNext = poaMinimumNextBid(poaAuction);
+        const bidBtn = add(actions, "button", `🏷️ Bid from ${poaShort(minNext)} POA (add to cart)`);
+        bidBtn.type = "button";
+        bidBtn.addEventListener("click", () => {
+            addToCart({
+                name,
+                action: "poaBid",
+                amount: minNext,
+                auctionId: poaAuction.id,
+            });
+            setFloatingCartOpen(true);
+        });
+    }
     if (view.deed && !view.deed.retired) {
         const manageBtn = add(actions, "button", "⚙️ Manage this domain", "secondary");
         manageBtn.type = "button";

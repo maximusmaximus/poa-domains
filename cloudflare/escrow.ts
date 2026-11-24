@@ -67,7 +67,12 @@ export interface Payment {
 }
 interface Deposit { payer: string; amount: string; tx: string | null; createdAt?: number; auto?: boolean; }
 interface Auction {
-  id: string; name: string; seller: string; reserve: string; closes: number; quiet: number; kind?: "auction" | "fixed"; createdAt?: number; history?: {event:string;at:number;amount?:string}[];
+  id: string; name: string; seller: string; reserve: string; closes: number; quiet: number; kind?: "auction" | "fixed"; createdAt?: number;
+  /** Auction duration (ms) started when the first bid lands (closes === 0 until first bid). */
+  window?: number;
+  /** Timestamp (ms) when the first bid started the auction timer. */
+  startedAt?: number | null;
+  history?: {event:string;at:number;amount?:string;payer?:string}[];
   high: { payer: string; amount: string } | null; status: "OPEN" | "CANCELLED" | "SETTLING" | "COMPLETE";
 }
 interface Settlement { auction: string; packet: Packet; payments: string[]; status: "PAYING" | "TITLE_PENDING" | "COMPLETE"; }
@@ -442,25 +447,45 @@ export class Escrow {
           const fixed=c.action==="list";exact(p,fixed?["name","price"]:["name","reserve"]); const reserve=String(fixed?p.price:p.reserve);const name=text(p.name,256), terms=this.titles.terms(name,c.actor);
           need(micros(reserve)>=micros(terms.reserve) && micros(reserve)<=micros(this.policy.perTx),"ESCROW_RESERVE");
           need(!Object.values(s.auctions).some(a=>a.name===name&&(a.status==="OPEN"||a.status==="SETTLING")),"ESCROW_TITLE_RESERVED");
-          const id=digest([rk,c]); s.auctions[id]={id,name,seller:c.actor,reserve:String(micros(reserve)),kind:fixed?"fixed":"auction",createdAt:this.now(),history:[{event:fixed?"Listed for POA":"Auction opened",at:this.now()}],
-            closes:this.now()+terms.window,quiet:terms.quiet,high:null,status:"OPEN"};result={auction:id};break;
+          const id=digest([rk,c]);
+          s.auctions[id]=fixed
+            ? {id,name,seller:c.actor,reserve:String(micros(reserve)),kind:"fixed",createdAt:this.now(),history:[{event:"Listed for POA",at:this.now()}],
+              closes:this.now()+terms.window,quiet:terms.quiet,high:null,status:"OPEN"}
+            : {id,name,seller:c.actor,reserve:String(micros(reserve)),kind:"auction",createdAt:this.now(),window:terms.window,startedAt:null,
+              history:[{event:"Auction queued; timer starts on first bid",at:this.now()}],
+              closes:0,quiet:terms.quiet,high:null,status:"OPEN"};
+          result={auction:id};break;
         }
         case "buy": case "bid": {
           need(s.sequence<PILOT_JOURNAL_LIMIT-32,"ESCROW_JOURNAL_CAPACITY");
-          exact(p,["auction","amount"]);const a=s.auctions[text(p.auction,64)]; need(a&&a.status==="OPEN"&&this.now()<a.closes,"ESCROW_AUCTION_CLOSED");
+          exact(p,["auction","amount"]);const a=s.auctions[text(p.auction,64)];
+          const awaitingFirstBid=Boolean(a&&a.kind!=="fixed"&&a.closes===0&&a.high===null);
+          need(a&&a.status==="OPEN"&&(awaitingFirstBid||this.now()<a.closes),"ESCROW_AUCTION_CLOSED");
           need(c.action==="buy"?a.kind==="fixed"&&a.high===null:a.kind!=="fixed","ESCROW_MARKET_KIND");
           const n=micros(p.amount);if(c.action==="buy")need(n===BigInt(a.reserve),"ESCROW_PRICE");need(n<=micros(this.policy.perTx),"ESCROW_PAYOUT_LIMIT");need(c.actor!==a.seller,"ESCROW_SELF_SALE");need(a.high?.payer!==c.actor,"ESCROW_SELF_RAISE");
           // Existing strict >10% rule, in integer micros (not rounded decimal floats).
           need(n>=BigInt(a.reserve)&&(!a.high||n*10n>BigInt(a.high.amount)*11n),"ESCROW_BID_INCREMENT");
           need(BigInt(s.available[c.actor]??"0")>=n,"ESCROW_INSUFFICIENT_FUNDS");
+          const hadHigh=a.high!==null;
           if(a.high) this.refund(s,`outbid-${a.id}-${rk}`,a.high.payer,a.high.amount);
           s.available[c.actor]=String(BigInt(s.available[c.actor]??"0")-n);a.high={payer:c.actor,amount:String(n)};
-          (a.history??=[]).push({event:c.action==="buy"?"Purchase reserved; seller handover needed":"Bid placed",at:this.now(),amount:String(n)});a.history=a.history.slice(-100);
-          a.closes=c.action==="buy"?this.now():Math.max(a.closes,this.now()+a.quiet);break;
+          const now=this.now();
+          if(c.action==="buy"){
+            (a.history??=[]).push({event:"Purchase reserved; seller handover needed",at:now,amount:String(n),payer:c.actor});
+            a.closes=now;
+          } else if(!hadHigh){
+            a.startedAt=now;
+            a.closes=awaitingFirstBid?now+(a.window??a.quiet):Math.max(a.closes,now+a.quiet);
+            (a.history??=[]).push({event:"Auction started (first bid)",at:now,amount:String(n),payer:c.actor});
+          } else {
+            a.closes=Math.max(a.closes,now+a.quiet);
+            (a.history??=[]).push({event:"Bid placed",at:now,amount:String(n),payer:c.actor});
+          }
+          a.history=a.history!.slice(-100);break;
         }
         case "cancel": case "expire": {
           exact(p,["auction"]);const a=s.auctions[text(p.auction,64)];need(a&&a.status==="OPEN","ESCROW_AUCTION_CLOSED");
-          need(c.action==="cancel"?a.seller===c.actor:this.now()>=a.closes,"ESCROW_CANCEL_NOT_ALLOWED");
+          need(c.action==="cancel"?a.seller===c.actor:a.closes>0&&this.now()>=a.closes,"ESCROW_CANCEL_NOT_ALLOWED");
           // Expiry without a title consent is a failure refund, never silently pays a seller.
           if(a.high)this.refund(s,`cancel-${a.id}`,a.high.payer,a.high.amount);a.status="CANCELLED";(a.history??=[]).push({event:"Cancelled; original payer refund due",at:this.now()});break;
         }
@@ -470,7 +495,7 @@ export class Escrow {
         }
         case "settle": {
           exact(p,["auction","transfer"]);const a=s.auctions[text(p.auction,64)];
-          need(a&&a.status==="OPEN"&&a.high&&this.now()>=a.closes&&c.actor===a.seller,"ESCROW_SETTLE_NOT_ALLOWED");
+          need(a&&a.status==="OPEN"&&a.high&&a.closes>0&&this.now()>=a.closes&&c.actor===a.seller,"ESCROW_SETTLE_NOT_ALLOWED");
           const packet=authenticate(p.transfer);this.titles.validate(packet,a.name,a.seller,a.high.payer);
           const fee=BigInt(a.high.amount)*BigInt(this.policy.feeBps)/10000n, net=BigInt(a.high.amount)-fee;
           const payments:string[]=[];
@@ -566,7 +591,7 @@ export class Escrow {
   tick(): Promise<State> { return this.serial(async()=>{
     this.gate();const status=await this.fresh();this.gate();
     for(const a of Object.values(this.state().auctions)){
-      if(a.status==="OPEN"&&((a.high===null&&this.now()>=a.closes)||(a.high!==null&&this.now()>=a.closes+a.quiet))){
+      if(a.status==="OPEN"&&a.closes>0&&((a.high===null&&this.now()>=a.closes)||(a.high!==null&&this.now()>=a.closes+a.quiet))){
         this.journal.append("auto-expire",{auction:a.id},s=>{
           need(this.enabled(),"ESCROW_DISABLED");need(!s.paused,"ESCROW_PAUSED");need(!s.halt,"ESCROW_HALTED");
           const cur=s.auctions[a.id];if(!cur||cur.status!=="OPEN")return;

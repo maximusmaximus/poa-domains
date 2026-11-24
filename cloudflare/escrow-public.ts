@@ -4,13 +4,27 @@ import { verifyCommand, address, decimal, micros } from "./escrow-codec.js";
 import { exact, need, parseJSON } from "../src/core.js";
 const PUBLIC_ACTIONS=new Set(["intent","detect","withdraw","open","list","bid","buy","cancel","expire","settle","repair-title","issue","list-sub","cancel-sub","buy-sub","view"]);
 export function marketView(s: State, name?: string) {
-  return Object.values(s.auctions).filter(a=>name===undefined||a.name===name).slice(-100).map(a=>({
-    id:a.id,name:a.name,seller:a.seller,kind:a.kind??"auction",price:decimal(BigInt(a.reserve)),
-    status:a.status,closes:a.closes,createdAt:a.createdAt??null,
-    high:a.high?{payer:a.high.payer,amount:decimal(BigInt(a.high.amount))}:null,
-    settlement:s.settlements[a.id]?.status??null,
-    history:(a.history??[{event:a.status,at:a.createdAt??0}]).slice(-100).map(h=>({...h,...(h.amount?{amount:decimal(BigInt(h.amount))}:{})})),
-  }));
+  return Object.values(s.auctions).filter(a=>name===undefined||a.name===name).slice(-100).map(a=>{
+    const reserveMicros=BigInt(a.reserve);
+    const highMicros=a.high?BigInt(a.high.amount):null;
+    const minNext=highMicros===null?reserveMicros:(highMicros*11n)/10n+1n;
+    const effectiveMin=minNext>reserveMicros?minNext:reserveMicros;
+    const kind=a.kind??"auction";
+    const awaitingFirstBid=a.status==="OPEN"&&kind!=="fixed"&&a.high===null&&a.closes===0;
+    const bidders=[...new Set((a.history??[]).map(h=>h.payer).filter((x):x is string=>typeof x==="string"&&x.length>0))];
+    if(a.high?.payer&&!bidders.includes(a.high.payer))bidders.push(a.high.payer);
+    const startedAt=a.startedAt??(kind!=="fixed"&&a.high!==null?(a.history?.find(h=>h.amount)?.at??a.createdAt??null):null);
+    return {
+      id:a.id,name:a.name,seller:a.seller,kind,price:decimal(reserveMicros),
+      minimumNextBid:decimal(effectiveMin),
+      status:a.status,closes:a.closes,window:a.window??a.quiet,quiet:a.quiet,
+      createdAt:a.createdAt??null,startedAt,awaitingFirstBid,
+      high:a.high?{payer:a.high.payer,amount:decimal(highMicros!)}:null,
+      bidders,
+      settlement:s.settlements[a.id]?.status??null,
+      history:(a.history??[{event:a.status,at:a.createdAt??0}]).slice(-100).map(h=>({...h,...(h.amount?{amount:decimal(BigInt(h.amount))}:{})})),
+    };
+  });
 }
 export function subnameView(s: State, parent?: string) {
   return Object.values(s.subListings??{}).filter(l=>parent===undefined||l.parent===parent).slice(-100).map(l=>({

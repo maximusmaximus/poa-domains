@@ -1,17 +1,17 @@
-import { installHelp } from "./ui-help.js?v=db30cf79d161";
-import { wireManagement } from "./ui-manage.js?v=db30cf79d161";
-import { bindTabKeys } from "./ui-a11y.js?v=db30cf79d161";
-import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=db30cf79d161";
-import { ui } from "./ui-state.js?v=db30cf79d161";
-import { canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=db30cf79d161";
-import { navigateHome, openPoa, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=db30cf79d161";
-import { el, endpointBase } from "./ui-core.js?v=db30cf79d161";
-import { clearHandoff, copyDomainListingPrompt, copySubnameListing, isTermsGateOpen, setFeedbackModalOpen, wireFeedbackModal, wireTermsGate } from "./ui-handoff.js?v=db30cf79d161";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=db30cf79d161";
-import { submitSearchQuery, wireSearchAutocomplete } from "./ui-search.js?v=db30cf79d161";
-import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=db30cf79d161";
-import { copyText, flashCopied, selectElementText } from "./ui-copy.js?v=db30cf79d161";
-import { cartCopyBlocked, downloadCartJSON, clearAllCart, renderCurrentCartHandoff, setFloatingCartOpen } from "./ui-cart.js?v=db30cf79d161";
+import { installHelp } from "./ui-help.js?v=03149c4be992";
+import { wireManagement } from "./ui-manage.js?v=03149c4be992";
+import { bindTabKeys } from "./ui-a11y.js?v=03149c4be992";
+import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=03149c4be992";
+import { ui } from "./ui-state.js?v=03149c4be992";
+import { canonical, digest, dismissNetworkBanner, instructions, isPoaAddress, loadBidderAddress, loadCart, loadTabSeen, makeBody, parsePublicJSON, recheckCartItem, saveBidderAddress, shouldHoldTransactions } from "./shared.js?v=03149c4be992";
+import { navigateHome, openPoa, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=03149c4be992";
+import { el, endpointBase } from "./ui-core.js?v=03149c4be992";
+import { clearHandoff, copyDomainListingPrompt, copySubnameListing, isTermsGateOpen, setFeedbackModalOpen, wireFeedbackModal, wireTermsGate } from "./ui-handoff.js?v=03149c4be992";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=03149c4be992";
+import { submitSearchQuery, wireSearchAutocomplete } from "./ui-search.js?v=03149c4be992";
+import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=03149c4be992";
+import { copyText, flashCopied, selectElementText } from "./ui-copy.js?v=03149c4be992";
+import { cartCopyBlocked, downloadCartJSON, clearAllCart, persistCart, renderCart, renderCurrentCartHandoff, setFloatingCartOpen } from "./ui-cart.js?v=03149c4be992";
 
 try {
     ui.statusPanelDismissed = false; // New page visits show status; closing lasts for this page only.
@@ -24,6 +24,26 @@ try {
     el("searchInput").addEventListener("input", updateIdeaContext);
     ui.cart = loadCart(globalThis.localStorage);
     ui.tabSeen = loadTabSeen(globalThis.localStorage);
+    ui.bidderAddress = loadBidderAddress(globalThis.localStorage);
+    const bidderInput = el("auctionsBidderInput");
+    if (bidderInput) {
+        bidderInput.value = ui.bidderAddress;
+        const onBidderChange = () => {
+            const v = bidderInput.value.trim();
+            ui.bidderAddress = isPoaAddress(v) ? v : "";
+            saveBidderAddress(globalThis.localStorage, ui.bidderAddress);
+            if (ui.latestState && ui.cap) {
+                ui.cart = ui.cart.map((item) =>
+                    recheckCartItem(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now()),
+                );
+                persistCart();
+                renderAuctions(ui.latestState);
+                renderCart();
+            }
+        };
+        bidderInput.addEventListener("input", onBidderChange);
+        bidderInput.addEventListener("change", onBidderChange);
+    }
     restoreViewFromURL();
     const keys = () => {
         el("keys").textContent = JSON.stringify(ui.cap?.actions?.[el("action").value] ?? {});

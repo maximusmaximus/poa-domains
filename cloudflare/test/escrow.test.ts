@@ -461,15 +461,40 @@ test("short-deadline seller consent is rejected before payout begins",async()=>{
  assert.equal(f.e.state().auctions[a]!.status,"OPEN");
 });
 
-test("abandoned OPEN auctions auto-expire in tick and release title lock + refund bidder",async()=>{
- const f=fixture();await fund(f,3,"10.000000","a");
- const o1=await f.e.command(command(who(2),"open1","open",{name:"empty",reserve:"1.000000"})) as any;
+test("queued auctions wait for first bid to start timer; abandoned fixed listings and bid-started auctions auto-expire in tick",async()=>{
+ const f=fixture();await fund(f,3,"10.000000","a");await fund(f,4,"10.000000","b");
+ // Queued auction: closes === 0 and startedAt === null until first bid lands.
+ const o1=await f.e.command(command(who(2),"open1","open",{name:"queued",reserve:"1.000000"})) as any;
+ assert.equal(f.e.state().auctions[o1.auction]!.closes,0);
+ assert.equal(f.e.state().auctions[o1.auction]!.startedAt,null);
  assert.equal(f.e.titleLocked(),true);
- f.net.now+=1001;
+ // Waiting past the nominal window does NOT expire an unbid auction or allow outsider expire.
+ f.net.now+=5000;
  await f.e.tick();
+ assert.equal(f.e.state().auctions[o1.auction]!.status,"OPEN");
+ await assert.rejects(f.e.command(command(who(4),"early-exp","expire",{auction:o1.auction})),/CANCEL_NOT_ALLOWED/);
+ // First bid starts the countdown timer (closes = now + window) and records startedAt + history.
+ const startAt=f.net.now;
+ await f.e.command(command(who(3),"first-bid","bid",{auction:o1.auction,amount:"1.000000"}));
+ assert.equal(f.e.state().auctions[o1.auction]!.startedAt,startAt);
+ assert.equal(f.e.state().auctions[o1.auction]!.closes,startAt+1000);
+ assert.equal(f.e.state().auctions[o1.auction]!.history?.at(-1)?.event,"Auction started (first bid)");
+ // Outbid by another bidder updates high, records both bidders, extends quiet, and queues refund to original payer.
+ f.net.now+=500;
+ await f.e.command(command(who(4),"outbid","bid",{auction:o1.auction,amount:"1.500000"}));
+ assert.equal(f.e.state().auctions[o1.auction]!.closes,f.net.now+1000);
+ assert.ok(f.e.state().payments[`outbid-${o1.auction}-${who(4)}:outbid`]);
+ // Seller can still cancel and release title lock + refund high bidder.
+ await f.e.command(command(who(2),"cancel1","cancel",{auction:o1.auction}));
  assert.equal(f.e.state().auctions[o1.auction]!.status,"CANCELLED");
  assert.equal(f.e.titleLocked(),false);
- // Now test with a high bid abandoned past closes + quiet
+ // Abandoned fixed-price listing still auto-expires after closes.
+ const l1=await f.e.command(command(who(2),"list1","list",{name:"fixed-empty",price:"1.000000"})) as any;
+ f.net.now+=1001;
+ await f.e.tick();
+ assert.equal(f.e.state().auctions[l1.auction]!.status,"CANCELLED");
+ assert.equal(f.e.titleLocked(),false);
+ // Bid-started auction abandoned past closes + quiet auto-expires and refunds high bidder.
  const o2=await f.e.command(command(who(2),"open2","open",{name:"bid-abandoned",reserve:"1.000000"})) as any;
  await f.e.command(command(who(3),"bid2","bid",{auction:o2.auction,amount:"2.000000"}));
  f.net.now+=1001; // past closes, within quiet grace window -> still OPEN so seller can settle

@@ -273,12 +273,136 @@ export function buildSubnamePurchasePrompt({ name, listing, price, endpointUrl }
   ].join("\n");
 }
 export function poaShort(value) { return String(value).replace(/(\.[0-9]*?)0+$/, "$1").replace(/\.$/, ""); }
+export function poaToMicros(value) {
+  const exact = /^[0-9]{1,12}\.[0-9]{6}$/.test(String(value ?? "")) ? String(value) : poaAmount(value);
+  const [w, f] = exact.split(".");
+  return BigInt(w) * 1000000n + BigInt(f);
+}
+export function microsToPoa(micros) {
+  const n = BigInt(micros);
+  if (n < 0n) throw Error("Negative POA amount");
+  return `${n / 1000000n}.${(n % 1000000n).toString().padStart(6, "0")}`;
+}
+export function poaMinimumNextBid(auction) {
+  const res = poaToMicros(auction?.price ?? "0.000001");
+  if (!auction?.high?.amount) return microsToPoa(res);
+  const hi = poaToMicros(auction.high.amount);
+  const next = (hi * 11n) / 10n + 1n;
+  return microsToPoa(next > res ? next : res);
+}
+export function isPoaAuctionAwaitingFirstBid(a) {
+  return Boolean(a && a.kind !== "fixed" && a.status === "OPEN" && (a.awaitingFirstBid === true || (!a.high && (!a.closes || a.closes === 0))));
+}
+export function isPoaAuctionLive(a, nowMs = Date.now()) {
+  if (!a || a.kind === "fixed" || a.status !== "OPEN") return false;
+  if (isPoaAuctionAwaitingFirstBid(a)) return false;
+  return a.closes === 0 || nowMs < a.closes;
+}
+export function partitionPoaAuctions(items, nowMs = Date.now()) {
+  const groups = { current: [], upcoming: [], past: [] };
+  for (const a of Array.isArray(items) ? items : []) {
+    if (!a || a.kind === "fixed") continue;
+    if (a.status !== "OPEN") groups.past.push(a);
+    else if (isPoaAuctionAwaitingFirstBid(a)) groups.upcoming.push(a);
+    else groups.current.push(a);
+  }
+  groups.current.sort((x, y) => (x.closes || Number.MAX_SAFE_INTEGER) - (y.closes || Number.MAX_SAFE_INTEGER) || String(x.name).localeCompare(String(y.name)));
+  groups.upcoming.sort((x, y) => String(x.name).localeCompare(String(y.name)));
+  groups.past.sort((x, y) => (y.closes || y.createdAt || 0) - (x.closes || x.createdAt || 0) || String(x.name).localeCompare(String(y.name)));
+  return groups;
+}
+export function activePoaFixedListings(items, nowMs = Date.now()) {
+  return (Array.isArray(items) ? items : [])
+    .filter((a) => a && a.kind === "fixed" && a.status === "OPEN" && !a.high && (!a.closes || nowMs < a.closes))
+    .sort((x, y) => String(x.name).localeCompare(String(y.name)));
+}
+export function findOpenPoaAuctionByName(escrowMarket, name, nowMs = Date.now()) {
+  return (Array.isArray(escrowMarket) ? escrowMarket : []).find(
+    (a) => a && a.name === name && a.kind !== "fixed" && a.status === "OPEN" && (isPoaAuctionAwaitingFirstBid(a) || !a.closes || nowMs < a.closes),
+  ) ?? null;
+}
+export function countLiveAuctions({ cap, state, escrowMarket = [], nowMs = Date.now() } = {}) {
+  const poaLive = (Array.isArray(escrowMarket) ? escrowMarket : []).filter((a) => isPoaAuctionLive(a, nowMs)).length;
+  if (poaOnlyMode(cap)) return poaLive;
+  const regLive = state?.auctions
+    ? Object.values(state.auctions).filter((a) => a && a.status === "live" && (typeof state.time !== "number" || (state.time >= a.openAt && state.time < auctionCloseAt(a)))).length
+    : 0;
+  return regLive + poaLive;
+}
+export function poaAuctionOutbidStatus(auction, { bidderAddress = "", cartItem = null } = {}) {
+  const minNext = poaMinimumNextBid(auction);
+  const currentHigh = auction?.high?.amount ?? null;
+  const currentHighPayer = auction?.high?.payer ?? null;
+  const addr = isPoaAddress(bidderAddress) ? bidderAddress : "";
+  if (addr && currentHighPayer === addr) {
+    return {
+      status: "leading",
+      message: `🏆 You are the highest bidder (${poaShort(currentHigh)} POA)`,
+      minimumNextBid: minNext,
+      currentHigh,
+      currentHighPayer,
+    };
+  }
+  if (addr && Array.isArray(auction?.bidders) && auction.bidders.includes(addr) && currentHigh && currentHighPayer !== addr) {
+    return {
+      status: "outbid",
+      message: `⚠️ You were outbid! High bid is now ${poaShort(currentHigh)} POA by ${shortenPoaAddress(currentHighPayer)} (min next ${poaShort(minNext)} POA).`,
+      minimumNextBid: minNext,
+      currentHigh,
+      currentHighPayer,
+    };
+  }
+  if (cartItem && cartItem.action === "poaBid" && currentHigh) {
+    let capMicros = 0n;
+    try { capMicros = poaToMicros(cartItem.amount); } catch { capMicros = 0n; }
+    const minMicros = poaToMicros(minNext);
+    const changed = cartItem.params?.lastHighAmount !== currentHigh || cartItem.params?.lastHighPayer !== currentHighPayer;
+    if (capMicros < minMicros) {
+      return {
+        status: "outbid",
+        message: `⚠️ Outbid! High bid is ${poaShort(currentHigh)} POA by ${shortenPoaAddress(currentHighPayer)} — min next ${poaShort(minNext)} POA exceeds your ${poaShort(cartItem.amount)} POA highest bid.`,
+        minimumNextBid: minNext,
+        currentHigh,
+        currentHighPayer,
+      };
+    }
+    if (changed) {
+      return {
+        status: "outbid-covered",
+        message: `⚠️ Higher bid placed (${poaShort(currentHigh)} POA by ${shortenPoaAddress(currentHighPayer)}). Your ${poaShort(cartItem.amount)} POA highest bid still covers the ${poaShort(minNext)} POA minimum.`,
+        minimumNextBid: minNext,
+        currentHigh,
+        currentHighPayer,
+      };
+    }
+  }
+  return { status: "none", message: "", minimumNextBid: minNext, currentHigh, currentHighPayer };
+}
+export const BIDDER_ADDRESS_KEY = "poadomains.bidderAddress.v1";
+export function loadBidderAddress(storage) {
+  try {
+    const raw = storage?.getItem?.(BIDDER_ADDRESS_KEY) ?? "";
+    return isPoaAddress(raw.trim()) ? raw.trim() : "";
+  } catch { return ""; }
+}
+export function saveBidderAddress(storage, value) {
+  try {
+    const v = String(value ?? "").trim();
+    if (isPoaAddress(v)) storage?.setItem?.(BIDDER_ADDRESS_KEY, v);
+    else if (!v) storage?.removeItem?.(BIDDER_ADDRESS_KEY);
+  } catch { /* ignore */ }
+}
 export function compactAmount(value) {
   const n = BigInt(value);
   return n >= 1000n && n % 1000n === 0n ? `${n / 1000n}k` : n.toString();
 }
-export function cartMinimum(item, cap, state) {
+export function cartMinimum(item, cap, state, escrowMarket = null) {
   if (item.action === "poaCheckout") return poaNewNamePrice(cap, inspectName(item.name, cap.emojiManifest));
+  if (item.action === "poaBid") {
+    const a = Array.isArray(escrowMarket) ? escrowMarket.find((x) => x && x.id === item.params?.auctionId) : null;
+    if (a) return poaMinimumNextBid(a);
+    return item.latestMinimum ?? item.minimumAmount ?? item.params?.minimumNextBid ?? item.amount;
+  }
   if (item.action === "announceAuction+bid") return rootAuctionPolicy(cap, inspectName(item.name, cap.emojiManifest), item.asset).reserve;
   if (item.action === "bid") {
     const auction = state?.auctions?.[item.params.auctionId];
@@ -290,6 +414,10 @@ export function cartSummary(item) {
   const p = item.params;
   if (item.action === "poaCheckout")
     return `🪙 Buy "${item.name}" for ${poaShort(item.amount)} POA with POA checkout.`;
+  if (item.action === "poaBid")
+    return p?.awaitingFirstBid
+      ? `🏷️ Start POA auction for "${item.name}" — highest bid up to ${poaShort(item.amount)} POA (reserve ${poaShort(item.minimumAmount ?? p.reserve ?? item.amount)} POA).`
+      : `🔥 Bid on "${item.name}" up to ${poaShort(item.amount)} POA (min next ${poaShort(item.minimumAmount ?? item.amount)} POA).`;
   if (item.action === "announceAuction+bid")
     return `Request root auction announcement for "${item.name}" (reserve=${p.reserve} ${registryUnit(item.asset)}) and place opening bid up to maxTotal=${item.amount} ${registryUnit(item.asset)}.`;
   if (item.action === "bid")
@@ -300,9 +428,18 @@ export function cartSummary(item) {
     return `Mint child domain ${item.name} via offer ${p.offerId.slice(0, 16)}… for ${item.amount} ${registryUnit(item.asset)} (expectedVersion=${p.expectedVersion}, expectedGeneration=${p.expectedGeneration}).`;
   return item.summary;
 }
-export function editCartAmount(item, raw, cap, state) {
+export function editCartAmount(item, raw, cap, state, escrowMarket = null) {
   const amount = String(raw).trim();
   if (item.action === "poaCheckout") { if (amount !== item.amount) throw Error(`⚠️ Fixed price is ${poaShort(item.amount)} POA.`); return { ...item }; }
+  if (item.action === "poaBid") {
+    const exact = poaAmount(amount);
+    const minimum = cartMinimum(item, cap, state, escrowMarket);
+    if (poaToMicros(exact) < poaToMicros(minimum)) throw Error(`⚠️ Minimum bid is ${poaShort(minimum)} POA.`);
+    const updated = { ...item, amount: exact, minimumAmount: minimum, params: { ...item.params, maxBid: exact, minimumNextBid: minimum } };
+    delete updated.validationError;
+    updated.summary = cartSummary(updated);
+    return updated;
+  }
   if (!/^[1-9][0-9]{0,38}$/.test(amount)) throw Error("⚠️ Enter a positive whole-number amount.");
   const minimum = cartMinimum(item, cap, state);
   if (BigInt(amount) < BigInt(minimum)) throw Error(`⚠️ Minimum bid is ${minimum} ${registryUnit(item.asset)}.`);
@@ -328,7 +465,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=db30cf79d161";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=03149c4be992";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -1259,9 +1396,9 @@ export function nameErrorReason(error) {
   return "⚠️ Invalid name. " + (reasons[error?.message] ?? "Check the name and try again.");
 }
 /** Current public facts relevant to this cart item. Never raises a user-approved amount. */
-export function cartReview(item, cap, state) {
+export function cartReview(item, cap, state, escrowMarket = null, bidderAddress = "", nowMs = Date.now()) {
   const p = item.params ?? {}, proposed = { ...p }, issues = [];
-  let facts = {}, minimum = item.minimumAmount ?? item.amount, blocked = false;
+  let facts = {}, minimum = item.minimumAmount ?? item.amount, blocked = false, outbid = false;
   const stop = message => { issues.push(message); blocked = true; };
   try {
     if (!state) throw Error("No state");
@@ -1270,11 +1407,60 @@ export function cartReview(item, cap, state) {
       const price = poaNewNamePrice(cap, info);
       const conflict = ownershipConflict(state, item.name, cap.emojiManifest, buildOwnershipIndex(cap.emojiOwnership));
       const auction = entry?.auctionId || Object.values(state.auctions ?? {}).find(a => a.name === item.name && a.status === "live")?.id;
-      if (!poaOnlyMode(cap) || !info.isRoot || entry?.activeId || auction || conflict || cap.reservedCatalog?.split(",").includes(item.name))
+      const poaAuction = Array.isArray(escrowMarket) ? findOpenPoaAuctionByName(escrowMarket, item.name, nowMs)?.id ?? null : null;
+      if (!poaOnlyMode(cap) || !info.isRoot || entry?.activeId || auction || poaAuction || conflict || cap.reservedCatalog?.split(",").includes(item.name))
         stop("This name is no longer available. Remove it and check Find again.");
       if (price !== item.amount) stop(`The POA price is now ${poaShort(price)} POA. Remove it and add it again only if you agree.`);
-      facts = { price, activeId: entry?.activeId ?? null, auction: auction ?? null, conflict };
-      return { signature: JSON.stringify(facts), issues, minimum: price, params: proposed, canAcknowledge: !blocked && !item.validationError };
+      facts = { price, activeId: entry?.activeId ?? null, auction: auction ?? poaAuction ?? null, conflict };
+      return { signature: JSON.stringify(facts), issues, minimum: price, params: proposed, canAcknowledge: !blocked && !item.validationError, outbid: false };
+    }
+    if (item.action === "poaBid") {
+      if (!poaOnlyMode(cap)) stop("POA auction bids require POA checkout mode.");
+      if (Array.isArray(escrowMarket)) {
+        const a = escrowMarket.find((x) => x && x.id === p.auctionId);
+        const awaiting = isPoaAuctionAwaitingFirstBid(a);
+        if (!a || a.status !== "OPEN" || a.kind === "fixed" || a.name !== item.name || (!awaiting && a.closes > 0 && nowMs >= a.closes)) {
+          stop("This POA auction is no longer open. Remove it from your cart.");
+          facts = { auctionId: p.auctionId ?? null, open: false };
+          return { signature: JSON.stringify(facts), issues, minimum, params: proposed, canAcknowledge: false, outbid: false };
+        }
+        minimum = poaMinimumNextBid(a);
+        proposed.minimumNextBid = minimum;
+        proposed.lastHighAmount = a.high?.amount ?? null;
+        proposed.lastHighPayer = a.high?.payer ?? null;
+        proposed.awaitingFirstBid = awaiting;
+        proposed.closes = a.closes ?? 0;
+        proposed.window = a.window ?? a.quiet ?? 3600000;
+        proposed.quiet = a.quiet ?? 3600000;
+        proposed.reserve = a.price;
+        proposed.seller = a.seller;
+        const addr = isPoaAddress(bidderAddress) ? bidderAddress : "";
+        const capMicros = poaToMicros(item.amount);
+        const minMicros = poaToMicros(minimum);
+        const highChanged = a.high && (p.lastHighAmount !== a.high.amount || p.lastHighPayer !== a.high.payer);
+        if (addr && a.high?.payer === addr) {
+          stop(`You are already the highest bidder at ${poaShort(a.high.amount)} POA (escrow rejects raising your own leading bid).`);
+        } else if (highChanged) {
+          outbid = true;
+          if (capMicros < minMicros) {
+            stop(`Outbid! Current high bid is ${poaShort(a.high.amount)} POA by ${shortenPoaAddress(a.high.payer)}. Your highest bid (${poaShort(item.amount)} POA) is below the new minimum (${poaShort(minimum)} POA). Raise it yourself or remove the item; your cap was not raised.`);
+          } else {
+            issues.push(`Outbid update: high bid is now ${poaShort(a.high.amount)} POA by ${shortenPoaAddress(a.high.payer)} (min next ${poaShort(minimum)} POA). Your highest bid (${poaShort(item.amount)} POA) still covers it — confirm review before copying.`);
+          }
+        } else if (capMicros < minMicros) {
+          outbid = Boolean(a.high);
+          stop(`Your highest bid (${poaShort(item.amount)} POA) is below the current minimum of ${poaShort(minimum)} POA. Raise it yourself or remove the item; your cap was not raised.`);
+        }
+        facts = { auctionId: a.id, status: a.status, high: a.high, minimum, awaitingFirstBid: awaiting, closes: a.closes ?? 0 };
+        return { signature: JSON.stringify(facts), issues, minimum, params: proposed, canAcknowledge: !blocked && !item.validationError, outbid };
+      }
+      // Escrow market not loaded yet: validate format only without false-closing saved bids.
+      const exactAmt = poaAmount(item.amount);
+      minimum = p.minimumNextBid ?? item.minimumAmount ?? exactAmt;
+      if (poaToMicros(exactAmt) < poaToMicros(minimum))
+        stop(`Your highest bid (${poaShort(exactAmt)} POA) is below the minimum of ${poaShort(minimum)} POA.`);
+      facts = { auctionId: p.auctionId ?? null, minimum, pendingMarket: true };
+      return { signature: JSON.stringify(facts), issues, minimum, params: proposed, canAcknowledge: !blocked && !item.validationError, outbid: false };
     }
     if (item.action === "announceAuction+bid") {
       const policy = rootAuctionPolicy(cap, info, item.asset);
@@ -1292,8 +1478,8 @@ export function cartReview(item, cap, state) {
       if (a) {
         minimum = a.high ? minimumNextBid(a.high.amount, cap.increment) : a.reserve;
         proposed.expectedVersion = a.version;
-        if (p.expectedVersion !== a.version) issues.push("The auction changed or was outbid. Review the new version and minimum bid.");
-        if (item.minimumAmount !== undefined && item.minimumAmount !== minimum) issues.push(`The minimum bid is now ${minimum} ${registryUnit(a.asset)}.`);
+        if (p.expectedVersion !== a.version) { outbid = true; issues.push("The auction changed or was outbid. Review the new version and minimum bid."); }
+        if (item.minimumAmount !== undefined && item.minimumAmount !== minimum) { outbid = true; issues.push(`The minimum bid is now ${minimum} ${registryUnit(a.asset)}.`); }
         if (item.asset !== a.asset) stop("The auction asset changed. Remove it and check Find again.");
         facts = { version: a.version, high: a.high, minimum, asset: a.asset, open: a.status === "live" && state.time >= a.openAt && state.time < auctionCloseAt(a) };
       }
@@ -1316,18 +1502,19 @@ export function cartReview(item, cap, state) {
     if (!/^[1-9][0-9]{0,38}$/.test(item.amount) || BigInt(item.amount) < BigInt(minimum))
       stop(`Your amount is below the current minimum of ${minimum} ${registryUnit(item.asset)}. Edit it yourself or remove the item; your cap was not raised.`);
   } catch { stop("Could not check this item. Refresh, or remove it and check Find again."); }
-  return { signature: JSON.stringify(facts), issues, minimum, params: proposed, canAcknowledge: !blocked && !item.validationError };
+  return { signature: JSON.stringify(facts), issues, minimum, params: proposed, canAcknowledge: !blocked && !item.validationError, outbid };
 }
-export function recheckCartItem(item, cap, state) {
-  const review = cartReview(item, cap, state);
+export function recheckCartItem(item, cap, state, escrowMarket = null, bidderAddress = "", nowMs = Date.now()) {
+  const review = cartReview(item, cap, state, escrowMarket, bidderAddress, nowMs);
   const needsReview = !!item.needsReview || review.issues.length > 0 || (item.reviewedState !== undefined && item.reviewedState !== review.signature);
-  return { ...item, needsReview, reviewMessage: needsReview ? review.issues.join(" ") || "Registry data changed. Review this item before copying." : "",
+  return { ...item, needsReview, outbid: Boolean(item.outbid || review.outbid), latestMinimum: review.minimum,
+    reviewMessage: needsReview ? review.issues.join(" ") || "Registry data changed. Review this item before copying." : "",
     reviewedState: item.reviewedState ?? (needsReview ? undefined : review.signature) };
 }
-export function acknowledgeCartItem(item, cap, state) {
-  const review = cartReview(item, cap, state);
+export function acknowledgeCartItem(item, cap, state, escrowMarket = null, bidderAddress = "", nowMs = Date.now()) {
+  const review = cartReview(item, cap, state, escrowMarket, bidderAddress, nowMs);
   if (!review.canAcknowledge) throw Error(review.issues.join(" ") || "Fix the amount before reviewing.");
-  const updated = { ...item, params: review.params, minimumAmount: review.minimum, reviewedState: review.signature, needsReview: false, reviewMessage: "" };
+  const updated = { ...item, params: review.params, minimumAmount: review.minimum, latestMinimum: review.minimum, reviewedState: review.signature, needsReview: false, outbid: false, reviewMessage: "" };
   updated.summary = cartSummary(updated);
   return updated;
 }
@@ -1341,13 +1528,37 @@ export function registryViewState(payload) {
 }
 
 /** Every UI entry point constructs cart params from the same current public facts. */
-export function buildCartItem(input, cap, state) {
+export function buildCartItem(input, cap, state, escrowMarket = null, bidderAddress = "", nowMs = Date.now()) {
   if (!state) throw Error("Refresh registry data before adding an item.");
   const info = inspectName(input.name, cap.emojiManifest), name = info.canonical, action = input.action;
   let asset, amount, params;
   if (action === "poaCheckout") {
     if (!poaOnlyMode(cap) || !info.isRoot) throw Error("Check this name in Find again.");
     asset = "POA"; amount = poaNewNamePrice(cap, info); params = { name, price: amount };
+  } else if (action === "poaBid") {
+    if (!poaOnlyMode(cap)) throw Error("POA auction bids require POA checkout mode.");
+    const a = Array.isArray(escrowMarket)
+      ? (escrowMarket.find((x) => x && x.id === input.auctionId && x.name === name && x.kind !== "fixed" && x.status === "OPEN") ??
+        findOpenPoaAuctionByName(escrowMarket, name, nowMs))
+      : null;
+    if (!a) throw Error("Check the current POA auction again.");
+    const minNext = poaMinimumNextBid(a);
+    const chosen = poaAmount(input.amount ?? minNext);
+    if (poaToMicros(chosen) < poaToMicros(minNext)) throw Error(`⚠️ Minimum bid is ${poaShort(minNext)} POA.`);
+    asset = "POA"; amount = chosen;
+    params = {
+      auctionId: a.id,
+      seller: a.seller,
+      reserve: a.price,
+      minimumNextBid: minNext,
+      maxBid: chosen,
+      lastHighAmount: a.high?.amount ?? null,
+      lastHighPayer: a.high?.payer ?? null,
+      awaitingFirstBid: isPoaAuctionAwaitingFirstBid(a),
+      closes: a.closes ?? 0,
+      window: a.window ?? a.quiet ?? 3600000,
+      quiet: a.quiet ?? 3600000,
+    };
   } else if (action === "announceAuction+bid") {
     asset = "POA"; const reserve = rootAuctionPolicy(cap, info).reserve;
     amount = input.amount ?? reserve;
@@ -1369,8 +1580,8 @@ export function buildCartItem(input, cap, state) {
     });
   } else throw Error("Unknown cart action");
   const item = { name, tier: info.tier, isRoot: info.isRoot, action, asset, amount: String(amount), params };
-  item.minimumAmount = cartMinimum(item, cap, state); item.summary = cartSummary(item);
-  return recheckCartItem(item, cap, state);
+  item.minimumAmount = cartMinimum(item, cap, state, escrowMarket); item.summary = cartSummary(item);
+  return recheckCartItem(item, cap, state, escrowMarket, bidderAddress, nowMs);
 }
 
 /** Local registry display units (non-production only). Production is POA-only. */

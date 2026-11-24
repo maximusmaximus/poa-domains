@@ -633,7 +633,144 @@ try {
     await hTerms.close();
   }
 
-  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations, escrow readiness banner, shortened PoA address copy, search autofill/dropdown, clean cart cards, cart-owned prefill, Manage this domain, Profile v1 editor, reorganized escrow signed request, treasury footer, domains served counter, bug/feature feedback modal & non-dismissible Terms gate");
+  // 9. POA Auctions: first-bid starts timer, live auctions icon count badge, top scroll bar "Auction started",
+  //    cart highest-bid ceiling, outbid indicators in cart & auctions page, and nuanced auction copy prompt.
+  const aucQueuedId = "1".repeat(64);
+  const aucLiveId = "2".repeat(64);
+  const sellerAddr = "poa1GHppB8pYZ43gK8yBzR1RJhzfWjzrJn29q96ykwngUP7N";
+  const bidder1 = "poa1An2SNaVU6NYV7RBCFKnpjXra91BzPs8qm45qh2u8EeSL";
+  const bidder2 = "poa1BMrTXjLwLQoxzPQGK3nfdLD9RnVsHdLHU4ikFdyYW1pb";
+  const nowAuctionMs = Date.now();
+  h.cap = { ...h.cap, escrow: { enabled: true } };
+  h.escrowCap = { enabled: true, paused: false, held: false, address: escrowWallet, limits: { perTransaction: "250000.000000", daily: "1000000.000000" }, serverTime: nowAuctionMs };
+  h.escrowMarket = {
+    serverTime: nowAuctionMs,
+    items: [
+      {
+        id: aucQueuedId, name: "vault", seller: sellerAddr, kind: "auction",
+        price: "100.000000", minimumNextBid: "100.000000", status: "OPEN",
+        closes: 0, window: 3600000, quiet: 3600000, createdAt: nowAuctionMs - 60000,
+        startedAt: null, awaitingFirstBid: true, high: null, bidders: [], settlement: null,
+        history: [{ event: "Auction queued; timer starts on first bid", at: nowAuctionMs - 60000 }],
+      },
+      {
+        id: aucLiveId, name: "comet", seller: sellerAddr, kind: "auction",
+        price: "100.000000", minimumNextBid: "220.000001", status: "OPEN",
+        closes: nowAuctionMs + 3600000, window: 3600000, quiet: 3600000, createdAt: nowAuctionMs - 120000,
+        startedAt: nowAuctionMs - 30000, awaitingFirstBid: false,
+        high: { payer: bidder1, amount: "200.000000" }, bidders: [bidder1], settlement: null,
+        history: [
+          { event: "Auction queued; timer starts on first bid", at: nowAuctionMs - 120000 },
+          { event: "Auction started (first bid)", at: nowAuctionMs - 30000, amount: "200.000000", payer: bidder1 },
+        ],
+      },
+    ],
+  };
+  const ctxAuc = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+  await ctxAuc.grantPermissions(["clipboard-read", "clipboard-write"], { origin: h.url });
+  const pageAuc = await ctxAuc.newPage();
+  const errorsAuc = [];
+  pageAuc.on("pageerror", (e) => errorsAuc.push(e.message));
+  await pageAuc.route("https://**", (r) => r.abort());
+  await pageAuc.goto(h.url);
+  await pageAuc.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageAuc.locator("#termsAgreeBtn").click();
+
+  // Top auction icon shows 1 live auction (NOT the queued unbid item "vault")
+  await expect(pageAuc.locator("#liveAuctionsBadge")).toBeVisible();
+  await expect(pageAuc.locator("#liveAuctionsBadge")).toHaveText("🔥1");
+  // Top scroll bar announces "comet" started and does NOT announce queued "vault"
+  const tickerInitial = await pageAuc.locator("#liveTickerTrack").innerText();
+  assert.ok(tickerInitial.includes("Auction started") && tickerInitial.includes("comet"), tickerInitial);
+  assert.equal(tickerInitial.includes("vault"), false, tickerInitial);
+
+  // Auctions tab: Current shows live "comet", Upcoming shows queued "vault" ("Starts on first bid")
+  await pageAuc.locator("#tabAuctions").click();
+  await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"]`)).toBeVisible();
+  await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"]`)).toContainText("Live POA auction");
+  await pageAuc.locator("#auctionTabUpcoming").click();
+  const vaultCard = pageAuc.locator(`#auctions article[data-auction-id="${aucQueuedId}"]`);
+  await expect(vaultCard).toBeVisible();
+  await expect(vaultCard).toContainText("Starts on first bid");
+  await vaultCard.locator("input").fill("150");
+  await vaultCard.getByRole("button", { name: /Add vault auction bid to cart/ }).click();
+
+  // Back to Current tab: add "comet" with highest bid 300 POA
+  await pageAuc.locator("#auctionTabCurrent").click();
+  const cometCard = pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"]`);
+  await cometCard.locator("input").fill("300");
+  await cometCard.getByRole("button", { name: /Add comet auction bid to cart/ }).click();
+
+  // Switch to Find/Cart: verify highest bid inputs, ceiling total, auction expectations & copied prompt nuances
+  await pageAuc.locator("#tabFind").click();
+  await expect(pageAuc.locator("#cartCount")).toHaveText("2");
+  await expect(pageAuc.locator("#cartExpectations")).toContainText("First bid starts the timer");
+  await expect(pageAuc.locator("#copyCartPrompt")).toBeEnabled();
+  await pageAuc.locator("#copyCartPrompt").click();
+  const auctionPrompt = await pageAuc.evaluate(() => navigator.clipboard.readText());
+  assert.match(auctionPrompt, /Whole-cart ceiling 450\.000000 POA/);
+  assert.match(auctionPrompt, /First-bid timer nuance/);
+  assert.match(auctionPrompt, /Outbid & refund nuance/);
+  assert.match(auctionPrompt, /ESCROW_SELF_RAISE/);
+  assert.match(auctionPrompt, /Settlement handover nuance/);
+
+  // Simulate: another user places first bid on "vault" (starting its timer!) AND outbids "comet" to 350 POA (> user's 300 max bid)
+  h.escrowMarket = {
+    serverTime: nowAuctionMs + 10000,
+    items: [
+      {
+        ...h.escrowMarket.items[0],
+        awaitingFirstBid: false,
+        startedAt: nowAuctionMs + 5000,
+        closes: nowAuctionMs + 5000 + 3600000,
+        minimumNextBid: "110.000001",
+        high: { payer: bidder2, amount: "100.000000" },
+        bidders: [bidder2],
+        history: [
+          ...h.escrowMarket.items[0].history,
+          { event: "Auction started (first bid)", at: nowAuctionMs + 5000, amount: "100.000000", payer: bidder2 },
+        ],
+      },
+      {
+        ...h.escrowMarket.items[1],
+        minimumNextBid: "385.000001",
+        high: { payer: bidder2, amount: "350.000000" },
+        bidders: [bidder1, bidder2],
+        history: [
+          ...h.escrowMarket.items[1].history,
+          { event: "Bid placed", at: nowAuctionMs + 6000, amount: "350.000000", payer: bidder2 },
+        ],
+      },
+    ],
+  };
+  await pageAuc.reload();
+  await pageAuc.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+
+  // Top badge now shows 2 live auctions, and top scroll bar announces "vault" auction started!
+  await expect(pageAuc.locator("#liveAuctionsBadge")).toHaveText("🔥2");
+  const tickerUpdated = await pageAuc.locator("#liveTickerTrack").innerText();
+  assert.ok(tickerUpdated.includes("Auction started") && tickerUpdated.includes("vault"), tickerUpdated);
+
+  // Cart shows Outbid warning on "comet", blocks Copy prompt, and NEVER auto-raises the 300 POA cap
+  await expect(pageAuc.locator("#cartList")).toContainText("Outbid!");
+  await expect(pageAuc.locator("#copyCartPrompt")).toBeDisabled();
+  assert.equal(await pageAuc.locator('#cartList input[aria-label="Highest bid in POA for comet"]').inputValue(), "300");
+
+  // Auctions page ALSO shows Outbid badge on "comet" (both via cart and via tracked bidder1 address!)
+  await pageAuc.locator("#tabAuctions").click();
+  await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"] .auction-outbid-badge`)).toBeVisible();
+  await pageAuc.locator("#auctionsBidderInput").fill(bidder1);
+  await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"] .auction-outbid-badge`)).toContainText("You were outbid");
+
+  // Explicit user action in Cart raises "comet" max bid and acknowledges "vault" -> unlocks Copy prompt
+  await pageAuc.locator("#tabFind").click();
+  await pageAuc.getByRole("button", { name: /Raise max bid to 385\.000001 POA/ }).click();
+  await pageAuc.locator("#cartList").getByRole("button", { name: /Review changed item/ }).click();
+  await expect(pageAuc.locator("#copyCartPrompt")).toBeEnabled();
+  assert.deepEqual(errorsAuc, []);
+  await ctxAuc.close();
+
+  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations, escrow readiness banner, shortened PoA address copy, search autofill/dropdown, clean cart cards, cart-owned prefill, Manage this domain, Profile v1 editor, reorganized escrow signed request, treasury footer, domains served counter, bug/feature feedback modal, non-dismissible Terms gate & POA first-bid auctions/outbid cart");
 } finally {
   await h.close();
   await browser.close();
