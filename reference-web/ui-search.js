@@ -1,13 +1,241 @@
-import { copyText } from "./ui-copy.js?v=9e3528a22292";
-import { publicNameUnavailable } from "./shared.js?v=9e3528a22292";
-import { registryUnit, poaOnlyMode, poaNewNamePrice, poaShort, buildSubnamePurchasePrompt } from "./shared.js?v=9e3528a22292";
-import { ui } from "./ui-state.js?v=9e3528a22292";
-import { nameLink, navigateDomain, ownerLink, writeViewURL } from "./ui-router.js?v=9e3528a22292";
-import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=9e3528a22292";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=9e3528a22292";
-import { addToCart } from "./ui-cart.js?v=9e3528a22292";
+import { copyText } from "./ui-copy.js?v=775cd3b55381";
+import { publicNameUnavailable } from "./shared.js?v=775cd3b55381";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaShort, buildSubnamePurchasePrompt } from "./shared.js?v=775cd3b55381";
+import { ui } from "./ui-state.js?v=775cd3b55381";
+import { nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=775cd3b55381";
+import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=775cd3b55381";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=775cd3b55381";
+import { addToCart } from "./ui-cart.js?v=775cd3b55381";
+import { suggestNames } from "./ideas-generator.js?v=775cd3b55381";
+import { logSubmittedSearch } from "./ui-search-log.js?v=775cd3b55381";
 
-export function runSearch(rawQuery, remember = true) {
+let activeSuggestionIdx = -1;
+let currentSuggestions = [];
+let currentCompletion = "";
+
+function isAvailableCandidate(name) {
+    if (!ui.cap || !ui.latestState)
+        return false;
+    const entry = ui.latestState.names?.[name];
+    if (publicNameUnavailable(name, ui.cap))
+        return false;
+    if (ui.reservedSet.has(name))
+        return false;
+    if (variantOwner(name))
+        return false;
+    if (entry?.activeId || entry?.auctionId)
+        return false;
+    if (Object.values(ui.latestState.auctions ?? {}).some((a) => a.name === name && a.status === "live"))
+        return false;
+    return true;
+}
+
+function suggestionPriceLabel(item) {
+    if (!ui.cap)
+        return "";
+    try {
+        if (poaOnlyMode(ui.cap))
+            return `${poaShort(poaNewNamePrice(ui.cap, item))} POA`;
+        return `${compactAmount(rootAuctionPolicy(ui.cap, item).reserve)} units`;
+    }
+    catch {
+        return "";
+    }
+}
+
+export function closeSearchSuggestions() {
+    const list = el("searchSuggestions");
+    const input = el("searchInput");
+    const ghost = el("searchAutofill");
+    activeSuggestionIdx = -1;
+    currentSuggestions = [];
+    currentCompletion = "";
+    if (list) {
+        list.hidden = true;
+        list.replaceChildren();
+    }
+    if (ghost) {
+        ghost.hidden = true;
+        ghost.textContent = "";
+    }
+    if (input) {
+        input.setAttribute("aria-expanded", "false");
+        input.removeAttribute("aria-activedescendant");
+    }
+}
+
+function highlightSuggestion(idx) {
+    const list = el("searchSuggestions");
+    const input = el("searchInput");
+    if (!list || !currentSuggestions.length)
+        return;
+    activeSuggestionIdx = idx;
+    const opts = [...list.querySelectorAll('[role="option"]')];
+    opts.forEach((node, i) => {
+        const selected = i === activeSuggestionIdx;
+        node.setAttribute("aria-selected", String(selected));
+        node.classList.toggle("is-active", selected);
+    });
+    if (input) {
+        if (activeSuggestionIdx >= 0 && opts[activeSuggestionIdx])
+            input.setAttribute("aria-activedescendant", opts[activeSuggestionIdx].id);
+        else
+            input.removeAttribute("aria-activedescendant");
+    }
+}
+
+export function selectSearchSuggestion(name) {
+    const input = el("searchInput");
+    if (input)
+        input.value = name;
+    closeSearchSuggestions();
+    runSearch(name, true, { autoAdd: true, fromSuggestion: true });
+    logSubmittedSearch(name);
+}
+
+export function updateSearchSuggestions() {
+    const input = el("searchInput");
+    const list = el("searchSuggestions");
+    const ghost = el("searchAutofill");
+    if (!input || !list || !ui.cap || !ui.latestState)
+        return;
+    const q = input.value.trim();
+    if (!q) {
+        closeSearchSuggestions();
+        return;
+    }
+    const { completion, items } = suggestNames(q, {
+        manifest: ui.cap.emojiManifest,
+        accept: isAvailableCandidate,
+        limit: 8,
+    });
+    currentSuggestions = items;
+    currentCompletion = completion;
+    activeSuggestionIdx = -1;
+    input.removeAttribute("aria-activedescendant");
+    if (ghost) {
+        if (completion && completion !== q.toLowerCase()) {
+            ghost.textContent = `${completion} ⇥`;
+            ghost.hidden = false;
+        }
+        else {
+            ghost.textContent = "";
+            ghost.hidden = true;
+        }
+    }
+    list.replaceChildren();
+    if (!items.length) {
+        list.hidden = true;
+        input.setAttribute("aria-expanded", "false");
+        return;
+    }
+    items.forEach((item, index) => {
+        const li = document.createElement("li");
+        li.id = `search-opt-${index}`;
+        li.className = "search-suggestion-item";
+        li.setAttribute("role", "option");
+        li.setAttribute("aria-selected", "false");
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "domain-name search-suggestion-name";
+        nameSpan.textContent = item.name;
+        const metaSpan = document.createElement("span");
+        metaSpan.className = "search-suggestion-meta";
+        const price = suggestionPriceLabel(item);
+        metaSpan.textContent = (price ? `🟢 ${price}` : "🟢 Available") + " · + Cart";
+        li.append(nameSpan, metaSpan);
+        li.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            selectSearchSuggestion(item.name);
+        });
+        list.append(li);
+    });
+    list.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+}
+
+export function submitSearchQuery() {
+    const input = el("searchInput");
+    if (!input)
+        return;
+    const raw = input.value.trim();
+    let chosen = raw;
+    let fromSuggestion = false;
+    if (activeSuggestionIdx >= 0 && currentSuggestions[activeSuggestionIdx]) {
+        chosen = currentSuggestions[activeSuggestionIdx].name;
+        input.value = chosen;
+        fromSuggestion = true;
+    }
+    closeSearchSuggestions();
+    runSearch(chosen, true, { autoAdd: true, fromSuggestion });
+    logSubmittedSearch(chosen);
+}
+
+export function wireSearchAutocomplete() {
+    const input = el("searchInput");
+    if (!input || input.dataset.acWired === "1")
+        return;
+    input.dataset.acWired = "1";
+    input.addEventListener("input", () => updateSearchSuggestions());
+    input.addEventListener("focus", () => {
+        if (input.value.trim())
+            updateSearchSuggestions();
+    });
+    input.addEventListener("blur", () => {
+        setTimeout(() => {
+            if (document.activeElement !== input)
+                closeSearchSuggestions();
+        }, 120);
+    });
+    input.addEventListener("keydown", (event) => {
+        const list = el("searchSuggestions");
+        const open = Boolean(list && !list.hidden && currentSuggestions.length);
+        if (event.key === "ArrowDown" && open) {
+            event.preventDefault();
+            highlightSuggestion((activeSuggestionIdx + 1) % currentSuggestions.length);
+            return;
+        }
+        if (event.key === "ArrowUp" && open) {
+            event.preventDefault();
+            highlightSuggestion(activeSuggestionIdx <= 0 ? currentSuggestions.length - 1 : activeSuggestionIdx - 1);
+            return;
+        }
+        if (event.key === "Escape" && open) {
+            event.preventDefault();
+            closeSearchSuggestions();
+            return;
+        }
+        if (event.key === "Tab" && !event.shiftKey && currentCompletion && open) {
+            event.preventDefault();
+            selectSearchSuggestion(currentCompletion);
+            return;
+        }
+        if (event.key === "Enter") {
+            event.preventDefault();
+            submitSearchQuery();
+        }
+    });
+}
+
+function appendSuggestedAlternatives(card, rawQuery) {
+    if (!ui.cap || !ui.latestState)
+        return;
+    const { items } = suggestNames(rawQuery, {
+        manifest: ui.cap.emojiManifest,
+        accept: isAvailableCandidate,
+        limit: 4,
+    });
+    if (!items.length)
+        return;
+    const row = add(card, "div", "", "search-alt-row");
+    add(row, "span", "Available suggestions:", "muted");
+    for (const item of items) {
+        const btn = add(row, "button", `${item.name} (${suggestionPriceLabel(item) || "Available"})`, "secondary small domain-name");
+        btn.type = "button";
+        btn.addEventListener("click", () => selectSearchSuggestion(item.name));
+    }
+}
+
+export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSuggestion = false } = {}) {
     if (remember) {
         ui.lastSearch = (rawQuery ?? "").trim().slice(0, 2048);
         writeViewURL();
@@ -44,6 +272,7 @@ export function runSearch(rawQuery, remember = true) {
     if (info.isRoot && ui.reservedSet.has(name)) {
         add(card, "p", "🔒 Reserved — not for sale", "badge-warn");
         add(card, "p", `${ui.reservedSet.size}-name reservation catalog`);
+        appendSuggestedAlternatives(card, name);
         return;
     }
     const sameEmoji = variantOwner(name);
@@ -52,6 +281,7 @@ export function runSearch(rawQuery, remember = true) {
         const p = add(card, "p", "Owned or in auction as ");
         nameLink(p, sameEmoji);
         add(card, "p", "One owner per emoji, whatever the skin tone or style.").setAttribute("data-info-description", "");
+        appendSuggestedAlternatives(card, name);
         return;
     }
     const entry = s.names[name];
@@ -112,6 +342,10 @@ export function runSearch(rawQuery, remember = true) {
         const ownerInfo = add(card, "p", "Owner: ");
         ownerLink(ownerInfo, d.owner, person(d.owner));
         ownerInfo.append(` · Generation ${d.generation} · Owner version ${d.ownerVersion} · Deed version ${d.version}`);
+        const manageBtn = add(card, "button", "⚙️ Manage this domain", "secondary small");
+        manageBtn.type = "button";
+        manageBtn.setAttribute("aria-label", `Manage ${name}`);
+        manageBtn.addEventListener("click", () => openManageDomain(name, d.owner));
         const resaleOffer = Object.values(s.offers).find((o) => o.kind === "resale" &&
             o.parentId === d.id &&
             !o.cancelled &&
@@ -131,6 +365,7 @@ export function runSearch(rawQuery, remember = true) {
                 });
             });
         }
+        appendSuggestedAlternatives(card, name);
         return;
     }
     if (!info.isRoot) {
@@ -178,11 +413,17 @@ export function runSearch(rawQuery, remember = true) {
         add(card, "p", `🪙 ${poaShort(price)} POA`, "badge-ok");
         add(card, "p", `Permanent name for ${poaShort(price)} POA. Add to cart to copy your agent checkout plan — once your agent’s POA transfer reaches finality and runs issue, ownership mints to your address right away.`, "muted poa-search-expect");
         add(card, "p", `Yours forever for ${poaShort(price)} POA. After your agent sends POA and it reaches PoA finality (K=5 attestations or checkpoint), escrow credits your balance and your agent mints the name permanently in one step. Unused POA stays refundable only to your original address. Nothing is paid here.`).setAttribute("data-info-description", "");
-        const btn = add(card, "button", "Add to cart", "small");
+        if (autoAdd)
+            addToCart({ name, action: "poaCheckout" });
+        const inCart = ui.cart.some((x) => x.name === name && x.action === "poaCheckout");
+        const btn = add(card, "button", inCart ? "✅ Added to cart" : "Add to cart", "small");
         btn.id = "addToCartBtn";
         btn.type = "button";
         btn.setAttribute("aria-label", `Add ${name} to cart for ${poaShort(price)} POA`);
-        btn.addEventListener("click", () => addToCart({ name, action: "poaCheckout" }));
+        btn.addEventListener("click", () => {
+            addToCart({ name, action: "poaCheckout" });
+            btn.textContent = "✅ Added to cart";
+        });
         return;
     }
     let pricing;
@@ -197,6 +438,13 @@ export function runSearch(rawQuery, remember = true) {
     const tierNote = `${compactAmount(reserve)} registry units ${info.isSingleEmoji ? "single-emoji" : info.isMultiEmoji ? "multi-emoji" : "root"} minimum bid`;
     add(card, "p", "🟢 Available in the registry snapshot", "badge-ok");
     add(card, "p", `Unclaimed ${info.tier} root domain (${tierNote}). Opening auction reserve: ${reserve} registry units (${formatDuration(pricing.window)} minimum window + ${formatDuration(pricing.quiet)} quiet period).`).setAttribute("data-info-description", "");
+    if (autoAdd && fromSuggestion) {
+        addToCart({
+            name,
+            action: "announceAuction+bid",
+            amount: reserve
+        });
+    }
     const controls = add(card, "div", "", "inline-controls");
     const maxBidInput = document.createElement("input");
     maxBidInput.value = reserve;

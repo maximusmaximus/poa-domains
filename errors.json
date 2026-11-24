@@ -956,6 +956,12 @@
       "retryable": false
     },
     {
+      "code": "IMAGE_TOO_LARGE",
+      "httpStatus": 413,
+      "message": "Profile images must be 5 MB or smaller.",
+      "retryable": false
+    },
+    {
       "code": "INSUFFICIENT_FUNDS",
       "httpStatus": 400,
       "message": "Insufficient funds. Check the documented inputs and current state.",
@@ -983,6 +989,48 @@
       "code": "INVALID",
       "httpStatus": 400,
       "message": "Invalid. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "INVALID_BTC_ADDRESS",
+      "httpStatus": 400,
+      "message": "Enter a valid Bitcoin mainnet address (bc1… SegWit/Taproot or legacy 1…/3… with valid checksum).",
+      "retryable": false
+    },
+    {
+      "code": "INVALID_ETH_ADDRESS",
+      "httpStatus": 400,
+      "message": "Enter a valid Ethereum 0x… address (40 hex characters).",
+      "retryable": false
+    },
+    {
+      "code": "INVALID_ETH_CHECKSUM",
+      "httpStatus": 400,
+      "message": "The Ethereum address failed EIP-55 checksum verification. Use the mixed-case checksummed 0x… address.",
+      "retryable": false
+    },
+    {
+      "code": "INVALID_IMAGE_FORMAT",
+      "httpStatus": 400,
+      "message": "Only PNG, JPG, WebP, or GIF images are supported.",
+      "retryable": false
+    },
+    {
+      "code": "INVALID_POA_ADDRESS",
+      "httpStatus": 400,
+      "message": "Enter a valid public poa1 address.",
+      "retryable": false
+    },
+    {
+      "code": "INVALID_PROFILE_DESCRIPTION",
+      "httpStatus": 400,
+      "message": "Keep the plain-text description to 280 characters or fewer without control characters.",
+      "retryable": false
+    },
+    {
+      "code": "INVALID_PROFILE_IMAGE",
+      "httpStatus": 400,
+      "message": "Use an https:// URL or ipfs:// URI for the profile image.",
       "retryable": false
     },
     {
@@ -1182,6 +1230,24 @@
       "httpStatus": 400,
       "message": "Mcp resource. Check the documented inputs and current state.",
       "retryable": false
+    },
+    {
+      "code": "MEDIA_RATE_LIMITED",
+      "httpStatus": 429,
+      "message": "Image uploads are temporarily rate-limited. Wait a moment and try again.",
+      "retryable": true
+    },
+    {
+      "code": "MEDIA_STORAGE_DISABLED",
+      "httpStatus": 503,
+      "message": "Profile media storage is not enabled on this server.",
+      "retryable": true
+    },
+    {
+      "code": "MEDIA_UPLOAD_FAILED",
+      "httpStatus": 503,
+      "message": "Could not save the uploaded image. Try again.",
+      "retryable": true
     },
     {
       "code": "METADATA_BINDING",
@@ -1721,6 +1787,12 @@
       "code": "PRODUCTION_WEB_CONFIG",
       "httpStatus": 400,
       "message": "Production web config. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "PROFILE_VERSION",
+      "httpStatus": 400,
+      "message": "Unsupported domain profile schema version. Version 1 is currently supported.",
       "retryable": false
     },
     {

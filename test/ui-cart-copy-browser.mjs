@@ -285,7 +285,172 @@ try {
   assert.deepEqual(errorsAddr, []);
   await ctxAddr.close();
 
-  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations, escrow readiness banner & shortened PoA address copy");
+  // 6. Search autofill/dropdown + auto-add, clean cart items, cart-owned prefill,
+  //    Manage this domain button, Profile v1 editor + avatar upload + /d/<name> view,
+  //    and reorganized Escrow Signed Request steps + ℹ️ help icons.
+  const ctxUx = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+  await ctxUx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: h.url });
+  const pageUx = await ctxUx.newPage();
+  const errorsUx = [];
+  pageUx.on("pageerror", (e) => errorsUx.push(e.message));
+  await pageUx.route("https://**", (r) => r.abort());
+  const samplePng = Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+  ]);
+  const mockAvatarCid = "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku";
+  await pageUx.route("**/v1/media/upload", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        cid: mockAvatarCid,
+        uri: `ipfs://${mockAvatarCid}`,
+        mediaUrl: `/v1/media/${mockAvatarCid}`,
+        contentType: "image/png",
+        bytes: samplePng.length,
+        r2Stored: true,
+        ipfsPinned: true,
+      }),
+    });
+  });
+  await pageUx.route(`**/v1/media/${mockAvatarCid}`, async (route) => {
+    await route.fulfill({ status: 200, contentType: "image/png", body: samplePng });
+  });
+
+  await pageUx.goto(h.url + "/");
+  await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+
+  // (a) Autofill + dropdown + click auto-adds to cart
+  await pageUx.locator("#searchInput").fill("agen");
+  await expect(pageUx.locator("#searchAutofill")).toHaveText("agent ⇥");
+  await expect(pageUx.locator("#searchSuggestions")).toBeVisible();
+  await pageUx.locator("#searchSuggestions [role='option']", { hasText: "agent" }).first().click();
+  await expect(pageUx.locator("#cartCount")).toHaveText("1");
+  await expect(pageUx.locator("#cartList")).toContainText("agent");
+
+  // (b) Clean POA cart item copy (no "Buy with POA · standard root", no "Buy \"agent\" for 100 POA with POA checkout.")
+  const inlineCartText = await pageUx.locator("#cartList").innerText();
+  assert.ok(inlineCartText.includes("🪙 100 POA · Standard root"), inlineCartText);
+  assert.equal(inlineCartText.includes("Buy with POA"), false, inlineCartText);
+  assert.equal(inlineCartText.includes("with POA checkout."), false, inlineCartText);
+
+  // Check button also auto-adds in POA-only mode
+  await pageUx.locator("#searchInput").fill("lunar");
+  await pageUx.locator("#searchBtn").click();
+  await expect(pageUx.locator("#cartCount")).toHaveText("2");
+
+  // Floating cart also uses clean price + type copy
+  await pageUx.locator("#tabHandoff").click();
+  await pageUx.locator("#floatingCartBtn").click();
+  const floatCartText = await pageUx.locator("#floatingCartList").innerText();
+  assert.ok(floatCartText.includes("🪙 100 POA · Standard root"), floatCartText);
+  assert.equal(floatCartText.includes("Buy with POA"), false, floatCartText);
+  await pageUx.locator("#floatingCartClose").click();
+
+  // (c) All cart items turn unavailable -> prefill Manage domains owner address
+  const buyerOwner = "poa1Buyer9mN3pQ7rS2tU5vW8xY4zA6bC1dE3fG5hJ7kL9mN";
+  const agentDeedId = "d".repeat(64);
+  const lunarDeedId = "e".repeat(64);
+  const rightsHash = "f".repeat(64);
+  h.payload.state.names.agent = { name: "agent", generation: 1, activeId: agentDeedId, auctionId: null, version: 1 };
+  h.payload.state.names.lunar = { name: "lunar", generation: 1, activeId: lunarDeedId, auctionId: null, version: 1 };
+  h.payload.state.deeds[agentDeedId] = {
+    id: agentDeedId, name: "agent", parentId: null, generation: 1, owner: buyerOwner,
+    version: 1, ownerVersion: 1, rights: { kind: "permanent" }, rightsHash, records: [],
+    metadata: [{ cid: "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi" }],
+  };
+  h.payload.state.deeds[lunarDeedId] = {
+    id: lunarDeedId, name: "lunar", parentId: null, generation: 1, owner: buyerOwner,
+    version: 1, ownerVersion: 1, rights: { kind: "permanent" }, rightsHash, records: [],
+    metadata: [{ cid: "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi" }],
+  };
+  await pageUx.reload();
+  await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageUx.locator("#tabFind").click();
+  await expect(pageUx.locator("#cartOwnedNotice")).toBeVisible();
+  await expect(pageUx.locator("#cartOwnedNotice")).toContainText("All names in your cart are now registered");
+  assert.equal(await pageUx.locator("#manageOwner").inputValue(), buyerOwner);
+
+  // (d) "Manage this domain" button on sold search result navigates to Manage domains & opens profile editor
+  await pageUx.locator("#searchInput").fill("agent");
+  await pageUx.locator("#searchBtn").click();
+  await expect(pageUx.locator("#searchResult")).toContainText("Manage this domain");
+  await pageUx.locator('#searchResult button[aria-label="Manage agent"]').click();
+  await expect(pageUx.locator("#escrowSection")).toBeVisible();
+  await expect(pageUx.locator("#manageOwnerNotice")).toBeVisible();
+  const agentCard = pageUx.locator('#manageNames article[data-domain-name="agent"]');
+  await expect(agentCard).toBeVisible();
+  await expect(agentCard.locator("details.profile-editor")).toHaveAttribute("open", "");
+  await expect(agentCard.locator(".profile-public-notice")).toContainText("publicly");
+  await expect(agentCard.locator(".profile-public-notice")).toContainText("IPFS");
+
+  // (e) Profile v1 editor: EIP-55 checksum fix, BTC mainnet, bio, image upload & agent prompt copy
+  await agentCard.locator('input[data-profile-field="btc"]').fill("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
+  await agentCard.locator('input[data-profile-field="eth"]').fill("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed");
+  await expect(agentCard.locator(".profile-eth-fix")).toBeVisible();
+  await agentCard.locator(".profile-eth-fix button").click();
+  assert.equal(
+    await agentCard.locator('input[data-profile-field="eth"]').inputValue(),
+    "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
+  );
+  await agentCard.locator('textarea[data-profile-field="description"]').fill("Agent bio https://minepoa.com <script>alert(1)</script>");
+  await agentCard.locator('input[type="file"]').setInputFiles({
+    name: "avatar.png",
+    mimeType: "image/png",
+    buffer: samplePng,
+  });
+  await expect(agentCard.locator(".profile-upload-row")).toContainText("Pinned to IPFS & backed up to R2");
+  assert.equal(await agentCard.locator('input[data-profile-field="image"]').inputValue(), `ipfs://${mockAvatarCid}`);
+  await agentCard.getByRole("button", { name: /Copy profile prompt for my agent/ }).click();
+  const profilePrompt = await pageUx.locator("#managePrompt").textContent();
+  assert.match(profilePrompt, /poa-domains\.profile\.v1/);
+  assert.match(profilePrompt, /setMetadata/);
+  assert.match(profilePrompt, /0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed/);
+  assert.match(profilePrompt, /bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4/);
+  assert.equal((await pageUx.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, "\n"), profilePrompt);
+
+  // (f) Reorganized Escrow Signed Request workflow with steps + ℹ️ popovers
+  await expect(pageUx.locator('#escrowPayments .escrow-step[data-step="1"] h3')).toContainText("1. Pick an action");
+  await expect(pageUx.locator('#escrowPayments .escrow-step[data-step="2"] h3')).toContainText("2. Copy the prompt to your agent");
+  await expect(pageUx.locator('#escrowPayments .escrow-step[data-step="3"] h3')).toContainText("3. Paste & submit");
+  assert.equal((await pageUx.locator("#escrowPayments").innerText()).includes("Signed request — public command and signature only"), false);
+  await pageUx.locator("#help-escrow-step-3").click();
+  await expect(pageUx.locator("#info-escrow-step-3")).toBeVisible();
+  await pageUx.keyboard.press("Escape");
+
+  // (g) Committed profile v1 renders safely on /d/agent (avatar + bio as plain text + Manage button)
+  const committedDoc = {
+    schema: "poa-domains.profile.v1",
+    version: 1,
+    name: "agent",
+    rightsHash,
+    poa: buyerOwner,
+    btc: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+    eth: "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
+    description: "Agent bio https://minepoa.com <script>alert(1)</script>",
+    image: `ipfs://${mockAvatarCid}`,
+  };
+  h.payload.state.deeds[agentDeedId].metadata = [{ cid: mockAvatarCid, document: committedDoc }];
+  await pageUx.goto(h.url + "/d/agent");
+  await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageUx.locator("#domainProfile")).toBeVisible();
+  await expect(pageUx.locator("#domainProfile img.domain-avatar")).toHaveAttribute("src", `/v1/media/${mockAvatarCid}`);
+  await expect(pageUx.locator("#domainProfile .domain-profile-bio")).toHaveText("Agent bio https://minepoa.com <script>alert(1)</script>");
+  assert.equal(await pageUx.locator("#domainProfile script").count(), 0);
+  await expect(pageUx.locator("#domainProfile")).toContainText("0x5aAe...eAed");
+  await expect(pageUx.locator("#domainProfile")).toContainText("bc1qw5...f3t4");
+  await pageUx.locator('#domainProfile button[aria-label="Copy ETH address for agent"]').click();
+  assert.equal(await pageUx.evaluate(() => navigator.clipboard.readText()), "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed");
+  await pageUx.locator('#domainProfile button[aria-label="Copy BTC address for agent"]').click();
+  assert.equal(await pageUx.evaluate(() => navigator.clipboard.readText()), "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
+  await expect(pageUx.locator('#domainActions button[aria-label="Manage agent"]')).toBeVisible();
+
+  assert.deepEqual(errorsUx, []);
+  await ctxUx.close();
+
+  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations, escrow readiness banner, shortened PoA address copy, search autofill/dropdown, clean cart cards, cart-owned prefill, Manage this domain, Profile v1 editor & reorganized escrow signed request");
 } finally {
   await h.close();
   await browser.close();

@@ -1,16 +1,16 @@
-import { publicNameUnavailable } from "./shared.js?v=9e3528a22292";
-import { installHelp } from "./ui-help.js?v=9e3528a22292";
-import { renderManagement } from "./ui-manage.js?v=9e3528a22292";
-import { actionLabel } from "./ui-copy.js?v=9e3528a22292";
-import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=9e3528a22292";
-import { ui } from "./ui-state.js?v=9e3528a22292";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=9e3528a22292";
-import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=9e3528a22292";
-import { render, updateTabDots } from "./ui-render.js?v=9e3528a22292";
-import { runSearch } from "./ui-search.js?v=9e3528a22292";
-import { renderIdeas } from "./ui-ideas.js?v=9e3528a22292";
-import { mountEscrow } from "./escrow.js?v=9e3528a22292";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=9e3528a22292";
+import { publicNameUnavailable } from "./shared.js?v=775cd3b55381";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=775cd3b55381";
+import { renderManagement } from "./ui-manage.js?v=775cd3b55381";
+import { actionLabel } from "./ui-copy.js?v=775cd3b55381";
+import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=775cd3b55381";
+import { ui } from "./ui-state.js?v=775cd3b55381";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=775cd3b55381";
+import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=775cd3b55381";
+import { render, updateTabDots } from "./ui-render.js?v=775cd3b55381";
+import { runSearch } from "./ui-search.js?v=775cd3b55381";
+import { renderIdeas } from "./ui-ideas.js?v=775cd3b55381";
+import { mountEscrow } from "./escrow.js?v=775cd3b55381";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=775cd3b55381";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -18,6 +18,114 @@ export function updateFreshness() {
     for (const node of document.querySelectorAll(".tab-age"))
         node.textContent = text;
     el("registryAge").textContent = "Registry data " + text + " · POA payments refresh separately.";
+}
+
+function enhanceEscrowSignedRequestUx(root) {
+    if (!root || root.dataset.escrowUxEnhanced === "1")
+        return;
+    const signed = root.querySelector("#escrowSignedPacket");
+    const submit = root.querySelector("#escrowSubmit");
+    const prompt = root.querySelector("#escrowPrompt");
+    const grid = root.querySelector(".escrow-grid");
+    const limits = root.querySelector("#escrowLimits");
+    const message = root.querySelector("#escrowMessage");
+    const deposit = root.querySelector("#escrowDeposit");
+    if (!signed || !submit || !prompt || !grid)
+        return;
+    const signedLabel = signed.closest("label");
+    const content = signedLabel?.parentElement;
+    if (!content)
+        return;
+    const actionRow = grid.parentElement === content ? content.querySelector(":scope > .button-row") : null;
+    const copyBtn = prompt.nextElementSibling?.tagName === "BUTTON" ? prompt.nextElementSibling : null;
+    root.dataset.escrowUxEnhanced = "1";
+
+    const makeStep = (num, title, infoId, infoLabel, infoText) => {
+        const box = document.createElement("div");
+        box.className = "escrow-step";
+        box.dataset.step = String(num);
+        const head = document.createElement("div");
+        head.className = "escrow-step-head";
+        const h3 = document.createElement("h3");
+        h3.textContent = `${num}. ${title}`;
+        head.append(h3, createInlineInfo(infoId, infoLabel, infoText));
+        box.append(head);
+        return box;
+    };
+
+    const step1 = makeStep(
+        1,
+        "Pick an action",
+        "escrow-step-1",
+        "About Step 1: Pick an action",
+        "Enter your public poa1… address (plus a name or exact POA amount when needed), then tap an action button. Nothing is sent or paid yet — this only drafts a prompt for your agent.",
+    );
+    const step2 = makeStep(
+        2,
+        "Copy the prompt to your agent",
+        "escrow-step-2",
+        "About Step 2: Copy prompt to your agent",
+        "Paste the drafted prompt to your AI agent or wallet CLI. Your agent verifies the amount, chain, and live escrow hold status, then signs the public command locally in your wallet. Your private key never touches this page.",
+    );
+    const step3 = makeStep(
+        3,
+        "Paste & submit your agent's signed JSON",
+        "escrow-step-3",
+        "About Step 3: Signed JSON response",
+        'Only needed if your agent hands back a signed JSON block instead of submitting it directly. It contains two public fields — "command" (what you approved) and "signature" (proof from your wallet). Never paste a private key, seed phrase, or admin token.',
+    );
+
+    const lead2 = document.createElement("p");
+    lead2.className = "muted escrow-step-lead";
+    lead2.textContent = "Choose an action above to generate instructions for your agent, then copy them below.";
+    step2.append(lead2);
+
+    const lead3 = document.createElement("p");
+    lead3.className = "muted escrow-step-lead";
+    lead3.textContent = "Skip this step if your agent submits directly via API/MCP. Otherwise paste the signed JSON it returns:";
+    step3.append(lead3);
+
+    const labelTextNode = [...signedLabel.childNodes].find((n) => n.nodeType === 3 && n.nodeValue?.trim());
+    if (labelTextNode)
+        labelTextNode.nodeValue = "Signed JSON from your agent ";
+    signed.placeholder = 'Paste {"command": { ... }, "signature": "..."} returned by your agent';
+    submit.textContent = "✅ Submit signed response";
+
+    const fieldHead = document.createElement("div");
+    fieldHead.className = "escrow-field-head";
+    const fieldHint = document.createElement("span");
+    fieldHint.className = "muted";
+    fieldHint.textContent = "Public command + signature only — never keys";
+    fieldHead.append(
+        fieldHint,
+        createInlineInfo(
+            "escrow-signed-json",
+            "About the signed JSON format",
+            'Your agent signs the canonical command JSON with Ed25519 and returns {"command":{...},"signature":"<base58>"}. This page submits that public packet to /v1/escrow/* with no credentials or private keys.',
+        ),
+    );
+
+    step1.append(grid);
+    if (limits)
+        step1.append(limits);
+    if (actionRow)
+        step1.append(actionRow);
+
+    if (message)
+        step2.append(message);
+    step2.append(prompt);
+    if (copyBtn)
+        step2.append(copyBtn);
+
+    step3.append(fieldHead, signedLabel, submit);
+
+    if (deposit) {
+        content.insertBefore(step1, deposit);
+        content.insertBefore(step2, deposit);
+        content.insertBefore(step3, deposit);
+    } else {
+        content.append(step1, step2, step3);
+    }
 }
 
 function observeEscrowAddresses(root) {
@@ -378,6 +486,7 @@ export async function loadRegistry() {
         if (!ui.escrowUI) {
             ui.escrowUI = mountEscrow({ base: ui.base, capability: ui.cap.escrow, registryId: ui.cap.registryId,
                 section: el("escrowPayments"), domain: el("escrowDomain"), selectTab: () => { navigateHome(); setSectionTab("escrow"); } });
+            enhanceEscrowSignedRequestUx(el("escrowPayments"));
             observeEscrowAddresses(el("escrowPayments"));
             observeEscrowAddresses(el("escrowDomain"));
         }

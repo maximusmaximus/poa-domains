@@ -192,7 +192,7 @@ try {
     (await client.listResourceTemplates()).resourceTemplates.length,
     2,
   );
-  assert.equal((await client.listPrompts()).prompts.length, 2);
+  assert.equal((await client.listPrompts()).prompts.length, 3);
   const quote = (
     await client.callTool({
       name: "quote_domain",
@@ -349,7 +349,7 @@ try {
   }
   assert.ok(limited, "real local rate binding must enforce its bucket");
   console.log(
-    "PASS real SDK + workerd: stateless golden stdio/HTTP parity, 9 tools, 15 typed actions, resources/prompts, signed preview/submit/receipt/exact resend, lost-response outcome safety, Origin/version/body guards and real binding rate limit; no external I/O",
+    "PASS real SDK + workerd: stateless golden stdio/HTTP parity, 11 tools, 15 typed actions, resources/prompts, signed preview/submit/receipt/exact resend, lost-response outcome safety, Origin/version/body guards and real binding rate limit; no external I/O",
   );
 } finally {
   if (client) await client.close();

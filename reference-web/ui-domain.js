@@ -1,17 +1,90 @@
-import { publicNameUnavailable, unavailableKey } from "./shared.js?v=9e3528a22292";
-import { registryUnit, poaOnlyMode } from "./shared.js?v=9e3528a22292";
-import { actionLabel } from "./ui-copy.js?v=9e3528a22292";
-import { ui } from "./ui-state.js?v=9e3528a22292";
-import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=9e3528a22292";
-import { add, appendPoaAddress, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=9e3528a22292";
-import { nameLink, ownerLink } from "./ui-router.js?v=9e3528a22292";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=9e3528a22292";
+import { extractDomainProfile, profileImageMediaPath, publicNameUnavailable, unavailableKey } from "./shared.js?v=775cd3b55381";
+import { registryUnit, poaOnlyMode } from "./shared.js?v=775cd3b55381";
+import { actionLabel, createPoaCopyButton } from "./ui-copy.js?v=775cd3b55381";
+import { ui } from "./ui-state.js?v=775cd3b55381";
+import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=775cd3b55381";
+import { add, appendPoaAddress, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=775cd3b55381";
+import { nameLink, openManageDomain, ownerLink } from "./ui-router.js?v=775cd3b55381";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=775cd3b55381";
+
+function appendCopyableValue(parent, value, ariaLabel) {
+    const wrap = document.createElement("span");
+    wrap.className = "poa-addr-inline";
+    const code = document.createElement("code");
+    code.className = "poa-addr-text";
+    code.textContent = value.length > 18 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
+    code.title = value;
+    wrap.append(code, createPoaCopyButton(value, { ariaLabel }));
+    parent.append(wrap);
+}
+
+function renderDomainProfileCard(deed) {
+    const box = el("domainProfile");
+    if (!box)
+        return;
+    box.replaceChildren();
+    if (!deed) {
+        box.hidden = true;
+        return;
+    }
+    const extracted = extractDomainProfile(deed);
+    if (!extracted || extracted.isDefault) {
+        box.hidden = true;
+        return;
+    }
+    const p = extracted.profile;
+    box.hidden = false;
+    const head = add(box, "div", "", "domain-profile-head");
+    const mediaPath = profileImageMediaPath(p.image);
+    if (mediaPath) {
+        const img = document.createElement("img");
+        img.className = "domain-avatar";
+        img.src = mediaPath;
+        img.alt = `Avatar for ${deed.name}`;
+        img.addEventListener("error", () => { img.hidden = true; });
+        head.append(img);
+    }
+    const meta = add(head, "div", "", "domain-profile-meta");
+    add(meta, "h3", `🪪 Public profile (v${p.version} · #${extracted.metadataVersion})`);
+    if (p.description)
+        add(meta, "p", p.description, "domain-profile-bio");
+    if (p.image && !mediaPath) {
+        const linkLine = add(meta, "p", "🖼️ Avatar: ", "muted");
+        if (p.image.startsWith("https://")) {
+            const a = document.createElement("a");
+            a.href = p.image;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            a.textContent = p.image;
+            linkLine.append(a);
+        }
+        else {
+            add(linkLine, "code", p.image);
+        }
+    }
+    const fields = add(box, "div", "", "domain-profile-fields");
+    const poaRow = add(fields, "p", "POA: ", "record");
+    appendPoaAddress(poaRow, p.poa, { code: true });
+    if (p.btc) {
+        const btcRow = add(fields, "p", "BTC: ", "record");
+        appendCopyableValue(btcRow, p.btc, `Copy BTC address for ${deed.name}`);
+    }
+    if (p.eth) {
+        const ethRow = add(fields, "p", "ETH / Base: ", "record");
+        appendCopyableValue(ethRow, p.eth, `Copy ETH address for ${deed.name}`);
+    }
+    if (extracted.cid) {
+        const cidRow = add(box, "p", "IPFS / R2 CID: ", "muted");
+        add(cidRow, "code", extracted.cid);
+    }
+}
 
 export function renderDomainPage(name) {
     if (!ui.latestState || !name)
         return;
     if(publicNameUnavailable(name,ui.cap)) {
       el("domainTitle").textContent="Name unavailable";el("domainStatus").textContent="🔒 Stored record withheld — not free to register";el("domainOwner").textContent="No public ownership record.";
+      if(el("domainProfile")){el("domainProfile").hidden=true;el("domainProfile").replaceChildren();}
       el("domainListing").hidden=true;el("domainListing").replaceChildren();el("domainActions").replaceChildren();el("domainHistory").replaceChildren();add(el("domainHistory"),"p","No public history.");el("domainOwnerTools").hidden=true;return;
     }
     const view = resolveDomainView(ui.latestState, name, ui.reservedSet, ownershipView());
@@ -33,6 +106,7 @@ export function renderDomainPage(name) {
     else {
         ownerNode.textContent = "No owner yet";
     }
+    renderDomainProfileCard(view.deed);
     const poa = poaOnlyMode(ui.cap);
     const listingBox = el("domainListing");
     listingBox.hidden = !view.listing || poa;
@@ -43,6 +117,12 @@ export function renderDomainPage(name) {
     }
     const actions = el("domainActions");
     actions.replaceChildren();
+    if (view.deed && !view.deed.retired) {
+        const manageBtn = add(actions, "button", "⚙️ Manage this domain", "secondary");
+        manageBtn.type = "button";
+        manageBtn.setAttribute("aria-label", `Manage ${name}`);
+        manageBtn.addEventListener("click", () => openManageDomain(name, view.deed.owner));
+    }
     if (!poa && view.auction && view.auction.status === "live" && view.auctionBucket === "current") {
         const minBid = view.auction.high
             ? minimumNextBid(view.auction.high.amount, ui.cap.increment)
@@ -122,6 +202,10 @@ export function renderOwnerPage(ownerId) {
         const h = add(card, "h4", "");
         nameLink(h, n.name);
         add(card, "p", d.rights.kind, "badge");
+        const manageBtn = add(card, "button", "⚙️ Manage this domain", "secondary small");
+        manageBtn.type = "button";
+        manageBtn.setAttribute("aria-label", `Manage ${n.name}`);
+        manageBtn.addEventListener("click", () => openManageDomain(n.name, d.owner));
     }
     const listings = poaOnlyMode(ui.cap) ? [] : activeResaleOffers(ui.latestState).filter((x) => x.offer.owner === ownerId && x.asset === "POA");
     if (!listings.length)
