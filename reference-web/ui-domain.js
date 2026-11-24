@@ -1,11 +1,11 @@
-import { extractDomainProfile, profileImageMediaPath, publicNameUnavailable, unavailableKey } from "./shared.js?v=9fe77daffcb5";
-import { registryUnit, poaOnlyMode } from "./shared.js?v=9fe77daffcb5";
-import { actionLabel, createPoaCopyButton } from "./ui-copy.js?v=9fe77daffcb5";
-import { ui } from "./ui-state.js?v=9fe77daffcb5";
-import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=9fe77daffcb5";
-import { add, appendPoaAddress, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=9fe77daffcb5";
-import { nameLink, openManageDomain, ownerLink } from "./ui-router.js?v=9fe77daffcb5";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=9fe77daffcb5";
+import { extractDomainProfile, profileImageMediaPath, publicNameUnavailable, unavailableKey } from "./shared.js?v=c79a40639d61";
+import { registryUnit, poaOnlyMode } from "./shared.js?v=c79a40639d61";
+import { actionLabel, createPoaCopyButton } from "./ui-copy.js?v=c79a40639d61";
+import { ui } from "./ui-state.js?v=c79a40639d61";
+import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=c79a40639d61";
+import { add, appendPoaAddress, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=c79a40639d61";
+import { nameLink, openManageDomain, ownerLink } from "./ui-router.js?v=c79a40639d61";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=c79a40639d61";
 
 function appendCopyableValue(parent, value, ariaLabel) {
     const wrap = document.createElement("span");

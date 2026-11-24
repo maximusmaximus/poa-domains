@@ -1,13 +1,13 @@
-import { copyText } from "./ui-copy.js?v=9fe77daffcb5";
-import { publicNameUnavailable } from "./shared.js?v=9fe77daffcb5";
-import { registryUnit, poaOnlyMode, poaNewNamePrice, poaShort, buildSubnamePurchasePrompt } from "./shared.js?v=9fe77daffcb5";
-import { ui } from "./ui-state.js?v=9fe77daffcb5";
-import { nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=9fe77daffcb5";
-import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=9fe77daffcb5";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=9fe77daffcb5";
-import { addToCart } from "./ui-cart.js?v=9fe77daffcb5";
-import { suggestNames } from "./ideas-generator.js?v=9fe77daffcb5";
-import { logSubmittedSearch } from "./ui-search-log.js?v=9fe77daffcb5";
+import { copyText } from "./ui-copy.js?v=c79a40639d61";
+import { publicNameUnavailable } from "./shared.js?v=c79a40639d61";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaShort, buildSubnamePurchasePrompt } from "./shared.js?v=c79a40639d61";
+import { ui } from "./ui-state.js?v=c79a40639d61";
+import { nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=c79a40639d61";
+import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=c79a40639d61";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=c79a40639d61";
+import { addToCart } from "./ui-cart.js?v=c79a40639d61";
+import { suggestNames } from "./ideas-generator.js?v=c79a40639d61";
+import { logSubmittedSearch } from "./ui-search-log.js?v=c79a40639d61";
 
 let activeSuggestionIdx = -1;
 let currentSuggestions = [];

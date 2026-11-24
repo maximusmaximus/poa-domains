@@ -1,12 +1,12 @@
-import { domainPath, isPoaAddress, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=9fe77daffcb5";
-import { ui } from "./ui-state.js?v=9fe77daffcb5";
-import { createPoaCopyButton } from "./ui-copy.js?v=9fe77daffcb5";
-import { add, el } from "./ui-core.js?v=9fe77daffcb5";
-import { runSearch } from "./ui-search.js?v=9fe77daffcb5";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=9fe77daffcb5";
-import { updateTabDots } from "./ui-render.js?v=9fe77daffcb5";
-import { syncCartShortcutNow } from "./ui-cart.js?v=9fe77daffcb5";
-import { renderManagement } from "./ui-manage.js?v=9fe77daffcb5";
+import { domainPath, isPoaAddress, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=c79a40639d61";
+import { ui } from "./ui-state.js?v=c79a40639d61";
+import { createPoaCopyButton } from "./ui-copy.js?v=c79a40639d61";
+import { add, el } from "./ui-core.js?v=c79a40639d61";
+import { runSearch } from "./ui-search.js?v=c79a40639d61";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=c79a40639d61";
+import { updateTabDots } from "./ui-render.js?v=c79a40639d61";
+import { syncCartShortcutNow } from "./ui-cart.js?v=c79a40639d61";
+import { renderManagement } from "./ui-manage.js?v=c79a40639d61";
 
 /** Open Manage domains tab, prefill the owner address, and focus a specific domain card. */
 export function openManageDomain(name, ownerId) {

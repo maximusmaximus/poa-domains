@@ -1,17 +1,17 @@
-import { publicNameUnavailable } from "./shared.js?v=9fe77daffcb5";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=9fe77daffcb5";
-import { renderManagement } from "./ui-manage.js?v=9fe77daffcb5";
-import { actionLabel } from "./ui-copy.js?v=9fe77daffcb5";
-import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=9fe77daffcb5";
-import { ui } from "./ui-state.js?v=9fe77daffcb5";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=9fe77daffcb5";
-import { createPoaCopyButton } from "./ui-copy.js?v=9fe77daffcb5";
-import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=9fe77daffcb5";
-import { render, updateTabDots } from "./ui-render.js?v=9fe77daffcb5";
-import { runSearch } from "./ui-search.js?v=9fe77daffcb5";
-import { renderIdeas } from "./ui-ideas.js?v=9fe77daffcb5";
-import { mountEscrow } from "./escrow.js?v=9fe77daffcb5";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=9fe77daffcb5";
+import { publicNameUnavailable } from "./shared.js?v=c79a40639d61";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=c79a40639d61";
+import { renderManagement } from "./ui-manage.js?v=c79a40639d61";
+import { actionLabel } from "./ui-copy.js?v=c79a40639d61";
+import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=c79a40639d61";
+import { ui } from "./ui-state.js?v=c79a40639d61";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=c79a40639d61";
+import { createPoaCopyButton } from "./ui-copy.js?v=c79a40639d61";
+import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=c79a40639d61";
+import { render, updateTabDots } from "./ui-render.js?v=c79a40639d61";
+import { runSearch } from "./ui-search.js?v=c79a40639d61";
+import { renderIdeas } from "./ui-ideas.js?v=c79a40639d61";
+import { mountEscrow } from "./escrow.js?v=c79a40639d61";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=c79a40639d61";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -347,15 +347,27 @@ export function renderTreasuryFooter() {
     walletsEl.hidden = false;
 }
 
+let treasuryAbort = null;
+if (typeof globalThis.addEventListener === "function") {
+    globalThis.addEventListener("pagehide", () => {
+        treasuryAbort?.abort();
+        treasuryAbort = null;
+    });
+}
+
 export async function refreshTreasury() {
     if (ui.demo)
         return;
+    treasuryAbort?.abort();
+    const ctrl = typeof AbortController === "function" ? new AbortController() : null;
+    treasuryAbort = ctrl;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), 10000) : null;
     try {
         const response = await fetch(endpointBase() + "/v1/treasury", {
             method: "GET",
             credentials: "omit",
             cache: "no-store",
-            signal: globalThis.AbortSignal?.timeout ? AbortSignal.timeout(10000) : undefined,
+            signal: ctrl?.signal,
         });
         if (!response.ok)
             return;
@@ -367,6 +379,12 @@ export async function refreshTreasury() {
     }
     catch {
         /* keep last known treasury snapshot */
+    }
+    finally {
+        if (timer)
+            clearTimeout(timer);
+        if (treasuryAbort === ctrl)
+            treasuryAbort = null;
     }
 }
 
@@ -500,6 +518,7 @@ export async function loadRegistry() {
                     throw Error("Public endpoint only");
                 ui.base = u.origin;
             }
+            void refreshTreasury();
             ui.cap = await json(ui.base + "/v1/capabilities?include=emoji");
             ui.readState = () => json(ui.base + "/v1/state");
         }
@@ -574,9 +593,7 @@ export async function loadRegistry() {
         }
         applyRoute();
         renderCart();
-        let startedTimers = false;
         if (!ui.demo && !ui.tickerTimer) {
-            startedTimers = true;
             ui.tickerTimer = setInterval(refreshRegistry, ui.TICKER_MS);
             refreshNetworkStatus();
             refreshEscrowCaps();
@@ -585,8 +602,6 @@ export async function loadRegistry() {
         else if (ui.demo)
             renderNetworkStatus();
         await refreshRegistry();
-        if (startedTimers)
-            refreshTreasury();
     }
     catch {
         ui.readState = null;
