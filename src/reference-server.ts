@@ -73,6 +73,11 @@ export async function startReferenceServer(
       const discovery=discoveryDocument(u.pathname);
       if(discovery){if(req.method!=="GET"&&req.method!=="HEAD")return send(405,{code:"METHOD_NOT_ALLOWED"});res.setHeader("content-type",discovery.type);res.setHeader("access-control-allow-origin","*");return void res.end(req.method==="HEAD"?undefined:discovery.text);}
       if (req.method === "GET" && u.pathname === "/config.json") return send(200,{mode:"local-reference-only",publicApiBase:""});
+      if ((req.method === "GET" || req.method === "HEAD") && u.pathname === "/v1/treasury") {
+        res.setHeader("access-control-allow-origin", "*");
+        if (req.method === "HEAD") { res.statusCode = 200; return void res.end(); }
+        return send(200, { total: null, escrow: null, treasury: null, poascanHomeUrl: "https://poascan.io/", checkedAt: Date.now(), stale: false });
+      }
       if (req.method === "GET") {
         res.setHeader("access-control-allow-origin", "*");
         const assetPath = /^\/(d|p)\/[^/]+\/?$/.test(u.pathname) ? "/" : u.pathname;

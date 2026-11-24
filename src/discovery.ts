@@ -30,6 +30,12 @@ export const GATEWAY_ROUTES = Object.freeze([
   ["HEAD", "/v1/media/:cid"],
   ["GET", "/v1/network-status"],
   ["HEAD", "/v1/network-status"],
+  ["GET", "/v1/treasury"],
+  ["HEAD", "/v1/treasury"],
+  ["GET", "/v1/feedback/challenge"],
+  ["GET", "/v1/feedback/captcha/:id"],
+  ["HEAD", "/v1/feedback/captcha/:id"],
+  ["POST", "/v1/feedback"],
   ...["capabilities", "market", "domain", "subnames", "intent"].map((p) => [
     "GET",
     "/v1/escrow/" + p,
@@ -149,7 +155,7 @@ function params(method: string, path: string): any[] {
       parameter(
         match[1]!,
         "path",
-        match[1] === "name" ? NAME : match[1] === "cid" ? { type: "string", pattern: "^bafkrei[a-z2-7]{52}$" } : ID,
+        match[1] === "name" ? NAME : match[1] === "cid" ? { type: "string", pattern: "^bafkrei[a-z2-7]{52}$" } : path === "/v1/feedback/captcha/:id" ? { type: "string", pattern: "^[0-9a-f]{32}$" } : ID,
         true,
       ),
     );
@@ -289,6 +295,50 @@ export function openApiDocument(): any {
       operation.responses = {
         "200": { description: "Immutable image bytes (image/png, image/jpeg, image/webp, or image/gif)" },
         default: response("Invalid CID or image not found", ref("Error")),
+      };
+    }
+    if (path === "/v1/treasury") {
+      operation.description = "Read-only Domains Treasury balance (escrow + treasury on PoA mainnet) with POAScan links.";
+    }
+    if (path === "/v1/feedback/challenge") {
+      operation.description = "Issue a single-use CAPTCHA and SHA-256 Proof-of-Work challenge for bug/feature feedback.";
+    }
+    if (path === "/v1/feedback/captcha/:id") {
+      operation.description = "Render the distorted SVG image for an active feedback verification challenge.";
+      operation.responses = {
+        "200": { description: "SVG verification image (image/svg+xml)" },
+        default: response("Challenge expired or not found", ref("Error")),
+      };
+    }
+    if (path === "/v1/feedback") {
+      operation.description = "Submit a CAPTCHA + PoW verified bug report or feature request (rate-limited; filed as a GitHub issue for review). Never send private keys.";
+      operation["x-browser-writes"] = "Same-origin feedback submission protected by CAPTCHA, PoW, and multi-tier rate limits";
+      operation["x-max-body-bytes"] = 16384;
+      operation.requestBody = {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["kind", "title", "details", "challengeId", "captchaAnswer", "powNonce"],
+              properties: {
+                kind: { enum: ["bug", "feature"] },
+                title: { type: "string", minLength: 5, maxLength: 120 },
+                details: { type: "string", minLength: 15, maxLength: 3000 },
+                poaAddress: { type: "string", maxLength: 80 },
+                pagePath: { type: "string", maxLength: 256 },
+                challengeId: { type: "string", pattern: "^[0-9a-f]{32}$" },
+                captchaAnswer: { type: "string", minLength: 4, maxLength: 8 },
+                powNonce: { type: "string", pattern: "^[0-9]{1,12}$" },
+                website: { type: "string", maxLength: 0 },
+              },
+            },
+          },
+        },
+      };
+      operation.responses = {
+        "201": response("Created GitHub issue reference for review"),
+        default: response("Rejected or rate-limited", ref("Error")),
       };
     }
     if (discovery) {

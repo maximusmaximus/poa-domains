@@ -1,16 +1,17 @@
-import { publicNameUnavailable } from "./shared.js?v=775cd3b55381";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=775cd3b55381";
-import { renderManagement } from "./ui-manage.js?v=775cd3b55381";
-import { actionLabel } from "./ui-copy.js?v=775cd3b55381";
-import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=775cd3b55381";
-import { ui } from "./ui-state.js?v=775cd3b55381";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=775cd3b55381";
-import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=775cd3b55381";
-import { render, updateTabDots } from "./ui-render.js?v=775cd3b55381";
-import { runSearch } from "./ui-search.js?v=775cd3b55381";
-import { renderIdeas } from "./ui-ideas.js?v=775cd3b55381";
-import { mountEscrow } from "./escrow.js?v=775cd3b55381";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=775cd3b55381";
+import { publicNameUnavailable } from "./shared.js?v=59cd045a6589";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=59cd045a6589";
+import { renderManagement } from "./ui-manage.js?v=59cd045a6589";
+import { actionLabel } from "./ui-copy.js?v=59cd045a6589";
+import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=59cd045a6589";
+import { ui } from "./ui-state.js?v=59cd045a6589";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=59cd045a6589";
+import { createPoaCopyButton } from "./ui-copy.js?v=59cd045a6589";
+import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=59cd045a6589";
+import { render, updateTabDots } from "./ui-render.js?v=59cd045a6589";
+import { runSearch } from "./ui-search.js?v=59cd045a6589";
+import { renderIdeas } from "./ui-ideas.js?v=59cd045a6589";
+import { mountEscrow } from "./escrow.js?v=59cd045a6589";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=59cd045a6589";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -288,6 +289,87 @@ export async function refreshEscrowCaps() {
     renderCartEscrowStatus();
 }
 
+export function renderTreasuryFooter() {
+    const totalEl = el("treasuryTotal");
+    const walletsEl = el("treasuryWallets");
+    const scanHome = el("poascanHomeLink");
+    if (!totalEl || !walletsEl)
+        return;
+    const data = ui.treasury;
+    if (scanHome && typeof data?.poascanHomeUrl === "string" && data.poascanHomeUrl.startsWith("https://poascan.io/"))
+        scanHome.href = data.poascanHomeUrl;
+    if (!data) {
+        totalEl.textContent = "—";
+        walletsEl.hidden = true;
+        walletsEl.replaceChildren();
+        return;
+    }
+    if (typeof data.total === "string" && /^[0-9]+\.[0-9]{6}$/.test(data.total)) {
+        totalEl.textContent = `🪙 ${poaShort(data.total)} POA${data.stale ? " · 🕰️" : ""}`;
+    } else {
+        totalEl.textContent = "View on POAScan";
+    }
+    const entries = [
+        ["Escrow", data.escrow],
+        ["Treasury", data.treasury],
+    ].filter(([, w]) => w && isPoaAddress(w.address) && typeof w.poascanUrl === "string" && w.poascanUrl.startsWith("https://poascan.io/"));
+    walletsEl.replaceChildren();
+    if (!entries.length) {
+        walletsEl.hidden = true;
+        return;
+    }
+    for (const [label, wallet] of entries) {
+        const item = document.createElement("span");
+        item.className = "treasury-item";
+        const tag = document.createElement("span");
+        tag.className = "muted";
+        tag.textContent = `${label}: `;
+        const wrap = document.createElement("span");
+        wrap.className = "poa-addr-inline";
+        const link = document.createElement("a");
+        link.className = "poa-addr-text treasury-addr-link";
+        link.href = wallet.poascanUrl;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = shortenPoaAddress(wallet.address);
+        link.title = `Inspect ${wallet.address} on POAScan`;
+        link.setAttribute("aria-label", `${label} address ${shortenPoaAddress(wallet.address)} on POAScan`);
+        wrap.append(link, createPoaCopyButton(wallet.address));
+        item.append(tag, wrap);
+        if (typeof wallet.balance === "string" && /^[0-9]+\.[0-9]{6}$/.test(wallet.balance)) {
+            const bal = document.createElement("span");
+            bal.className = "treasury-bal muted";
+            bal.textContent = ` (${poaShort(wallet.balance)} POA)`;
+            item.append(bal);
+        }
+        walletsEl.append(item);
+    }
+    walletsEl.hidden = false;
+}
+
+export async function refreshTreasury() {
+    if (ui.demo)
+        return;
+    try {
+        const response = await fetch(endpointBase() + "/v1/treasury", {
+            method: "GET",
+            credentials: "omit",
+            cache: "no-store",
+            signal: globalThis.AbortSignal?.timeout ? AbortSignal.timeout(10000) : undefined,
+        });
+        if (!response.ok)
+            return;
+        const body = await response.json();
+        if (body && typeof body === "object") {
+            ui.treasury = body;
+            renderTreasuryFooter();
+        }
+    }
+    catch {
+        /* keep last known treasury snapshot */
+    }
+}
+
 // Keep critical holds visible in a few words; explanations belong in the window's ℹ️ popover.
 function shortNetworkLine(level) {
     return { online: "🟢 PoA network Online", degraded: "🟡 PoA network Slow", down: "🔴 PoA network Down · actions held" }[level] ?? "⚪ Checking PoA network…";
@@ -492,15 +574,19 @@ export async function loadRegistry() {
         }
         applyRoute();
         renderCart();
+        let startedTimers = false;
         if (!ui.demo && !ui.tickerTimer) {
+            startedTimers = true;
             ui.tickerTimer = setInterval(refreshRegistry, ui.TICKER_MS);
             refreshNetworkStatus();
             refreshEscrowCaps();
-            ui.networkTimer = setInterval(() => { refreshNetworkStatus(); refreshEscrowCaps(); }, ui.NETWORK_MS);
+            ui.networkTimer = setInterval(() => { refreshNetworkStatus(); refreshEscrowCaps(); refreshTreasury(); }, ui.NETWORK_MS);
         }
         else if (ui.demo)
             renderNetworkStatus();
         await refreshRegistry();
+        if (startedTimers)
+            refreshTreasury();
     }
     catch {
         ui.readState = null;

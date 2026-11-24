@@ -920,6 +920,66 @@
       "retryable": false
     },
     {
+      "code": "FEEDBACK_CAPTCHA_EXPIRED",
+      "httpStatus": 400,
+      "message": "The verification challenge expired or was already used. Request a new code and try again.",
+      "retryable": false
+    },
+    {
+      "code": "FEEDBACK_CAPTCHA_INVALID",
+      "httpStatus": 400,
+      "message": "The verification code did not match. A new code is required.",
+      "retryable": false
+    },
+    {
+      "code": "FEEDBACK_CONTAINS_SECRET",
+      "httpStatus": 400,
+      "message": "Submission rejected because it looks like a private key, seed phrase, or secret token. Remove secrets before submitting.",
+      "retryable": false
+    },
+    {
+      "code": "FEEDBACK_DISABLED",
+      "httpStatus": 503,
+      "message": "Public feedback submission is not configured on this server yet.",
+      "retryable": true
+    },
+    {
+      "code": "FEEDBACK_DUPLICATE",
+      "httpStatus": 409,
+      "message": "This feedback was already submitted recently. Avoid duplicate reports.",
+      "retryable": false
+    },
+    {
+      "code": "FEEDBACK_INVALID_INPUT",
+      "httpStatus": 400,
+      "message": "Check the feedback type, title (5–120 chars), details (15–3000 chars), and optional poa1… address.",
+      "retryable": false
+    },
+    {
+      "code": "FEEDBACK_POW_INVALID",
+      "httpStatus": 400,
+      "message": "Browser verification check failed. Reload the code and submit again.",
+      "retryable": false
+    },
+    {
+      "code": "FEEDBACK_RATE_LIMITED",
+      "httpStatus": 429,
+      "message": "Too many feedback submissions right now. Please wait before submitting again.",
+      "retryable": true
+    },
+    {
+      "code": "FEEDBACK_TOO_FAST",
+      "httpStatus": 400,
+      "message": "Please wait a couple of seconds after loading the form before submitting.",
+      "retryable": false
+    },
+    {
+      "code": "FEEDBACK_UPSTREAM_FAILED",
+      "httpStatus": 502,
+      "message": "Could not post feedback to the repository right now. Try again shortly.",
+      "retryable": true
+    },
+    {
       "code": "FILE_REQUIRED",
       "httpStatus": 400,
       "message": "File required. Check the documented inputs and current state.",
@@ -2154,6 +2214,12 @@
       "httpStatus": 400,
       "message": "Tool failure. Check the documented inputs and current state.",
       "retryable": false
+    },
+    {
+      "code": "TREASURY_UNAVAILABLE",
+      "httpStatus": 503,
+      "message": "Live treasury balance could not be read right now. Check POAScan directly.",
+      "retryable": true
     },
     {
       "code": "UNEXPECTED_BUILD_ARTIFACT",

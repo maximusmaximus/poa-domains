@@ -1,7 +1,8 @@
-import { copyText } from "./ui-copy.js?v=775cd3b55381";
-import { ui } from "./ui-state.js?v=775cd3b55381";
-import { el, endpointBase, ownershipView } from "./ui-core.js?v=775cd3b55381";
-import { buildListingPrompt, buildSubnameListingPrompt, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=775cd3b55381";
+import { copyText } from "./ui-copy.js?v=59cd045a6589";
+import { trapDialog } from "./ui-a11y.js?v=59cd045a6589";
+import { ui } from "./ui-state.js?v=59cd045a6589";
+import { el, endpointBase, ownershipView } from "./ui-core.js?v=59cd045a6589";
+import { buildListingPrompt, buildSubnameListingPrompt, isPoaAddress, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=59cd045a6589";
 
 export function clearHandoff() {
     ui.generation++;
@@ -74,4 +75,267 @@ export async function copySubnameListing() {
     box.textContent = text; box.hidden = false;
     const res = await copyText(text, box);
     status.textContent = res.ok ? "✅ Copied" : "📋 Press Ctrl/Cmd+C to copy from the box.";
+}
+
+const LAST_POA_KEY = "poadomains.lastPoaAddress.v1";
+let feedbackChallenge = null;
+let releaseFeedbackFocus = null;
+let lastPrefilledPoa = "";
+let feedbackBusy = false;
+
+export function detectUserPoaAddress() {
+    const candidates = [
+        el("manageOwner")?.value,
+        el("escrowPayer")?.value,
+        ui.inferredCartOwner,
+        ui.currentOwnerId,
+    ];
+    try {
+        candidates.push(globalThis.localStorage?.getItem?.(LAST_POA_KEY));
+    } catch {}
+    for (const raw of candidates) {
+        const s = typeof raw === "string" ? raw.trim() : "";
+        if (isPoaAddress(s)) return s;
+    }
+    return "";
+}
+
+function saveLastPoaAddress(addr) {
+    if (!isPoaAddress(addr)) return;
+    try {
+        globalThis.localStorage?.setItem?.(LAST_POA_KEY, addr);
+    } catch {}
+}
+
+function leadingZeroBits(bytes) {
+    let count = 0;
+    for (const byte of bytes) {
+        if (byte === 0) {
+            count += 8;
+            continue;
+        }
+        for (let bit = 7; bit >= 0; bit--) {
+            if ((byte & (1 << bit)) === 0) count++;
+            else return count;
+        }
+    }
+    return count;
+}
+
+export async function solveFeedbackPow(powSalt, bits) {
+    const targetBits = Number.isSafeInteger(bits) && bits >= 0 ? Math.min(bits, 24) : 16;
+    const enc = new TextEncoder();
+    for (let nonce = 0; nonce < 5_000_000; nonce++) {
+        const digest = new Uint8Array(
+            await crypto.subtle.digest("SHA-256", enc.encode(`${powSalt}:${nonce}`)),
+        );
+        if (leadingZeroBits(digest) >= targetBits) return String(nonce);
+        if (nonce > 0 && nonce % 512 === 0) {
+            await new Promise((r) => setTimeout(r, 0));
+        }
+    }
+    throw Error("Verification timed out. Please try again.");
+}
+
+function setFeedbackStatus(text, tone = "muted", link = null) {
+    const status = el("feedbackStatus");
+    if (!status) return;
+    status.className = "feedback-status " + (tone === "warn" ? "badge-warn" : tone === "ok" ? "badge-ok" : "muted");
+    status.replaceChildren();
+    if (text) status.append(text);
+    if (link?.href && link?.label && /^https:\/\/github\.com\//.test(link.href)) {
+        status.append(" ");
+        const a = document.createElement("a");
+        a.href = link.href;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = link.label;
+        status.append(a);
+    }
+}
+
+export async function loadFeedbackChallenge() {
+    const img = el("feedbackCaptchaImg");
+    const submitBtn = el("feedbackSubmit");
+    feedbackChallenge = null;
+    if (img) {
+        img.hidden = true;
+        img.removeAttribute("src");
+    }
+    if (ui.demo) {
+        if (submitBtn) submitBtn.disabled = true;
+        setFeedbackStatus("🧪 Static demo mode has no backend. Use poadomains.grok.me or GitHub to submit feedback.");
+        return;
+    }
+    setFeedbackStatus("⏳ Loading verification code…");
+    try {
+        const res = await fetch(endpointBase() + "/v1/feedback/challenge", {
+            method: "GET",
+            credentials: "omit",
+            cache: "no-store",
+            signal: globalThis.AbortSignal?.timeout ? AbortSignal.timeout(10000) : undefined,
+        });
+        const body = await res.json();
+        if (!res.ok) throw Error(body?.message || "Could not load verification code.");
+        feedbackChallenge = { ...body, loadedAt: Date.now() };
+        if (img && typeof body.captchaUrl === "string" && body.captchaUrl.startsWith("/v1/feedback/captcha/")) {
+            img.src = endpointBase() + body.captchaUrl;
+            img.hidden = false;
+        }
+        if (submitBtn) submitBtn.disabled = body.enabled === false;
+        if (body.enabled === false) {
+            setFeedbackStatus("ℹ️ Public feedback filing is not enabled on this server yet.", "warn");
+        } else {
+            setFeedbackStatus("");
+        }
+    } catch (error) {
+        if (submitBtn) submitBtn.disabled = true;
+        setFeedbackStatus("⚠️ " + (error?.message || "Could not load verification code."), "warn");
+    }
+}
+
+export function setFeedbackModalOpen(open) {
+    const modal = el("feedbackModal");
+    const backdrop = el("feedbackBackdrop");
+    const opener = el("openFeedbackBtn");
+    if (!modal || !backdrop) return;
+    const wasOpen = !modal.hidden;
+    if (open === wasOpen) return;
+    modal.hidden = !open;
+    backdrop.hidden = !open;
+    if (open) {
+        const poaInput = el("feedbackPoa");
+        const detected = detectUserPoaAddress();
+        if (poaInput && detected && (!poaInput.value.trim() || poaInput.value.trim() === lastPrefilledPoa)) {
+            poaInput.value = detected;
+            lastPrefilledPoa = detected;
+        }
+        releaseFeedbackFocus = trapDialog(modal, backdrop, opener);
+        void loadFeedbackChallenge();
+    } else {
+        releaseFeedbackFocus?.();
+        releaseFeedbackFocus = null;
+    }
+}
+
+export function wireFeedbackModal() {
+    const openBtn = el("openFeedbackBtn");
+    const closeBtn = el("feedbackClose");
+    const backdrop = el("feedbackBackdrop");
+    const refreshBtn = el("feedbackRefreshCaptcha");
+    const form = el("feedbackForm");
+    if (!openBtn || !form || form.dataset.wired === "1") return;
+    form.dataset.wired = "1";
+
+    for (const id of ["manageOwner", "escrowPayer"]) {
+        el(id)?.addEventListener("change", () => saveLastPoaAddress(el(id)?.value?.trim()));
+    }
+    openBtn.addEventListener("click", () => setFeedbackModalOpen(true));
+    closeBtn?.addEventListener("click", () => setFeedbackModalOpen(false));
+    backdrop?.addEventListener("click", () => setFeedbackModalOpen(false));
+    refreshBtn?.addEventListener("click", () => {
+        const ans = el("feedbackCaptchaAnswer");
+        if (ans) ans.value = "";
+        void loadFeedbackChallenge();
+        ans?.focus();
+    });
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (feedbackBusy) return;
+        const kind = form.querySelector('input[name="feedbackKind"]:checked')?.value === "feature" ? "feature" : "bug";
+        const poaAddress = el("feedbackPoa")?.value.trim() ?? "";
+        const title = el("feedbackTitle")?.value.trim() ?? "";
+        const details = el("feedbackDetails")?.value.trim() ?? "";
+        const captchaAnswer = el("feedbackCaptchaAnswer")?.value.trim() ?? "";
+        const website = el("feedbackWebsite")?.value ?? "";
+
+        if (poaAddress && !isPoaAddress(poaAddress)) {
+            setFeedbackStatus("⚠️ Enter a valid public poa1… address (or leave it blank).", "warn");
+            el("feedbackPoa")?.focus();
+            return;
+        }
+        if (title.length < 5 || title.length > 120) {
+            setFeedbackStatus("⚠️ Enter a summary between 5 and 120 characters.", "warn");
+            el("feedbackTitle")?.focus();
+            return;
+        }
+        if (details.length < 15 || details.length > 3000) {
+            setFeedbackStatus("⚠️ Enter details between 15 and 3000 characters.", "warn");
+            el("feedbackDetails")?.focus();
+            return;
+        }
+        if (!/^[A-Za-z0-9]{4,8}$/.test(captchaAnswer)) {
+            setFeedbackStatus("⚠️ Enter the verification code shown in the image.", "warn");
+            el("feedbackCaptchaAnswer")?.focus();
+            return;
+        }
+        if (!feedbackChallenge) {
+            setFeedbackStatus("⚠️ Load a verification code first.", "warn");
+            void loadFeedbackChallenge();
+            return;
+        }
+
+        const submitBtn = el("feedbackSubmit");
+        feedbackBusy = true;
+        if (submitBtn) submitBtn.disabled = true;
+        try {
+            setFeedbackStatus("⏳ Verifying challenge…");
+            const powNonce = await solveFeedbackPow(feedbackChallenge.powSalt, feedbackChallenge.powBits);
+            const remainingDwell = (feedbackChallenge.minDwellMs ?? 0) - (Date.now() - feedbackChallenge.loadedAt);
+            if (remainingDwell > 0 && remainingDwell <= 5000) {
+                await new Promise((r) => setTimeout(r, remainingDwell));
+            }
+            setFeedbackStatus("📨 Submitting for review…");
+            const res = await fetch(endpointBase() + "/v1/feedback", {
+                method: "POST",
+                credentials: "omit",
+                cache: "no-store",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                    kind,
+                    title,
+                    details,
+                    poaAddress,
+                    pagePath: location.pathname,
+                    challengeId: feedbackChallenge.challengeId,
+                    captchaAnswer,
+                    powNonce,
+                    website,
+                }),
+            });
+            const body = await res.json();
+            if (!res.ok) {
+                setFeedbackStatus("⚠️ " + (body?.message || "Could not submit feedback."), "warn");
+                if (["FEEDBACK_CAPTCHA_INVALID", "FEEDBACK_CAPTCHA_EXPIRED", "FEEDBACK_POW_INVALID", "FEEDBACK_TOO_FAST"].includes(body?.code)) {
+                    const ans = el("feedbackCaptchaAnswer");
+                    if (ans) ans.value = "";
+                    void loadFeedbackChallenge();
+                }
+                return;
+            }
+            saveLastPoaAddress(poaAddress);
+            if (el("feedbackTitle")) el("feedbackTitle").value = "";
+            if (el("feedbackDetails")) el("feedbackDetails").value = "";
+            if (el("feedbackCaptchaAnswer")) el("feedbackCaptchaAnswer").value = "";
+            feedbackChallenge = null;
+            const img = el("feedbackCaptchaImg");
+            if (img) {
+                img.hidden = true;
+                img.removeAttribute("src");
+            }
+            setFeedbackStatus(
+                "✅ Submitted to the repository for review!",
+                "ok",
+                body?.issueUrl && body?.issueNumber
+                    ? { href: body.issueUrl, label: `View GitHub issue #${body.issueNumber}` }
+                    : null,
+            );
+        } catch (error) {
+            setFeedbackStatus("⚠️ " + (error?.message || "Could not submit feedback."), "warn");
+        } finally {
+            feedbackBusy = false;
+            if (submitBtn && !ui.demo) submitBtn.disabled = false;
+        }
+    });
 }

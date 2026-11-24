@@ -1,8 +1,8 @@
-import { ui } from "./ui-state.js?v=775cd3b55381";
-import { add, el, endpointBase } from "./ui-core.js?v=775cd3b55381";
-import { nameLink, openPoa } from "./ui-router.js?v=775cd3b55381";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=775cd3b55381";
-import { createInlineInfo } from "./ui-help.js?v=775cd3b55381";
+import { ui } from "./ui-state.js?v=59cd045a6589";
+import { add, el, endpointBase } from "./ui-core.js?v=59cd045a6589";
+import { nameLink, openPoa } from "./ui-router.js?v=59cd045a6589";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=59cd045a6589";
+import { createInlineInfo } from "./ui-help.js?v=59cd045a6589";
 import {
   buildProfileUpdatePrompt,
   checkBtcAddress,
@@ -16,7 +16,7 @@ import {
   PROFILE_SCHEMA_V1,
   profileImageMediaPath,
   validPrincipal,
-} from "./shared.js?v=775cd3b55381";
+} from "./shared.js?v=59cd045a6589";
 
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 

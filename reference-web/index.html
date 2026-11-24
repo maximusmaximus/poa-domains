@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=8ff897acbf21" />
+    <link rel="stylesheet" href="/style.css?v=b3d7514e669e" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -290,10 +290,19 @@
     </main>
 
     <footer id="siteFooter" class="site-footer">
+      <div id="treasuryFooter" class="treasury-footer" aria-label="Domains treasury">
+        <div class="treasury-summary">
+          <span class="treasury-label">🏦 Domains Treasury:</span>
+          <strong id="treasuryTotal" class="treasury-total">—</strong>
+          <a id="poascanHomeLink" href="https://poascan.io/" target="_blank" rel="noopener noreferrer" class="treasury-scan-link">🔎 POAScan</a>
+        </div>
+        <div id="treasuryWallets" class="treasury-wallets" hidden></div>
+      </div>
       <nav class="footer-links" aria-label="Project links">
         <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer"><svg class="github-mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg> <span>poa-domains on GitHub</span></a>
         <a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer" title="Mirror Site — static read-only landing page"><svg class="github-mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg> <span>Mirror Site</span></a>
         <a href="/terms" target="_blank" rel="noopener noreferrer">📜 Terms</a>
+        <button type="button" id="openFeedbackBtn" class="footer-action-btn" aria-haspopup="dialog" aria-controls="feedbackModal">💬 Bug / Feature</button>
       </nav>
       <p class="footer-credit">made with ❤️ in SF by Tesselate Army | <a href="https://maxi.grok.me" rel="noreferrer">maxi.grok.me</a></p>
     </footer>
@@ -343,6 +352,62 @@
       <p id="floatingCartStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
 
-    <script type="module" src="/app.js?v=775cd3b55381"></script>
+    <div id="feedbackBackdrop" class="floating-cart-backdrop" hidden></div>
+    <div
+      id="feedbackModal"
+      class="feedback-modal"
+      role="dialog"
+      tabindex="-1"
+      aria-modal="true"
+      aria-labelledby="feedbackHeading"
+      hidden
+    >
+      <div class="floating-cart-header">
+        <h2 id="feedbackHeading">💬 Bug or Feature Request</h2>
+        <button type="button" id="feedbackClose" class="secondary" aria-label="Close feedback form">Close</button>
+      </div>
+      <p class="feedback-public-notice">🌐 Submissions are posted publicly as GitHub issues on <code>maximusmaximus/poa-domains</code> for maintainer review. Never include private keys, seed phrases, or passwords.</p>
+      <form id="feedbackForm" novalidate>
+        <fieldset class="feedback-kind-group">
+          <legend>Category</legend>
+          <label class="feedback-kind-pill" for="feedbackKindBug">
+            <input type="radio" id="feedbackKindBug" name="feedbackKind" value="bug" checked />
+            <span>🐛 Bug report</span>
+          </label>
+          <label class="feedback-kind-pill" for="feedbackKindFeature">
+            <input type="radio" id="feedbackKindFeature" name="feedbackKind" value="feature" />
+            <span>✨ Feature request</span>
+          </label>
+        </fieldset>
+        <label for="feedbackPoa">Your public POA address (optional — prefilled when available)
+          <input id="feedbackPoa" type="text" autocomplete="off" placeholder="poa1… public address" maxlength="80" />
+        </label>
+        <label for="feedbackTitle">Summary (5–120 characters)
+          <input id="feedbackTitle" type="text" autocomplete="off" minlength="5" maxlength="120" placeholder="Brief title of the bug or feature" required />
+        </label>
+        <label for="feedbackDetails">Details (15–3000 characters)
+          <textarea id="feedbackDetails" rows="4" minlength="15" maxlength="3000" placeholder="Describe what happened, steps to reproduce, or what you would like added…" required></textarea>
+        </label>
+        <div class="feedback-hp" aria-hidden="true">
+          <label for="feedbackWebsite">Leave this field empty</label>
+          <input id="feedbackWebsite" name="website" type="text" tabindex="-1" autocomplete="off" />
+        </div>
+        <div class="feedback-captcha-box">
+          <div class="feedback-captcha-row">
+            <img id="feedbackCaptchaImg" class="feedback-captcha-img" width="180" height="56" alt="Verification code" hidden />
+            <button type="button" id="feedbackRefreshCaptcha" class="secondary small" title="Get a new verification code">🔄 New code</button>
+          </div>
+          <label for="feedbackCaptchaAnswer">Verification code (CAPTCHA)
+            <input id="feedbackCaptchaAnswer" type="text" autocomplete="off" spellcheck="false" maxlength="8" placeholder="Enter the 5 characters shown above" required />
+          </label>
+        </div>
+        <div class="button-row">
+          <button type="submit" id="feedbackSubmit">📨 Submit for review</button>
+        </div>
+        <p id="feedbackStatus" class="muted feedback-status" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+
+    <script type="module" src="/app.js?v=59cd045a6589"></script>
   </body>
 </html>

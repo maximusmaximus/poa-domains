@@ -450,7 +450,103 @@ try {
   assert.deepEqual(errorsUx, []);
   await ctxUx.close();
 
-  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations, escrow readiness banner, shortened PoA address copy, search autofill/dropdown, clean cart cards, cart-owned prefill, Manage this domain, Profile v1 editor & reorganized escrow signed request");
+  // 7. Footer Domains Treasury balance + POAScan links + shortened address copy,
+  //    and Bug/Feature popup form with prefilled POA address + CAPTCHA + PoW submission.
+  const escrowWallet = "poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf";
+  const treasuryWallet = "poa1GHppB8pYZ43gK8yBzR1RJhzfWjzrJn29q96ykwngUP7N";
+  h.treasury = {
+    total: "201.000000",
+    escrow: { address: escrowWallet, balance: "201.000000", poascanUrl: `https://poascan.io/address/${escrowWallet}` },
+    treasury: { address: treasuryWallet, balance: "0.000000", poascanUrl: `https://poascan.io/address/${treasuryWallet}` },
+    poascanHomeUrl: "https://poascan.io/",
+    checkedAt: Date.now(),
+    stale: false,
+  };
+  const ctxFooter = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+  await ctxFooter.grantPermissions(["clipboard-read", "clipboard-write"], { origin: h.url });
+  const pageFooter = await ctxFooter.newPage();
+  const errorsFooter = [];
+  pageFooter.on("pageerror", (e) => errorsFooter.push(e.message));
+  await pageFooter.route("https://**", (r) => r.abort());
+
+  const submittedFeedback = [];
+  const mockChallengeId = "a".repeat(32);
+  await pageFooter.route("**/v1/feedback/challenge", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        challengeId: mockChallengeId,
+        captchaUrl: `/v1/feedback/captcha/${mockChallengeId}`,
+        powSalt: "test-salt-1234",
+        powBits: 4,
+        minDwellMs: 0,
+        expiresAt: Date.now() + 600_000,
+        enabled: true,
+      }),
+    });
+  });
+  await pageFooter.route(`**/v1/feedback/captcha/${mockChallengeId}`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="180" height="56"><rect width="180" height="56" fill="#09131a"/><text x="20" y="36" fill="#9cffe0">K7M4P</text></svg>',
+    });
+  });
+  await pageFooter.route("**/v1/feedback", async (route) => {
+    const body = route.request().postDataJSON();
+    submittedFeedback.push(body);
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        id: "fb123456",
+        kind: body.kind,
+        issueNumber: 114,
+        issueUrl: "https://github.com/maximusmaximus/poa-domains/issues/114",
+      }),
+    });
+  });
+
+  await pageFooter.goto(h.url + "/");
+  await pageFooter.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageFooter.locator("#treasuryTotal")).toHaveText("🪙 201 POA");
+  await expect(pageFooter.locator("#poascanHomeLink")).toHaveAttribute("href", "https://poascan.io/");
+  await expect(pageFooter.locator("#treasuryWallets")).toBeVisible();
+  const escrowLink = pageFooter.locator(`#treasuryWallets a[href="https://poascan.io/address/${escrowWallet}"]`);
+  const treasuryLink = pageFooter.locator(`#treasuryWallets a[href="https://poascan.io/address/${treasuryWallet}"]`);
+  await expect(escrowLink).toHaveText("poa1...piRf");
+  await expect(treasuryLink).toHaveText("poa1...UP7N");
+  await pageFooter.locator("#treasuryWallets .poa-copy-btn").first().click();
+  assert.equal(await pageFooter.evaluate(() => navigator.clipboard.readText()), escrowWallet);
+
+  // Set user's POA address in Manage domains, then open Bug/Feature modal -> prefilled automatically
+  await pageFooter.locator("#tabEscrow").click();
+  await pageFooter.locator("#manageOwner").fill(buyerOwner);
+  await pageFooter.locator("#openFeedbackBtn").click();
+  await expect(pageFooter.locator("#feedbackModal")).toBeVisible();
+  assert.equal(await pageFooter.locator("#feedbackPoa").inputValue(), buyerOwner);
+  await expect(pageFooter.locator("#feedbackCaptchaImg")).toBeVisible();
+  await pageFooter.locator('label[for="feedbackKindFeature"]').click();
+  await pageFooter.locator("#feedbackTitle").fill("Add bulk export to CSV");
+  await pageFooter.locator("#feedbackDetails").fill("Would love a one-click CSV export of my managed domains.");
+  await pageFooter.locator("#feedbackCaptchaAnswer").fill("K7M4P");
+  await pageFooter.locator("#feedbackSubmit").click();
+  await expect(pageFooter.locator("#feedbackStatus")).toContainText("Submitted to the repository for review");
+  await expect(pageFooter.locator('#feedbackStatus a[href="https://github.com/maximusmaximus/poa-domains/issues/114"]')).toBeVisible();
+  assert.equal(submittedFeedback.length, 1);
+  assert.equal(submittedFeedback[0].kind, "feature");
+  assert.equal(submittedFeedback[0].poaAddress, buyerOwner);
+  assert.equal(submittedFeedback[0].captchaAnswer, "K7M4P");
+  assert.match(submittedFeedback[0].powNonce, /^[0-9]+$/);
+  await pageFooter.locator("#feedbackClose").click();
+  await expect(pageFooter.locator("#feedbackModal")).toBeHidden();
+
+  assert.deepEqual(errorsFooter, []);
+  await ctxFooter.close();
+
+  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations, escrow readiness banner, shortened PoA address copy, search autofill/dropdown, clean cart cards, cart-owned prefill, Manage this domain, Profile v1 editor, reorganized escrow signed request, treasury footer & bug/feature feedback modal");
 } finally {
   await h.close();
   await browser.close();

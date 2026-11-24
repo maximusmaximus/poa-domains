@@ -95,6 +95,12 @@ test("all actual registry, gateway and discovery API methods appear exactly once
     ["HEAD", "/v1/media/:cid"],
     ["GET", "/v1/network-status"],
     ["HEAD", "/v1/network-status"],
+    ["GET", "/v1/treasury"],
+    ["HEAD", "/v1/treasury"],
+    ["GET", "/v1/feedback/challenge"],
+    ["GET", "/v1/feedback/captcha/:id"],
+    ["HEAD", "/v1/feedback/captcha/:id"],
+    ["POST", "/v1/feedback"],
     ...["capabilities", "market", "domain", "subnames", "intent"].map((p) => [
       "GET",
       "/v1/escrow/" + p,

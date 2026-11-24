@@ -37,6 +37,7 @@ export async function uiHarness(profile = "fixture", options = {}) {
       return json(h.stateStatus === 200 ? h.payload : { code: "UNAVAILABLE" }, h.stateStatus);
     }
     if (u.pathname === "/v1/network-status") return json(h.networkStatus??{ level: "online", hold: false, message: "🟢 Local test network", livePoA: false });
+    if (u.pathname === "/v1/treasury") return json(h.treasury ?? { total: null, escrow: null, treasury: null, poascanHomeUrl: "https://poascan.io/", checkedAt: Date.now(), stale: false });
     if (u.pathname === "/v1/escrow/capabilities") return json(h.escrowCap ?? { enabled: false });
     if (u.pathname.startsWith("/v1/")) return json({ code: "NOT_FOUND" }, 404);
     const pathname = u.pathname === "/" || /^\/(d|p)\/[^/]+$/.test(u.pathname) ? "/index.html" : u.pathname === "/terms" ? "/terms.html" : u.pathname;
