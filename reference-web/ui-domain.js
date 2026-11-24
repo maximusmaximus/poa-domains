@@ -18,12 +18,12 @@ import {
   registryUnit,
   resolveDomainView,
   unavailableKey,
-} from "./shared.js?v=52aa72885d34";
-import { actionLabel, createPoaCopyButton } from "./ui-copy.js?v=52aa72885d34";
-import { ui } from "./ui-state.js?v=52aa72885d34";
-import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=52aa72885d34";
-import { nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=52aa72885d34";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=52aa72885d34";
+} from "./shared.js?v=c8a3dd96f525";
+import { actionLabel, createPoaCopyButton } from "./ui-copy.js?v=c8a3dd96f525";
+import { ui } from "./ui-state.js?v=c8a3dd96f525";
+import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=c8a3dd96f525";
+import { nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=c8a3dd96f525";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=c8a3dd96f525";
 
 function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) {
   const wrap = document.createElement("span");
@@ -532,7 +532,7 @@ export function renderDomainPage(name) {
   if (!view.history.length) add(hist, "p", "No history yet", "muted");
   for (const row of view.history) {
     const card = add(hist, "div", "", "card");
-    namedText(add(card, "p", ""), row.text);
+    namedText(add(card,"p",""),row.text);
     add(card, "p", `#${row.sequence} · ${actionLabel(row.kind)}`, "badge");
   }
 }

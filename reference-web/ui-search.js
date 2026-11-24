@@ -1,13 +1,13 @@
-import { copyText } from "./ui-copy.js?v=52aa72885d34";
-import { publicNameUnavailable } from "./shared.js?v=52aa72885d34";
-import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, poaAuctionOutbidStatus, buildSubnamePurchasePrompt } from "./shared.js?v=52aa72885d34";
-import { ui } from "./ui-state.js?v=52aa72885d34";
-import { nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=52aa72885d34";
-import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=52aa72885d34";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=52aa72885d34";
-import { addToCart } from "./ui-cart.js?v=52aa72885d34";
-import { suggestNames } from "./ideas-generator.js?v=52aa72885d34";
-import { logSubmittedSearch } from "./ui-search-log.js?v=52aa72885d34";
+import { copyText } from "./ui-copy.js?v=c8a3dd96f525";
+import { publicNameUnavailable } from "./shared.js?v=c8a3dd96f525";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, poaAuctionOutbidStatus, buildSubnamePurchasePrompt } from "./shared.js?v=c8a3dd96f525";
+import { ui } from "./ui-state.js?v=c8a3dd96f525";
+import { nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=c8a3dd96f525";
+import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=c8a3dd96f525";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=c8a3dd96f525";
+import { addToCart } from "./ui-cart.js?v=c8a3dd96f525";
+import { suggestNames } from "./ideas-generator.js?v=c8a3dd96f525";
+import { logSubmittedSearch } from "./ui-search-log.js?v=c8a3dd96f525";
 
 let activeSuggestionIdx = -1;
 let currentSuggestions = [];
