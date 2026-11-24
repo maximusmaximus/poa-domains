@@ -465,7 +465,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=03149c4be992";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=52aa72885d34";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -926,6 +926,9 @@ export function resolveDomainView(state, name, reservedSet = new Set(), ownershi
   return result;
 }
 
+export const SALE_FIELDS_WARNING =
+  "⚠️ Sale & auction notice: Attached domain fields (tags, wallet/service/IPFS records, and public profile) are paused while this domain is listed for sale or in an auction, and will be dropped when ownership transfers to a new holder (archived as historical records on the domain page).";
+
 export function buildListingPrompt({
   kind,
   name,
@@ -946,6 +949,8 @@ export function buildListingPrompt({
   ];
   if (kind === "list") {
     lines.push(
+      SALE_FIELDS_WARNING,
+      "",
       `Action: sellFixed`,
       `List "${name}" for ${price} registry units until ${validUntil}.`,
       `Params JSON: ${JSON.stringify({
@@ -981,6 +986,8 @@ export function buildListingPrompt({
     );
   } else if (kind === "change") {
     lines.push(
+      SALE_FIELDS_WARNING,
+      "",
       `Change listing price for "${name}" to ${price} registry units (two-step: cancelOffer then sellFixed).`,
       `Step 1 cancelOffer params: ${JSON.stringify({
         offerId: offer?.id,
@@ -1754,12 +1761,14 @@ export function checkProfileImage(value) {
 export function extractDomainProfile(deed) {
   if (!deed) return null;
   const list = Array.isArray(deed.metadata) ? deed.metadata : [];
-  for (let i = list.length - 1; i >= 0; i--) {
+  const rawReset = Number(deed.profileResetAt);
+  const resetAt = Number.isSafeInteger(rawReset) && rawReset > 0 ? Math.min(rawReset, list.length) : 0;
+  for (let i = list.length - 1; i >= resetAt; i--) {
     const entry = list[i];
     if (entry?.document?.schema === PROFILE_SCHEMA_V1)
       return { profile: entry.document, cid: entry.cid, isDefault: false, metadataVersion: i + 1 };
   }
-  const latest = list[list.length - 1];
+  const latest = resetAt === 0 ? list[list.length - 1] : undefined;
   return {
     profile: {
       schema: PROFILE_SCHEMA_V1,
@@ -1778,6 +1787,189 @@ export function extractDomainProfile(deed) {
     isDefault: true,
     metadataVersion: list.length,
   };
+}
+export function findDomainSalesAndAuctions({ name, deed = null, view = null, state = null, escrowMarket = [], nowMs = Date.now() } = {}) {
+  const poaItems = (Array.isArray(escrowMarket) ? escrowMarket : []).filter((x) => x && x.name === name);
+  const activePoaAuctions = poaItems.filter((x) => x.kind !== "fixed" && (x.status === "OPEN" || x.status === "SETTLING"));
+  const activePoaSales = poaItems.filter((x) => x.kind === "fixed" && (x.status === "OPEN" || x.status === "SETTLING"));
+  const pastPoaItems = poaItems
+    .filter((x) => x.status !== "OPEN" && x.status !== "SETTLING")
+    .sort((a, b) => (b.closes || b.createdAt || 0) - (a.closes || a.createdAt || 0));
+  const resolvedDeed = deed ?? view?.deed ?? null;
+  const registryListing =
+    view?.listing ??
+    (resolvedDeed && state
+      ? Object.values(state.offers ?? {}).find(
+          (o) => o.kind === "resale" && o.parentId === resolvedDeed.id && offerIsActive(o, state.time),
+        ) ?? null
+      : null);
+  const registryAuction =
+    view?.auction ??
+    (state ? Object.values(state.auctions ?? {}).find((a) => a && a.name === name) ?? null : null);
+  const activeRegistryAuction = registryAuction && registryAuction.status === "live" ? registryAuction : null;
+  const openPoaAuctions = activePoaAuctions.filter((x) => x.status === "OPEN" && (isPoaAuctionAwaitingFirstBid(x) || !x.closes || nowMs < x.closes));
+  const openPoaSales = activePoaSales.filter((x) => x.status === "OPEN" && (!x.closes || nowMs < x.closes));
+  const listedForSale = Boolean(
+    activePoaAuctions.length ||
+      activePoaSales.length ||
+      registryListing ||
+      (resolvedDeed && resolvedDeed.lock) ||
+      (resolvedDeed && activeRegistryAuction),
+  );
+  const kind = activePoaAuctions.length
+    ? "poa-auction"
+    : activePoaSales.length
+      ? "poa-fixed"
+      : registryListing
+        ? "registry-resale"
+        : resolvedDeed && (resolvedDeed.lock || activeRegistryAuction)
+          ? "registry-auction"
+          : null;
+  return {
+    poaItems,
+    activePoaAuctions,
+    activePoaSales,
+    openPoaAuctions,
+    openPoaSales,
+    pastPoaItems,
+    registryListing,
+    registryAuction,
+    activeRegistryAuction,
+    listedForSale,
+    kind,
+    hasAnyActivity: Boolean(poaItems.length || registryListing || registryAuction),
+  };
+}
+export function collectPreviousDomainFields(deed, { listedForSale = false } = {}) {
+  if (!deed) return [];
+  const list = Array.isArray(deed.metadata) ? deed.metadata : [];
+  const rawReset = Number(deed.profileResetAt);
+  const resetAt = Number.isSafeInteger(rawReset) && rawReset > 0 ? Math.min(rawReset, list.length) : 0;
+  let activeProfileIdx = -1;
+  for (let i = list.length - 1; i >= resetAt; i--) {
+    if (list[i]?.document?.schema === PROFILE_SCHEMA_V1) {
+      activeProfileIdx = i;
+      break;
+    }
+  }
+  const activeRecords = Array.isArray(deed.records) ? deed.records : [];
+  const out = [];
+  const seenCids = new Set();
+
+  if (listedForSale) {
+    const activeProfileEntry = activeProfileIdx >= 0 ? list[activeProfileIdx] : null;
+    if (activeProfileEntry || activeRecords.length > 0) {
+      out.push({
+        status: "paused",
+        label: "⏸️ Paused while listed for sale / auction (will drop on transfer)",
+        owner: deed.owner ?? null,
+        ownerVersion: deed.ownerVersion ?? null,
+        transferredAt: null,
+        metadataVersion: activeProfileIdx >= 0 ? activeProfileIdx + 1 : null,
+        cid: activeProfileEntry?.cid ?? null,
+        profile: activeProfileEntry?.document ?? null,
+        description: "",
+        records: activeRecords,
+      });
+      if (activeProfileEntry?.cid) seenCids.add(activeProfileEntry.cid);
+    }
+  }
+
+  for (let i = list.length - 1; i >= resetAt; i--) {
+    if (i === activeProfileIdx) continue;
+    const entry = list[i];
+    if (!entry || (entry.cid && seenCids.has(entry.cid))) continue;
+    const isProfile = entry.document?.schema === PROFILE_SCHEMA_V1;
+    if (isProfile) {
+      out.push({
+        status: "previous-version",
+        label: `🕘 Previous profile version (#${i + 1})`,
+        owner: deed.owner ?? null,
+        ownerVersion: deed.ownerVersion ?? null,
+        transferredAt: null,
+        metadataVersion: i + 1,
+        cid: entry.cid ?? null,
+        profile: entry.document,
+        description: "",
+        records: [],
+      });
+      if (entry.cid) seenCids.add(entry.cid);
+    } else if ((i > resetAt || activeProfileIdx > i) && typeof entry.document?.description === "string" && entry.document.description.trim()) {
+      out.push({
+        status: "previous-version",
+        label: `📜 Previous metadata record (#${i + 1})`,
+        owner: deed.owner ?? null,
+        ownerVersion: deed.ownerVersion ?? null,
+        transferredAt: null,
+        metadataVersion: i + 1,
+        cid: entry.cid ?? null,
+        profile: null,
+        description: entry.document.description,
+        records: [],
+      });
+      if (entry.cid) seenCids.add(entry.cid);
+    }
+  }
+
+  const archived = Array.isArray(deed.previousFields) ? deed.previousFields : [];
+  for (let i = archived.length - 1; i >= 0; i--) {
+    const rec = archived[i];
+    if (!rec) continue;
+    const profDoc = rec.profile?.document?.schema === PROFILE_SCHEMA_V1 ? rec.profile.document : null;
+    const profCid = rec.profile?.cid ?? null;
+    const recs = Array.isArray(rec.records) ? rec.records : [];
+    if (!profDoc && !recs.length) continue;
+    if (profCid) seenCids.add(profCid);
+    out.push({
+      status: "dropped",
+      label: "📦 Dropped on ownership transfer (previous holder)",
+      owner: rec.owner ?? null,
+      ownerVersion: rec.ownerVersion ?? null,
+      transferredAt: typeof rec.transferredAt === "number" ? rec.transferredAt : null,
+      metadataVersion: null,
+      cid: profCid,
+      profile: profDoc,
+      description: "",
+      records: recs,
+    });
+  }
+
+  for (let i = resetAt - 1; i >= 0; i--) {
+    const entry = list[i];
+    if (!entry || (entry.cid && seenCids.has(entry.cid))) continue;
+    const isProfile = entry.document?.schema === PROFILE_SCHEMA_V1;
+    if (isProfile) {
+      out.push({
+        status: "archived-metadata",
+        label: `📦 Previous holder profile (#${i + 1})`,
+        owner: entry.document?.poa ?? null,
+        ownerVersion: null,
+        transferredAt: null,
+        metadataVersion: i + 1,
+        cid: entry.cid ?? null,
+        profile: entry.document,
+        description: "",
+        records: [],
+      });
+      if (entry.cid) seenCids.add(entry.cid);
+    } else if (typeof entry.document?.description === "string" && entry.document.description.trim()) {
+      out.push({
+        status: "archived-metadata",
+        label: `📜 Prior holder metadata (#${i + 1})`,
+        owner: null,
+        ownerVersion: null,
+        transferredAt: null,
+        metadataVersion: i + 1,
+        cid: entry.cid ?? null,
+        profile: null,
+        description: entry.document.description,
+        records: [],
+      });
+      if (entry.cid) seenCids.add(entry.cid);
+    }
+  }
+
+  return out;
 }
 export function profileImageMediaPath(image) {
   if (typeof image !== "string" || !image.startsWith("ipfs://")) return null;

@@ -96,6 +96,13 @@ export interface NameEntry {
   activeId: string | null;
   auctionId: string | null;
 }
+export interface ArchivedFieldRecord {
+  owner: string;
+  ownerVersion: number;
+  transferredAt: number;
+  records: RecordValue[];
+  profile: Metadata | null;
+}
 export interface Deed {
   id: string;
   name: string;
@@ -114,6 +121,10 @@ export interface Deed {
   recordsVersion: number;
   lock: string | null;
   encumbranceVersion: number;
+  /** Metadata index boundary: entries before this index belong to prior holders and are archived, not active. */
+  profileResetAt?: number;
+  /** Archived records and profile snapshots dropped when ownership transferred to a new holder. */
+  previousFields?: ArchivedFieldRecord[];
 }
 export type RecordValue =
   | { type: "service"; url: string }

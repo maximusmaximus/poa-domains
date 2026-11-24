@@ -1979,3 +1979,63 @@ body.terms-gate-open {
   box-sizing: border-box;
   margin-top: 0.25rem;
 }
+.sale-fields-warning {
+  margin: 0.55rem 0;
+  padding: 0.55rem 0.75rem;
+  background: #2b1d12;
+  border: 1px solid #b57b3c;
+  border-radius: 0.45rem;
+  color: #ffe3b8;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+.domain-fields-paused {
+  background: #2b1d12;
+  border: 1px solid #b57b3c;
+  color: #ffe3b8;
+}
+.domain-clean-slate {
+  margin: 0.45rem 0 0;
+  padding: 0.5rem 0.7rem;
+  background: #103227;
+  border: 1px solid #45d897;
+  border-radius: 0.45rem;
+  color: #d6fff0;
+  font-size: 0.84rem;
+}
+.domain-records-list {
+  margin-top: 0.55rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #284252;
+}
+.domain-records-list h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.88rem;
+  color: #b7d2e2;
+}
+.domain-sales-list {
+  display: grid;
+  gap: 0.65rem;
+}
+.domain-sale-item {
+  padding: 0.65rem 0.75rem;
+  background: #0d1c27;
+  border: 1px solid #31535c;
+  border-radius: 0.5rem;
+}
+.domain-sale-item.is-active {
+  border-color: #65cfa8;
+}
+.domain-previous-fields {
+  margin: 0.85rem 0;
+}
+.domain-prev-entry {
+  margin-top: 0.6rem;
+  padding: 0.65rem 0.75rem;
+  background: #0c1821;
+  border: 1px solid #2c4654;
+  border-radius: 0.5rem;
+}
+.domain-prev-entry p {
+  margin: 0.3rem 0;
+}

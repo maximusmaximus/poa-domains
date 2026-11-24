@@ -37,6 +37,7 @@ import {
   normalizationModeForHash,
 } from "./names.js";
 import { Metadata, metadata, validCid } from "./metadata.js";
+import { PROFILE_SCHEMA_V1 } from "./profile.js";
 
 import {
   State,
@@ -80,6 +81,8 @@ export const LEGACY_LEASE_POLICY: Readonly<AdmissionPolicy> = Object.freeze({ pe
 /** Production registry approved by Max on Nov 11 2026: no internal-unit onboarding grant after sequence 16. */
 export const PRODUCTION_REGISTRY_ID = "4c27c2d05c20f03e3ca1dfe90bb2cea4eb24c57b72a6a5d4074dbf15b6bbbed3";
 export const ONBOARDING_GRANT_FINAL_SEQUENCE = 16;
+/** Forward-only activation timestamp (Unix sec) on PRODUCTION_REGISTRY_ID so pre-existing transfer commits replay byte-identically. */
+export const TRANSFER_FIELD_RESET_TIME = 1795553000;
 /** Forward-only: commits applied at sequence 0..15 (history #1..#16) replay exactly as before. */
 export function onboardingGrantOpen(registry: string, sequenceBefore: number): boolean {
   return registry !== PRODUCTION_REGISTRY_ID || sequenceBefore < ONBOARDING_GRANT_FINAL_SEQUENCE;
@@ -395,7 +398,35 @@ export class Engine {
     need(!o.cancelled && o.uses < o.maxUses, "OFFER_CLOSED");
     return o;
   }
-  private transferDeed(d: Deed, to: string): void {
+  private transferDeed(d: Deed, to: string, time: number): void {
+    const dropFields =
+      this.registryId !== PRODUCTION_REGISTRY_ID ||
+      time >= TRANSFER_FIELD_RESET_TIME;
+    if (dropFields) {
+      const resetAt = d.profileResetAt ?? 0;
+      let latestProfile: Metadata | null = null;
+      for (let i = d.metadata.length - 1; i >= resetAt; i--) {
+        const entry = d.metadata[i];
+        if ((entry?.document as { schema?: unknown } | undefined)?.schema === PROFILE_SCHEMA_V1) {
+          latestProfile = structuredClone(entry!);
+          break;
+        }
+      }
+      if (d.records.length > 0 || latestProfile !== null) {
+        (d.previousFields ??= []).push({
+          owner: d.owner,
+          ownerVersion: d.ownerVersion,
+          transferredAt: time,
+          records: structuredClone(d.records),
+          profile: latestProfile,
+        });
+      }
+      if (d.records.length > 0) {
+        d.records = [];
+        d.recordsVersion = integer(d.recordsVersion + 1);
+      }
+      d.profileResetAt = d.metadata.length;
+    }
     d.owner = principal(to);
     d.ownerVersion = integer(d.ownerVersion + 1);
     d.version = integer(d.version + 1);
@@ -634,7 +665,7 @@ export class Engine {
             "TITLE_LOCKED",
           );
           d.lock = null;
-          this.transferDeed(d, high.beneficiary);
+          this.transferDeed(d, high.beneficiary, time);
         } else {
           e.auctionId = null;
           d = this.mint(
@@ -821,7 +852,7 @@ export class Engine {
         );
         need(b.signer !== d.owner, "SELF_SALE");
         this.sale(s, b, o.asset, amount(o.price), o.owner);
-        this.transferDeed(d, b.signer);
+        this.transferDeed(d, b.signer, time);
         o.uses++;
         o.version++;
         return { deedId: d.id };
@@ -878,7 +909,7 @@ export class Engine {
       case "transfer": {
         const d = this.deed(s, p);
         this.owner(d, b, time);
-        this.transferDeed(d, principal(p.recipient));
+        this.transferDeed(d, principal(p.recipient), time);
         return { deedId: d.id, owner: d.owner };
       }
       case "setRecords": {

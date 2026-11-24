@@ -29,14 +29,18 @@ import {
   checkProfileDescription,
   checkProfileImage,
   cidForDocument,
+  collectPreviousDomainFields,
   extractDomainProfile,
+  findDomainSalesAndAuctions,
   profileImageMediaPath,
+  SALE_FIELDS_WARNING,
   toEip55Address as uiToEip55Address,
 } from "../reference-web/shared.js";
 import { SUGGESTION_WORDS, suggestNames } from "../reference-web/ideas-generator.js";
 import { canonical } from "../dist/src/core.js";
+import { Engine, LEGACY_LEASE_POLICY, TRANSFER_FIELD_RESET_TIME } from "../dist/src/engine.js";
 import { nativeAddress } from "../dist/src/native-crypto.js";
-import { setup } from "../dist/test/helpers.js";
+import { setup, witness as makeWitness } from "../dist/test/helpers.js";
 
 const EIP55_VECTORS = [
   "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
@@ -292,4 +296,278 @@ test("Search autocomplete word bank is large and returns obvious available sugge
   const ag = suggestNames("agen", { manifest, accept: () => true, limit: 8 });
   assert.equal(ag.completion, "agent");
   assert.ok(ag.items.some((x) => x.name === "agent"));
+});
+
+test("Ownership transfer drops attached records & profile fields, archives previousFields, replays identically, and keeps MCP clean", async () => {
+  const commits = [];
+  const t = setup();
+  const baseDeed = t.win("comet", t.alice);
+  assert.ok(Number.isSafeInteger(TRANSFER_FIELD_RESET_TIME) && TRANSFER_FIELD_RESET_TIME > 1795500000);
+  assert.ok(SALE_FIELDS_WARNING.includes("dropped"));
+
+  // Alice attaches wallet/service/ipfs records AND sets a v1 public profile
+  const ipfsCid = cidForBytes(new Uint8Array([1, 2, 3, 4, 5]));
+  const avatarCid = cidForBytes(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 7, 8]));
+  const records = [
+    { type: "wallet", chain: "poa", address: SAMPLE_POA },
+    { type: "service", url: "https://alice.example/api" },
+    { type: "ipfs", cid: ipfsCid },
+  ];
+  const r1 = t.e.submit(
+    t.packet(
+      "setRecords",
+      {
+        name: "comet",
+        expectedDeedId: baseDeed.id,
+        expectedVersion: baseDeed.version,
+        records,
+      },
+      t.alice,
+    ),
+  );
+  assert.equal(r1.status, "succeeded");
+  const dAfterRecs = t.e.snapshot().deeds[baseDeed.id];
+  assert.equal(dAfterRecs.records.length, 3);
+
+  const aliceProfile = buildProfileWitness({
+    name: "comet",
+    rightsHash: dAfterRecs.rightsHash,
+    poa: SAMPLE_POA,
+    btc: BTC_MAINNET_VALID[0],
+    eth: EIP55_VECTORS[0],
+    description: "Alice original profile bio",
+    image: `ipfs://${avatarCid}`,
+  });
+  const r2 = t.e.submit(
+    t.packet(
+      "setMetadata",
+      {
+        name: "comet",
+        expectedDeedId: dAfterRecs.id,
+        expectedVersion: dAfterRecs.version,
+        metadata: aliceProfile,
+      },
+      t.alice,
+    ),
+  );
+  assert.equal(r2.status, "succeeded");
+  const dBeforeTransfer = t.e.snapshot().deeds[baseDeed.id];
+  assert.equal(extractLatestProfile(dBeforeTransfer).isDefault, false);
+  assert.equal(extractDomainProfile(dBeforeTransfer).isDefault, false);
+
+  // While listed for sale, collectPreviousDomainFields surfaces Alice's paused active fields
+  const pausedEntries = collectPreviousDomainFields(dBeforeTransfer, { listedForSale: true });
+  assert.equal(pausedEntries[0].status, "paused");
+  assert.equal(pausedEntries[0].records.length, 3);
+  assert.equal(pausedEntries[0].profile.eth, EIP55_VECTORS[0]);
+
+  // 1) Direct transfer (same engine path POA escrow settle uses): Alice -> Bob
+  const rTransfer = t.e.submit(
+    t.packet(
+      "transfer",
+      {
+        name: "comet",
+        expectedDeedId: dBeforeTransfer.id,
+        expectedVersion: dBeforeTransfer.version,
+        recipient: t.bob.id,
+      },
+      t.alice,
+    ),
+  );
+  assert.equal(rTransfer.status, "succeeded");
+  const dBob = t.e.snapshot().deeds[baseDeed.id];
+  assert.equal(dBob.owner, t.bob.id);
+  assert.deepEqual(dBob.records, []);
+  assert.equal(dBob.profileResetAt, dBob.metadata.length);
+  assert.equal(dBob.previousFields.length, 1);
+  assert.equal(dBob.previousFields[0].owner, t.alice.id);
+  assert.equal(dBob.previousFields[0].records.length, 3);
+  assert.equal(dBob.previousFields[0].profile.cid, aliceProfile.cid);
+
+  // Clean slate for Bob on BOTH server (extractLatestProfile) and browser (extractDomainProfile)
+  const bobServerProf = extractLatestProfile(dBob);
+  assert.equal(bobServerProf.isDefault, true);
+  assert.equal(bobServerProf.profile.poa, t.bob.id);
+  assert.equal(bobServerProf.profile.btc, null);
+  assert.equal(bobServerProf.profile.eth, null);
+  assert.equal(bobServerProf.profile.description, "");
+  assert.equal(bobServerProf.profile.image, null);
+  assert.equal(bobServerProf.cid, null);
+
+  const bobUiProf = extractDomainProfile(dBob);
+  assert.equal(bobUiProf.isDefault, true);
+  assert.equal(bobUiProf.profile.description, "");
+  assert.equal(bobUiProf.profile.btc, null);
+  assert.equal(bobUiProf.profile.eth, null);
+
+  // Previous fields helper exposes Alice's dropped records & profile on /d/comet
+  const archivedForBob = collectPreviousDomainFields(dBob);
+  const droppedEntry = archivedForBob.find((e) => e.status === "dropped");
+  assert.ok(droppedEntry);
+  assert.equal(droppedEntry.owner, t.alice.id);
+  assert.equal(droppedEntry.records.length, 3);
+  assert.equal(droppedEntry.profile.eth, EIP55_VECTORS[0]);
+  assert.equal(droppedEntry.profile.btc, BTC_MAINNET_VALID[0]);
+  assert.equal(droppedEntry.profile.description, "Alice original profile bio");
+
+  // MCP get_domain_profile and build_profile_witness start completely clean for Bob
+  const backend = async (method, path, query = {}, packet) => {
+    const r = registryRoute(t.e, { method, path, query, packet: packet ? JSON.stringify(packet) : undefined, requestId: "transfer-mcp-test" });
+    const data = JSON.parse(r.jsonText);
+    if (r.status >= 400) throw Object.assign(Error(data.code), { detail: data });
+    return data;
+  };
+  const mcp = new McpCore(registryMcpProfile(backend));
+  await mcp.handle(JSON.stringify({ jsonrpc: "2.0", id: 0, method: "initialize", params: { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "t", version: "1" } } }));
+  await mcp.handle(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }));
+  const mcpProf = await mcp.handle(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "get_domain_profile", arguments: { name: "comet" } } }));
+  assert.equal(mcpProf.result.isError, false);
+  assert.equal(mcpProf.result.structuredContent.isDefault, true);
+  assert.equal(mcpProf.result.structuredContent.owner, t.bob.id);
+  assert.equal(mcpProf.result.structuredContent.profile.btc, null);
+  assert.equal(mcpProf.result.structuredContent.profile.eth, null);
+  assert.equal(mcpProf.result.structuredContent.profile.description, "");
+
+  // 2) Bob sets his own profile, lists via sellFixed, and Alice buys back via buyFixed
+  const bobProfile = buildProfileWitness({
+    name: "comet",
+    rightsHash: dBob.rightsHash,
+    poa: SAMPLE_POA,
+    btc: null,
+    eth: EIP55_VECTORS[1],
+    description: "Bob second holder bio",
+    image: null,
+  });
+  assert.equal(
+    t.e.submit(t.packet("setMetadata", { name: "comet", expectedDeedId: dBob.id, expectedVersion: dBob.version, metadata: bobProfile }, t.bob)).status,
+    "succeeded",
+  );
+  const dBobV2 = t.e.snapshot().deeds[dBob.id];
+  const sellRes = t.e.submit(
+    t.packet(
+      "sellFixed",
+      { name: "comet", expectedDeedId: dBobV2.id, expectedVersion: dBobV2.version, asset: "POA", price: "50", validUntil: t.e.snapshot().time + 3600 },
+      t.bob,
+    ),
+  );
+  assert.equal(sellRes.status, "succeeded");
+  const offerId = sellRes.result.offerId;
+
+  // Check findDomainSalesAndAuctions detects the active registry resale listing
+  const saleInfo = findDomainSalesAndAuctions({ name: "comet", deed: dBobV2, state: t.e.snapshot(), escrowMarket: [] });
+  assert.equal(saleInfo.listedForSale, true);
+  assert.equal(saleInfo.kind, "registry-resale");
+
+  assert.equal(
+    t.e.submit(t.packet("buyFixed", { offerId, expectedVersion: 1, asset: "POA", amount: "50" }, t.alice)).status,
+    "succeeded",
+  );
+  const dAfterBuy = t.e.snapshot().deeds[dBob.id];
+  assert.equal(dAfterBuy.owner, t.alice.id);
+  assert.equal(dAfterBuy.previousFields.length, 2);
+  assert.equal(dAfterBuy.previousFields[1].owner, t.bob.id);
+  assert.equal(dAfterBuy.previousFields[1].profile.cid, bobProfile.cid);
+  assert.equal(extractLatestProfile(dAfterBuy).isDefault, true);
+  assert.equal(extractLatestProfile(dAfterBuy).profile.eth, null);
+
+  // 3) Secondary auction finalize ALSO drops records & archives previousFields
+  assert.equal(
+    t.e.submit(
+      t.packet(
+        "setRecords",
+        { name: "comet", expectedDeedId: dAfterBuy.id, expectedVersion: dAfterBuy.version, records: [{ type: "ipfs", cid: ipfsCid }] },
+        t.alice,
+      ),
+    ).status,
+    "succeeded",
+  );
+  const dBeforeAuc = t.e.snapshot().deeds[dBob.id];
+  const ann = t.e.submit(
+    t.packet(
+      "announceAuction",
+      {
+        name: "comet",
+        asset: "POA",
+        reserve: "100",
+        openAt: t.clock.now() + 86400,
+        expectedDeedId: dBeforeAuc.id,
+        expectedVersion: dBeforeAuc.version,
+        metadata: dBeforeAuc.metadata.at(-1),
+      },
+      t.alice,
+    ),
+  );
+  assert.equal(ann.status, "succeeded");
+  const aucId = ann.result.auctionId;
+  const aucObj = t.e.snapshot().auctions[aucId];
+  t.clock.set(aucObj.openAt);
+  assert.equal(
+    t.e.submit(t.packet("bid", { auctionId: aucId, expectedVersion: aucObj.version, asset: "POA", amount: "120", beneficiary: t.bob.id }, t.bob)).status,
+    "succeeded",
+  );
+  const aucAfterBid = t.e.snapshot().auctions[aucId];
+  t.clock.set(t.e.closeEligible(aucAfterBid));
+  assert.equal(t.e.submit(t.packet("finalize", { auctionId: aucId, expectedVersion: aucAfterBid.version }, t.bob)).status, "succeeded");
+  const dAfterAuc = t.e.snapshot().deeds[dBob.id];
+  assert.equal(dAfterAuc.owner, t.bob.id);
+  assert.deepEqual(dAfterAuc.records, []);
+  assert.equal(dAfterAuc.previousFields.length, 3);
+  assert.equal(dAfterAuc.previousFields[2].records.length, 1);
+  assert.equal(extractLatestProfile(dAfterAuc).isDefault, true);
+
+  // Replay verification: committing into a recorded Engine and replaying reproduces exact stateHash
+  const tReplay = setup();
+  const recorded = [];
+  const recEngine = new Engine(tReplay.config, tReplay.clock, LEGACY_LEASE_POLICY);
+  recEngine.attach({ append: (c) => recorded.push(c), close() {} });
+  const pAnn = tReplay.packet(
+    "announceAuction",
+    { name: "orbit", asset: "POA", reserve: "100", openAt: tReplay.clock.now() + 86400, expectedDeedId: null, expectedVersion: 0, metadata: makeWitness("orbit") },
+    tReplay.issuer,
+    { nonce: recEngine.nextNonce(tReplay.issuer.id) },
+  );
+  const rAnn = recEngine.submit(pAnn);
+  assert.equal(rAnn.status, "succeeded");
+  const aRec = recEngine.snapshot().auctions[rAnn.result.auctionId];
+  tReplay.clock.set(aRec.openAt);
+  const rBid = recEngine.submit(
+    tReplay.packet("bid", { auctionId: aRec.id, expectedVersion: aRec.version, asset: "POA", amount: "100", beneficiary: tReplay.alice.id }, tReplay.alice, { nonce: recEngine.nextNonce(tReplay.alice.id) }),
+  );
+  assert.equal(rBid.status, "succeeded");
+  const aRec2 = recEngine.snapshot().auctions[aRec.id];
+  tReplay.clock.set(recEngine.closeEligible(aRec2));
+  assert.equal(
+    recEngine.submit(tReplay.packet("finalize", { auctionId: aRec2.id, expectedVersion: aRec2.version }, tReplay.bob, { nonce: recEngine.nextNonce(tReplay.bob.id) })).status,
+    "succeeded",
+  );
+  const orbDeed = recEngine.snapshot().deeds[recEngine.snapshot().names.orbit.activeId];
+  assert.equal(
+    recEngine.submit(
+      tReplay.packet(
+        "setRecords",
+        { name: "orbit", expectedDeedId: orbDeed.id, expectedVersion: orbDeed.version, records: [{ type: "service", url: "https://orbit.example" }] },
+        tReplay.alice,
+        { nonce: recEngine.nextNonce(tReplay.alice.id) },
+      ),
+    ).status,
+    "succeeded",
+  );
+  const orbV2 = recEngine.snapshot().deeds[orbDeed.id];
+  assert.equal(
+    recEngine.submit(
+      tReplay.packet(
+        "transfer",
+        { name: "orbit", expectedDeedId: orbV2.id, expectedVersion: orbV2.version, recipient: tReplay.bob.id },
+        tReplay.alice,
+        { nonce: recEngine.nextNonce(tReplay.alice.id) },
+      ),
+    ).status,
+    "succeeded",
+  );
+  assert.equal(recorded.length, 5);
+  const replayed = new Engine(tReplay.config, { now: () => 0 }, LEGACY_LEASE_POLICY);
+  for (const commit of recorded) replayed.replay(commit);
+  assert.equal(replayed.stateHash(), recEngine.stateHash());
+  assert.equal(replayed.snapshot().deeds[orbDeed.id].previousFields.length, 1);
+  assert.deepEqual(replayed.snapshot().deeds[orbDeed.id].records, []);
 });

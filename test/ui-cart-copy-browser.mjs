@@ -770,7 +770,162 @@ try {
   assert.deepEqual(errorsAuc, []);
   await ctxAuc.close();
 
-  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations, escrow readiness banner, shortened PoA address copy, search autofill/dropdown, clean cart cards, cart-owned prefill, Manage this domain, Profile v1 editor, reorganized escrow signed request, treasury footer, domains served counter, bug/feature feedback modal, non-dismissible Terms gate & POA first-bid auctions/outbid cart");
+  // 10. Sale & auction field-drop warnings, paused fields while listed, clear sales/auctions on /d/<name>,
+  //     and post-transfer clean slate + archived previous fields as records on /d/<name>.
+  const ownedAgentDeed = h.payload.state.deeds[agentDeedId];
+  const prevOwner = ownedAgentDeed.owner;
+  const newOwner = bidder2;
+  const agentSaleAucId = "3".repeat(64);
+  const agentFixedId = "4".repeat(64);
+  const sampleIpfsCid = "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku";
+  const agentAttachedRecords = [
+    { type: "wallet", chain: "poa", address: prevOwner },
+    { type: "service", url: "https://agent.example/endpoint" },
+    { type: "ipfs", cid: sampleIpfsCid },
+  ];
+  const agentProfileMeta = ownedAgentDeed.metadata[ownedAgentDeed.metadata.length - 1];
+  const nowFieldMs = Date.now();
+
+  // 10a. Unlisted domain: owner tools + Manage domains + My POA all show clear field-drop warnings
+  h.payload.state.deeds[agentDeedId] = { ...ownedAgentDeed, records: agentAttachedRecords };
+  h.escrowMarket = { serverTime: nowFieldMs, items: [] };
+  const ctxFields = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+  await ctxFields.grantPermissions(["clipboard-read", "clipboard-write"], { origin: h.url });
+  const pageFields = await ctxFields.newPage();
+  const errorsFields = [];
+  pageFields.on("pageerror", (e) => errorsFields.push(e.message));
+  await pageFields.route("https://**", (r) => r.abort());
+  await pageFields.goto(`${h.url}/d/agent`);
+  await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageFields.locator("#termsAgreeBtn").click();
+
+  // Unlisted domain shows active profile + attached records + warning in owner sell tools
+  await expect(pageFields.locator("#domainProfile")).toBeVisible();
+  await expect(pageFields.locator("#domainProfile")).toContainText("Attached domain records");
+  await expect(pageFields.locator("#domainProfile")).toContainText("https://agent.example/endpoint");
+  await expect(pageFields.locator("#poaSellTools .sale-fields-warning")).toBeVisible();
+  await expect(pageFields.locator("#poaSellTools .sale-fields-warning")).toContainText("will be dropped");
+
+  // Manage domains + My POA show clear field-drop warnings before listing or auctioning
+  await pageFields.locator('#domainActions button[aria-label="Manage agent"]').click();
+  await expect(pageFields.locator('#manageNames article[data-domain-name="agent"] .sale-fields-warning')).toBeVisible();
+  await expect(pageFields.locator("#escrowListingFieldWarning")).toBeVisible();
+  await expect(pageFields.locator("#escrowListingFieldWarning")).toContainText("paused while this domain is listed");
+  await pageFields.locator("#escrowPayer").fill(prevOwner);
+  await pageFields.locator("#escrowName").fill("agent");
+  await pageFields.locator("#escrowAmount").fill("250.000000");
+  await pageFields.getByRole("button", { name: "🏷️ List my name for POA", exact: true }).click();
+  await expect(pageFields.locator("#escrowPrompt")).toContainText("Sale & auction notice");
+  await expect(pageFields.locator("#escrowMessage")).toContainText("paused while listed");
+
+  // 10b. Listed in live POA auction: /d/agent shows auction card + pauses active fields + shows paused fields as records
+  h.escrowMarket = {
+    serverTime: nowFieldMs,
+    items: [
+      {
+        id: agentSaleAucId, name: "agent", seller: prevOwner, kind: "auction",
+        price: "100.000000", minimumNextBid: "220.000001", status: "OPEN",
+        closes: nowFieldMs + 3600000, window: 3600000, quiet: 3600000,
+        createdAt: nowFieldMs - 120000, startedAt: nowFieldMs - 30000, awaitingFirstBid: false,
+        high: { payer: bidder1, amount: "200.000000" }, bidders: [bidder1], settlement: null,
+        history: [{ event: "Auction started (first bid)", at: nowFieldMs - 30000, amount: "200.000000", payer: bidder1 }],
+      },
+    ],
+  };
+  await pageFields.goto(`${h.url}/d/agent`);
+  await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageFields.locator("#domainStatus")).toContainText("In live POA auction");
+  await expect(pageFields.locator("#domainListing")).toBeVisible();
+  await expect(pageFields.locator("#domainListing")).toContainText("Auctions & Sales");
+  await expect(pageFields.locator(`#domainListing article[data-auction-id="${agentSaleAucId}"]`)).toContainText("High bid 200 POA");
+  await expect(pageFields.locator("#domainListing .sale-fields-warning")).toBeVisible();
+  await expect(pageFields.locator("#domainProfile")).toContainText("paused while listed");
+  assert.equal(await pageFields.locator("#domainProfile img.domain-avatar").count(), 0);
+  await expect(pageFields.locator("#domainPreviousFields")).toBeVisible();
+  await expect(pageFields.locator('#domainPreviousFields article[data-record-status="paused"]')).toContainText("Paused while listed");
+  await expect(pageFields.locator("#domainPreviousFields")).toContainText("https://agent.example/endpoint");
+  await expect(pageFields.locator("#domainPreviousFields")).toContainText("0x5aAe...eAed");
+  assert.equal(await pageFields.locator("#domainPreviousFields script").count(), 0);
+
+  // 10c. Listed for fixed-price POA sale: /d/agent clearly shows fixed sale + buy button
+  h.escrowMarket = {
+    serverTime: nowFieldMs,
+    items: [
+      {
+        id: agentFixedId, name: "agent", seller: prevOwner, kind: "fixed",
+        price: "250.000000", minimumNextBid: "250.000000", status: "OPEN",
+        closes: nowFieldMs + 7200000, window: 7200000, quiet: 0,
+        createdAt: nowFieldMs - 60000, startedAt: nowFieldMs - 60000, awaitingFirstBid: false,
+        high: null, bidders: [], settlement: null,
+        history: [{ event: "Fixed-price listing created", at: nowFieldMs - 60000, amount: "250.000000" }],
+      },
+    ],
+  };
+  await pageFields.reload();
+  await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageFields.locator("#domainStatus")).toContainText("For sale (POA)");
+  await expect(pageFields.locator(`#domainListing article[data-sale-id="${agentFixedId}"]`)).toContainText("250 POA (Fixed price)");
+  await expect(pageFields.locator("#domainListing").getByRole("button", { name: /Open My POA to buy/ })).toBeVisible();
+
+  // 10d. After transfer to new holder: clean slate in #domainProfile, past completed auction in #domainListing,
+  //      and all previous holder's dropped fields & records preserved in #domainPreviousFields!
+  h.payload.state.deeds[agentDeedId] = {
+    ...ownedAgentDeed,
+    owner: newOwner,
+    ownerVersion: 2,
+    version: ownedAgentDeed.version + 1,
+    records: [],
+    recordsVersion: (ownedAgentDeed.recordsVersion ?? 0) + 1,
+    profileResetAt: ownedAgentDeed.metadata.length,
+    previousFields: [
+      {
+        owner: prevOwner,
+        ownerVersion: 1,
+        transferredAt: Math.floor(nowFieldMs / 1000),
+        records: agentAttachedRecords,
+        profile: agentProfileMeta,
+      },
+    ],
+  };
+  h.escrowMarket = {
+    serverTime: nowFieldMs + 5000,
+    items: [
+      {
+        id: agentSaleAucId, name: "agent", seller: prevOwner, kind: "auction",
+        price: "100.000000", minimumNextBid: "275.000001", status: "COMPLETE",
+        closes: nowFieldMs, window: 3600000, quiet: 3600000,
+        createdAt: nowFieldMs - 120000, startedAt: nowFieldMs - 60000, awaitingFirstBid: false,
+        high: { payer: newOwner, amount: "250.000000" }, bidders: [bidder1, newOwner], settlement: "COMPLETE",
+        history: [
+          { event: "Auction started (first bid)", at: nowFieldMs - 60000, amount: "200.000000", payer: bidder1 },
+          { event: "Bid placed", at: nowFieldMs - 30000, amount: "250.000000", payer: newOwner },
+          { event: "Handover settled", at: nowFieldMs, amount: "250.000000", payer: newOwner },
+        ],
+      },
+    ],
+  };
+  await pageFields.reload();
+  await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageFields.locator("#domainOwner")).toContainText(`${newOwner.slice(0, 4)}...${newOwner.slice(-4)}`);
+  await expect(pageFields.locator("#domainProfile")).toContainText("Clean slate for current holder");
+  assert.equal(await pageFields.locator("#domainProfile img.domain-avatar").count(), 0);
+  await expect(pageFields.locator("#domainProfile")).not.toContainText("0x5aAe...eAed");
+  await expect(pageFields.locator("#domainListing")).toBeVisible();
+  await expect(pageFields.locator(`#domainListing article[data-past-sale-id="${agentSaleAucId}"]`)).toContainText("Past POA Auction · ✅ Complete");
+  await expect(pageFields.locator(`#domainListing article[data-past-sale-id="${agentSaleAucId}"]`)).toContainText("Final: 250 POA");
+  await expect(pageFields.locator("#domainPreviousFields")).toBeVisible();
+  const droppedCard = pageFields.locator('#domainPreviousFields article[data-record-status="dropped"]');
+  await expect(droppedCard).toBeVisible();
+  await expect(droppedCard).toContainText("Dropped on ownership transfer");
+  await expect(droppedCard).toContainText("0x5aAe...eAed");
+  await expect(droppedCard).toContainText("bc1qw5...f3t4");
+  await expect(droppedCard).toContainText("https://agent.example/endpoint");
+  await expect(droppedCard).toContainText("Agent bio https://minepoa.com <script>alert(1)</script>");
+  assert.equal(await pageFields.locator("#domainPreviousFields script").count(), 0);
+  assert.deepEqual(errorsFields, []);
+  await ctxFields.close();
+
+  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations, escrow readiness banner, shortened PoA address copy, search autofill/dropdown, clean cart cards, cart-owned prefill, Manage this domain, Profile v1 editor, reorganized escrow signed request, treasury footer, domains served counter, bug/feature feedback modal, non-dismissible Terms gate, POA first-bid auctions/outbid cart & sale/auction field-drop warnings + archived previous fields");
 } finally {
   await h.close();
   await browser.close();

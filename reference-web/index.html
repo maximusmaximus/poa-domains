@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=b47041a9f7a6" />
+    <link rel="stylesheet" href="/style.css?v=5623f52c62f6" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -253,11 +253,12 @@
         <div id="domainListing" class="card" hidden></div>
         <div id="domainActions" class="button-row"></div>
         <div id="domainOwnerTools" class="owner-tools" hidden>
-          <div id="poaSellTools" hidden><h3>🏷️ Sell for POA</h3><p data-info-description class="howto">List or auction your name for POA in 🪙 My POA. Your agent signs; nothing submits here.</p><button type="button" id="poaSellBtn">🏷️ Sell for POA</button>
+          <div id="poaSellTools" hidden><h3>🏷️ Sell for POA</h3><p data-info-description class="howto">List or auction your name for POA in 🪙 My POA. Your agent signs; nothing submits here.</p><p class="sale-fields-warning" role="note">⚠️ <strong>Before you list or auction:</strong> Attached domain fields (tags, wallet/service/IPFS records, and public profile) will not work while listed, and will be dropped when ownership transfers to a new holder (archived as historical records on this page).</p><button type="button" id="poaSellBtn">🏷️ Sell for POA</button>
           <div id="poaSubnameTools"><h3>🧩 Sell subnames</h3><p data-info-description class="howto">Set one POA price for new subnames like shop.yourname. Buyers pay with POA checkout and your share is paid out to you from escrow. Your agent signs; nothing submits here.</p><label>Subname price (POA) <input id="subnamePriceInput" inputmode="decimal" placeholder="10" aria-label="Subname price" /></label><button type="button" id="poaSubnameBtn">🧩 Copy agent request</button><pre id="subnamePromptBox" class="prompt-box" hidden></pre><p id="subnamePromptStatus" class="muted" role="status"></p></div></div>
           <div id="unitSellTools">
           <h3>💰 Sell</h3>
           <p data-info-description class="howto">Owners list, change price, or unlist. Copy a prompt for your agent — nothing submits here.</p>
+          <p class="sale-fields-warning" role="note">⚠️ <strong>Before you list:</strong> Attached domain fields (tags, wallet/service/IPFS records, and public profile) will not work while listed, and will be dropped when ownership transfers to a new holder (archived as historical records on this page).</p>
           <label>
             Price
             <input id="listPriceInput" inputmode="numeric" placeholder="2500" aria-label="List price" />
@@ -275,6 +276,7 @@
           <p id="listingPromptStatus" class="muted" role="status"></p>
           </div>
         </div>
+        <div id="domainPreviousFields" class="card domain-previous-fields" hidden></div>
         <h3>History</h3>
         <div id="domainHistory" class="cards"></div>
       </section>
@@ -455,6 +457,6 @@
       </details>
     </div>
 
-    <script type="module" src="/app.js?v=03149c4be992"></script>
+    <script type="module" src="/app.js?v=52aa72885d34"></script>
   </body>
 </html>

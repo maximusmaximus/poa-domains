@@ -1,18 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=03149c4be992";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=03149c4be992";
-import { renderManagement } from "./ui-manage.js?v=03149c4be992";
-import { actionLabel } from "./ui-copy.js?v=03149c4be992";
-import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=03149c4be992";
-import { ui } from "./ui-state.js?v=03149c4be992";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=03149c4be992";
-import { createPoaCopyButton } from "./ui-copy.js?v=03149c4be992";
-import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=03149c4be992";
-import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=03149c4be992";
-import { renderDomainPage } from "./ui-domain.js?v=03149c4be992";
-import { runSearch } from "./ui-search.js?v=03149c4be992";
-import { renderIdeas } from "./ui-ideas.js?v=03149c4be992";
-import { mountEscrow } from "./escrow.js?v=03149c4be992";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=03149c4be992";
+import { publicNameUnavailable } from "./shared.js?v=52aa72885d34";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=52aa72885d34";
+import { renderManagement } from "./ui-manage.js?v=52aa72885d34";
+import { actionLabel } from "./ui-copy.js?v=52aa72885d34";
+import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=52aa72885d34";
+import { ui } from "./ui-state.js?v=52aa72885d34";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=52aa72885d34";
+import { createPoaCopyButton } from "./ui-copy.js?v=52aa72885d34";
+import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=52aa72885d34";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=52aa72885d34";
+import { renderDomainPage } from "./ui-domain.js?v=52aa72885d34";
+import { runSearch } from "./ui-search.js?v=52aa72885d34";
+import { renderIdeas } from "./ui-ideas.js?v=52aa72885d34";
+import { mountEscrow } from "./escrow.js?v=52aa72885d34";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=52aa72885d34";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -110,8 +110,31 @@ function enhanceEscrowSignedRequestUx(root) {
     step1.append(grid);
     if (limits)
         step1.append(limits);
-    if (actionRow)
+    if (actionRow) {
         step1.append(actionRow);
+        const sellWarning = document.createElement("p");
+        sellWarning.id = "escrowListingFieldWarning";
+        sellWarning.className = "sale-fields-warning";
+        sellWarning.setAttribute("role", "note");
+        sellWarning.textContent = SALE_FIELDS_WARNING;
+        step1.append(sellWarning);
+        for (const btn of actionRow.querySelectorAll("button")) {
+            const label = btn.textContent ?? "";
+            if (!/List my name for POA|Open my POA auction/.test(label))
+                continue;
+            btn.addEventListener("click", () => {
+                const txt = prompt.textContent ?? "";
+                if (/"action":\s*"(?:list|open)"/.test(txt) && !txt.includes("Sale & auction notice")) {
+                    prompt.textContent = txt.trimEnd() + "\n" + SALE_FIELDS_WARNING;
+                    if (message && !message.textContent.includes("paused while listed")) {
+                        message.textContent =
+                            (message.textContent ? message.textContent + " " : "") +
+                            "⚠️ Attached domain fields & profile are paused while listed and dropped on transfer.";
+                    }
+                }
+            });
+        }
+    }
 
     if (message)
         step2.append(message);
@@ -330,6 +353,7 @@ export async function refreshEscrowMarket() {
             renderCart();
             if (ui.lastSearch)
                 runSearch(ui.lastSearch, false);
+            renderManagement();
             if (ui.route.kind === "domain" && ui.currentDomainName)
                 renderDomainPage(ui.currentDomainName);
         });
