@@ -40,14 +40,30 @@ const ASSET: Schema = {
   description:
     "Use an asset advertised by this registry's capabilities.",
 };
+const METADATA_DOC = objectSchema({
+  schema: { const: "poa-domains.metadata.v1" },
+  name: NAME,
+  rightsHash: ID,
+  description: { type: "string", maxLength: 2048 },
+});
+export const PROFILE_DOC = objectSchema({
+  schema: { const: "poa-domains.profile.v1" },
+  version: { const: 1 },
+  name: NAME,
+  rightsHash: ID,
+  poa: { type: "string", maxLength: 80, pattern: "^poa1[1-9A-HJ-NP-Za-km-z]{32,50}$" },
+  btc: { anyOf: [{ type: "null" }, { type: "string", minLength: 14, maxLength: 90 }] },
+  eth: { anyOf: [{ type: "null" }, { type: "string", pattern: "^0x[0-9a-fA-F]{40}$" }] },
+  description: { type: "string", maxLength: 1120 },
+  image: { anyOf: [{ type: "null" }, { type: "string", minLength: 8, maxLength: 2048 }] },
+});
 const METADATA = objectSchema({
   cid: { type: "string", maxLength: 128 },
-  document: objectSchema({
-    schema: { const: "poa-domains.metadata.v1" },
-    name: NAME,
-    rightsHash: ID,
-    description: { type: "string", maxLength: 2048 },
-  }),
+  document: METADATA_DOC,
+});
+const SET_METADATA_VALUE = objectSchema({
+  cid: { type: "string", maxLength: 128 },
+  document: { oneOf: [METADATA_DOC, PROFILE_DOC] },
 });
 const resource = { auctionId: ID, expectedVersion: UINT };
 const deed = { name: NAME, expectedDeedId: ID, expectedVersion: UINT };
@@ -125,7 +141,7 @@ export const ACTION_SCHEMAS: Record<string, Schema> = {
     ...deed,
     records: { type: "array", items: RECORD, maxItems: 16 },
   }),
-  setMetadata: objectSchema({ ...deed, metadata: METADATA }),
+  setMetadata: objectSchema({ ...deed, metadata: SET_METADATA_VALUE }),
   revokeChild: objectSchema({ ...deed, parentOwnerVersion: UINT }),
 };
 const common = {

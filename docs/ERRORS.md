@@ -646,6 +646,10 @@ HTTP 400; retryable: false. Http error. Check the documented inputs and current 
 
 HTTP 400; retryable: false. This request ID already belongs to different signed bytes. Query its existing receipt.
 
+## IMAGE_TOO_LARGE
+
+HTTP 413; retryable: false. Profile images must be 5 MB or smaller.
+
 ## INSUFFICIENT_FUNDS
 
 HTTP 400; retryable: false. Insufficient funds. Check the documented inputs and current state.
@@ -665,6 +669,34 @@ HTTP 400; retryable: false. Intent id. Check the documented inputs and current s
 ## INVALID
 
 HTTP 400; retryable: false. Invalid. Check the documented inputs and current state.
+
+## INVALID_BTC_ADDRESS
+
+HTTP 400; retryable: false. Enter a valid Bitcoin mainnet address (bc1… SegWit/Taproot or legacy 1…/3… with valid checksum).
+
+## INVALID_ETH_ADDRESS
+
+HTTP 400; retryable: false. Enter a valid Ethereum 0x… address (40 hex characters).
+
+## INVALID_ETH_CHECKSUM
+
+HTTP 400; retryable: false. The Ethereum address failed EIP-55 checksum verification. Use the mixed-case checksummed 0x… address.
+
+## INVALID_IMAGE_FORMAT
+
+HTTP 400; retryable: false. Only PNG, JPG, WebP, or GIF images are supported.
+
+## INVALID_POA_ADDRESS
+
+HTTP 400; retryable: false. Enter a valid public poa1 address.
+
+## INVALID_PROFILE_DESCRIPTION
+
+HTTP 400; retryable: false. Keep the plain-text description to 280 characters or fewer without control characters.
+
+## INVALID_PROFILE_IMAGE
+
+HTTP 400; retryable: false. Use an https:// URL or ipfs:// URI for the profile image.
 
 ## INVALID_REQUEST
 
@@ -797,6 +829,18 @@ HTTP 503; retryable: false. Mcp rate unavailable. Check the documented inputs an
 ## MCP_RESOURCE
 
 HTTP 400; retryable: false. Mcp resource. Check the documented inputs and current state.
+
+## MEDIA_RATE_LIMITED
+
+HTTP 429; retryable: true. Image uploads are temporarily rate-limited. Wait a moment and try again.
+
+## MEDIA_STORAGE_DISABLED
+
+HTTP 503; retryable: true. Profile media storage is not enabled on this server.
+
+## MEDIA_UPLOAD_FAILED
+
+HTTP 503; retryable: true. Could not save the uploaded image. Try again.
 
 ## METADATA_BINDING
 
@@ -1157,6 +1201,10 @@ HTTP 400; retryable: false. Production config unsupported. Check the documented 
 ## PRODUCTION_WEB_CONFIG
 
 HTTP 400; retryable: false. Production web config. Check the documented inputs and current state.
+
+## PROFILE_VERSION
+
+HTTP 400; retryable: false. Unsupported domain profile schema version. Version 1 is currently supported.
 
 ## PUBLIC_ARTIFACT
 

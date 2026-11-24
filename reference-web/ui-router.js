@@ -1,11 +1,31 @@
-import { domainPath, isPoaAddress, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=9e3528a22292";
-import { ui } from "./ui-state.js?v=9e3528a22292";
-import { createPoaCopyButton } from "./ui-copy.js?v=9e3528a22292";
-import { add, el } from "./ui-core.js?v=9e3528a22292";
-import { runSearch } from "./ui-search.js?v=9e3528a22292";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=9e3528a22292";
-import { updateTabDots } from "./ui-render.js?v=9e3528a22292";
-import { syncCartShortcutNow } from "./ui-cart.js?v=9e3528a22292";
+import { domainPath, isPoaAddress, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=775cd3b55381";
+import { ui } from "./ui-state.js?v=775cd3b55381";
+import { createPoaCopyButton } from "./ui-copy.js?v=775cd3b55381";
+import { add, el } from "./ui-core.js?v=775cd3b55381";
+import { runSearch } from "./ui-search.js?v=775cd3b55381";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=775cd3b55381";
+import { updateTabDots } from "./ui-render.js?v=775cd3b55381";
+import { syncCartShortcutNow } from "./ui-cart.js?v=775cd3b55381";
+import { renderManagement } from "./ui-manage.js?v=775cd3b55381";
+
+/** Open Manage domains tab, prefill the owner address, and focus a specific domain card. */
+export function openManageDomain(name, ownerId) {
+    const resolvedOwner = ownerId || (() => {
+        const entry = ui.latestState?.names?.[name];
+        return entry?.activeId ? ui.latestState?.deeds?.[entry.activeId]?.owner : "";
+    })();
+    navigateHome();
+    setSectionTab("escrow");
+    const ownerField = el("manageOwner");
+    if (ownerField && typeof resolvedOwner === "string" && resolvedOwner)
+        ownerField.value = resolvedOwner;
+    ui.focusedManageDomain = typeof name === "string" && name ? name : null;
+    renderManagement({ focusDomain: ui.focusedManageDomain });
+    const target = ui.focusedManageDomain
+        ? [...document.querySelectorAll("#manageNames article.card")].find((c) => c.dataset.domainName === ui.focusedManageDomain)
+        : el("manageDomains");
+    target?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+}
 
 /** Open 🪙 My POA; with a name, prefill it for a POA listing or auction. Your agent signs; nothing is sent here. */
 export function openPoa(name) {

@@ -1,11 +1,11 @@
-import { publicNameUnavailable } from "./shared.js?v=9e3528a22292";
-import { registryUnit } from "./shared.js?v=9e3528a22292";
-import { actionLabel } from "./ui-copy.js?v=9e3528a22292";
-import { trapDialog } from "./ui-a11y.js?v=9e3528a22292";
-import { ui } from "./ui-state.js?v=9e3528a22292";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions } from "./shared.js?v=9e3528a22292";
-import { add, el, endpointBase } from "./ui-core.js?v=9e3528a22292";
-import { nameLink } from "./ui-router.js?v=9e3528a22292";
+import { publicNameUnavailable } from "./shared.js?v=775cd3b55381";
+import { registryUnit } from "./shared.js?v=775cd3b55381";
+import { actionLabel } from "./ui-copy.js?v=775cd3b55381";
+import { trapDialog } from "./ui-a11y.js?v=775cd3b55381";
+import { ui } from "./ui-state.js?v=775cd3b55381";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions, validPrincipal } from "./shared.js?v=775cd3b55381";
+import { add, el, endpointBase } from "./ui-core.js?v=775cd3b55381";
+import { nameLink, openManageDomain } from "./ui-router.js?v=775cd3b55381";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
@@ -202,6 +202,66 @@ export function renderCartExpectations() {
     }
 }
 
+function poaPurchaseTypeLabel(item) {
+    if (item.tier === "premium")
+        return "Premium single emoji";
+    return item.isRoot === false ? "Subdomain" : "Standard root";
+}
+
+export function inferOwnerFromPurchasedCart(state) {
+    if (!state || !ui.cap || !ui.cart.length)
+        return null;
+    const owners = [];
+    for (const item of ui.cart) {
+        const review = cartReview(item, ui.cap, state);
+        if (review.canAcknowledge || !review.issues.length)
+            return null;
+        const entry = state.names?.[item.name];
+        const deed = entry?.activeId ? state.deeds?.[entry.activeId] : null;
+        if (!deed || deed.retired)
+            return null;
+        if (validPrincipal(deed.owner))
+            owners.push(deed.owner);
+    }
+    if (!owners.length)
+        return null;
+    const counts = new Map();
+    for (const o of owners)
+        counts.set(o, (counts.get(o) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+}
+
+export function maybePrefillOwnerFromPurchasedCart(state) {
+    const inferred = inferOwnerFromPurchasedCart(state);
+    const notice = el("cartOwnedNotice");
+    if (!inferred) {
+        if (notice) {
+            notice.hidden = true;
+            notice.replaceChildren();
+        }
+        return null;
+    }
+    const ownerInput = el("manageOwner");
+    const manageNotice = el("manageOwnerNotice");
+    if (ownerInput && (!ownerInput.value.trim() || ownerInput.value.trim() === ui.inferredCartOwner)) {
+        ownerInput.value = inferred;
+        ui.inferredCartOwner = inferred;
+        if (manageNotice) {
+            manageNotice.textContent = "🎉 Prefilled from your recently registered cart names (view-only until your agent signs an update).";
+            manageNotice.hidden = false;
+        }
+    }
+    if (notice) {
+        notice.hidden = false;
+        notice.replaceChildren();
+        add(notice, "span", "🎉 All names in your cart are now registered! We prefilled their owner address in Manage domains. ");
+        const btn = add(notice, "button", "⚙️ Manage these domains", "secondary small");
+        btn.type = "button";
+        btn.addEventListener("click", () => openManageDomain(ui.cart[0]?.name ?? "", inferred));
+    }
+    return inferred;
+}
+
 export function renderFloatingCart() {
     observeCartArea();
     renderCartEscrowStatus();
@@ -231,8 +291,13 @@ export function renderFloatingCart() {
         const card = add(list, "div", "", "card cart-item");
         const h = add(card, "h3", "");
         nameLink(h, item.name);
-        add(card, "p", item.action === "poaCheckout" ? `🪙 ${poaShort(item.amount)} POA` : `${actionLabel(item.action)} · ${item.amount} ${registryUnit(item.asset)}`, "badge");
-        add(card, "p", item.summary);
+        if (item.action === "poaCheckout") {
+            add(card, "p", `🪙 ${poaShort(item.amount)} POA · ${poaPurchaseTypeLabel(item)}`, "badge-ok");
+        }
+        else {
+            add(card, "p", `${actionLabel(item.action)} · ${item.amount} ${registryUnit(item.asset)}`, "badge");
+            add(card, "p", item.summary);
+        }
         if (item.needsReview)
             add(card, "p", "⚠️ " + item.reviewMessage + " Open Find to review your cart.", "badge-warn");
         const btn = add(card, "button", "✖️", "secondary small cart-remove");
@@ -247,6 +312,7 @@ export function renderCart() {
     syncIdeaMarks();
     renderCartEscrowStatus();
     renderCartExpectations();
+    maybePrefillOwnerFromPurchasedCart(ui.latestState);
     el("cartCount").textContent = String(ui.cart.length);
     el("clearCart").disabled = ui.cart.length === 0;
     {
@@ -272,6 +338,18 @@ export function renderCart() {
         const card = add(listNode, "div", "", "card cart-item");
         const h = add(card, "h4", "");
         nameLink(h, item.name);
+        if (item.action === "poaCheckout") {
+            add(card, "p", `🪙 ${poaShort(item.amount)} POA · ${poaPurchaseTypeLabel(item)}`, "badge-ok");
+            if (item.needsReview)
+                add(card, "p", "⚠️ " + item.reviewMessage, "badge-warn");
+            const errorNode = add(card, "p", item.validationError || "", "badge-warn");
+            errorNode.setAttribute("role", "alert");
+            const removePoa = add(card, "button", "✖️", "secondary small cart-remove");
+            removePoa.setAttribute("aria-label", "Remove " + item.name + " from cart");
+            removePoa.type = "button";
+            removePoa.addEventListener("click", () => removeCartAt(index));
+            return;
+        }
         add(card, "p", `${actionLabel(item.action)} · ${item.tier} ${item.isRoot ? "root" : "child"}`, "badge");
         const summaryNode = add(card, "p", item.summary);
         if (item.needsReview)
@@ -295,14 +373,6 @@ export function renderCart() {
         }
         const errorNode = add(card, "p", item.validationError || "", "badge-warn");
         errorNode.setAttribute("role", "alert");
-        if (item.action === "poaCheckout") {
-            add(card, "p", `🪙 ${poaShort(item.amount)} POA`, "badge-ok");
-            const removePoa = add(card, "button", "✖️", "secondary small cart-remove");
-            removePoa.setAttribute("aria-label", "Remove " + item.name + " from cart");
-            removePoa.type = "button";
-            removePoa.addEventListener("click", () => removeCartAt(index));
-            return;
-        }
         const controls = add(card, "div", "", "inline-controls");
         const amountInput = document.createElement("input");
         amountInput.value = item.amount;

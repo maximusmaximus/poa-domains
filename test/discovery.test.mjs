@@ -90,6 +90,9 @@ test("all actual registry, gateway and discovery API methods appear exactly once
     ...REGISTRY_ROUTES,
     ["POST", "/mcp"],
     ["POST", "/v1/search-log"],
+    ["POST", "/v1/media/upload"],
+    ["GET", "/v1/media/:cid"],
+    ["HEAD", "/v1/media/:cid"],
     ["GET", "/v1/network-status"],
     ["HEAD", "/v1/network-status"],
     ...["capabilities", "market", "domain", "subnames", "intent"].map((p) => [

@@ -1,13 +1,13 @@
-import { isPoaAddress, registryUnit, poaOnlyMode } from "./shared.js?v=9e3528a22292";
-import { drawTicker } from "./ui-ticker.js?v=9e3528a22292";
-import { actionLabel } from "./ui-copy.js?v=9e3528a22292";
-import { returnFocus } from "./ui-a11y.js?v=9e3528a22292";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=9e3528a22292";
-import { ui } from "./ui-state.js?v=9e3528a22292";
-import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=9e3528a22292";
-import { nameLink, navigateDomain, ownerLink, openPoa } from "./ui-router.js?v=9e3528a22292";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=9e3528a22292";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=9e3528a22292";
+import { isPoaAddress, registryUnit, poaOnlyMode } from "./shared.js?v=775cd3b55381";
+import { drawTicker } from "./ui-ticker.js?v=775cd3b55381";
+import { actionLabel } from "./ui-copy.js?v=775cd3b55381";
+import { returnFocus } from "./ui-a11y.js?v=775cd3b55381";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=775cd3b55381";
+import { ui } from "./ui-state.js?v=775cd3b55381";
+import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=775cd3b55381";
+import { nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=775cd3b55381";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=775cd3b55381";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=775cd3b55381";
 
 export function updateTabDots(state) {
     const marks = tabWatermarks(state);
@@ -287,7 +287,13 @@ export function render(payload) {
             else
                 recLine.append(String(value ?? ""));
         }
-        add(card, "code", d.metadata[d.metadata.length - 1].cid);
+        const lastCid = d.metadata?.[d.metadata.length - 1]?.cid;
+        if (lastCid)
+            add(card, "code", lastCid);
+        const manageBtn = add(card, "button", "⚙️ Manage this domain", "secondary small");
+        manageBtn.type = "button";
+        manageBtn.setAttribute("aria-label", `Manage ${n.name}`);
+        manageBtn.addEventListener("click", () => openManageDomain(n.name, d.owner));
     }
     if (!names.length)
         add(el("names"), "p", "No owned names");

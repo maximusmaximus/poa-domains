@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=2dbbccbd9434" />
+    <link rel="stylesheet" href="/style.css?v=8ff897acbf21" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -78,13 +78,21 @@
         </div>
         <div class="search-label"><label id="searchLabel" for="searchInput">Check Availability</label><span id="searchHelp"></span></div>
         <div class="search-bar">
-          <input
-            id="searchInput"
-            placeholder="name or emoji"
-            autocomplete="off"
-            aria-describedby="searchHelpText searchPrivacy"
-          />
+          <div class="search-combo">
+            <span id="searchAutofill" class="search-autofill" aria-hidden="true" hidden></span>
+            <input
+              id="searchInput"
+              placeholder="name or emoji"
+              autocomplete="off"
+              role="combobox"
+              aria-autocomplete="both"
+              aria-expanded="false"
+              aria-controls="searchSuggestions"
+              aria-describedby="searchHelpText searchPrivacy"
+            />
+          </div>
           <button id="searchBtn" type="button">Check</button>
+          <ul id="searchSuggestions" class="search-suggestions" role="listbox" aria-label="Suggested available names" hidden></ul>
         </div>
         <p data-info-description id="searchHelpText" class="muted">Enter a name or emoji, then select 🔍 to check its registry availability. Add a result to your planning cart or open its page. No payment is sent.</p>
         <p data-info-description id="searchPrivacy" class="muted">Submitted name searches are saved without IP or account details to improve suggestions. Query text is saved: do not enter personal information, wallet addresses or keys.</p>
@@ -99,6 +107,7 @@
             <button id="clearCart" type="button" class="secondary" disabled>Clear</button>
           </div>
           <p id="cartEscrowStatus" class="cart-escrow-status" role="status" aria-live="polite" hidden></p>
+          <div id="cartOwnedNotice" class="cart-owned-notice" role="status" aria-live="polite" hidden></div>
           <div id="cartList" class="cards"></div>
           <h4>Agent prompt</h4>
           <p id="cartRealityNote" data-info-description class="muted">🪙 Your agent pays in POA through POA checkout, only after your approval. Nothing is sent from this page.</p>
@@ -221,8 +230,10 @@
           <h2>🌱 Manage domains and subdomains</h2>
           <p data-info-description>View a public owner address. This is not a wallet connection or proof that you own it. These are application-registry names, not verified native-chain ownership.</p>
           <label for="manageOwner">Public owner address — never a private key</label><div class="search-bar"><input id="manageOwner" autocomplete="off" placeholder="poa1… public owner address" /><button id="manageLookup" type="button">View names</button></div>
-          <p data-info-description>Open a name to view it, or prepare a sale or subdomain request for its owner's agent. Retiring a subdomain needs both the child holder and parent owner. Nothing is sent from these controls.</p>
+          <p id="manageOwnerNotice" class="muted" role="status" aria-live="polite" hidden></p>
+          <p data-info-description>Open a name to view it, edit its public profile fields (v1: POA/BTC/ETH addresses, bio, and avatar image backed up to R2 &amp; IPFS), or prepare a sale or subdomain request for its owner's agent. Retiring a subdomain needs both the child holder and parent owner. Nothing is sent from these controls.</p>
           <div id="manageNames" class="cards"></div><pre id="managePrompt" class="prompt-box" role="status"></pre>
+          <div id="managePromptActions" class="button-row" hidden><button type="button" id="copyManagePrompt" class="secondary small">📋 Copy agent prompt</button><span id="managePromptStatus" class="muted" role="status" aria-live="polite"></span></div>
         </div>
         <div id="escrowPayments"></div>
       </section>
@@ -234,6 +245,7 @@
         <h2 id="domainTitle">Domain</h2>
         <p id="domainStatus" class="badge"></p>
         <p id="domainOwner" class="muted"></p>
+        <div id="domainProfile" class="card domain-profile" hidden></div>
         <div id="domainListing" class="card" hidden></div>
         <div id="domainActions" class="button-row"></div>
         <div id="domainOwnerTools" class="owner-tools" hidden>
@@ -331,6 +343,6 @@
       <p id="floatingCartStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
 
-    <script type="module" src="/app.js?v=9e3528a22292"></script>
+    <script type="module" src="/app.js?v=775cd3b55381"></script>
   </body>
 </html>

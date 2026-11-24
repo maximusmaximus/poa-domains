@@ -8,6 +8,7 @@ import { correlationId, errorEnvelope, errorReply } from "../src/errors.js";
 import { Fault, need } from "../src/core.js";
 import { SINGLETON } from "./registry.js";
 import { networkStatusMonitor } from "./network-status.js";
+import { backupCommittedProfile } from "./profiles-storage.js";
 const HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store",
@@ -50,7 +51,7 @@ async function bodyText(request: Request): Promise<string> {
   }
   return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
 }
-export async function mcpHttp(request: Request, env: Env): Promise<Response> {
+export async function mcpHttp(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
   const requestId = correlationId(request.headers.get("x-request-id"));
   const fail = (status: number, code: string, rpcCode = -32600) =>
     new Response(
@@ -162,6 +163,11 @@ export async function mcpHttp(request: Request, env: Env): Promise<Response> {
         throw Object.assign(new Fault(data.code), {
           detail: errorReply(reply.status, data, requestId).body,
         });
+      if (submitting && packet?.body?.action === "setMetadata") {
+        const backupTask = backupCommittedProfile(env, packet, data);
+        if (ctx) ctx.waitUntil(backupTask);
+        else await backupTask;
+      }
       return data;
     };
     const response = await new McpCore(

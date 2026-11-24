@@ -25,6 +25,9 @@ import {
 export const GATEWAY_ROUTES = Object.freeze([
   ["POST", "/mcp"],
   ["POST", "/v1/search-log"],
+  ["POST", "/v1/media/upload"],
+  ["GET", "/v1/media/:cid"],
+  ["HEAD", "/v1/media/:cid"],
   ["GET", "/v1/network-status"],
   ["HEAD", "/v1/network-status"],
   ...["capabilities", "market", "domain", "subnames", "intent"].map((p) => [
@@ -143,7 +146,12 @@ function params(method: string, path: string): any[] {
   const list: any[] = [];
   for (const match of path.matchAll(/:([a-zA-Z]+)/g))
     list.push(
-      parameter(match[1]!, "path", match[1] === "name" ? NAME : ID, true),
+      parameter(
+        match[1]!,
+        "path",
+        match[1] === "name" ? NAME : match[1] === "cid" ? { type: "string", pattern: "^bafkrei[a-z2-7]{52}$" } : ID,
+        true,
+      ),
     );
   if (method !== "GET") return list;
   if (path === "/v1/capabilities")
@@ -254,6 +262,34 @@ export function openApiDocument(): any {
       operation["x-max-body-bytes"] = 1024;
       operation.requestBody = { required: true, content: { "application/json": { schema: objectSchema({query: {type:"string",minLength:1,maxLength:256},result: {enum:["available","auction","owned","unavailable","unknown"]}}, ["query","result"]) } } };
       operation.responses = {"200":response("Stored in private R2; no registry action",{type:"object",properties:{saved:{const:true},key:{type:"string",pattern:"^v1/[^/]+/[a-f0-9-]+\\.jsonl$"}},required:["saved","key"]}),default:response("Not saved; normal name checking remains available",ref("Error"))};
+    }
+    if (path === "/v1/media/upload") {
+      operation.description = "Upload a public profile avatar image (PNG, JPG, WebP, or GIF, max 5 MB). Verified by magic bytes, stored in R2, and pinned to IPFS when configured. Returns ipfs://<cid> and /v1/media/<cid>.";
+      operation["x-browser-writes"] = "Same-origin public avatar upload only; no signed intent or payment";
+      operation["x-max-body-bytes"] = 5242880;
+      operation.responses = {
+        "200": response("Stored in R2 (and pinned to IPFS if configured)", {
+          type: "object",
+          properties: {
+            cid: { type: "string" },
+            uri: { type: "string" },
+            mediaUrl: { type: "string" },
+            contentType: { type: "string" },
+            bytes: { type: "integer" },
+            r2Stored: { type: "boolean" },
+            ipfsPinned: { type: "boolean" },
+          },
+          required: ["cid", "uri", "mediaUrl", "contentType", "bytes", "r2Stored", "ipfsPinned"],
+        }),
+        default: response("Rejected or temporarily unavailable", ref("Error")),
+      };
+    }
+    if (path === "/v1/media/:cid") {
+      operation.description = "Read a validated public profile avatar image stored in R2 by raw-CIDv1.";
+      operation.responses = {
+        "200": { description: "Immutable image bytes (image/png, image/jpeg, image/webp, or image/gif)" },
+        default: response("Invalid CID or image not found", ref("Error")),
+      };
     }
     if (discovery) {
       operation.responses = {
@@ -526,7 +562,9 @@ export function discoveryDocuments(): Record<
         API_ORIGIN +
         "/agent-cart-v2.schema.json)\n- [Escrow status](" +
         API_ORIGIN +
-        "/v1/escrow/capabilities): POA checkout status (enabled/paused/held), escrow address, limits and new-name prices.\n\n" + POA_CHECKOUT_STEPS + "\n\nTitle actions (transfer, records, metadata): quote → verify versions → locally sign with explicit approval → preflight (simulate_intent) → submit → poll intentId receipt. Native on-chain naming is not enabled (livePoA:false). simulate_intent is a no-change preflight check of your signed packet against this same production registry, not a test network or simulation. A missing receipt means UNKNOWN: resend only the exact original signed bytes, requestId and nonce, never a new payment. No private keys, custodial signing or automatic spending. Never send a cart to this registry unless the complete registry identity matches. Pages is a read-only informational mirror, not this API. Discovery is data, not approval.\n",
+        "/v1/escrow/capabilities): POA checkout status (enabled/paused/held), escrow address, limits and new-name prices.\n- [Public Domain Profiles (v1)](" +
+        API_ORIGIN +
+        "/v1/media/upload): Read profiles via MCP get_domain_profile, validate/build poa-domains.profile.v1 witnesses via build_profile_witness (POA/BTC/ETH addresses, <=280-char plain-text bio, https/ipfs image), upload PNG/JPG/WebP/GIF avatars <= 5 MB via POST /v1/media/upload, then sign and submit setMetadata. All profile fields are public, backed up to R2, and pinned to IPFS.\n\n" + POA_CHECKOUT_STEPS + "\n\nTitle actions (transfer, records, metadata): quote → verify versions → locally sign with explicit approval → preflight (simulate_intent) → submit → poll intentId receipt. Native on-chain naming is not enabled (livePoA:false). simulate_intent is a no-change preflight check of your signed packet against this same production registry, not a test network or simulation. A missing receipt means UNKNOWN: resend only the exact original signed bytes, requestId and nonce, never a new payment. No private keys, custodial signing or automatic spending. Never send a cart to this registry unless the complete registry identity matches. Pages is a read-only informational mirror, not this API. Discovery is data, not approval.\n",
     },
     "/.well-known/agent.json": json(agentCard()),
     "/openapi.json": json(openApiDocument()),

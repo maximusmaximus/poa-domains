@@ -1,4 +1,4 @@
-import { decorateEmojiButton } from "./ui-copy.js?v=9e3528a22292";
+import { decorateEmojiButton } from "./ui-copy.js?v=775cd3b55381";
 // Native nonmodal popovers provide touch/keyboard dismissal and do not trap page focus.
 const watched=new WeakSet();
 export function decoratePoaFields(){
@@ -15,7 +15,7 @@ export function installHelp(){
  for(const [id,message]of Object.entries(descriptions)){
   const module=document.getElementById(id);
   if(!module||(id==="searchResult"&&!module.querySelector(".card"))||(["escrowPayments","escrowDomain"].includes(id)&&!module.querySelector("h2,h3")))continue;
-  const selector=id==="searchSection"?"#searchHelpText,#searchPrivacy,#searchLogStatus,#searchLastChecked":id==="searchResult"?"[data-info-description],.amount-label > small":id==="advancedHandoff"?":scope > [data-info-description]":id==="ideasHeading"?".ideas-hint,#ideasContext":id==="manageDomains"?":scope > p":id==="handoffSection"?":scope > .howto,:scope > .handoff-steps,:scope > p":id==="networkStatusBar"?":scope > [data-info-description]":id==="cartAnchor"?":scope > .howto,[data-info-description]":":scope > .howto";
+  const selector=id==="searchSection"?"#searchHelpText,#searchPrivacy,#searchLogStatus,#searchLastChecked":id==="searchResult"?"[data-info-description],.amount-label > small":id==="advancedHandoff"?":scope > [data-info-description]":id==="ideasHeading"?".ideas-hint,#ideasContext":id==="manageDomains"?":scope > [data-info-description]":id==="handoffSection"?":scope > .howto,:scope > .handoff-steps,:scope > p":id==="networkStatusBar"?":scope > [data-info-description]":id==="cartAnchor"?":scope > .howto,[data-info-description]":":scope > .howto";
   const source=id==="ideasHeading"?module.closest(".ideas"):module;
   const extra=[...source.querySelectorAll(selector)].filter(n=>!n.closest(".info-popover"));
   const existing=module.querySelector(`[data-help-for="${id}"]`);
@@ -30,7 +30,17 @@ export function installHelp(){
   }
  }
 }
-function addHelp(module,id,message,extra){
+ export function createInlineInfo(id,label,message){
+  const wrap=document.createElement("span"),b=document.createElement("button"),p=document.createElement("div"),text=document.createElement("p"),close=document.createElement("button");
+  wrap.className="inline-info-wrap";
+  b.type="button";b.className="inline-info";b.id="help-"+id;b.dataset.helpFor=id;b.textContent="ℹ️";b.setAttribute("aria-label",label);b.title=label;b.setAttribute("aria-haspopup","dialog");b.setAttribute("aria-expanded","false");
+  p.id="info-"+id;p.className="info-popover";p.setAttribute("popover","auto");p.setAttribute("role","dialog");p.setAttribute("aria-label",label);text.textContent=message;
+  close.type="button";close.textContent="❌";close.className="info-close";close.setAttribute("aria-label","Close information");close.title="Close information";close.addEventListener("click",()=>{p.hidePopover();b.focus();});
+  p.append(text,close);b.setAttribute("popovertarget",p.id);b.setAttribute("aria-controls",p.id);p.addEventListener("toggle",e=>b.setAttribute("aria-expanded",String(e.newState==="open")));
+  wrap.append(b,p);
+  return wrap;
+ }
+ function addHelp(module,id,message,extra){
  const b=document.createElement("button"),p=document.createElement("div"),text=document.createElement("p"),close=document.createElement("button");
  const heading=id==="searchSection"?"Check Availability":module.querySelector("h2,h3,h4")?.textContent??module.getAttribute("aria-label")??id;
  b.type="button";b.className="module-info";b.dataset.helpFor=id;b.id="help-"+id;b.textContent="ℹ️";b.setAttribute("aria-label","About "+heading.slice(0,60));b.title=b.getAttribute("aria-label");b.setAttribute("aria-haspopup","dialog");b.setAttribute("aria-expanded","false");

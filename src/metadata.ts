@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
 import { canonical, exact, need, noSecrets, text } from "./core.js";
+import {
+  PROFILE_SCHEMA_V1,
+  ProfileDocumentV1,
+  validateProfileDocument,
+} from "./profile.js";
 const alphabet = "abcdefghijklmnopqrstuvwxyz234567";
 export function base32(bytes: Uint8Array): string {
   let acc = 0,
@@ -47,14 +52,15 @@ export function validCid(cid: unknown): string {
   );
   return s;
 }
+export interface MetadataDocumentV1 {
+  schema: string;
+  name: string;
+  rightsHash: string;
+  description: string;
+}
 export interface Metadata {
   cid: string;
-  document: {
-    schema: string;
-    name: string;
-    rightsHash: string;
-    description: string;
-  };
+  document: MetadataDocumentV1 | ProfileDocumentV1;
 }
 export function metadata(
   v: unknown,
@@ -62,6 +68,13 @@ export function metadata(
   rightsHash: string,
 ): Metadata {
   const m = exact(v, ["cid", "document"]);
+  const rawDoc = m.document as Record<string, unknown> | null;
+  if (rawDoc && typeof rawDoc === "object" && !Array.isArray(rawDoc) && rawDoc.schema === PROFILE_SCHEMA_V1) {
+    const d = validateProfileDocument(rawDoc, name, rightsHash);
+    validCid(m.cid);
+    need(cidFor(d) === m.cid, "CID_CONTENT_MISMATCH");
+    return { cid: m.cid as string, document: d };
+  }
   const d = exact(m.document, ["schema", "name", "rightsHash", "description"]);
   noSecrets(d);
   need(

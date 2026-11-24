@@ -75,6 +75,10 @@
     {
       "binding": "SEARCH_LOGS",
       "bucket_name": "poadomains-search-log"
+    },
+    {
+      "binding": "PROFILES",
+      "bucket_name": "poadomains-profiles"
     }
   ],
   "triggers": {

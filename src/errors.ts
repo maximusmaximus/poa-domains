@@ -162,11 +162,19 @@ HIGH_SELF_RAISE
 HOST
 HTTP_ERROR
 IDEMPOTENCY_CONFLICT
+IMAGE_TOO_LARGE
 INSUFFICIENT_FUNDS
 INTEGER
 INTENT_EXPIRED
 INTENT_ID
 INVALID
+INVALID_BTC_ADDRESS
+INVALID_ETH_ADDRESS
+INVALID_ETH_CHECKSUM
+INVALID_IMAGE_FORMAT
+INVALID_POA_ADDRESS
+INVALID_PROFILE_DESCRIPTION
+INVALID_PROFILE_IMAGE
 INVALID_REQUEST
 INVARIANT_ASSET
 INVARIANT_CONSERVATION
@@ -200,6 +208,9 @@ MCP_PROTOCOL_VERSION
 MCP_RATE_LIMITED
 MCP_RATE_UNAVAILABLE
 MCP_RESOURCE
+MEDIA_RATE_LIMITED
+MEDIA_STORAGE_DISABLED
+MEDIA_UPLOAD_FAILED
 METADATA_BINDING
 METADATA_VERSION
 METHOD_NOT_ALLOWED
@@ -290,6 +301,7 @@ PORT_ONLY_FOR_SERVE
 PRINCIPAL
 PRODUCTION_CONFIG_UNSUPPORTED
 PRODUCTION_WEB_CONFIG
+PROFILE_VERSION
 PUBLIC_ARTIFACT
 PUBLIC_JSON
 PUBLIC_NUMBER
@@ -365,6 +377,7 @@ const statuses:Record<string,number> = {
  PUBLIC_RECORD_WITHHELD:409, POA_ONLY:409, RESOURCE_NOT_FOUND:404, STALE_CURSOR:409, QUOTE_AMBIGUOUS:409, NOT_FOUND:404, METHOD_NOT_ALLOWED:405, BODY_TOO_LARGE:413, URL_SIZE:414, UNKNOWN_OUTCOME:404,
  NATIVE_NAMING_UNAVAILABLE:503, NATIVE_DIGEST:400, NATIVE_OPTIONS:400,
  ESCROW_ROUTE:404, ESCROW_DISABLED:503, NETWORK_HELD:503, REGISTRY_UNAVAILABLE:503, SEARCH_LOG_DISABLED:503, SEARCH_LOG_FAILED:503, SEARCH_LOG_RATE_LIMITED:429, SEARCH_LOG_LIMITER_UNAVAILABLE:503,
+ IMAGE_TOO_LARGE:413, MEDIA_RATE_LIMITED:429, MEDIA_STORAGE_DISABLED:503, MEDIA_UPLOAD_FAILED:503,
  DURABILITY_UNKNOWN_RESTART_AND_QUERY:503, OUTCOME_UNKNOWN:503, NETWORK_ERROR:502,
  ESCROW_UNAVAILABLE:503, ESCROW_HELD:503,
  // Deployed financial business-state errors retain their existing status contract.
@@ -372,7 +385,7 @@ const statuses:Record<string,number> = {
  ESCROW_REVIEW:409, ESCROW_REVIEW_INTENT:409, ESCROW_REVIEW_STATE:409, ESCROW_REVIEW_USED:409,
  ESCROW_SUBNAMES_OFF:409, ESCROW_SUB_CLOSED:409, ESCROW_SUB_COMMIT:409, ESCROW_SUB_CONSENT:409, ESCROW_SUB_LISTED:409, ESCROW_SUB_NAME:409, ESCROW_SUB_NOT_READY:409, ESCROW_SUB_STALE:409,
 };
-const retry = new Set(['SEARCH_LOG_RATE_LIMITED','SEARCH_LOG_LIMITER_UNAVAILABLE','SEARCH_LOG_DISABLED','SEARCH_LOG_FAILED','NATIVE_READ_FAILED','NATIVE_HTTP','NATIVE_BUSY','NATIVE_STALE_CACHE','NETWORK_ERROR','NETWORK_HELD','REGISTRY_UNAVAILABLE','ESCROW_DISABLED','ESCROW_UNAVAILABLE','ESCROW_HELD','ESCROW_PAUSED','ESCROW_STALE','ESCROW_NETWORK_HELD','ESCROW_NOT_FINAL','DURABILITY_UNKNOWN_RESTART_AND_QUERY','UNKNOWN_OUTCOME','OUTCOME_UNKNOWN']);
+const retry = new Set(['SEARCH_LOG_RATE_LIMITED','SEARCH_LOG_LIMITER_UNAVAILABLE','SEARCH_LOG_DISABLED','SEARCH_LOG_FAILED','MEDIA_RATE_LIMITED','MEDIA_STORAGE_DISABLED','MEDIA_UPLOAD_FAILED','NATIVE_READ_FAILED','NATIVE_HTTP','NATIVE_BUSY','NATIVE_STALE_CACHE','NETWORK_ERROR','NETWORK_HELD','REGISTRY_UNAVAILABLE','ESCROW_DISABLED','ESCROW_UNAVAILABLE','ESCROW_HELD','ESCROW_PAUSED','ESCROW_STALE','ESCROW_NETWORK_HELD','ESCROW_NOT_FINAL','DURABILITY_UNKNOWN_RESTART_AND_QUERY','UNKNOWN_OUTCOME','OUTCOME_UNKNOWN']);
 const messages:Record<string,string> = {
  PUBLIC_RECORD_WITHHELD:'This stored record is not public. The name or reference remains unavailable; it is not free to register. No new action was dispatched. Hidden receipts are not reported as missing: keep the original packet and do not replace its nonce or request ID.',
  ESCROW_SUBNAMES_OFF:'POA subname sales are not open right now. No POA was moved.',
@@ -413,6 +426,18 @@ const messages:Record<string,string> = {
  NETWORK_ERROR:'The read failed before any signed submission. Check the connection and try again.',
  ESCROW_UNAVAILABLE:'Escrow outcome may be unknown. Keep the exact signed request and query the signed account.',
  ESCROW_HELD:'Escrow is held. Keep the exact signed request and check its account before another action.',
+ INVALID_POA_ADDRESS:'Enter a valid public poa1 address.',
+ INVALID_BTC_ADDRESS:'Enter a valid Bitcoin mainnet address (bc1… SegWit/Taproot or legacy 1…/3… with valid checksum).',
+ INVALID_ETH_ADDRESS:'Enter a valid Ethereum 0x… address (40 hex characters).',
+ INVALID_ETH_CHECKSUM:'The Ethereum address failed EIP-55 checksum verification. Use the mixed-case checksummed 0x… address.',
+ INVALID_PROFILE_DESCRIPTION:'Keep the plain-text description to 280 characters or fewer without control characters.',
+ INVALID_PROFILE_IMAGE:'Use an https:// URL or ipfs:// URI for the profile image.',
+ INVALID_IMAGE_FORMAT:'Only PNG, JPG, WebP, or GIF images are supported.',
+ IMAGE_TOO_LARGE:'Profile images must be 5 MB or smaller.',
+ MEDIA_RATE_LIMITED:'Image uploads are temporarily rate-limited. Wait a moment and try again.',
+ MEDIA_STORAGE_DISABLED:'Profile media storage is not enabled on this server.',
+ MEDIA_UPLOAD_FAILED:'Could not save the uploaded image. Try again.',
+ PROFILE_VERSION:'Unsupported domain profile schema version. Version 1 is currently supported.',
 };
 export const ERROR_CATALOGUE:Record<string,{code:string;httpStatus:number;message:string;retryable:boolean}> = Object.freeze(Object.fromEntries(codes.map(code=>[code,Object.freeze({code,httpStatus:statuses[code]??(code.startsWith('NATIVE_')?502:400),message:messages[code]??(code.charAt(0)+code.slice(1).toLowerCase().replaceAll('_',' ')+'. Check the documented inputs and current state.'),retryable:retry.has(code)})])));
 export function correlationId(value:unknown):string {

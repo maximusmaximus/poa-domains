@@ -1,4 +1,5 @@
 import { searchLog } from "./search-log.js";
+import { backupCommittedProfile, handleMediaGet, handleMediaUpload } from "./profiles-storage.js";
 import { UI_SECURITY, secureUiResponse } from "../src/ui-policy.js";
 import { discoveryDocument } from "../src/discovery.js";
 import {mcpHttp} from "./mcp-http.js";
@@ -137,7 +138,10 @@ const gateway = {
       const discovery=discoveryDocument(u.pathname);
       if(discovery){if(request.method!=="GET"&&request.method!=="HEAD")return fail(405,{code:"METHOD_NOT_ALLOWED"});return new Response(request.method==="HEAD"?null:discovery.text,{headers:{...SECURITY,"content-type":discovery.type,"access-control-allow-origin":"*"}});}
       if(u.pathname === "/v1/search-log") return searchLog(request,env);
-      if(u.pathname === "/mcp") return mcpHttp(request,env);
+      if(u.pathname === "/v1/media/upload") return handleMediaUpload(request,env);
+      // GET/HEAD /v1/media/:cid
+      if(u.pathname.startsWith("/v1/media/")) return handleMediaGet(request,env,u.pathname.slice("/v1/media/".length));
+      if(u.pathname === "/mcp") return mcpHttp(request,env,ctx);
 
       // Same-origin network status: Worker probes minepoa.com; browser never needs a PoA key.
       if (u.pathname === "/v1/network-status") {
@@ -196,6 +200,11 @@ const gateway = {
       dispatched = true;
       const reply = await env.REGISTRY.getByName(SINGLETON).handle({ method: request.method, path: u.pathname,
         query: Object.fromEntries(u.searchParams), requestId, ...(packet!==undefined ? { packet: JSON.stringify(packet) } : {}) });
+      if (submitting && reply.status < 400 && (packet as any)?.body?.action === "setMetadata") {
+        const backupTask = backupCommittedProfile(env, packet, JSON.parse(reply.jsonText));
+        if (ctx) ctx.waitUntil(backupTask);
+        else await backupTask;
+      }
       return envelopeResponse(new Response(reply.jsonText, { status: reply.status, headers: { ...SECURITY, "content-type": "application/json; charset=utf-8", ...(request.method === "GET" ? { "access-control-allow-origin": "*" } : {}) } }),requestId);
     } catch (error) {
       if (error instanceof Fault) return fail(error.code === "BODY_TOO_LARGE" ? 413 : 400, { code: error.code, accepted: false });
