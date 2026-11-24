@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as treasury from "../dist/treasury.mjs";
 import * as feedback from "../dist/feedback.mjs";
+import { formatEmojiCounter } from "../reference-web/shared.js";
 
 const ESCROW_ADDR = "poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf";
 const TREASURY_ADDR = "poa1GHppB8pYZ43gK8yBzR1RJhzfWjzrJn29q96ykwngUP7N";
@@ -534,4 +535,14 @@ test("treasury and feedback enforce HTTP bounds, origin/method/host checks, rate
   });
   assert.equal(failUp.status, 502);
   assert.equal((await failUp.json()).code, "FEEDBACK_UPSTREAM_FAILED");
+});
+
+test("formatEmojiCounter renders 6-digit keycap emoji counters cleanly", () => {
+  assert.equal(formatEmojiCounter(0), "0️⃣0️⃣0️⃣0️⃣0️⃣0️⃣");
+  assert.equal(formatEmojiCounter(2), "0️⃣0️⃣0️⃣0️⃣0️⃣2️⃣");
+  assert.equal(formatEmojiCounter(42), "0️⃣0️⃣0️⃣0️⃣4️⃣2️⃣");
+  assert.equal(formatEmojiCounter(123456), "1️⃣2️⃣3️⃣4️⃣5️⃣6️⃣");
+  assert.equal(formatEmojiCounter(1000000), "1️⃣0️⃣0️⃣0️⃣0️⃣0️⃣0️⃣");
+  assert.equal(formatEmojiCounter(-5), "0️⃣0️⃣0️⃣0️⃣0️⃣0️⃣");
+  assert.equal(formatEmojiCounter(Number.NaN), "0️⃣0️⃣0️⃣0️⃣0️⃣0️⃣");
 });

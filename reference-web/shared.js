@@ -328,7 +328,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=c79a40639d61";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=8095046bb2aa";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -1592,4 +1592,9 @@ export function buildProfileUpdatePrompt({ name, deed, metadata, endpointUrl }) 
     `2) Run MCP simulate_intent (or POST ${endpoint}/v1/intents/preview). Only if wouldSucceed is true and I confirm, submit via MCP submit_intent (or POST ${endpoint}/v1/intents) and verify with get_receipt.`,
     "3) Never paste or reveal my private key. If outcome is UNKNOWN, query the receipt and resend only the exact same signed bytes.",
   ].join("\n");
+}
+const EMOJI_DIGITS = ["0\uFE0F\u20E3", "1\uFE0F\u20E3", "2\uFE0F\u20E3", "3\uFE0F\u20E3", "4\uFE0F\u20E3", "5\uFE0F\u20E3", "6\uFE0F\u20E3", "7\uFE0F\u20E3", "8\uFE0F\u20E3", "9\uFE0F\u20E3"];
+export function formatEmojiCounter(count, digits = 6) {
+  const n = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+  return String(n).padStart(digits, "0").replace(/[0-9]/g, (d) => EMOJI_DIGITS[Number(d)]);
 }

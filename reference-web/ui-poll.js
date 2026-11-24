@@ -1,17 +1,17 @@
-import { publicNameUnavailable } from "./shared.js?v=c79a40639d61";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=c79a40639d61";
-import { renderManagement } from "./ui-manage.js?v=c79a40639d61";
-import { actionLabel } from "./ui-copy.js?v=c79a40639d61";
-import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=c79a40639d61";
-import { ui } from "./ui-state.js?v=c79a40639d61";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=c79a40639d61";
-import { createPoaCopyButton } from "./ui-copy.js?v=c79a40639d61";
-import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=c79a40639d61";
-import { render, updateTabDots } from "./ui-render.js?v=c79a40639d61";
-import { runSearch } from "./ui-search.js?v=c79a40639d61";
-import { renderIdeas } from "./ui-ideas.js?v=c79a40639d61";
-import { mountEscrow } from "./escrow.js?v=c79a40639d61";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=c79a40639d61";
+import { publicNameUnavailable } from "./shared.js?v=8095046bb2aa";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=8095046bb2aa";
+import { renderManagement } from "./ui-manage.js?v=8095046bb2aa";
+import { actionLabel } from "./ui-copy.js?v=8095046bb2aa";
+import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=8095046bb2aa";
+import { ui } from "./ui-state.js?v=8095046bb2aa";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=8095046bb2aa";
+import { createPoaCopyButton } from "./ui-copy.js?v=8095046bb2aa";
+import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=8095046bb2aa";
+import { render, updateTabDots } from "./ui-render.js?v=8095046bb2aa";
+import { runSearch } from "./ui-search.js?v=8095046bb2aa";
+import { renderIdeas } from "./ui-ideas.js?v=8095046bb2aa";
+import { mountEscrow } from "./escrow.js?v=8095046bb2aa";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=8095046bb2aa";
 
 export function updateFreshness() {
     updateHandoffAge();

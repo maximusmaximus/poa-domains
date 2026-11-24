@@ -511,6 +511,9 @@ try {
 
   await pageFooter.goto(h.url + "/");
   await pageFooter.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageFooter.locator("#domainsServedFooter")).toContainText("Number of Domains Served:");
+  await expect(pageFooter.locator("#domainsServedCount")).toHaveText("0️⃣0️⃣0️⃣0️⃣0️⃣3️⃣");
+  await expect(pageFooter.locator("#domainsServedSr")).toHaveText("3");
   await expect(pageFooter.locator("#treasuryTotal")).toHaveText("🪙 201 POA");
   await expect(pageFooter.locator("#poascanHomeLink")).toHaveAttribute("href", "https://poascan.io/");
   await expect(pageFooter.locator("#treasuryWallets")).toBeVisible();

@@ -1,13 +1,13 @@
-import { isPoaAddress, registryUnit, poaOnlyMode } from "./shared.js?v=c79a40639d61";
-import { drawTicker } from "./ui-ticker.js?v=c79a40639d61";
-import { actionLabel } from "./ui-copy.js?v=c79a40639d61";
-import { returnFocus } from "./ui-a11y.js?v=c79a40639d61";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=c79a40639d61";
-import { ui } from "./ui-state.js?v=c79a40639d61";
-import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=c79a40639d61";
-import { nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=c79a40639d61";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=c79a40639d61";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=c79a40639d61";
+import { isPoaAddress, registryUnit, poaOnlyMode } from "./shared.js?v=8095046bb2aa";
+import { drawTicker } from "./ui-ticker.js?v=8095046bb2aa";
+import { actionLabel } from "./ui-copy.js?v=8095046bb2aa";
+import { returnFocus } from "./ui-a11y.js?v=8095046bb2aa";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=8095046bb2aa";
+import { ui } from "./ui-state.js?v=8095046bb2aa";
+import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=8095046bb2aa";
+import { nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=8095046bb2aa";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=8095046bb2aa";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=8095046bb2aa";
 
 export function updateTabDots(state) {
     const marks = tabWatermarks(state);
@@ -226,6 +226,12 @@ export function render(payload) {
                 }).format(new Date(ui.details.generatedAt)) +
                 " Pacific time.";
     const names = Object.values(s.names).filter((n) => n.activeId), auctions = Object.values(s.auctions), offers = Object.values(s.offers ?? {}), bids = Object.values(s.bids ?? {}), receipts = Object.values(s.receipts ?? {});
+    const servedCountEl = el("domainsServedCount");
+    if (servedCountEl)
+        servedCountEl.textContent = formatEmojiCounter(names.length, 6);
+    const servedSrEl = el("domainsServedSr");
+    if (servedSrEl)
+        servedSrEl.textContent = String(names.length);
     const rootDeeds = names.filter((n) => !s.deeds[n.activeId].parentId).length;
     const childDeeds = names.length - rootDeeds;
     const activeOffers = offers.filter((o) => !o.cancelled && o.uses < o.maxUses && s.time < o.validUntil);

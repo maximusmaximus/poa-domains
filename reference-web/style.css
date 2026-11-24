@@ -1686,6 +1686,25 @@ code.escrow-value.poa-addr-text {
   align-items: center;
   gap: 0.25rem;
 }
+.domains-served-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin: 0 auto 0.85rem;
+  font-size: 0.9rem;
+  color: #dfecf5;
+}
+.domains-served-label {
+  font-weight: 600;
+  color: #b7d2e2;
+}
+.domains-served-digits {
+  letter-spacing: 0.08em;
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
 .footer-action-btn {
   display: inline-flex;
   align-items: center;
