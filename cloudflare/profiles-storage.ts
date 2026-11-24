@@ -17,7 +17,35 @@ export interface ProfileStorageEnv {
   PUBLIC_EXPLORER_URL?: string;
   PINATA_JWT?: string;
   PINATA_API_URL?: string;
-  MCP_RATE_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> };
+  PINATA_GROUP_ID?: string;
+  MEDIA_UPLOAD_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> };
+}
+
+/** Per-client hourly upload cap (on top of the per-minute MEDIA_UPLOAD_LIMITER binding). */
+export const MEDIA_UPLOAD_HOURLY_PER_CLIENT = 30;
+/** Hourly cap across all clients; bounds storage and pinning use even behind a shared proxy IP. */
+export const MEDIA_UPLOAD_HOURLY_GLOBAL = 200;
+const LIMIT_PREFIX = "v1/limits/uploads/";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type PinLog = (event: Record<string, unknown>) => void;
+const defaultPinLog: PinLog = (event) => console.warn(JSON.stringify(event));
+
+function safeText(value: unknown, secret: string): string | undefined {
+  if (typeof value !== "string" || !value) return undefined;
+  let text = value.replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, 200);
+  if (secret && text.includes(secret)) text = text.split(secret).join("[redacted]");
+  return text.replace(/Bearer\s+\S+/gi, "Bearer [redacted]");
+}
+
+/** Extracts only Pinata's error code/message; never headers or request data. */
+function pinataError(body: unknown, secret: string): { code?: string; message?: string } {
+  const b = body as any;
+  const e = b?.error;
+  if (typeof e === "string") return { message: safeText(e, secret) };
+  if (e && typeof e === "object")
+    return { code: safeText(e.code ?? e.reason, secret), message: safeText(e.details ?? e.message, secret) };
+  return { code: safeText(b?.code ?? b?.reason, secret), message: safeText(b?.message ?? b?.details, secret) };
 }
 
 const MAX_JSON_UPLOAD_BYTES = Math.ceil((MAX_PROFILE_IMAGE_BYTES * 4) / 3) + 4096;
@@ -68,31 +96,82 @@ export async function pinBytesToPinata(
   contentType: string,
   env: ProfileStorageEnv,
   fetchImpl: typeof fetch = fetch,
+  log: PinLog = defaultPinLog,
 ): Promise<{ pinned: boolean; pinataCid?: string }> {
   const jwt = typeof env.PINATA_JWT === "string" ? env.PINATA_JWT.trim() : "";
   if (!jwt) return { pinned: false };
   const baseUrl = (env.PINATA_API_URL || "https://api.pinata.cloud").replace(/\/+$/, "");
+  const groupId = typeof env.PINATA_GROUP_ID === "string" && UUID_RE.test(env.PINATA_GROUP_ID.trim())
+    ? env.PINATA_GROUP_ID.trim().toLowerCase()
+    : undefined;
+  const fail = (detail: Record<string, unknown>) => {
+    try {
+      log({ event: "pinata_pin_failed", filename, ...detail });
+    } catch {}
+    return { pinned: false };
+  };
+  let res: Response;
   try {
     const form = new FormData();
     const copy = new Uint8Array(bytes.byteLength);
     copy.set(bytes);
-    form.append("file", new Blob([copy.buffer], { type: contentType }), filename);
-    form.append("pinataOptions", JSON.stringify({ cidVersion: 1 }));
+    form.append("file", new File([copy], filename, { type: contentType }));
+    // Legacy pinning API: the group goes in pinataOptions.groupId.
+    form.append("pinataOptions", JSON.stringify({ cidVersion: 1, ...(groupId ? { groupId } : {}) }));
     form.append("pinataMetadata", JSON.stringify({ name: filename }));
-    const res = await fetchImpl(`${baseUrl}/pinning/pinFileToIPFS`, {
+    // Workers reject redirect:"error"; use "manual" and treat any non-2xx as a failure.
+    res = await fetchImpl(`${baseUrl}/pinning/pinFileToIPFS`, {
       method: "POST",
       headers: { authorization: `Bearer ${jwt}` },
       body: form,
-      redirect: "error",
+      redirect: "manual",
       signal: AbortSignal.timeout(12000),
     });
-    if (!res.ok) return { pinned: false };
-    const body = (await res.json()) as { IpfsHash?: unknown };
-    const pinataCid = typeof body?.IpfsHash === "string" && body.IpfsHash.length <= 128 ? body.IpfsHash : undefined;
-    return { pinned: Boolean(pinataCid), ...(pinataCid ? { pinataCid } : {}) };
-  } catch {
-    return { pinned: false };
+  } catch (error) {
+    return fail({ status: 0, code: safeText((error as any)?.name, jwt) ?? "FETCH_FAILED", message: safeText((error as any)?.message, jwt) });
   }
+  let body: unknown = undefined;
+  try {
+    body = await res.json();
+  } catch {}
+  if (!res.ok) return fail({ status: res.status, ...pinataError(body, jwt) });
+  const hash = (body as { IpfsHash?: unknown } | undefined)?.IpfsHash;
+  const pinataCid = typeof hash === "string" && hash.length <= 128 ? hash : undefined;
+  if (!pinataCid) return fail({ status: res.status, code: "NO_IPFS_HASH" });
+  return { pinned: true, pinataCid };
+}
+
+async function clientKey(ip: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("poa-domains:media:" + ip));
+  return [...new Uint8Array(digest).slice(0, 12)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function readCount(bucket: R2Bucket, key: string): Promise<number> {
+  const obj = await bucket.get(key);
+  if (!obj) return 0;
+  const n = Number(await obj.text());
+  return Number.isSafeInteger(n) && n >= 0 ? n : 0;
+}
+
+/**
+ * Approximate hourly caps kept as small counter objects in R2 (no raw IPs stored; keys hold a
+ * truncated hash). Counters may undercount slightly under concurrency; the per-minute binding
+ * bounds bursts. Reports the seconds until the window resets when limited.
+ */
+export async function checkHourlyUploadCaps(
+  bucket: R2Bucket,
+  ip: string,
+  now: number = Date.now(),
+): Promise<{ limited: false } | { limited: true; retryAfter: number }> {
+  const hour = new Date(now).toISOString().slice(0, 13).replace(/[-T:]/g, "");
+  const retryAfter = Math.max(1, Math.ceil((3600000 - (now % 3600000)) / 1000));
+  const globalKey = `${LIMIT_PREFIX}${hour}/all`;
+  const clientCounter = `${LIMIT_PREFIX}${hour}/c-${await clientKey(ip)}`;
+  const [all, mine] = await Promise.all([readCount(bucket, globalKey), readCount(bucket, clientCounter)]);
+  if (all >= MEDIA_UPLOAD_HOURLY_GLOBAL || mine >= MEDIA_UPLOAD_HOURLY_PER_CLIENT) return { limited: true, retryAfter };
+  const meta = { httpMetadata: { contentType: "text/plain" } };
+  await Promise.all([bucket.put(globalKey, String(all + 1), meta), bucket.put(clientCounter, String(mine + 1), meta)]);
+  return { limited: false };
 }
 
 function allowedHost(hostname: string, env: ProfileStorageEnv): boolean {
@@ -111,13 +190,14 @@ export async function handleMediaUpload(
   request: Request,
   env: ProfileStorageEnv,
   fetchImpl: typeof fetch = fetch,
+  now: () => number = Date.now,
 ): Promise<Response> {
   const requestId = correlationId(request.headers.get("x-request-id"));
   const headers = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
-  const fail = (status: number, code: string) =>
+  const fail = (status: number, code: string, retryAfter = 60) =>
     Response.json(errorEnvelope(code, requestId), {
       status,
-      headers: status === 429 ? { ...headers, "retry-after": "60" } : headers,
+      headers: status === 429 ? { ...headers, "retry-after": String(retryAfter) } : headers,
     });
   try {
     const u = new URL(request.url);
@@ -146,16 +226,23 @@ export async function handleMediaUpload(
         return fail(403, "HOST");
     }
     if (!env.PROFILES) return fail(503, "MEDIA_STORAGE_DISABLED");
-    if (env.MCP_RATE_LIMITER) {
-      const ip = request.headers.get("cf-connecting-ip") ?? "local";
-      let ok = false;
-      try {
-        ok = (await env.MCP_RATE_LIMITER.limit({ key: "poa-domains:media:" + ip })).success;
-      } catch {
-        return fail(503, "MCP_RATE_UNAVAILABLE");
-      }
-      if (!ok) return fail(429, "MEDIA_RATE_LIMITED");
+    // Uploads have their own limiter, well below the general MCP limit; fail closed if unavailable.
+    if (!env.MEDIA_UPLOAD_LIMITER) return fail(503, "MEDIA_RATE_UNAVAILABLE");
+    const ip = request.headers.get("cf-connecting-ip") ?? "missing-ip";
+    let ok = false;
+    try {
+      ok = (await env.MEDIA_UPLOAD_LIMITER.limit({ key: "poa-domains:media:" + ip })).success;
+    } catch {
+      return fail(503, "MEDIA_RATE_UNAVAILABLE");
     }
+    if (!ok) return fail(429, "MEDIA_RATE_LIMITED");
+    let hourly: Awaited<ReturnType<typeof checkHourlyUploadCaps>>;
+    try {
+      hourly = await checkHourlyUploadCaps(env.PROFILES, ip, now());
+    } catch {
+      return fail(503, "MEDIA_RATE_UNAVAILABLE");
+    }
+    if (hourly.limited) return fail(429, "MEDIA_HOURLY_LIMITED", hourly.retryAfter);
     const rawType = (request.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
     const lengthHeader = request.headers.get("content-length");
     let bytes: Uint8Array;

@@ -830,9 +830,17 @@ HTTP 503; retryable: false. Mcp rate unavailable. Check the documented inputs an
 
 HTTP 400; retryable: false. Mcp resource. Check the documented inputs and current state.
 
+## MEDIA_HOURLY_LIMITED
+
+HTTP 429; retryable: true. The hourly image upload limit was reached. Try again after the time in Retry-After.
+
 ## MEDIA_RATE_LIMITED
 
-HTTP 429; retryable: true. Image uploads are temporarily rate-limited. Wait a moment and try again.
+HTTP 429; retryable: true. Image uploads are limited to 10 per minute. Wait a moment and try again.
+
+## MEDIA_RATE_UNAVAILABLE
+
+HTTP 503; retryable: true. Image upload limits could not be checked right now. Try again shortly.
 
 ## MEDIA_STORAGE_DISABLED
 

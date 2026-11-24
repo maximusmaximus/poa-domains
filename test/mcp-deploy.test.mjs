@@ -24,6 +24,11 @@ test("first MCP deploy keeps disabled committed defaults, live-binding preservat
       namespace_id: "2026110908",
       simple: { limit: 60, period: 60 },
     },
+    {
+      name: "MEDIA_UPLOAD_LIMITER",
+      namespace_id: "2026112401",
+      simple: { limit: 10, period: 60 },
+    },
   ]);
   const live = {
     POA_ESCROW_ENABLED: "true",
