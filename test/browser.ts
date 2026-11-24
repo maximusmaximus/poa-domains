@@ -26,6 +26,7 @@ export async function browserSmoke(
       return route.continue();
     });
     await page.goto(url);
+    await page.locator("#termsAgreeBtn").click();
     await page.waitForFunction(
       () => document.querySelectorAll("#action option").length === 17,
     );

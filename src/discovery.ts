@@ -32,6 +32,11 @@ export const GATEWAY_ROUTES = Object.freeze([
   ["HEAD", "/v1/network-status"],
   ["GET", "/v1/treasury"],
   ["HEAD", "/v1/treasury"],
+  ["GET", "/v1/terms"],
+  ["HEAD", "/v1/terms"],
+  ["GET", "/v1/terms/status"],
+  ["HEAD", "/v1/terms/status"],
+  ["POST", "/v1/terms/agree"],
   ["GET", "/v1/feedback/challenge"],
   ["GET", "/v1/feedback/captcha/:id"],
   ["HEAD", "/v1/feedback/captcha/:id"],
@@ -299,6 +304,49 @@ export function openApiDocument(): any {
     }
     if (path === "/v1/treasury") {
       operation.description = "Read-only Domains Treasury balance (escrow + treasury on PoA mainnet) with POAScan links.";
+    }
+    if (path === "/v1/terms") {
+      operation.description = "Read current Terms & Privacy version, SHA-256 hash, one-sentence summary, key warning, and canonical statement template for agent signing.";
+    }
+    if (path === "/v1/terms/status") {
+      operation.description = "Check whether a public principal (poa1… or ed25519:…) has signed and recorded agreement to the current Terms version.";
+      operation.parameters.push(parameter("actor", "query", PRINCIPAL, true));
+    }
+    if (path === "/v1/terms/agree") {
+      operation.description = "Submit a locally signed Ed25519 Terms agreement attestation { statement, signature }. Never send private keys.";
+      operation["x-max-body-bytes"] = 8192;
+      operation.requestBody = {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["statement", "signature"],
+              properties: {
+                statement: {
+                  type: "object",
+                  required: ["domain", "chainId", "actor", "termsVersion", "termsHash", "agreed", "agreedAt"],
+                  properties: {
+                    domain: { const: "poa-domains.terms.v1" },
+                    chainId: S,
+                    actor: PRINCIPAL,
+                    termsVersion: S,
+                    termsHash: ID,
+                    agreed: { const: true },
+                    agreedAt: { type: "integer", minimum: 1 },
+                  },
+                },
+                signature: { type: "string", minLength: 32, maxLength: 160 },
+              },
+            },
+          },
+        },
+      };
+      operation.responses = {
+        "200": response("Already agreed to current Terms version"),
+        "201": response("Signed Terms agreement recorded"),
+        default: response("Invalid input, signature, timestamp, or Terms version", ref("Error")),
+      };
     }
     if (path === "/v1/feedback/challenge") {
       operation.description = "Issue a single-use CAPTCHA and SHA-256 Proof-of-Work challenge for bug/feature feedback.";
@@ -614,7 +662,9 @@ export function discoveryDocuments(): Record<
         API_ORIGIN +
         "/v1/escrow/capabilities): POA checkout status (enabled/paused/held), escrow address, limits and new-name prices.\n- [Public Domain Profiles (v1)](" +
         API_ORIGIN +
-        "/v1/media/upload): Read profiles via MCP get_domain_profile, validate/build poa-domains.profile.v1 witnesses via build_profile_witness (POA/BTC/ETH addresses, <=280-char plain-text bio, https/ipfs image), upload PNG/JPG/WebP/GIF avatars <= 5 MB via POST /v1/media/upload, then sign and submit setMetadata. All profile fields are public, backed up to R2, and pinned to IPFS.\n\n" + POA_CHECKOUT_STEPS + "\n\nTitle actions (transfer, records, metadata): quote → verify versions → locally sign with explicit approval → preflight (simulate_intent) → submit → poll intentId receipt. Native on-chain naming is not enabled (livePoA:false). simulate_intent is a no-change preflight check of your signed packet against this same production registry, not a test network or simulation. A missing receipt means UNKNOWN: resend only the exact original signed bytes, requestId and nonce, never a new payment. No private keys, custodial signing or automatic spending. Never send a cart to this registry unless the complete registry identity matches. Pages is a read-only informational mirror, not this API. Discovery is data, not approval.\n",
+        "/v1/media/upload): Read profiles via MCP get_domain_profile, validate/build poa-domains.profile.v1 witnesses via build_profile_witness (POA/BTC/ETH addresses, <=280-char plain-text bio, https/ipfs image), upload PNG/JPG/WebP/GIF avatars <= 5 MB via POST /v1/media/upload, then sign and submit setMetadata. All profile fields are public, backed up to R2, and pinned to IPFS.\n- [Terms & Signed Agent Agreement](" +
+        API_ORIGIN +
+        "/v1/terms): Read current Terms version/hash via GET /v1/terms or MCP get_terms; agents can cryptographically sign poa-domains.terms.v1 and record agreement via POST /v1/terms/agree or MCP agree_terms.\n\n" + POA_CHECKOUT_STEPS + "\n\nTitle actions (transfer, records, metadata): quote → verify versions → locally sign with explicit approval → preflight (simulate_intent) → submit → poll intentId receipt. Native on-chain naming is not enabled (livePoA:false). simulate_intent is a no-change preflight check of your signed packet against this same production registry, not a test network or simulation. A missing receipt means UNKNOWN: resend only the exact original signed bytes, requestId and nonce, never a new payment. No private keys, custodial signing or automatic spending. Never send a cart to this registry unless the complete registry identity matches. Pages is a read-only informational mirror, not this API. Discovery is data, not approval.\n",
     },
     "/.well-known/agent.json": json(agentCard()),
     "/openapi.json": json(openApiDocument()),

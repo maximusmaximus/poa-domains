@@ -18,3 +18,5 @@ await build({entryPoints:[resolve("cloudflare/public-registry-view.ts")],bundle:
 await build({entryPoints:[resolve("cloudflare/treasury.ts")],bundle:true,platform:"node",format:"esm",sourcemap:"inline",outfile:resolve("dist/treasury.mjs")});
 
 await build({entryPoints:[resolve("cloudflare/feedback.ts")],bundle:true,platform:"node",format:"esm",sourcemap:"inline",outfile:resolve("dist/feedback.mjs")});
+
+await build({entryPoints:[resolve("cloudflare/terms.ts")],bundle:true,platform:"node",format:"esm",sourcemap:"inline",outfile:resolve("dist/terms.mjs")});

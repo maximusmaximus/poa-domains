@@ -2,6 +2,7 @@ import { searchLog } from "./search-log.js";
 import { backupCommittedProfile, handleMediaGet, handleMediaUpload } from "./profiles-storage.js";
 import { handleTreasuryRequest } from "./treasury.js";
 import { handleFeedbackCaptcha, handleFeedbackChallenge, handleFeedbackSubmit } from "./feedback.js";
+import { handleTermsAgree, handleTermsInfo, handleTermsStatus } from "./terms.js";
 import { UI_SECURITY, secureUiResponse } from "../src/ui-policy.js";
 import { discoveryDocument } from "../src/discovery.js";
 import {mcpHttp} from "./mcp-http.js";
@@ -146,6 +147,16 @@ const gateway = {
       if(u.pathname === "/v1/treasury") {
         const stub = env.REGISTRY.getByName(SINGLETON);
         return handleTreasuryRequest(request, env, () => stub.treasuryAddresses());
+      }
+      if(u.pathname === "/v1/terms" || u.pathname === "/v1/terms/status" || u.pathname === "/v1/terms/agree") {
+        if (u.pathname === "/v1/terms") return handleTermsInfo(request, env);
+        const stub = env.REGISTRY.getByName(SINGLETON);
+        const termsStore = {
+          getTermsAgreement: (actor: string, termsVersion: string) => stub.getTermsAgreement(actor, termsVersion),
+          recordTermsAgreement: (row: Parameters<typeof stub.recordTermsAgreement>[0]) => stub.recordTermsAgreement(row),
+        };
+        if (u.pathname === "/v1/terms/status") return handleTermsStatus(request, env, termsStore);
+        return handleTermsAgree(request, env, termsStore);
       }
       // GET/HEAD /v1/feedback/captcha/:id
       if(u.pathname === "/v1/feedback/challenge" || u.pathname.startsWith("/v1/feedback/captcha/") || u.pathname === "/v1/feedback") {

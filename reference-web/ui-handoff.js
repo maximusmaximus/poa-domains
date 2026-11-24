@@ -1,8 +1,8 @@
-import { copyText } from "./ui-copy.js?v=8095046bb2aa";
-import { trapDialog } from "./ui-a11y.js?v=8095046bb2aa";
-import { ui } from "./ui-state.js?v=8095046bb2aa";
-import { el, endpointBase, ownershipView } from "./ui-core.js?v=8095046bb2aa";
-import { buildListingPrompt, buildSubnameListingPrompt, isPoaAddress, resolveDomainView, shouldHoldTransactions } from "./shared.js?v=8095046bb2aa";
+import { copyText } from "./ui-copy.js?v=db30cf79d161";
+import { trapDialog } from "./ui-a11y.js?v=db30cf79d161";
+import { ui } from "./ui-state.js?v=db30cf79d161";
+import { el, endpointBase, ownershipView } from "./ui-core.js?v=db30cf79d161";
+import { buildAgentTermsPrompt, buildListingPrompt, buildSubnameListingPrompt, hasAgreedToTerms, isPoaAddress, parsePublicJSON, resolveDomainView, saveTermsAgreement, shouldHoldTransactions } from "./shared.js?v=db30cf79d161";
 
 export function clearHandoff() {
     ui.generation++;
@@ -344,4 +344,126 @@ export function wireFeedbackModal() {
     };
     form.addEventListener("submit", submitFeedback);
     el("feedbackSubmit")?.addEventListener("click", submitFeedback);
+}
+
+let releaseTermsFocus = null;
+let termsSubmitBusy = false;
+
+export function isTermsGateOpen() {
+    const modal = el("termsGateModal");
+    return Boolean(modal && !modal.hidden);
+}
+
+function setTermsAgentStatus(text, tone = "muted") {
+    const node = el("termsAgentStatus");
+    if (!node) return;
+    node.className = "feedback-status " + (tone === "warn" ? "badge-warn" : tone === "ok" ? "badge-ok" : "muted");
+    node.textContent = text;
+}
+
+function closeTermsGate(actor = null) {
+    const modal = el("termsGateModal");
+    const backdrop = el("termsGateBackdrop");
+    saveTermsAgreement(globalThis.localStorage, actor);
+    if (actor && isPoaAddress(actor)) saveLastPoaAddress(actor);
+    if (modal) modal.hidden = true;
+    if (backdrop) backdrop.hidden = true;
+    document.body.classList.remove("terms-gate-open");
+    releaseTermsFocus?.();
+    releaseTermsFocus = null;
+}
+
+export function wireTermsGate() {
+    const modal = el("termsGateModal");
+    const backdrop = el("termsGateBackdrop");
+    const agreeBtn = el("termsAgreeBtn");
+    if (!modal || !backdrop || !agreeBtn) return;
+
+    if (modal.dataset.wired !== "1") {
+        modal.dataset.wired = "1";
+        agreeBtn.addEventListener("click", () => {
+            closeTermsGate();
+        });
+
+        el("termsAgentCopyBtn")?.addEventListener("click", async () => {
+            const actorInput = el("termsAgentActor");
+            const actor = actorInput?.value.trim() || detectUserPoaAddress() || "";
+            if (actorInput && actor && !actorInput.value.trim()) actorInput.value = actor;
+            const promptText = buildAgentTermsPrompt({
+                actor: actor || "<YOUR_POA_ADDRESS>",
+                endpointUrl: endpointBase() || location.origin,
+                chainId: ui.cap?.chainId || "poa-mainnet-1",
+            });
+            const pre = el("termsAgentPrompt");
+            if (pre) {
+                pre.textContent = promptText;
+                pre.hidden = false;
+            }
+            const res = await copyText(promptText, pre);
+            setTermsAgentStatus(
+                res.ok ? "✅ Signing prompt copied for your agent." : "📋 Select and copy the prompt above for your agent.",
+                res.ok ? "ok" : "muted",
+            );
+        });
+
+        el("termsAgentSubmitBtn")?.addEventListener("click", async () => {
+            if (termsSubmitBusy) return;
+            if (ui.demo) {
+                setTermsAgentStatus("🧪 Static demo mode has no backend. Click I Agree to browse the demo, or submit signed attestations on poadomains.grok.me.", "warn");
+                return;
+            }
+            const raw = el("termsAgentPacket")?.value.trim() ?? "";
+            if (!raw) {
+                setTermsAgentStatus("⚠️ Paste the signed {statement, signature} JSON from your agent first.", "warn");
+                el("termsAgentPacket")?.focus();
+                return;
+            }
+            let packet;
+            try {
+                packet = parsePublicJSON(raw);
+            } catch (error) {
+                setTermsAgentStatus("⚠️ " + (error?.message || "Invalid JSON or forbidden secret field."), "warn");
+                return;
+            }
+            const submitBtn = el("termsAgentSubmitBtn");
+            termsSubmitBusy = true;
+            if (submitBtn) submitBtn.disabled = true;
+            setTermsAgentStatus("⏳ Verifying signed Terms agreement…");
+            try {
+                const res = await fetch(endpointBase() + "/v1/terms/agree", {
+                    method: "POST",
+                    credentials: "omit",
+                    cache: "no-store",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify(packet),
+                });
+                const body = await res.json();
+                if (!res.ok || body?.ok !== true) {
+                    setTermsAgentStatus("⚠️ " + (body?.message || "Could not verify signed agreement."), "warn");
+                    return;
+                }
+                setTermsAgentStatus("✅ Signed Terms agreement recorded.", "ok");
+                closeTermsGate(body.actor || null);
+            } catch (error) {
+                setTermsAgentStatus("⚠️ " + (error?.message || "Could not submit signed agreement."), "warn");
+            } finally {
+                termsSubmitBusy = false;
+                if (submitBtn) submitBtn.disabled = false;
+            }
+        });
+    }
+
+    if (!hasAgreedToTerms(globalThis.localStorage)) {
+        modal.hidden = false;
+        backdrop.hidden = false;
+        document.body.classList.add("terms-gate-open");
+        if (!releaseTermsFocus) {
+            releaseTermsFocus = trapDialog(
+                modal,
+                backdrop,
+                document.querySelector('.section-tab[aria-selected="true"]') || el("siteTitle"),
+            );
+        }
+        agreeBtn.focus();
+    }
 }

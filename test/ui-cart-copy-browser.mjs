@@ -1,8 +1,11 @@
 // GET-only loopback regression test for POA-mode cart copy, clipboard fallbacks, and modal navigation.
 import assert from "node:assert/strict";
+import { generateKeyPairSync } from "node:crypto";
 import { chromium, expect } from "@playwright/test";
 import { uiHarness } from "./fixtures/ui-harness.mjs";
 import { auditedEngine, get } from "./fixtures/audited-engine.mjs";
+import { nativePrincipal } from "../dist/src/auth.js";
+import { TERMS_DOMAIN, TERMS_HASH, TERMS_VERSION, signTermsAgreement } from "../dist/src/terms.js";
 
 const browser = await chromium.launch({ headless: true });
 const h = await uiHarness("mainnet");
@@ -20,6 +23,7 @@ try {
   await page.route("https://**", (r) => r.abort());
   await page.goto(h.url + "/?q=freshpoaname");
   await page.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await page.locator("#termsAgreeBtn").click();
   await expect(page.locator("#cartExpectations")).toBeHidden();
   await expect(page.locator("#searchResult")).toContainText("reaches finality and runs issue");
   await page.locator("#addToCartBtn").click();
@@ -101,6 +105,7 @@ try {
   });
   await pageNoClip.goto(h.url + "/?q=freshpoaname");
   await pageNoClip.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageNoClip.locator("#termsAgreeBtn").click();
   await pageNoClip.locator("#addToCartBtn").click();
   await expect(pageNoClip.locator("#copyCartPrompt")).toBeEnabled();
   const fallbackPrompt = await pageNoClip.locator("#cartPrompt").textContent();
@@ -129,6 +134,7 @@ try {
   });
   await pageManual.goto(h.url + "/?q=freshpoaname");
   await pageManual.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageManual.locator("#termsAgreeBtn").click();
   await pageManual.locator("#addToCartBtn").click();
   await expect(pageManual.locator("#copyCartPrompt")).toBeEnabled();
   await pageManual.locator("#copyCartPrompt").click();
@@ -168,6 +174,7 @@ try {
   await pageEscrow.route("https://**", (r) => r.abort());
   await pageEscrow.goto(h.url + "/?q=freshpoaname");
   await pageEscrow.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageEscrow.locator("#termsAgreeBtn").click();
   await expect(pageEscrow.locator("#cartEscrowStatus")).toBeVisible();
   await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("currently on hold");
   await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("reconciliation hold");
@@ -243,6 +250,7 @@ try {
   await pageAddr.route("https://**", (r) => r.abort());
   await pageAddr.goto(h.url + "/?q=addrcheck");
   await pageAddr.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageAddr.locator("#termsAgreeBtn").click();
 
   // Search result shows shortened owner + copy icon that copies full owner address
   await expect(pageAddr.locator("#searchResult .poa-addr-text")).toHaveText("poa1...piRf");
@@ -321,6 +329,7 @@ try {
 
   await pageUx.goto(h.url + "/");
   await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageUx.locator("#termsAgreeBtn").click();
 
   // (a) Autofill + dropdown + click auto-adds to cart
   await pageUx.locator("#searchInput").fill("agen");
@@ -511,6 +520,7 @@ try {
 
   await pageFooter.goto(h.url + "/");
   await pageFooter.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageFooter.locator("#termsAgreeBtn").click();
   await expect(pageFooter.locator("#domainsServedFooter")).toContainText("Number of Domains Served:");
   await expect(pageFooter.locator("#domainsServedCount")).toHaveText("0️⃣0️⃣0️⃣0️⃣0️⃣3️⃣");
   await expect(pageFooter.locator("#domainsServedSr")).toHaveText("3");
@@ -549,7 +559,81 @@ try {
   assert.deepEqual(errorsFooter, []);
   await ctxFooter.close();
 
-  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations, escrow readiness banner, shortened PoA address copy, search autofill/dropdown, clean cart cards, cart-owned prefill, Manage this domain, Profile v1 editor, reorganized escrow signed request, treasury footer & bug/feature feedback modal");
+  // 8. First-visit non-dismissible Terms modal + localStorage persistence + signed agent agreement
+  const hTerms = await uiHarness("mainnet", { allowTermsAgree: true });
+  hTerms.cap = h.cap;
+  hTerms.payload = h.payload;
+  try {
+    const ctxGate = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+    await ctxGate.grantPermissions(["clipboard-read", "clipboard-write"], { origin: hTerms.url });
+    const pageGate = await ctxGate.newPage();
+    const errorsGate = [];
+    pageGate.on("pageerror", (e) => errorsGate.push(e.message));
+    await pageGate.route("https://**", (r) => r.abort());
+    await pageGate.goto(hTerms.url + "/");
+    await pageGate.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+
+    // Modal is open, contains summary, key warning, Terms link, and NO close button
+    await expect(pageGate.locator("#termsGateModal")).toBeVisible();
+    await expect(pageGate.locator("#termsGateSummary")).toContainText("application registry");
+    await expect(pageGate.locator("#termsGateWarning")).toContainText("Never enter private keys");
+    await expect(pageGate.locator("#termsGateLink")).toHaveAttribute("href", "/terms");
+    await expect(pageGate.locator("#termsGateLink")).toHaveAttribute("target", "_blank");
+    assert.equal(await pageGate.locator("#termsGateModal button", { hasText: /close|dismiss/i }).count(), 0);
+    assert.equal(await pageGate.locator("#homeMain").evaluate((n) => n.inert), true);
+
+    // Pressing Escape or clicking backdrop MUST NOT dismiss the modal
+    await pageGate.keyboard.press("Escape");
+    await expect(pageGate.locator("#termsGateModal")).toBeVisible();
+    await pageGate.locator("#termsGateBackdrop").click({ position: { x: 8, y: 8 }, force: true });
+    await expect(pageGate.locator("#termsGateModal")).toBeVisible();
+
+    // Clicking I Agree dismisses modal, un-inerts page, and persists across reload
+    await pageGate.locator("#termsAgreeBtn").click();
+    await expect(pageGate.locator("#termsGateModal")).toBeHidden();
+    assert.equal(await pageGate.locator("#homeMain").evaluate((n) => n.inert), false);
+    await pageGate.reload();
+    await pageGate.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await expect(pageGate.locator("#termsGateModal")).toBeHidden();
+
+    // Fresh visit: agent signs Terms attestation with Ed25519 and unlocks the modal via POST /v1/terms/agree
+    await pageGate.evaluate(() => localStorage.clear());
+    await pageGate.reload();
+    await pageGate.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await expect(pageGate.locator("#termsGateModal")).toBeVisible();
+
+    const { privateKey: agentKey } = generateKeyPairSync("ed25519");
+    const agentActor = nativePrincipal(agentKey);
+    await pageGate.locator("#termsAgentDetails summary").click();
+    await pageGate.locator("#termsAgentActor").fill(agentActor);
+    await pageGate.locator("#termsAgentCopyBtn").click();
+    const copiedTermsPrompt = await pageGate.evaluate(() => navigator.clipboard.readText());
+    assert.ok(copiedTermsPrompt.includes(TERMS_VERSION) && copiedTermsPrompt.includes(TERMS_HASH) && copiedTermsPrompt.includes(agentActor));
+
+    const signedPacket = signTermsAgreement(
+      {
+        domain: TERMS_DOMAIN,
+        chainId: "poa-mainnet-1",
+        actor: agentActor,
+        termsVersion: TERMS_VERSION,
+        termsHash: TERMS_HASH,
+        agreed: true,
+        agreedAt: Math.floor(Date.now() / 1000),
+      },
+      agentKey,
+    );
+    await pageGate.locator("#termsAgentPacket").fill(JSON.stringify(signedPacket));
+    await pageGate.locator("#termsAgentSubmitBtn").click();
+    await expect(pageGate.locator("#termsGateModal")).toBeHidden();
+    const statusCheck = await (await fetch(`${hTerms.url}/v1/terms/status?actor=${encodeURIComponent(agentActor)}`)).json();
+    assert.equal(statusCheck.agreed, true);
+    assert.deepEqual(errorsGate, []);
+    await ctxGate.close();
+  } finally {
+    await hTerms.close();
+  }
+
+  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations, escrow readiness banner, shortened PoA address copy, search autofill/dropdown, clean cart cards, cart-owned prefill, Manage this domain, Profile v1 editor, reorganized escrow signed request, treasury footer, domains served counter, bug/feature feedback modal & non-dismissible Terms gate");
 } finally {
   await h.close();
   await browser.close();

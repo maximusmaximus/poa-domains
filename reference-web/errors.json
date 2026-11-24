@@ -2198,6 +2198,36 @@
       "retryable": false
     },
     {
+      "code": "TERMS_EXPIRED",
+      "httpStatus": 400,
+      "message": "The signed Terms statement timestamp is outside the allowed window. Refresh GET /v1/terms and sign again.",
+      "retryable": false
+    },
+    {
+      "code": "TERMS_INVALID_INPUT",
+      "httpStatus": 400,
+      "message": "Provide a valid signed Terms agreement packet { statement, signature } with agreed: true and a valid public principal.",
+      "retryable": false
+    },
+    {
+      "code": "TERMS_RATE_LIMITED",
+      "httpStatus": 429,
+      "message": "Too many Terms agreement requests right now. Wait a moment and try again.",
+      "retryable": true
+    },
+    {
+      "code": "TERMS_SIGNATURE_INVALID",
+      "httpStatus": 400,
+      "message": "The Ed25519 signature does not match the canonical Terms statement and actor public key.",
+      "retryable": false
+    },
+    {
+      "code": "TERMS_VERSION_MISMATCH",
+      "httpStatus": 409,
+      "message": "The signed Terms version or SHA-256 hash does not match the current Terms. Read GET /v1/terms first.",
+      "retryable": false
+    },
+    {
       "code": "TITLE_LOCKED",
       "httpStatus": 400,
       "message": "Title locked. Check the documented inputs and current state.",

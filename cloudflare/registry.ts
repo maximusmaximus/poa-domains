@@ -18,6 +18,7 @@ import { BootableSystemClock, seedRegistry } from "../src/seed.js";
 import { SQLiteJournal } from "./sqlite-journal.js";
 import { BackupKind, JournalRow, buildBackup, encryptSecrets, journalHeadOf, secretAad, verifyBackup } from "./backup-codec.js";
 import type { FeedbackChallengeRow, FeedbackConsumeInput, FeedbackConsumeResult } from "./feedback.js";
+import type { TermsAgreementRecord } from "./terms.js";
 
 export interface BackupExport { bodyText: string; sha256: string; size: number; sequence: number; stateHash: string; createdAt: string; }
 export type EscrowExport = EscrowArchive;
@@ -84,6 +85,58 @@ export class PoaRegistry extends DurableObject<Env> {
       ? this.engine.config.treasury.trim()
       : null;
     return { escrow, treasury };
+  }
+  #ensureTermsTable(): void {
+    this.ctx.storage.sql.exec(
+      "CREATE TABLE IF NOT EXISTS terms_agreements (actor TEXT NOT NULL, terms_version TEXT NOT NULL, terms_hash TEXT NOT NULL, agreed_at INTEGER NOT NULL, recorded_at INTEGER NOT NULL, signature TEXT NOT NULL, statement_json TEXT NOT NULL, PRIMARY KEY (actor, terms_version));",
+    );
+  }
+  /** Isolated Terms acceptance table for signed agent attestations; never part of registry state, journal, or backups. */
+  getTermsAgreement(actor: string, termsVersion: string): TermsAgreementRecord | null {
+    this.#ensureTermsTable();
+    const row = this.ctx.storage.sql.exec<{
+      actor: string;
+      terms_version: string;
+      terms_hash: string;
+      agreed_at: number;
+      recorded_at: number;
+      signature: string;
+      statement_json: string;
+    }>(
+      "SELECT actor, terms_version, terms_hash, agreed_at, recorded_at, signature, statement_json FROM terms_agreements WHERE actor = ? AND terms_version = ?",
+      actor,
+      termsVersion,
+    ).toArray()[0];
+    if (!row) return null;
+    return {
+      actor: String(row.actor),
+      termsVersion: String(row.terms_version),
+      termsHash: String(row.terms_hash),
+      agreedAt: Number(row.agreed_at),
+      recordedAt: Number(row.recorded_at),
+      signature: String(row.signature),
+      statementJson: String(row.statement_json),
+    };
+  }
+  recordTermsAgreement(row: TermsAgreementRecord): { record: TermsAgreementRecord; alreadyAgreed: boolean } {
+    this.#ensureTermsTable();
+    return this.ctx.storage.transactionSync(() => {
+      const existing = this.getTermsAgreement(row.actor, row.termsVersion);
+      if (existing && existing.termsHash === row.termsHash) {
+        return { record: existing, alreadyAgreed: true };
+      }
+      this.ctx.storage.sql.exec(
+        "INSERT OR REPLACE INTO terms_agreements(actor, terms_version, terms_hash, agreed_at, recorded_at, signature, statement_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        row.actor,
+        row.termsVersion,
+        row.termsHash,
+        row.agreedAt,
+        row.recordedAt,
+        row.signature,
+        row.statementJson,
+      );
+      return { record: row, alreadyAgreed: false };
+    });
   }
   #ensureFeedbackTables(): void {
     const sql = this.ctx.storage.sql;

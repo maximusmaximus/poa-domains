@@ -309,10 +309,74 @@ export function registryMcpProfile(backend: McpRegistryBackend, beforeWitness?: 
       outputSchema: output({ nonce: { type: "integer", minimum: 0 } }),
       call: (a: any) => read("/v1/nonce", { signer: a.signer }),
     },
+    {
+      name: "get_terms",
+      description:
+        "Read the current Terms & Privacy version, SHA-256 hash, one-sentence disclosure, key warning, and signing template; pass optional actor to check signed agreement status.",
+      inputSchema: objectSchema({ actor: PRINCIPAL }, []),
+      outputSchema: output(
+        {
+          domain: S,
+          termsVersion: S,
+          termsHash: ID,
+          termsUrl: S,
+          summary: S,
+          keyWarning: S,
+          statementTemplate: O,
+          instructions: S,
+          actor: { anyOf: [S, { type: "null" }] },
+          agreed: { type: "boolean" },
+          agreedAt: { anyOf: [{ type: "integer" }, { type: "null" }] },
+          recordedAt: { anyOf: [{ type: "integer" }, { type: "null" }] },
+        },
+        ["domain", "termsVersion", "termsHash", "termsUrl", "summary", "keyWarning", "statementTemplate", "instructions"],
+      ),
+      call: async (a: any) => {
+        const info = await read("/v1/terms");
+        if (a?.actor) {
+          const st = await read("/v1/terms/status", { actor: a.actor });
+          return {
+            ...info,
+            actor: st.actor,
+            agreed: Boolean(st.agreed),
+            agreedAt: st.agreedAt ?? null,
+            recordedAt: st.recordedAt ?? null,
+          };
+        }
+        return info;
+      },
+    },
+    {
+      name: "agree_terms",
+      description:
+        "Submit a locally signed Ed25519 Terms agreement attestation { statement, signature } for an agent/user principal. Never accepts private keys or signs server-side.",
+      inputSchema: objectSchema({
+        statement: objectSchema({
+          domain: { const: "poa-domains.terms.v1" },
+          chainId: S,
+          actor: PRINCIPAL,
+          termsVersion: S,
+          termsHash: ID,
+          agreed: { const: true },
+          agreedAt: { type: "integer", minimum: 1 },
+        }),
+        signature: { type: "string", minLength: 32, maxLength: 160 },
+      }),
+      outputSchema: output({
+        ok: { const: true },
+        actor: S,
+        termsVersion: S,
+        termsHash: ID,
+        agreedAt: { type: "integer" },
+        recordedAt: { type: "integer" },
+        alreadyAgreed: { type: "boolean" },
+      }),
+      call: (a: any) => backend("POST", "/v1/terms/agree", {}, a),
+    },
   ].map((tool) => ({
     ...tool,
     annotations: {
-      readOnlyHint: tool.name !== "submit_intent",
+      readOnlyHint: tool.name !== "submit_intent" && tool.name !== "agree_terms",
       destructiveHint: tool.name === "submit_intent",
       idempotentHint: true,
       openWorldHint: false,

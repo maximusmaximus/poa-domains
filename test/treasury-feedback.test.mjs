@@ -518,7 +518,16 @@ test("treasury and feedback enforce HTTP bounds, origin/method/host checks, rate
   };
   assert.equal((await post({ ...validPayload, poaAddress: "bad-addr" })).status, 400);
   assert.equal((await post({ ...validPayload, pagePath: "no-leading-slash" })).status, 400);
-  assert.equal((await post({ ...validPayload, powNonce: "999999999" })).status, 400);
+  // Deterministically pick a PoW nonce that fails powBits (avoids 1-in-2^powBits flake)
+  let badPowNonce = "999999999";
+  for (let i = 0; i < 64; i++) {
+    const cand = `bad-${i}`;
+    if (!(await feedback.verifyPow(ch.powSalt, cand, ch.powBits))) {
+      badPowNonce = cand;
+      break;
+    }
+  }
+  assert.equal((await post({ ...validPayload, powNonce: badPowNonce })).status, 400);
   assert.equal((await post(validPayload, {}, "https://poadomains.grok.me/v1/feedback", { ...env, FEEDBACK_GITHUB_REPO: "bad repo" })).status, 503);
 
   // Upstream GitHub failure returns 502

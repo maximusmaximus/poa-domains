@@ -1474,6 +1474,26 @@ HTTP 400; retryable: false. Storage path. Check the documented inputs and curren
 
 HTTP 400; retryable: false. String. Check the documented inputs and current state.
 
+## TERMS_EXPIRED
+
+HTTP 400; retryable: false. The signed Terms statement timestamp is outside the allowed window. Refresh GET /v1/terms and sign again.
+
+## TERMS_INVALID_INPUT
+
+HTTP 400; retryable: false. Provide a valid signed Terms agreement packet { statement, signature } with agreed: true and a valid public principal.
+
+## TERMS_RATE_LIMITED
+
+HTTP 429; retryable: true. Too many Terms agreement requests right now. Wait a moment and try again.
+
+## TERMS_SIGNATURE_INVALID
+
+HTTP 400; retryable: false. The Ed25519 signature does not match the canonical Terms statement and actor public key.
+
+## TERMS_VERSION_MISMATCH
+
+HTTP 409; retryable: false. The signed Terms version or SHA-256 hash does not match the current Terms. Read GET /v1/terms first.
+
 ## TITLE_LOCKED
 
 HTTP 400; retryable: false. Title locked. Check the documented inputs and current state.

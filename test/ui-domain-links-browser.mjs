@@ -12,7 +12,7 @@ for(const [name,launcher] of [['chromium',chromium],['firefox',firefox],['webkit
  state.credits.local={amount:'10',payer:owner,auctionId:auction,asset:'POA',version:1};state.receipts[receipt]={intentId:receipt,requestId:'local-link-regression',sequence:1,time:state.time,status:'succeeded',signer:owner,result:{name:'seed.nexus',deedId:child}};state.sequence=1;safeObject(h.payload);
  try{
   await context.route('**/*',r=>{const q=r.request();requests.push(q.method()+' '+q.url());return new URL(q.url()).origin===h.url&&q.method()==='GET'?r.continue():r.abort();});
-  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(h.url);await page.waitForFunction(()=>['ready','error'].includes(document.body.dataset.registryStatus));assert.equal(await page.locator('body').getAttribute('data-registry-status'),'ready');
+  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(h.url);await page.waitForFunction(()=>['ready','error'].includes(document.body.dataset.registryStatus));await page.locator('#termsAgreeBtn').click();assert.equal(await page.locator('body').getAttribute('data-registry-status'),'ready');
   await expect(page.locator('#history h4 a[href="/d/seed.nexus"]')).toHaveCount(1);await expect(page.locator('#balances .badge-ok a[href="/d/nexus"]')).toHaveCount(1);
   await page.locator('#searchInput').fill('new.nexus');await page.locator('#searchBtn').click();await expect(page.locator('#searchResult p a[href="/d/nexus"]')).toHaveCount(1);
   await page.locator('#searchResult p a[href="/d/nexus"]').click();await expect(page.locator('#domainMain')).toBeVisible();assert.ok(await page.locator('#domainHistory a[href="/d/nexus"]').count());

@@ -52,6 +52,7 @@ try {
   await page.waitForFunction(
     () => document.body.dataset.registryStatus === "ready",
   );
+  await page.locator("#termsAgreeBtn").click();
   await page.locator("#addToCartBtn").click();
   await ready();
   const data = await payload();

@@ -1,17 +1,17 @@
-import { installHelp } from "./ui-help.js?v=8095046bb2aa";
-import { wireManagement } from "./ui-manage.js?v=8095046bb2aa";
-import { bindTabKeys } from "./ui-a11y.js?v=8095046bb2aa";
-import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=8095046bb2aa";
-import { ui } from "./ui-state.js?v=8095046bb2aa";
-import { canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=8095046bb2aa";
-import { navigateHome, openPoa, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=8095046bb2aa";
-import { el, endpointBase } from "./ui-core.js?v=8095046bb2aa";
-import { clearHandoff, copyDomainListingPrompt, copySubnameListing, setFeedbackModalOpen, wireFeedbackModal } from "./ui-handoff.js?v=8095046bb2aa";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=8095046bb2aa";
-import { submitSearchQuery, wireSearchAutocomplete } from "./ui-search.js?v=8095046bb2aa";
-import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=8095046bb2aa";
-import { copyText, flashCopied, selectElementText } from "./ui-copy.js?v=8095046bb2aa";
-import { cartCopyBlocked, downloadCartJSON, clearAllCart, renderCurrentCartHandoff, setFloatingCartOpen } from "./ui-cart.js?v=8095046bb2aa";
+import { installHelp } from "./ui-help.js?v=db30cf79d161";
+import { wireManagement } from "./ui-manage.js?v=db30cf79d161";
+import { bindTabKeys } from "./ui-a11y.js?v=db30cf79d161";
+import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=db30cf79d161";
+import { ui } from "./ui-state.js?v=db30cf79d161";
+import { canonical, digest, dismissNetworkBanner, instructions, loadCart, loadTabSeen, makeBody, parsePublicJSON, shouldHoldTransactions } from "./shared.js?v=db30cf79d161";
+import { navigateHome, openPoa, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=db30cf79d161";
+import { el, endpointBase } from "./ui-core.js?v=db30cf79d161";
+import { clearHandoff, copyDomainListingPrompt, copySubnameListing, isTermsGateOpen, setFeedbackModalOpen, wireFeedbackModal, wireTermsGate } from "./ui-handoff.js?v=db30cf79d161";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=db30cf79d161";
+import { submitSearchQuery, wireSearchAutocomplete } from "./ui-search.js?v=db30cf79d161";
+import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=db30cf79d161";
+import { copyText, flashCopied, selectElementText } from "./ui-copy.js?v=db30cf79d161";
+import { cartCopyBlocked, downloadCartJSON, clearAllCart, renderCurrentCartHandoff, setFloatingCartOpen } from "./ui-cart.js?v=db30cf79d161";
 
 try {
     ui.statusPanelDismissed = false; // New page visits show status; closing lasts for this page only.
@@ -20,6 +20,7 @@ try {
     wireManagement();
     wireSearchAutocomplete();
     wireFeedbackModal();
+    wireTermsGate();
     el("searchInput").addEventListener("input", updateIdeaContext);
     ui.cart = loadCart(globalThis.localStorage);
     ui.tabSeen = loadTabSeen(globalThis.localStorage);
@@ -119,6 +120,10 @@ try {
     document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape")
             return;
+        if (isTermsGateOpen()) {
+            event.preventDefault();
+            return;
+        }
         if (document.querySelector(".info-popover:popover-open")) return;
         if (!el("feedbackModal")?.hidden)
             setFeedbackModalOpen(false);

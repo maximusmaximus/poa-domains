@@ -328,7 +328,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=8095046bb2aa";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=db30cf79d161";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -1597,4 +1597,49 @@ const EMOJI_DIGITS = ["0\uFE0F\u20E3", "1\uFE0F\u20E3", "2\uFE0F\u20E3", "3\uFE0
 export function formatEmojiCounter(count, digits = 6) {
   const n = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
   return String(n).padStart(digits, "0").replace(/[0-9]/g, (d) => EMOJI_DIGITS[Number(d)]);
+}
+export const TERMS_DOMAIN = "poa-domains.terms.v1";
+export const TERMS_VERSION = "2026-11-24.v1";
+export const TERMS_HASH = "a0fbfdb5b853b1ec52512e02e1ec2c60fcc58e0d6b3900449a3d48d791aee75d";
+export const TERMS_AGREED_KEY = "poadomains.termsAgreed.v1";
+export function hasAgreedToTerms(storage) {
+  try {
+    const raw = storage?.getItem?.(TERMS_AGREED_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    return parsed?.version === TERMS_VERSION && parsed?.hash === TERMS_HASH;
+  } catch {
+    return false;
+  }
+}
+export function saveTermsAgreement(storage, actor = null) {
+  try {
+    storage?.setItem?.(TERMS_AGREED_KEY, JSON.stringify({
+      version: TERMS_VERSION,
+      hash: TERMS_HASH,
+      agreedAt: Date.now(),
+      actor: typeof actor === "string" && actor ? actor : null,
+    }));
+  } catch {
+    /* ignore storage restrictions */
+  }
+}
+export function buildAgentTermsPrompt({ actor, endpointUrl, chainId = "poa-mainnet-1", nowSec = Math.floor(Date.now() / 1000) } = {}) {
+  const endpoint = (endpointUrl || "https://poadomains.grok.me").replace(/\/+$/, "");
+  const statement = {
+    domain: TERMS_DOMAIN,
+    chainId,
+    actor: actor || "<YOUR_POA_ADDRESS>",
+    termsVersion: TERMS_VERSION,
+    termsHash: TERMS_HASH,
+    agreed: true,
+    agreedAt: nowSec,
+  };
+  return [
+    "📜 Sign PoA Domains Terms & Privacy Agreement (poa-domains.terms.v1). Never reveal or send my private key.",
+    `Terms URL: ${endpoint}/terms`,
+    "1) Locally sign canonical sorted-key UTF-8 JSON of `statement` with Ed25519 (base58 64-byte signature for poa1… addresses, hex for ed25519:… fixtures):",
+    JSON.stringify(statement, null, 2),
+    `2) Submit { "statement": <exact object above>, "signature": "<sig>" } via POST ${endpoint}/v1/terms/agree (or MCP tool agree_terms), OR paste the signed JSON back into this dialog.`,
+  ].join("\n");
 }

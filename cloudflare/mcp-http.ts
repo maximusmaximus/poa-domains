@@ -9,6 +9,8 @@ import { Fault, need } from "../src/core.js";
 import { SINGLETON } from "./registry.js";
 import { networkStatusMonitor } from "./network-status.js";
 import { backupCommittedProfile } from "./profiles-storage.js";
+import { buildTermsInfo, TERMS_HASH, TERMS_VERSION, verifyTermsAgreement } from "../src/terms.js";
+import { principal } from "../src/auth.js";
 const HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store",
@@ -116,6 +118,61 @@ export async function mcpHttp(request: Request, env: Env, ctx?: ExecutionContext
       query = {},
       packet,
     ) => {
+      if (path === "/v1/terms" && method === "GET") {
+        return buildTermsInfo({ baseUrl: env.PUBLIC_EXPLORER_URL || new URL(request.url).origin });
+      }
+      if (path === "/v1/terms/status" && method === "GET") {
+        const actor = principal(query.actor ?? "");
+        const existing = await env.REGISTRY.getByName(SINGLETON).getTermsAgreement(actor, TERMS_VERSION);
+        const agreed = Boolean(existing && existing.termsHash === TERMS_HASH);
+        return {
+          actor,
+          agreed,
+          termsVersion: TERMS_VERSION,
+          termsHash: TERMS_HASH,
+          agreedAt: agreed ? existing!.agreedAt : null,
+          recordedAt: agreed ? existing!.recordedAt : null,
+        };
+      }
+      if (path === "/v1/terms/agree" && method === "POST") {
+        const nowMs = Date.now();
+        const verified = verifyTermsAgreement(packet, Math.floor(nowMs / 1000));
+        const saved = await env.REGISTRY.getByName(SINGLETON).recordTermsAgreement({
+          actor: verified.statement.actor,
+          termsVersion: verified.statement.termsVersion,
+          termsHash: verified.statement.termsHash,
+          agreedAt: verified.statement.agreedAt,
+          recordedAt: nowMs,
+          signature: verified.signature,
+          statementJson: verified.statementJson,
+        });
+        if (env.PROFILES && !saved.alreadyAgreed) {
+          const putTask = env.PROFILES.put(
+            `v1/terms-agreements/${saved.record.termsVersion}/${saved.record.actor}.json`,
+            JSON.stringify({
+              actor: saved.record.actor,
+              termsVersion: saved.record.termsVersion,
+              termsHash: saved.record.termsHash,
+              agreedAt: saved.record.agreedAt,
+              recordedAt: saved.record.recordedAt,
+              signature: saved.record.signature,
+              statement: verified.statement,
+            }),
+            { httpMetadata: { contentType: "application/json; charset=utf-8" } },
+          ).catch(() => {});
+          if (ctx) ctx.waitUntil(putTask);
+          else await putTask;
+        }
+        return {
+          ok: true,
+          actor: saved.record.actor,
+          termsVersion: saved.record.termsVersion,
+          termsHash: saved.record.termsHash,
+          agreedAt: saved.record.agreedAt,
+          recordedAt: saved.record.recordedAt,
+          alreadyAgreed: saved.alreadyAgreed,
+        };
+      }
       const submitting = method === "POST" && path === "/v1/intents";
       if (submitting && networkStatusMonitor.peekStatus().hold)
         throw Object.assign(new Fault("NETWORK_HELD"), {

@@ -10,7 +10,7 @@ async function scenario(name, run, setup=()=>{}) {
  try { setup(h); await page.clock.install(); await run(h,page); assert.deepEqual(errors,[]); assert.deepEqual(h.writes,[]); console.log('PASS '+name); }
  finally { await page.close(); await h.close(); }
 }
-const ready=p=>p.waitForFunction(()=>document.body.dataset.registryStatus==='ready');
+const ready=async p=>{await p.waitForFunction(()=>document.body.dataset.registryStatus==='ready');if(await p.locator('#termsAgreeBtn').isVisible())await p.locator('#termsAgreeBtn').click();};
 async function poll(h,p) {
  const response=p.waitForResponse(r=>new URL(r.url()).pathname==='/v1/state');
  await p.clock.fastForward(12000); await response;
@@ -19,7 +19,7 @@ async function poll(h,p) {
 async function check(p,name) { await p.locator('#searchInput').fill(name); await p.locator('#searchBtn').click(); }
 try {
  await scenario('listeners and escrow mount before slow initial state; submitted search survives loading',async(h,p)=>{
-  await p.goto(h.url,{waitUntil:'commit'}); await p.locator('#action option').first().waitFor({state:'attached'});
+  await p.goto(h.url,{waitUntil:'commit'}); await p.locator('#action option').first().waitFor({state:'attached'}); if(await p.locator('#termsAgreeBtn').isVisible())await p.locator('#termsAgreeBtn').click();
   await expect(p.locator('#registryLoading')).not.toHaveAttribute('hidden');
   await p.locator('#tabEscrow').click(); await expect(p.locator('#tabEscrow')).toHaveAttribute('aria-selected','true');
   await expect(p.locator('#escrowPayments h2')).toHaveText('🪙 My POA');
@@ -28,7 +28,7 @@ try {
   await ready(p); await expect(p.locator('#searchResult')).toContainText('Available');
  },h=>h.stateDelay=1200);
  await scenario('initial 500 has a page-wide error, working tabs/escrow and retry recovery',async(h,p)=>{
-  await p.goto(h.url); await expect(p.locator('#registryError')).toBeVisible();
+  await p.goto(h.url); if(await p.locator('#termsAgreeBtn').isVisible())await p.locator('#termsAgreeBtn').click(); await expect(p.locator('#registryError')).toBeVisible();
   await p.locator('#tabEscrow').click(); await expect(p.locator('#registryError')).toBeVisible();
   await expect(p.locator('#escrowPayments h2')).toHaveText('🪙 My POA');
   h.stateStatus=200; await p.locator('#registryRetry').click(); await ready(p);

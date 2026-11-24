@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=acc068c9f330" />
+    <link rel="stylesheet" href="/style.css?v=707dc669b252" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -413,6 +413,44 @@
       </form>
     </div>
 
-    <script type="module" src="/app.js?v=8095046bb2aa"></script>
+    <div id="termsGateBackdrop" class="terms-gate-backdrop" hidden></div>
+    <div
+      id="termsGateModal"
+      class="terms-gate-modal"
+      role="alertdialog"
+      tabindex="-1"
+      aria-modal="true"
+      aria-labelledby="termsGateHeading"
+      aria-describedby="termsGateSummary termsGateWarning termsGateConsent"
+      hidden
+    >
+      <h2 id="termsGateHeading">📜 Welcome to PoA Domains</h2>
+      <p id="termsGateSummary">PoA Domains is a standalone application registry for permanent names and public profiles using custodial POA escrow, not a native PoA naming protocol.</p>
+      <p id="termsGateWarning" class="terms-gate-warning">⚠️ Never enter private keys, seed phrases, or passwords on this site — your agent signs locally in your own wallet.</p>
+      <p id="termsGateConsent">By continuing, you acknowledge this warning and agree to the <a id="termsGateLink" href="/terms" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions and Privacy Policy</a>.</p>
+      <div class="button-row terms-gate-actions">
+        <button type="button" id="termsAgreeBtn">✅ I Agree</button>
+      </div>
+      <details id="termsAgentDetails" class="terms-agent-details">
+        <summary>🤖 Agree with an AI agent (signed attestation)</summary>
+        <p class="muted">Agents can cryptographically sign and record agreement via <code>POST /v1/terms/agree</code> or MCP <code>agree_terms</code>.</p>
+        <label for="termsAgentActor">Public POA address (<code>poa1…</code>)
+          <input id="termsAgentActor" type="text" autocomplete="off" placeholder="poa1… public address" maxlength="80" />
+        </label>
+        <div class="button-row">
+          <button type="button" id="termsAgentCopyBtn" class="secondary small">📋 Copy agent signing prompt</button>
+        </div>
+        <pre id="termsAgentPrompt" class="prompt-box" hidden></pre>
+        <label for="termsAgentPacket">Paste signed attestation JSON (<code>{"statement":…,"signature":"…"}</code>)
+          <textarea id="termsAgentPacket" rows="3" autocomplete="off" spellcheck="false" placeholder='{"statement":{…},"signature":"…"}'></textarea>
+        </label>
+        <div class="button-row">
+          <button type="button" id="termsAgentSubmitBtn" class="secondary small">✅ Submit signed agreement</button>
+        </div>
+        <p id="termsAgentStatus" class="muted feedback-status" role="status" aria-live="polite"></p>
+      </details>
+    </div>
+
+    <script type="module" src="/app.js?v=db30cf79d161"></script>
   </body>
 </html>

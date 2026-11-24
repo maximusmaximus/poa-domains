@@ -1,11 +1,11 @@
-import { publicNameUnavailable } from "./shared.js?v=8095046bb2aa";
-import { registryUnit } from "./shared.js?v=8095046bb2aa";
-import { actionLabel } from "./ui-copy.js?v=8095046bb2aa";
-import { trapDialog } from "./ui-a11y.js?v=8095046bb2aa";
-import { ui } from "./ui-state.js?v=8095046bb2aa";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions, validPrincipal } from "./shared.js?v=8095046bb2aa";
-import { add, el, endpointBase } from "./ui-core.js?v=8095046bb2aa";
-import { nameLink, openManageDomain } from "./ui-router.js?v=8095046bb2aa";
+import { publicNameUnavailable } from "./shared.js?v=db30cf79d161";
+import { registryUnit } from "./shared.js?v=db30cf79d161";
+import { actionLabel } from "./ui-copy.js?v=db30cf79d161";
+import { trapDialog } from "./ui-a11y.js?v=db30cf79d161";
+import { ui } from "./ui-state.js?v=db30cf79d161";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions, validPrincipal } from "./shared.js?v=db30cf79d161";
+import { add, el, endpointBase } from "./ui-core.js?v=db30cf79d161";
+import { nameLink, openManageDomain } from "./ui-router.js?v=db30cf79d161";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;

@@ -67,6 +67,7 @@ try{
    try{
     await app.goto(base+'/?tab=handoff');await app.waitForFunction(()=>document.body.dataset.registryStatus==='ready');await app.evaluate(()=>document.fonts.ready);
     assert.equal(appRequests.filter(r=>r.url.endsWith('.woff2')).length,0,name+' font loaded without visible domain names');
+    await app.locator('#termsAgreeBtn').click();
     const handoffBytes=await bytes(app);assert.ok(handoffBytes<750000,name+' handoff byte budget '+handoffBytes);
     await app.locator('#tabFind').click();await app.locator('#searchInput').fill('alpha');await app.locator('#searchBtn').click();await app.locator('#addToCartBtn').click();await expect(app.locator('#copyCartPrompt')).toBeEnabled();
     await app.evaluate(()=>document.fonts.ready);const findBytes=await bytes(app);assert.ok(findBytes<2600000,name+' full cold resource budget '+findBytes);
