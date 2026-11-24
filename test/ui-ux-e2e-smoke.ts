@@ -381,11 +381,11 @@ async function runFullUiUxFlowsOnRegistryApp(
 
   // 4. Add items to cart directly from #auctions and #offers cards
   await page.locator("#tabAuctions").click();
-  await page.locator("#auctions article button").first().click();
+  await page.locator('#auctions article button[aria-label="Add to cart"]').first().click();
   assert.equal(await page.locator("#cartCount").innerText(), "2");
 
   await page.locator("#tabExplore").click();
-  const offerButtons = page.locator("#offers .card button");
+  const offerButtons = page.locator('#offers .card button[aria-label="Add to cart"]');
   assert.equal(await offerButtons.count(), 2);
   await offerButtons.nth(0).click();
   await offerButtons.nth(1).click();
@@ -433,7 +433,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.setViewportSize({ width: 375, height: 812 });
   await page.locator('.section-tab[data-tab="auctions"]').click();
   await page.locator("#tabAuctions").click();
-  await page.locator("#auctions article button").first().click();
+  await page.locator('#auctions article button[aria-label="Add to cart"]').first().click();
   await page.locator('.section-tab[data-tab="explore"]').click();
   await offerButtons.nth(0).click();
   await assertResponsiveGeometry(
@@ -639,7 +639,9 @@ async function runAgentRoundtripVerification(
   assert.match(balancesText, /Refund: 100000 registry units/);
   const refund=page.locator("#balances .card").filter({has:page.getByRole("heading",{name:"Refund: 100000 registry units",exact:true})});
   assert.equal(await refund.count(),1);
-  assert.ok((await refund.innerText()).includes(app.principals.carol!.slice(0,18)),"refund belongs to displaced payer");
+  const carol=app.principals.carol!;
+  assert.ok((await refund.innerText()).includes(`${carol.slice(0,4)}...${carol.slice(-4)}`),"refund belongs to displaced payer");
+  assert.equal(await refund.locator(".poa-copy-btn").getAttribute("data-copy-address"),carol);
   assert.match(await refund.innerText(),/🌐 · v1/);
 }
 

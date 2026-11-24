@@ -1,11 +1,11 @@
-import { publicNameUnavailable, unavailableKey } from "./shared.js?v=84cf1fca35ea";
-import { registryUnit, poaOnlyMode } from "./shared.js?v=84cf1fca35ea";
-import { actionLabel } from "./ui-copy.js?v=84cf1fca35ea";
-import { ui } from "./ui-state.js?v=84cf1fca35ea";
-import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=84cf1fca35ea";
-import { add, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=84cf1fca35ea";
-import { nameLink, ownerLink } from "./ui-router.js?v=84cf1fca35ea";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=84cf1fca35ea";
+import { publicNameUnavailable, unavailableKey } from "./shared.js?v=9e3528a22292";
+import { registryUnit, poaOnlyMode } from "./shared.js?v=9e3528a22292";
+import { actionLabel } from "./ui-copy.js?v=9e3528a22292";
+import { ui } from "./ui-state.js?v=9e3528a22292";
+import { activeResaleOffers, formatClock, minimumNextBid, resolveDomainView } from "./shared.js?v=9e3528a22292";
+import { add, appendPoaAddress, el, ownershipView, person, statusLabel, namedText } from "./ui-core.js?v=9e3528a22292";
+import { nameLink, ownerLink } from "./ui-router.js?v=9e3528a22292";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=9e3528a22292";
 
 export function renderDomainPage(name) {
     if (!ui.latestState || !name)
@@ -106,7 +106,9 @@ export function renderOwnerPage(ownerId) {
       el("ownerTitle").textContent="No public owner profile";el("ownerPrincipal").textContent="";el("ownerNames").replaceChildren();el("ownerListings").replaceChildren();add(el("ownerNames"),"p","No public registry names or subdomains.");add(el("ownerListings"),"p","No public listings.");return;
     }
     el("ownerTitle").textContent = "👤 Owner profile";
-    el("ownerPrincipal").textContent = ownerId;
+    const principalNode = el("ownerPrincipal");
+    principalNode.replaceChildren();
+    appendPoaAddress(principalNode, ownerId, { code: true });
     const namesBox = el("ownerNames");
     const listBox = el("ownerListings");
     namesBox.replaceChildren();

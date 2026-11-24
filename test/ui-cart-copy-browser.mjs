@@ -191,7 +191,101 @@ try {
   assert.deepEqual(errorsEscrow, []);
   await ctxEscrow.close();
 
-  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations & escrow readiness banner");
+  // 5. Shortened PoA address display (first 4 + "..." + last 4) + copy icon across views & escrow
+  const sampleOwner = "poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf";
+  const sampleEscrow = "poa1K9mN3pQ7rS2tU5vW8xY4zA6bC1dE3fG5hJ7kL9mN2p";
+  const sampleDeedId = "a".repeat(64);
+  const sampleReceiptId = "b".repeat(64);
+  const sampleAuctionId = "c".repeat(64);
+  h.payload.state.names.addrcheck = { name: "addrcheck", generation: 1, activeId: sampleDeedId, auctionId: null, version: 1 };
+  h.payload.state.deeds[sampleDeedId] = {
+    id: sampleDeedId,
+    name: "addrcheck",
+    parentId: null,
+    generation: 1,
+    owner: sampleOwner,
+    version: 1,
+    ownerVersion: 1,
+    rights: { kind: "permanent" },
+    records: [{ type: "poa", address: sampleOwner }],
+    metadata: [{ cid: "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi" }],
+  };
+  h.payload.state.balances[sampleOwner] = { POA: "500" };
+  h.payload.state.receipts[sampleReceiptId] = {
+    intentId: sampleReceiptId,
+    requestId: "req-addr-check",
+    sequence: 99,
+    time: h.payload.state.time,
+    status: "succeeded",
+    signer: sampleOwner,
+    result: { deedId: sampleDeedId },
+  };
+  h.payload.state.auctions[sampleAuctionId] = {
+    id: sampleAuctionId,
+    name: "addrcheck",
+    status: "cancelled",
+    reserve: "100",
+    asset: "POA",
+    openAt: h.payload.state.time - 100,
+    window: 60,
+    quiet: 60,
+    high: null,
+    version: 1,
+  };
+  h.payload.state.credits.addrcheck = { amount: "25", payer: sampleOwner, auctionId: sampleAuctionId, asset: "POA", version: 1 };
+  h.escrowCap = { ...h.escrowCap, address: sampleEscrow };
+
+  const ctxAddr = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  await ctxAddr.grantPermissions(["clipboard-read", "clipboard-write"], { origin: h.url });
+  const pageAddr = await ctxAddr.newPage();
+  const errorsAddr = [];
+  pageAddr.on("pageerror", (e) => errorsAddr.push(e.message));
+  await pageAddr.route("https://**", (r) => r.abort());
+  await pageAddr.goto(h.url + "/?q=addrcheck");
+  await pageAddr.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+
+  // Search result shows shortened owner + copy icon that copies full owner address
+  await expect(pageAddr.locator("#searchResult .poa-addr-text")).toHaveText("poa1...piRf");
+  assert.equal((await pageAddr.locator("#searchResult").innerText()).includes(sampleOwner), false);
+  await pageAddr.locator("#searchResult .poa-copy-btn").click();
+  assert.equal(await pageAddr.evaluate(() => navigator.clipboard.readText()), sampleOwner);
+  await expect(pageAddr.locator("#searchResult .poa-copy-btn")).toHaveClass(/is-copied/);
+
+  // Explore tab: Names, Record, History, Balances all shorten & copy full address
+  await pageAddr.locator("#tabExplore").click();
+  for (const sel of ["#names", "#history", "#balances"]) {
+    const text = await pageAddr.locator(sel).innerText();
+    assert.equal(text.includes(sampleOwner), false, `${sel} must not show unshortened PoA address`);
+    assert.ok(text.includes("poa1...piRf"), `${sel} must show shortened PoA address`);
+    const btn = pageAddr.locator(`${sel} .poa-copy-btn`).first();
+    await btn.click();
+    assert.equal(await pageAddr.evaluate(() => navigator.clipboard.readText()), sampleOwner);
+  }
+
+  // Escrow tab: #escrowLimits shortens escrow address + copies full address
+  await pageAddr.locator("#tabEscrow").click();
+  await expect(pageAddr.locator("#escrowLimits .poa-addr-text")).toHaveText("poa1...mN2p");
+  assert.equal((await pageAddr.locator("#escrowLimits").innerText()).includes(sampleEscrow), false);
+  await pageAddr.locator("#escrowLimits .poa-copy-btn").click();
+  assert.equal(await pageAddr.evaluate(() => navigator.clipboard.readText()), sampleEscrow);
+
+  // Domain page -> Owner profile page shorten & copy full address
+  await pageAddr.goto(h.url + "/d/addrcheck");
+  await pageAddr.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageAddr.locator("#domainOwner .poa-addr-text")).toHaveText("poa1...piRf");
+  await pageAddr.locator("#domainOwner .poa-copy-btn").click();
+  assert.equal(await pageAddr.evaluate(() => navigator.clipboard.readText()), sampleOwner);
+  await pageAddr.locator("#domainOwner a.poa-addr-text").click();
+  await expect(pageAddr.locator("#ownerMain")).toBeVisible();
+  await expect(pageAddr.locator("#ownerPrincipal .poa-addr-text")).toHaveText("poa1...piRf");
+  assert.equal((await pageAddr.locator("#ownerPrincipal").innerText()).includes(sampleOwner), false);
+  await pageAddr.locator("#ownerPrincipal .poa-copy-btn").click();
+  assert.equal(await pageAddr.evaluate(() => navigator.clipboard.readText()), sampleOwner);
+
+  assert.deepEqual(errorsAddr, []);
+  await ctxAddr.close();
+
+  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations, escrow readiness banner & shortened PoA address copy");
 } finally {
   await h.close();
   await browser.close();

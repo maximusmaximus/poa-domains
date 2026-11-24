@@ -1,11 +1,11 @@
-import { copyText } from "./ui-copy.js?v=84cf1fca35ea";
-import { publicNameUnavailable } from "./shared.js?v=84cf1fca35ea";
-import { registryUnit, poaOnlyMode, poaNewNamePrice, poaShort, buildSubnamePurchasePrompt } from "./shared.js?v=84cf1fca35ea";
-import { ui } from "./ui-state.js?v=84cf1fca35ea";
-import { nameLink, navigateDomain, writeViewURL } from "./ui-router.js?v=84cf1fca35ea";
-import { add, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=84cf1fca35ea";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=84cf1fca35ea";
-import { addToCart } from "./ui-cart.js?v=84cf1fca35ea";
+import { copyText } from "./ui-copy.js?v=9e3528a22292";
+import { publicNameUnavailable } from "./shared.js?v=9e3528a22292";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaShort, buildSubnamePurchasePrompt } from "./shared.js?v=9e3528a22292";
+import { ui } from "./ui-state.js?v=9e3528a22292";
+import { nameLink, navigateDomain, ownerLink, writeViewURL } from "./ui-router.js?v=9e3528a22292";
+import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=9e3528a22292";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=9e3528a22292";
+import { addToCart } from "./ui-cart.js?v=9e3528a22292";
 
 export function runSearch(rawQuery, remember = true) {
     if (remember) {
@@ -68,7 +68,14 @@ export function runSearch(rawQuery, remember = true) {
             ? minimumNextBid(liveAuction.high.amount, ui.cap.increment)
             : liveAuction.reserve;
         add(card, "p", "🏷️ In auction now", "badge");
-        add(card, "p", `Auction ID: ${liveAuction.id.slice(0, 18)}… · Version ${liveAuction.version} · Reserve: ${liveAuction.reserve} ${registryUnit(liveAuction.asset)} · ${liveAuction.high ? "Current high bid: " + liveAuction.high.amount + " by " + person(liveAuction.high.payer) : "No bids yet"}`);
+        const auctionInfo = add(card, "p", `Auction ID: ${liveAuction.id.slice(0, 18)}… · Version ${liveAuction.version} · Reserve: ${liveAuction.reserve} ${registryUnit(liveAuction.asset)} · `);
+        if (liveAuction.high) {
+            auctionInfo.append(`Current high bid: ${liveAuction.high.amount} by `);
+            appendPrincipal(auctionInfo, liveAuction.high.payer);
+        }
+        else {
+            auctionInfo.append("No bids yet");
+        }
         add(card, "p", `Minimum next valid bid: ${minBid} ${registryUnit(liveAuction.asset)} base units.`, "badge-ok");
         const controls = add(card, "div", "", "inline-controls");
         const bidInput = document.createElement("input");
@@ -102,7 +109,9 @@ export function runSearch(rawQuery, remember = true) {
     if (entry?.activeId && s.deeds[entry.activeId]) {
         const d = s.deeds[entry.activeId];
         add(card, "p", `✅ Owned (${d.rights.kind}) — OWNED (${d.rights.kind.toUpperCase()} DEED)`, "badge");
-        add(card, "p", `Owner: ${person(d.owner)} · Generation ${d.generation} · Owner version ${d.ownerVersion} · Deed version ${d.version}`);
+        const ownerInfo = add(card, "p", "Owner: ");
+        ownerLink(ownerInfo, d.owner, person(d.owner));
+        ownerInfo.append(` · Generation ${d.generation} · Owner version ${d.ownerVersion} · Deed version ${d.version}`);
         const resaleOffer = Object.values(s.offers).find((o) => o.kind === "resale" &&
             o.parentId === d.id &&
             !o.cancelled &&

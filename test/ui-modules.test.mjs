@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,readdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {transformSync} from 'esbuild';
-import {buildCartItem,editCartAmount} from '../reference-web/shared.js';
+import {buildCartItem,editCartAmount,isPoaAddress,shortenPoaAddress} from '../reference-web/shared.js';
 import {capabilities} from '../dist/src/interface.js';
 import {profileEngine} from './fixtures/ui-harness.mjs';
 import {auctionState,offerState} from './fixtures/ui-state.mjs';
@@ -68,6 +68,12 @@ test('all UI modules load without booting a browser, and shared copy guards rema
   ui.cart=[];ui.networkStatus.hold=true;assert.equal(cart.cartCopyBlocked(),true);
   assert.match(core.statusLabel('available'),/🟢/);assert.equal(core.statusLabel('custom'),'custom');
   ui.details={roles:{buyer:'fixture-public-id'}};assert.equal(core.person('fixture-public-id'),'Demo buyer');assert.match(core.person('other-public-identity'),/…$/);
+  const samplePoa='poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf';
+  assert.equal(isPoaAddress(samplePoa),true);
+  assert.equal(isPoaAddress('poa1...piRf'),false);
+  assert.equal(isPoaAddress('other-public-identity'),false);
+  assert.equal(shortenPoaAddress(samplePoa),'poa1...piRf');
+  assert.equal(core.person(samplePoa),'poa1...piRf');
   ui.demo=true;assert.equal(core.endpointBase(),'http://127.0.0.1:8787');ui.demo=false;ui.base='https://poadomains.grok.me';assert.equal(core.endpointBase(),ui.base);
  }finally{Object.assign(ui,previous);}
 });

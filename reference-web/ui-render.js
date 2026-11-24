@@ -1,13 +1,13 @@
-import { registryUnit, poaOnlyMode } from "./shared.js?v=84cf1fca35ea";
-import { drawTicker } from "./ui-ticker.js?v=84cf1fca35ea";
-import { actionLabel } from "./ui-copy.js?v=84cf1fca35ea";
-import { returnFocus } from "./ui-a11y.js?v=84cf1fca35ea";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=84cf1fca35ea";
-import { ui } from "./ui-state.js?v=84cf1fca35ea";
-import { add, el, person, namedText } from "./ui-core.js?v=84cf1fca35ea";
-import { nameLink, navigateDomain, ownerLink, openPoa } from "./ui-router.js?v=84cf1fca35ea";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=84cf1fca35ea";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=84cf1fca35ea";
+import { isPoaAddress, registryUnit, poaOnlyMode } from "./shared.js?v=9e3528a22292";
+import { drawTicker } from "./ui-ticker.js?v=9e3528a22292";
+import { actionLabel } from "./ui-copy.js?v=9e3528a22292";
+import { returnFocus } from "./ui-a11y.js?v=9e3528a22292";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatDuration, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=9e3528a22292";
+import { ui } from "./ui-state.js?v=9e3528a22292";
+import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=9e3528a22292";
+import { nameLink, navigateDomain, ownerLink, openPoa } from "./ui-router.js?v=9e3528a22292";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=9e3528a22292";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=9e3528a22292";
 
 export function updateTabDots(state) {
     const marks = tabWatermarks(state);
@@ -134,7 +134,14 @@ export function renderAuctions(s) {
         const ah = add(card, "h4", "");
         nameLink(ah, a.name);
         add(card, "p", phase, "badge");
-        add(card, "p", `Reserve ${a.reserve} ${registryUnit(a.asset)}. ${a.high ? "High bid " + a.high.amount + " by " + person(a.high.payer) : "No active high bid."}`);
+        const bidLine = add(card, "p", `Reserve ${a.reserve} ${registryUnit(a.asset)}. `);
+        if (a.high) {
+            bidLine.append(`High bid ${a.high.amount} by `);
+            appendPrincipal(bidLine, a.high.payer);
+        }
+        else {
+            bidLine.append("No active high bid.");
+        }
         add(card, "p", `Window ${formatDuration(a.window)} + quiet ${formatDuration(a.quiet)} · closes ${formatClock(close)}`);
         if (a.status === "live" && !(typeof s.time === "number" && s.time < a.openAt)) {
             const nextMin = a.high
@@ -272,8 +279,14 @@ export function render(payload) {
         add(card, "p", d.rights.kind === "lease"
             ? "📜 Legacy lease record · renewals are off"
             : "♾️ Owned forever · resale or transfer only", "badge-ok");
-        for (const r of d.records)
-            add(card, "p", r.type + ": " + (r.url ?? r.address ?? r.cid), "record");
+        for (const r of d.records) {
+            const value = r.url ?? r.address ?? r.cid;
+            const recLine = add(card, "p", r.type + ": ", "record");
+            if (isPoaAddress(value))
+                appendPoaAddress(recLine, value);
+            else
+                recLine.append(String(value ?? ""));
+        }
         add(card, "code", d.metadata[d.metadata.length - 1].cid);
     }
     if (!names.length)
@@ -309,7 +322,9 @@ export function render(payload) {
             nameLink(oh, targetName);
         }
         add(card, "p", `${o.kind} offer · ${statusText} · price ${o.price} ${registryUnit(o.asset)}`, active ? "badge-ok" : "badge");
-        add(card, "p", `Seller: ${person(o.owner)} · Uses: ${o.uses}/${o.maxUses} · Until ${formatClock(o.validUntil)}`);
+        const sellerLine = add(card, "p", "Seller: ");
+        ownerLink(sellerLine, o.owner, person(o.owner));
+        sellerLine.append(` · Uses: ${o.uses}/${o.maxUses} · Until ${formatClock(o.validUntil)}`);
         if (o.kind === "child" && o.rights) {
             add(card, "p", `Rights: ${o.rights.kind} · Labels: ${o.labels ? o.labels.join(", ") : "any"}`);
         }
@@ -344,7 +359,10 @@ export function render(payload) {
         nameLink(hh, domainName);
         hh.append(` — ${b.amount} ${registryUnit(a ? a.asset : "POA")}`);
         add(card, "p", `Bid status: ${b.status.toUpperCase()} · Sequence #${b.sequence} · ${formatClock(b.at)}`, b.status === "won" || b.status === "high" ? "badge-ok" : "badge");
-        add(card, "p", `Payer: ${person(b.payer)} · Beneficiary: ${person(b.beneficiary)}`);
+        const partyLine = add(card, "p", "Payer: ");
+        appendPrincipal(partyLine, b.payer);
+        partyLine.append(" · Beneficiary: ");
+        appendPrincipal(partyLine, b.beneficiary);
     }
     const purchaseReceipts = [...receipts]
         .filter((r) => r.status === "succeeded" &&
@@ -363,7 +381,9 @@ export function render(payload) {
         const card = add(el("history"), "div", "", "card");
         namedText(add(card, "h4", ""), label);
         add(card, "p", `Receipt #${r.sequence} · ${formatClock(r.time)} · Status: ${r.status}`, "badge");
-        add(card, "p", `Signer: ${person(r.signer)} · Request: ${r.requestId}`);
+        const signerLine = add(card, "p", "Signer: ");
+        appendPrincipal(signerLine, r.signer);
+        signerLine.append(` · Request: ${r.requestId}`);
         add(card, "code", `intentId: ${r.intentId.slice(0, 24)}…`);
     }
     if (!sortedBids.length && !purchaseReceipts.length)
@@ -375,18 +395,22 @@ export function render(payload) {
         const card = add(el("balances"), "div", "", "card");
         const a = s.auctions[c.auctionId];
         add(card, "h4", `Refund: ${c.amount} ${registryUnit(c.asset)}`);
-        const refundLine = add(card, "p", `${person(c.payer)} · `, "badge-ok");
+        const refundLine = add(card, "p", "", "badge-ok");
+        appendPrincipal(refundLine, c.payer);
+        refundLine.append(" · ");
         if (a) nameLink(refundLine, a.name); else refundLine.append(c.auctionId.slice(0, 12));
         refundLine.append(` · v${c.version}`);
     }
     if (!Object.keys(s.balances ?? {}).length && !Object.keys(s.credits ?? {}).length) add(el("balances"), "p", "No public registry-unit balances or refunds. These are not POA or wallet balances.", "muted");
     for (const [who, wallet] of Object.entries(s.balances ?? {})) {
         const card = add(el("balances"), "div", "", "card");
-        add(card, "h4", person(who));
+        const wh = add(card, "h4", "");
+        ownerLink(wh, who, person(who));
         const entries = Object.entries(wallet)
             .map(([asset, amt]) => `${amt} ${registryUnit(asset)}`)
             .join(" · ");
         add(card, "p", entries, "record");
-        add(card, "code", who);
+        if (!isPoaAddress(who))
+            add(card, "code", who);
     }
 }
