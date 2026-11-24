@@ -1,18 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=c8a3dd96f525";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=c8a3dd96f525";
-import { renderManagement } from "./ui-manage.js?v=c8a3dd96f525";
-import { actionLabel } from "./ui-copy.js?v=c8a3dd96f525";
-import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=c8a3dd96f525";
-import { ui } from "./ui-state.js?v=c8a3dd96f525";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=c8a3dd96f525";
-import { createPoaCopyButton } from "./ui-copy.js?v=c8a3dd96f525";
-import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=c8a3dd96f525";
-import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=c8a3dd96f525";
-import { renderDomainPage } from "./ui-domain.js?v=c8a3dd96f525";
-import { runSearch } from "./ui-search.js?v=c8a3dd96f525";
-import { renderIdeas } from "./ui-ideas.js?v=c8a3dd96f525";
-import { mountEscrow } from "./escrow.js?v=c8a3dd96f525";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=c8a3dd96f525";
+import { publicNameUnavailable } from "./shared.js?v=38947c454eb2";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=38947c454eb2";
+import { renderManagement } from "./ui-manage.js?v=38947c454eb2";
+import { actionLabel } from "./ui-copy.js?v=38947c454eb2";
+import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=38947c454eb2";
+import { ui } from "./ui-state.js?v=38947c454eb2";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=38947c454eb2";
+import { createPoaCopyButton } from "./ui-copy.js?v=38947c454eb2";
+import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=38947c454eb2";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=38947c454eb2";
+import { renderDomainPage } from "./ui-domain.js?v=38947c454eb2";
+import { runSearch } from "./ui-search.js?v=38947c454eb2";
+import { renderIdeas } from "./ui-ideas.js?v=38947c454eb2";
+import { mountEscrow } from "./escrow.js?v=38947c454eb2";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=38947c454eb2";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -20,6 +20,12 @@ export function updateFreshness() {
     for (const node of document.querySelectorAll(".tab-age"))
         node.textContent = text;
     el("registryAge").textContent = "Registry data " + text + " · POA payments refresh separately.";
+    const nowMs = Date.now();
+    for (const cd of document.querySelectorAll(".auction-countdown[data-closes-ms]")) {
+        const closes = Number(cd.dataset.closesMs);
+        if (Number.isFinite(closes) && closes > 0)
+            cd.textContent = `⏳ ${formatCountdown(closes - nowMs)}`;
+    }
 }
 
 function enhanceEscrowSignedRequestUx(root) {
@@ -112,6 +118,13 @@ function enhanceEscrowSignedRequestUx(root) {
         step1.append(limits);
     if (actionRow) {
         step1.append(actionRow);
+        const balanceNote = document.createElement("p");
+        balanceNote.id = "escrowBalanceNote";
+        balanceNote.className = "escrow-balance-note";
+        balanceNote.setAttribute("role", "note");
+        balanceNote.textContent =
+            "💡 Held balance & withdrawals: Deposited POA and outbid auction funds return immediately to your available escrow balance so you can re-bid right away — tap ↩️ Request my refund anytime to withdraw back to your original wallet (up to the per-tx limit per request; funds locked in an active leading bid unlock if outbid, cancelled, or expired).";
+        step1.append(balanceNote);
         const sellWarning = document.createElement("p");
         sellWarning.id = "escrowListingFieldWarning";
         sellWarning.className = "sale-fields-warning";

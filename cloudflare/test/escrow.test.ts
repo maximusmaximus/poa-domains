@@ -17,9 +17,9 @@ function fixture(crash=(point:string)=>{}, p=policy){
   const e=make();e.pause(false);
   return {e,journal,net,make,owner:()=>owner,count:()=>transferCount,disable:()=>{enabled=false;}};
 }
-async function fund(f:ReturnType<typeof fixture>,n=3,amount="10.000000",tag="a"){
+async function fund(f:ReturnType<typeof fixture>,n=3,amount="10.000000",tag="a",nonce=1){
   const r=await f.e.command(command(who(n),`intent-${tag}`,"intent",{amount})) as any;
-  const id=f.net.add(depositBody(n,policy.wallet,amount,r.intent));
+  const id=f.net.add(depositBody(n,policy.wallet,amount,r.intent,nonce));
   await f.e.command(command(who(n),`detect-${tag}`,"detect",{intent:r.intent,txid:id}));return{id,intent:r.intent};
 }
 async function auction(f:ReturnType<typeof fixture>,amount="2.000000"){
@@ -100,14 +100,25 @@ test("idempotency binds complete payload and survives replay",async()=>{
  assert.deepEqual(await f.make().command(c),a);await assert.rejects(f.e.command({...c,params:{amount:"2.000000"}}),/CONFLICT/);
  const rows=structuredClone(f.journal.rows);rows[0]!.state.assets="1";assert.throws(()=>replay(rows,policy),/CORRUPT/);
 });
-test("bid holds, strict increment, outbid original payer refund, cancel and double refund",async()=>{
+test("bid holds, strict increment, outbid credits available balance for instant re-bid/withdraw, cancel and double refund",async()=>{
  const f=fixture(),a=await auction(f);await fund(f,4,"10.000000","b");
+ assert.equal(f.e.state().available[who(3)],"8000000");
  await assert.rejects(f.e.command(command(who(3),"raise","bid",{auction:a,amount:"3.000000"})),/SELF_RAISE/);
  await assert.rejects(f.e.command(command(who(4),"low","bid",{auction:a,amount:"2.200000"})),/INCREMENT/);
  await f.e.command(command(who(4),"high","bid",{auction:a,amount:"2.200001"}));
- assert.equal(Object.values(f.e.state().payments)[0]!.to,who(3));
+ // Outbid funds credit back to original bidder's available balance immediately (no on-chain refund wait).
+ assert.equal(f.e.state().available[who(3)],"10000000");
+ assert.equal(f.e.state().available[who(4)],"7799999");
+ assert.equal(Object.keys(f.e.state().payments).length,0);
  await f.e.command(command(who(2),"cancel","cancel",{auction:a}));
- await assert.rejects(f.e.command(command(who(2),"again","cancel",{auction:a})),/CLOSED/);assert.equal(Object.keys(f.e.state().payments).length,2);invariant(f.e.state());
+ await assert.rejects(f.e.command(command(who(2),"again","cancel",{auction:a})),/CLOSED/);
+ assert.equal(Object.keys(f.e.state().payments).length,1);
+ assert.equal(Object.values(f.e.state().payments)[0]!.to,who(4));
+ // Displaced bidder can withdraw their full returned balance cleanly to their own address.
+ await f.e.command(command(who(3),"w-back","withdraw",{amount:"10.000000"}));
+ assert.equal(f.e.state().available[who(3)],"0");
+ assert.equal(Object.keys(f.e.state().payments).length,2);
+ invariant(f.e.state());
 });
 test("expiry/failure reclassifies refund liability even while admin paused",async()=>{
  const f=fixture(),a=await auction(f);f.e.pause(true);f.net.now+=1001;
@@ -146,7 +157,12 @@ test("nonce gap and per-transaction limits hold before signing/submitting",async
 test("simultaneous bid/cancel/ticks cannot overdraw or double refund/payout",async()=>{
  const f=fixture(),a=await auction(f);await fund(f,4,"10.000000","b");
  await Promise.allSettled(Array.from({length:20},(_,i)=>f.e.command(command(who(4),`race-${i}`,"bid",{auction:a,amount:"3.000000"}))));
- assert.equal(Object.keys(f.e.state().payments).length,1);await f.e.command(command(who(2),"cancel","cancel",{auction:a}));
+ // Exactly one outbid succeeded: who(3) credited ONCE (10 POA), who(4) debited ONCE (7 POA), 0 payments yet.
+ assert.equal(f.e.state().available[who(3)],"10000000");
+ assert.equal(f.e.state().available[who(4)],"7000000");
+ assert.equal(Object.keys(f.e.state().payments).length,0);
+ await f.e.command(command(who(2),"cancel","cancel",{auction:a}));
+ await f.e.command(command(who(3),"withdraw-all","withdraw",{amount:"10.000000"}));
  await Promise.all(Array.from({length:20},()=>f.e.tick()));assert.equal(f.net.calls,2);invariant(f.e.state());
 });
 test("deterministic model/property sequences preserve assets = liabilities across replay",async()=>{
@@ -479,11 +495,16 @@ test("queued auctions wait for first bid to start timer; abandoned fixed listing
  assert.equal(f.e.state().auctions[o1.auction]!.startedAt,startAt);
  assert.equal(f.e.state().auctions[o1.auction]!.closes,startAt+1000);
  assert.equal(f.e.state().auctions[o1.auction]!.history?.at(-1)?.event,"Auction started (first bid)");
- // Outbid by another bidder updates high, records both bidders, extends quiet, and queues refund to original payer.
+ // Outbid by another bidder updates high, records both bidders, extends quiet, and credits original bidder's available balance immediately.
  f.net.now+=500;
  await f.e.command(command(who(4),"outbid","bid",{auction:o1.auction,amount:"1.500000"}));
  assert.equal(f.e.state().auctions[o1.auction]!.closes,f.net.now+1000);
- assert.ok(f.e.state().payments[`outbid-${o1.auction}-${who(4)}:outbid`]);
+ assert.equal(f.e.state().available[who(3)],"10000000");
+ assert.equal(Object.keys(f.e.state().payments).length,0);
+ // Original bidder can immediately re-bid using their returned available balance with zero on-chain wait.
+ await f.e.command(command(who(3),"rebid","bid",{auction:o1.auction,amount:"1.700000"}));
+ assert.equal(f.e.state().available[who(3)],"8300000");
+ assert.equal(f.e.state().available[who(4)],"10000000");
  // Seller can still cancel and release title lock + refund high bidder.
  await f.e.command(command(who(2),"cancel1","cancel",{auction:o1.auction}));
  assert.equal(f.e.state().auctions[o1.auction]!.status,"CANCELLED");
@@ -813,7 +834,7 @@ test("committed reviewed credit is exactly DT1's 1 POA deposit to its own intent
  for(const id of ["__proto__","constructor","toString","",1])assert.throws(()=>reviewedCredit(id),/ESCROW_REVIEW|./);
 });
 // ---- POA subname sales: parent holder lists, buyer pays through escrow, proceeds wait as READY payouts ----
-import { registryTitles } from "../escrow-titles.js";
+import { escrowPacketBlocked, registryTitles } from "../escrow-titles.js";
 function subRegistration(e:Engine,buyer:number,name:string,price:string,overrides:Record<string,unknown>={},tag="sub"):any{
  const s=e.snapshot(),root=s.deeds[s.names[name.split(".").at(-1)!]!.activeId!]!;
  const b={domain:"poa-domains.local.intent.v1",revision:e.config.revision,chainId:CHAIN,genesisHash:e.config.genesisHash,registryId:e.registryId,policyHash:e.policyHash,normalizationHash:e.config.normalizationHash,
@@ -1008,4 +1029,218 @@ test("auto-sweep credits finalized matching open intents before reconciliation w
  g.net.add(depositBody(4,policy.wallet,"1.000000","0".repeat(64)),5,true);
  await assert.rejects(g.e.reconcile(),/MISMATCH/);
  assert.equal(g.e.state().halt,"ASSET_LIABILITY_MISMATCH");
+});
+
+test("outbid instant available credit, multi-auction holding, chunked withdrawal & adversarial theft/abuse guards",async()=>{
+ // Tight perTx (6 POA) proves balances > perTx after outbid still reserve full chunked withdrawal capacity.
+ const tight={...policy,perTx:"6.000000",daily:"100.000000"};
+ const f=fixture(()=>{},tight);
+ await fund(f,3,"6.000000","a1",1);
+ await fund(f,3,"4.000000","a2",2); // who(3) holds 10 POA (> perTx 6 POA)
+ await fund(f,4,"6.000000","b1");
+ await fund(f,5,"6.000000","c1");
+ const o1=await f.e.command(command(who(2),"open-a","open",{name:"alpha",reserve:"1.000000"})) as any;
+ const o2=await f.e.command(command(who(2),"open-b","open",{name:"beta",reserve:"1.000000"})) as any;
+
+ // Alice bids 4 POA on alpha and 4 POA on beta -> 2 POA available, 8 POA locked.
+ await f.e.command(command(who(3),"bid-a1","bid",{auction:o1.auction,amount:"4.000000"}));
+ await f.e.command(command(who(3),"bid-b1","bid",{auction:o2.auction,amount:"4.000000"}));
+ assert.equal(f.e.state().available[who(3)],"2000000");
+
+ // Adversarial checks while leading:
+ // 1. Cannot withdraw locked bid funds.
+ await assert.rejects(f.e.command(command(who(3),"steal-locked","withdraw",{amount:"2.000001"})),/ESCROW_INSUFFICIENT_FUNDS/);
+ // 2. Cannot withdraw > perTx in one chunk.
+ await assert.rejects(f.e.command(command(who(3),"over-pertx","withdraw",{amount:"6.000001"})),/ESCROW_PAYOUT_LIMIT/);
+ // 3. Cannot redirect withdrawal to another address.
+ await assert.rejects(f.e.command(command(who(3),"redir","withdraw",{amount:"1.000000",to:who(4)})),/SCHEMA/);
+ // 4. Cannot self-raise or self-bid to manufacture available balance.
+ await assert.rejects(f.e.command(command(who(3),"self-raise","bid",{auction:o1.auction,amount:"5.000000"})),/ESCROW_SELF_RAISE/);
+ await assert.rejects(f.e.command(command(who(2),"self-bid","bid",{auction:o1.auction,amount:"5.000000"})),/ESCROW_SELF_SALE/);
+ // 5. Zero/negative/invalid amounts rejected.
+ for(const bad of ["0.000000","-1.000000","1.0000001"])
+  await assert.rejects(f.e.command(command(who(3),"bad-"+bad,"withdraw",{amount:bad})));
+
+ // Bob outbids Alice on alpha (5 POA) -> Alice immediately gets 4 POA back (2 -> 6 POA available) with 0 payouts.
+ await f.e.command(command(who(4),"bid-a2","bid",{auction:o1.auction,amount:"5.000000"}));
+ assert.equal(f.e.state().available[who(3)],"6000000");
+ assert.equal(f.e.state().available[who(4)],"1000000");
+ assert.equal(Object.keys(f.e.state().payments).length,0);
+
+ // Alice instantly re-bids 6 POA on alpha using returned balance -> Bob immediately gets 5 POA back (1 -> 6 POA available).
+ await f.e.command(command(who(3),"bid-a3","bid",{auction:o1.auction,amount:"6.000000"}));
+ assert.equal(f.e.state().available[who(3)],"0");
+ assert.equal(f.e.state().available[who(4)],"6000000");
+
+ // Carol outbids Alice on beta (5 POA) -> Alice immediately gets 4 POA back.
+ await f.e.command(command(who(5),"bid-b2","bid",{auction:o2.auction,amount:"5.000000"}));
+ assert.equal(f.e.state().available[who(3)],"4000000");
+
+ // Cancel both auctions and let everyone withdraw every remaining micro cleanly to assets === "0".
+ await f.e.command(command(who(2),"c1","cancel",{auction:o1.auction})); // refunds Alice's 6 POA on alpha
+ await f.e.command(command(who(2),"c2","cancel",{auction:o2.auction})); // refunds Carol's 5 POA on beta
+ await f.e.command(command(who(3),"w-alice","withdraw",{amount:"4.000000"}));
+ await f.e.command(command(who(4),"w-bob","withdraw",{amount:"6.000000"}));
+ await f.e.command(command(who(5),"w-carol","withdraw",{amount:"1.000000"}));
+ for(let i=0;i<15;i++)await f.e.tick();
+ assert.equal(f.e.state().assets,"0");
+ assert.equal(f.e.state().available[who(3)],"0");
+ assert.equal(f.e.state().available[who(4)],"0");
+ assert.equal(f.e.state().available[who(5)],"0");
+ // Every outgoing transfer paid ONLY the exact original depositor.
+ const paidByAddr=new Map<string,bigint>();
+ for(const tx of f.net.submitted)paidByAddr.set(tx.to,(paidByAddr.get(tx.to)??0n)+micros(tx.amount));
+ assert.equal(paidByAddr.get(who(3)),10000000n);
+ assert.equal(paidByAddr.get(who(4)),6000000n);
+ assert.equal(paidByAddr.get(who(5)),6000000n);
+ assert.deepEqual(replay(f.journal.rows,tight),f.e.state());
+ invariant(f.e.state());
+});
+
+test("randomized multi-bidder multi-auction property test: deposits, outbids, instant re-bids & withdrawals conserve assets = liabilities",async()=>{
+ const actors=[3,4,5] as const;
+ let ops=0;
+ for(let run=0;run<12;run++){
+  const f=fixture();
+  const avail=new Map<string,bigint>([[who(3),0n],[who(4),0n],[who(5),0n]]);
+  let totalAssets=0n;
+  for(const n of actors){
+   await fund(f,n,"20.000000",`init-${n}`);
+   avail.set(who(n),20000000n);
+   totalAssets+=20000000n;
+  }
+  const o1=await f.e.command(command(who(2),"o1","open",{name:"n1",reserve:"1.000000"})) as any;
+  const o2=await f.e.command(command(who(2),"o2","open",{name:"n2",reserve:"1.000000"})) as any;
+  const high=new Map<string,{payer:string;amount:bigint}|null>([[o1.auction,null],[o2.auction,null]]);
+  let rng=(run+1)*2654435761>>>0;
+  const nextRand=()=>{rng=(rng*1664525+1013904223)>>>0;return rng;};
+  for(let step=0;step<25;step++){
+   const actorIdx=actors[nextRand()%actors.length]!;
+   const actor=who(actorIdx);
+   const mode=nextRand()%3;
+   if(mode<2){
+    const aucId=mode===0?o1.auction:o2.auction;
+    const cur=high.get(aucId);
+    const minBid=cur?(cur.amount*11n)/10n+1n:1000000n;
+    const bidAmt=minBid+BigInt(nextRand()%200000);
+    const canBid=cur?.payer!==actor&&avail.get(actor)!>=bidAmt&&bidAmt<=micros(policy.perTx);
+    const cmd=command(actor,`b-${step}`,"bid",{auction:aucId,amount:decimal(bidAmt)});
+    if(canBid){
+     await f.e.command(cmd);
+     avail.set(actor,avail.get(actor)!-bidAmt);
+     if(cur)avail.set(cur.payer,avail.get(cur.payer)!+cur.amount);
+     high.set(aucId,{payer:actor,amount:bidAmt});
+     // Idempotent replay of exact same bid must not double-debit or double-credit.
+     await f.e.command(cmd);
+    } else {
+     await assert.rejects(f.e.command(cmd));
+    }
+   } else {
+    const amt=BigInt((nextRand()%3000000)+1);
+    const cmd=command(actor,`w-${step}`,"withdraw",{amount:decimal(amt)});
+    if(avail.get(actor)!>=amt){
+     await f.e.command(cmd);
+     avail.set(actor,avail.get(actor)!-amt);
+     await f.e.command(cmd); // idempotent replay
+    } else {
+     await assert.rejects(f.e.command(cmd));
+    }
+   }
+   const st=f.e.state();
+   invariant(st);
+   for(const n of actors)assert.equal(BigInt(st.available[who(n)]??"0"),avail.get(who(n))!);
+   assert.equal(BigInt(st.assets),totalAssets);
+   ops++;
+  }
+  await f.e.command(command(who(2),"cancel-1","cancel",{auction:o1.auction}));
+  await f.e.command(command(who(2),"cancel-2","cancel",{auction:o2.auction}));
+  for(const n of actors){
+   const rem=avail.get(who(n))!;
+   if(rem>0n)await f.e.command(command(who(n),`drain-${n}`,"withdraw",{amount:decimal(rem)}));
+  }
+  for(let i=0;i<80;i++){if(f.e.state().assets==="0")break;await f.e.tick();}
+  assert.equal(f.e.state().assets,"0");
+  assert.deepEqual(replay(f.journal.rows,policy),f.e.state());
+ }
+ assert.equal(ops,300);
+});
+
+test("per-domain escrowPacketBlocked scopes locks to reserved domains & emoji classes, allows unrelated domains, and protects settling seller nonces",async()=>{
+ const journal=new MemoryJournal(policy),net=new MockNetwork();
+ const engine=new Engine(mainnetConfig(who(6),who(5),[who(2),who(3),who(4)]),{now:()=>Math.floor(net.now/1000)});
+ // Mint three root domains: who(2) owns "👩‍🦰" and "star"; who(3) owns "other".
+ const issueFor=(ownerIdx:number,name:string,price:string,tag:string)=>{
+  const b={domain:"poa-domains.local.intent.v1",revision:engine.config.revision,chainId:CHAIN,genesisHash:engine.config.genesisHash,registryId:engine.registryId,policyHash:engine.policyHash,normalizationHash:engine.config.normalizationHash,
+   signer:who(ownerIdx),coSigners:[],requestId:`issue-${tag}`,nonce:engine.nextNonce(who(ownerIdx)),notBefore:0,deadline:2000000000,maxTotal:"0",maxNetworkFee:"0",action:"issueFromTreasury",
+   params:{name,asset:"POA",price,expectedDeedId:null,expectedVersion:0,metadata:buildMetadataWitness(name)}};
+  return signBody(b,[key(ownerIdx)]);
+ };
+ for(const [ownerIdx,name,price,tag] of [[2,"👩‍🦰",poaNewNamePriceMicros("premium"),"emoji"],[2,"star",poaNewNamePriceMicros("standard"),"star"],[3,"other",poaNewNamePriceMicros("standard"),"other"]] as const)
+  assert.equal(engine.submitEscrowIssue(issueFor(ownerIdx,name,price,tag)).status,"succeeded");
+ // who(3) also owns a child "sub.👩‍🦰" under who(2)'s "👩‍🦰" (via subname issuance).
+ assert.equal(engine.submitEscrowIssue(subRegistration(engine,3,"sub.👩‍🦰","1000000",{requestId:"sub-emoji-child"})).status,"succeeded");
+ const e=new Escrow(journal,net,signer(),registryTitles(engine),policy,()=>net.now,()=>true,()=>{},()=>true,()=>true);
+ await e.pause(false);
+ await fund({e,net} as any,3,"5.000000","b3");
+ await fund({e,net} as any,4,"5.000000","b4");
+
+ const signAction=(actorIdx:number,action:string,params:Record<string,unknown>,co:number[]=[],req="req")=>{
+  const b={domain:"poa-domains.local.intent.v1",revision:engine.config.revision,chainId:CHAIN,genesisHash:engine.config.genesisHash,registryId:engine.registryId,policyHash:engine.policyHash,normalizationHash:engine.config.normalizationHash,
+   signer:who(actorIdx),coSigners:co.map(x=>who(x)).sort(),requestId:`${req}-${actorIdx}-${action}`,nonce:engine.nextNonce(who(actorIdx)),notBefore:0,deadline:2000000000,maxTotal:"0",maxNetworkFee:"0",action,params};
+  return signBody(b,[key(actorIdx),...co.map(x=>key(x))]);
+ };
+ const deedOf=(name:string)=>engine.snapshot().deeds[engine.snapshot().names[name]!.activeId!]!;
+
+ // Nothing in escrow yet -> nothing blocked.
+ assert.equal(escrowPacketBlocked(e.state(),engine,{}),false);
+
+ // who(2) opens POA auction for "👩‍🦰" (OPEN).
+ const opened=await e.command(command(who(2),"open-emoji","open",{name:"👩‍🦰",reserve:"1.000000"})) as any;
+ const dEmoji=deedOf("👩‍🦰"),dStar=deedOf("star"),dOther=deedOf("other"),dSub=deedOf("sub.👩‍🦰");
+
+ // 1. Unrelated domains stay 100% UNBLOCKED while "👩‍🦰" is OPEN!
+ const metaOther=signAction(3,"setMetadata",{name:"other",expectedDeedId:dOther.id,expectedVersion:dOther.version,metadata:buildMetadataWitness("other",{kind:"permanent"},null,"Updated other")});
+ const metaStar=signAction(2,"setMetadata",{name:"star",expectedDeedId:dStar.id,expectedVersion:dStar.version,metadata:buildMetadataWitness("star",{kind:"permanent"},null,"Updated star")});
+ const metaSub=signAction(3,"setMetadata",{name:"sub.👩‍🦰",expectedDeedId:dSub.id,expectedVersion:dSub.version,metadata:buildMetadataWitness("sub.👩‍🦰",{kind:"permanent"},dEmoji.id,"Updated sub")});
+ assert.equal(escrowPacketBlocked(e.state(),engine,metaOther),false);
+ assert.equal(escrowPacketBlocked(e.state(),engine,metaStar),false);
+ assert.equal(escrowPacketBlocked(e.state(),engine,metaSub),false);
+ assert.equal(engine.submit(metaOther).status,"succeeded");
+ assert.equal(engine.submit(metaStar).status,"succeeded");
+
+ // 2. Reserved domain "👩‍🦰", prefixed "poa:👩‍🦰", skin-tone variant "👩🏿‍🦰", deedId, createChildOffer, and parent-mutating revokeChild are ALL BLOCKED!
+ assert.equal(escrowPacketBlocked(e.state(),engine,signAction(2,"setMetadata",{name:"👩‍🦰",expectedDeedId:dEmoji.id,expectedVersion:dEmoji.version,metadata:buildMetadataWitness("👩‍🦰")})),true);
+ assert.equal(escrowPacketBlocked(e.state(),engine,signAction(2,"transfer",{name:"poa:👩‍🦰",expectedDeedId:dEmoji.id,expectedVersion:dEmoji.version,recipient:who(4)})),true);
+ assert.equal(escrowPacketBlocked(e.state(),engine,signAction(4,"announceAuction",{name:"👩🏿‍🦰",asset:"POA",reserve:"1000",openAt:0,expectedDeedId:null,expectedVersion:0,metadata:buildMetadataWitness("👩🏿‍🦰")})),true);
+ assert.equal(escrowPacketBlocked(e.state(),engine,signAction(2,"createChildOffer",{parent:"👩‍🦰",parentDeedId:dEmoji.id,expectedOwnerVersion:dEmoji.ownerVersion,asset:"POA",price:"10",validUntil:2000000000,rights:{kind:"permanent"},labels:null,maxUses:1})),true);
+ assert.equal(escrowPacketBlocked(e.state(),engine,signAction(3,"revokeChild",{name:"sub.👩‍🦰",expectedDeedId:dSub.id,expectedVersion:dSub.version,parentOwnerVersion:dEmoji.ownerVersion},[2])),true);
+ // Malformed / empty packets fail closed while any auction is reserved.
+ assert.equal(escrowPacketBlocked(e.state(),engine,{}),true);
+ assert.equal(escrowPacketBlocked(e.state(),engine,null),true);
+ // Escrow list-sub on the auctioned root is also refused.
+ await assert.rejects(e.command(command(who(2),"sub-on-open","list-sub",{parent:"👩‍🦰",price:"1.000000"})),/ESCROW_TITLE_RESERVED/);
+
+ // 3. Bid, close, and enter SETTLING -> seller who(2)'s nonce is now pinned, so ALL writes by who(2) (even on "star"!) are BLOCKED,
+ //    while unrelated holder who(3) writing to "other" remains UNBLOCKED!
+ await e.command(command(who(3),"bid-emoji","bid",{auction:opened.auction,amount:"1.000000"}));
+ net.now+=86400001;
+ const transferPacket=signAction(2,"transfer",{name:"👩‍🦰",expectedDeedId:dEmoji.id,expectedVersion:dEmoji.version,recipient:who(3)},[],"handover");
+ await e.command(command(who(2),"settle-emoji","settle",{auction:opened.auction,transfer:transferPacket}));
+ assert.equal(e.state().auctions[opened.auction]!.status,"SETTLING");
+
+ const dStar2=deedOf("star"),dOther2=deedOf("other");
+ const sellerStarWrite=signAction(2,"setMetadata",{name:"star",expectedDeedId:dStar2.id,expectedVersion:dStar2.version,metadata:buildMetadataWitness("star",{kind:"permanent"},null,"Nonce attack")},[],"settle-star");
+ const otherWrite=signAction(3,"setMetadata",{name:"other",expectedDeedId:dOther2.id,expectedVersion:dOther2.version,metadata:buildMetadataWitness("other",{kind:"permanent"},null,"Unrelated during settle")},[],"settle-other");
+ assert.equal(escrowPacketBlocked(e.state(),engine,sellerStarWrite),true,"settling seller cannot burn handover nonce via unrelated domain");
+ assert.equal(escrowPacketBlocked(e.state(),engine,otherWrite),false,"unrelated holder remains unblocked during another seller's settlement");
+ assert.equal(engine.submit(otherWrite).status,"succeeded");
+ // Settling seller also cannot open a second concurrent settle or escrow issue that would burn their registry nonce.
+ await fund({e,net} as any,2,"100.000000","b2");
+ await assert.rejects(e.command(command(who(2),"issue-during-settle","issue",{name:"nonceburn",amount:"100.000000",registration:issueFor(2,"nonceburn",poaNewNamePriceMicros("standard"),"nonceburn")})),/ESCROW_TITLE_RESERVED/);
+
+ // 4. Finish payout ticks -> handover commits cleanly (nonce intact!) and all locks release.
+ for(let i=0;i<6;i++)await e.tick();
+ assert.equal(e.state().auctions[opened.auction]!.status,"COMPLETE");
+ assert.equal(owner(engine,"👩‍🦰"),who(3));
+ assert.equal(escrowPacketBlocked(e.state(),engine,sellerStarWrite),false);
 });

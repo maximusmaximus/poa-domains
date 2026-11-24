@@ -1,7 +1,7 @@
 import { publicRegistryRoute } from "./public-registry-view.js";
 import { registryRoute, type RegistryCall, type RegistryReply } from "../src/registry-routes.js";
 import { marketView, publicCommand, subnameView } from "./escrow-public.js";
-import { registryTitles } from "./escrow-titles.js";
+import { escrowPacketBlocked, registryTitles } from "./escrow-titles.js";
 import { DurableObject } from "cloudflare:workers";
 import { createPrivateKey, generateKeyPairSync, KeyObject } from "node:crypto";
 import { Escrow, Policy, SQLiteEscrowJournal, EscrowArchive, exportEscrow, restoreEscrow, reviewedCredit, replay as replayEscrow } from "./escrow.js";
@@ -376,13 +376,14 @@ export class PoaRegistry extends DurableObject<Env> {
     }catch(e){if(e instanceof Fault||e instanceof Error&&/^ESCROW_[A-Z_]+$/.test(e.message))throw e;
       this.ctx.abort("Escrow public command storage failure");throw new Error("ESCROW_UNAVAILABLE");}
   }
-  private escrowTitleLocked(): boolean {
+  private escrowTitleLocked(packet?: unknown): boolean {
     const sql = this.ctx.storage.sql;
     if (!sql.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='escrow_journal'").toArray().length) return false;
     const row = sql.exec<{record:string}>("SELECT record FROM escrow_journal ORDER BY sequence DESC LIMIT 1").toArray()[0];
     if (!row) return false;
     const state = JSON.parse(row.record).state as import("./escrow.js").State;
-    return Object.values(state.auctions).some(a => a.status === "OPEN" || a.status === "SETTLING");
+    if (packet === undefined) return Object.values(state.auctions).some(a => a.status === "OPEN" || a.status === "SETTLING");
+    return escrowPacketBlocked(state, this.engine, packet);
   }
   async alarm(): Promise<void> {
     if (String(this.env.POA_ESCROW_ENABLED) !== "true" || String(this.env.POA_ESCROW_NETWORK_WRITES) !== "approved-v1") return;
@@ -425,8 +426,8 @@ export class PoaRegistry extends DurableObject<Env> {
       return publicRegistryRoute(e, call, {
         health: { livePoA: false, principals: this.principals },
         capabilities: { publicExplorerUrl: this.env.PUBLIC_EXPLORER_URL, escrow: {enabled:String(this.env.POA_ESCROW_ENABLED)==="true",capabilities:"/v1/escrow/capabilities"} },
-        // Keep the title/nonce reservation hook in its original durable-object boundary.
-        beforeSubmit: () => need(!this.escrowTitleLocked(), "ESCROW_TITLE_RESERVED"),
+        // Scope title/nonce reservation to domains currently in escrow (and settling seller nonces).
+        beforeSubmit: (packet) => need(!this.escrowTitleLocked(packet), "ESCROW_TITLE_RESERVED"),
       });
     } catch (error) {
       if (error instanceof Fault) {

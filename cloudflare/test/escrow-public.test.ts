@@ -26,9 +26,16 @@ test('marketView reports awaitingFirstBid until first bid starts timer, exact >1
  assert.equal(before.awaitingFirstBid,true);assert.equal(before.closes,0);assert.equal(before.startedAt,null);assert.equal(before.minimumNextBid,'2.000000');assert.deepEqual(before.bidders,[]);
  const startMs=e.net.now+5000;e.net.now=startMs;
  await call(e,3,'bid',{auction:opened.result.auction,amount:'2.000000'},'bid-3');
+ const acc3Leading=accountView(e.escrow.state(),who(3));
+ assert.equal(acc3Leading.available,'8.000000');assert.equal(acc3Leading.lockedInAuctions,'2.000000');
  const live=marketView(e.escrow.state(),'popular')[0]!;
  assert.equal(live.awaitingFirstBid,false);assert.equal(live.startedAt,startMs);assert.equal(live.closes,startMs+86400000);assert.equal(live.minimumNextBid,'2.200001');assert.deepEqual(live.bidders,[who(3)]);
  await call(e,4,'bid',{auction:opened.result.auction,amount:'3.000000'},'bid-4');
+ // Outbid returns who(3)'s 2 POA immediately to available balance (locked drops to 0) so who(3) can re-bid or withdraw right away.
+ const acc3Outbid=accountView(e.escrow.state(),who(3));
+ assert.equal(acc3Outbid.available,'10.000000');assert.equal(acc3Outbid.lockedInAuctions,'0.000000');
+ const acc4Leading=accountView(e.escrow.state(),who(4));
+ assert.equal(acc4Leading.available,'7.000000');assert.equal(acc4Leading.lockedInAuctions,'3.000000');
  const outbid=marketView(e.escrow.state(),'popular')[0]!;
  assert.equal(outbid.high?.payer,who(4));assert.equal(outbid.high?.amount,'3.000000');assert.equal(outbid.minimumNextBid,'3.300001');assert.deepEqual(outbid.bidders,[who(3),who(4)]);
 });

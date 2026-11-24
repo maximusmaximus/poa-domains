@@ -1,11 +1,11 @@
-import { publicNameUnavailable } from "./shared.js?v=c8a3dd96f525";
-import { registryUnit } from "./shared.js?v=c8a3dd96f525";
-import { actionLabel } from "./ui-copy.js?v=c8a3dd96f525";
-import { trapDialog } from "./ui-a11y.js?v=c8a3dd96f525";
-import { ui } from "./ui-state.js?v=c8a3dd96f525";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions, validPrincipal } from "./shared.js?v=c8a3dd96f525";
-import { add, el, endpointBase } from "./ui-core.js?v=c8a3dd96f525";
-import { nameLink, openManageDomain } from "./ui-router.js?v=c8a3dd96f525";
+import { publicNameUnavailable } from "./shared.js?v=38947c454eb2";
+import { registryUnit } from "./shared.js?v=38947c454eb2";
+import { actionLabel } from "./ui-copy.js?v=38947c454eb2";
+import { trapDialog } from "./ui-a11y.js?v=38947c454eb2";
+import { ui } from "./ui-state.js?v=38947c454eb2";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions, validPrincipal } from "./shared.js?v=38947c454eb2";
+import { add, el, endpointBase } from "./ui-core.js?v=38947c454eb2";
+import { nameLink, openManageDomain } from "./ui-router.js?v=38947c454eb2";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
@@ -217,7 +217,7 @@ export function renderCartExpectations() {
                     ? [
                         ["Finality first: ", "Your agent checks existing available escrow POA, creates an intent only for any shortfall, sends exact POA with the unique memo, and waits for PoA finality (K=5 attestations or checkpoint — seen is not credited yet)."],
                         ["First bid starts the timer: ", "Queued inventory auctions have no ticking timer until the first bid lands. Your agent bids the minimum valid amount (>10% above any live high bid) up to your highest bid cap — never above it."],
-                        ["Outbid refunds & quiet extensions: ", "Late bids extend the close time by the quiet window. If another user outbids you, escrow automatically queues an on-chain refund of your outbid POA back to your original wallet (not back to available credit)."],
+                        ["Instant outbid credit & easy withdraw: ", "Late bids extend the close time by the quiet window. If another user outbids you, your outbid POA credits instantly back to your available escrow balance so you can re-bid right away — or withdraw it back to your original wallet anytime in My POA."],
                         ["Seller handover after close: ", newCount > 0
                             ? "New names mint immediately via issue. Winning an auction waits for the seller's signed settle handover (seller/fee paid before title commits); if unsettled past close + quiet, escrow auto-expires and refunds the winner."
                             : "Winning a POA auction waits for the seller's signed settle handover after close (seller + fee are paid on-chain before title commits). If unsettled past close + quiet, escrow auto-expires and refunds the winner to the original payer."],

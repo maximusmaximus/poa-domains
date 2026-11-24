@@ -4,6 +4,7 @@ import {
   extractDomainProfile,
   findDomainSalesAndAuctions,
   formatClock,
+  formatCountdown,
   formatDuration,
   isPoaAuctionAwaitingFirstBid,
   minimumNextBid,
@@ -18,12 +19,12 @@ import {
   registryUnit,
   resolveDomainView,
   unavailableKey,
-} from "./shared.js?v=c8a3dd96f525";
-import { actionLabel, createPoaCopyButton } from "./ui-copy.js?v=c8a3dd96f525";
-import { ui } from "./ui-state.js?v=c8a3dd96f525";
-import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=c8a3dd96f525";
-import { nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=c8a3dd96f525";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=c8a3dd96f525";
+} from "./shared.js?v=38947c454eb2";
+import { actionLabel, createPoaCopyButton } from "./ui-copy.js?v=38947c454eb2";
+import { ui } from "./ui-state.js?v=38947c454eb2";
+import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=38947c454eb2";
+import { nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=38947c454eb2";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=38947c454eb2";
 
 function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) {
   const wrap = document.createElement("span");
@@ -301,7 +302,13 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
     if (awaiting) {
       add(item, "p", `⏱️ Timer (${formatDuration(windowSec)} + ${formatDuration(quietSec)} quiet) starts when the first bid is placed.`, "muted");
     } else if (a.closes > 0) {
-      add(item, "p", `⏱️ Closes ${formatClock(Math.floor(a.closes / 1000))} (+${formatDuration(quietSec)} anti-snipe quiet)`);
+      const closeRow = add(item, "p", "");
+      if (a.status === "OPEN" && !closed) {
+        const cd = add(closeRow, "span", `⏳ ${formatCountdown(a.closes - nowMs)}`, "auction-countdown");
+        cd.dataset.closesMs = String(a.closes);
+        closeRow.append(" · ");
+      }
+      closeRow.append(`Closes ${formatClock(Math.floor(a.closes / 1000))} (+${formatDuration(quietSec)} anti-snipe quiet)`);
     }
 
     if (a.status === "OPEN" && (awaiting || !closed)) {

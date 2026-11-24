@@ -684,10 +684,11 @@ try {
   assert.ok(tickerInitial.includes("Auction started") && tickerInitial.includes("comet"), tickerInitial);
   assert.equal(tickerInitial.includes("vault"), false, tickerInitial);
 
-  // Auctions tab: Current shows live "comet", Upcoming shows queued "vault" ("Starts on first bid")
+  // Auctions tab: Current shows live "comet" with countdown timer, Upcoming shows queued "vault" ("Starts on first bid")
   await pageAuc.locator("#tabAuctions").click();
   await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"]`)).toBeVisible();
   await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"]`)).toContainText("Live POA auction");
+  await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"] .auction-countdown`)).toContainText("left");
   await pageAuc.locator("#auctionTabUpcoming").click();
   const vaultCard = pageAuc.locator(`#auctions article[data-auction-id="${aucQueuedId}"]`);
   await expect(vaultCard).toBeVisible();
@@ -711,6 +712,7 @@ try {
   assert.match(auctionPrompt, /Whole-cart ceiling 450\.000000 POA/);
   assert.match(auctionPrompt, /First-bid timer nuance/);
   assert.match(auctionPrompt, /Outbid & refund nuance/);
+  assert.match(auctionPrompt, /credited instantly back to my available escrow balance/);
   assert.match(auctionPrompt, /ESCROW_SELF_RAISE/);
   assert.match(auctionPrompt, /Settlement handover nuance/);
 
@@ -806,9 +808,11 @@ try {
   await expect(pageFields.locator("#poaSellTools .sale-fields-warning")).toBeVisible();
   await expect(pageFields.locator("#poaSellTools .sale-fields-warning")).toContainText("will be dropped");
 
-  // Manage domains + My POA show clear field-drop warnings before listing or auctioning
+  // Manage domains + My POA show clear field-drop warnings AND held-balance/withdrawal guidance
   await pageFields.locator('#domainActions button[aria-label="Manage agent"]').click();
   await expect(pageFields.locator('#manageNames article[data-domain-name="agent"] .sale-fields-warning')).toBeVisible();
+  await expect(pageFields.locator("#escrowBalanceNote")).toBeVisible();
+  await expect(pageFields.locator("#escrowBalanceNote")).toContainText("available escrow balance");
   await expect(pageFields.locator("#escrowListingFieldWarning")).toBeVisible();
   await expect(pageFields.locator("#escrowListingFieldWarning")).toContainText("paused while this domain is listed");
   await pageFields.locator("#escrowPayer").fill(prevOwner);
@@ -838,6 +842,7 @@ try {
   await expect(pageFields.locator("#domainListing")).toBeVisible();
   await expect(pageFields.locator("#domainListing")).toContainText("Auctions & Sales");
   await expect(pageFields.locator(`#domainListing article[data-auction-id="${agentSaleAucId}"]`)).toContainText("High bid 200 POA");
+  await expect(pageFields.locator(`#domainListing article[data-auction-id="${agentSaleAucId}"] .auction-countdown`)).toContainText("left");
   await expect(pageFields.locator("#domainListing .sale-fields-warning")).toBeVisible();
   await expect(pageFields.locator("#domainProfile")).toContainText("paused while listed");
   assert.equal(await pageFields.locator("#domainProfile img.domain-avatar").count(), 0);

@@ -9,6 +9,7 @@ import {
   cartReview,
   countLiveAuctions,
   editCartAmount,
+  formatCountdown,
   isPoaAuctionAwaitingFirstBid,
   isPoaAuctionLive,
   loadBidderAddress,
@@ -83,6 +84,11 @@ test("first-bid-starts-timer classification, live auction count, and top scroll 
 
   assert.equal(poaMinimumNextBid(market[0]), "100.000000");
   assert.equal(poaMinimumNextBid(market[1]), "220.000001");
+  assert.equal(formatCountdown(0), "Closing now");
+  assert.equal(formatCountdown(30000), "<1m left");
+  assert.equal(formatCountdown(14 * 60000), "14m left");
+  assert.equal(formatCountdown((5 * 60 + 12) * 60000), "5h 12m left");
+  assert.equal(formatCountdown((2 * 24 + 3) * 3600000), "2d 3h left");
   assert.equal(isPoaAuctionAwaitingFirstBid(market[0]), true);
   assert.equal(isPoaAuctionAwaitingFirstBid(market[1]), false);
   assert.equal(isPoaAuctionLive(market[0], nowMs), false);
@@ -144,7 +150,8 @@ test("POA auction cart supports highest bid ceiling, outbid detection without au
   assert.match(prompt, /First-bid timer nuance/);
   assert.match(prompt, /Anti-snipe quiet period/);
   assert.match(prompt, /Outbid & refund nuance/);
-  assert.match(prompt, /does NOT return to available escrow credit/);
+  assert.match(prompt, /credited instantly back to my available escrow balance/);
+  assert.match(prompt, /Safety & withdrawals/);
   assert.match(prompt, /Settlement handover nuance/);
   assert.match(prompt, /issueFromTreasury/);
 

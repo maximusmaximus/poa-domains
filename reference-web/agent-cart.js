@@ -1,12 +1,12 @@
-import { registryUnit } from "./shared.js?v=c8a3dd96f525";
-import { actionLabel } from "./ui-copy.js?v=c8a3dd96f525";
+import { registryUnit } from "./shared.js?v=38947c454eb2";
+import { actionLabel } from "./ui-copy.js?v=38947c454eb2";
 /** One unsigned Cart Handoff v2 object; text, clipboard and download derive from it. */
 import {
   canonical,
   safeObject,
   validPrincipal,
   cartParamsForSigner,
-} from "./shared.js?v=c8a3dd96f525";
+} from "./shared.js?v=38947c454eb2";
 export const CART_SCHEMA_VERSION = "poa-domains.agent-cart.v2";
 export const CART_ILLUSTRATION_CONTEXT = "static-synthetic-illustration";
 export const CART_ILLUSTRATION_CONTEXT_DEPRECATED = "static-synthetic-demo";
@@ -665,7 +665,7 @@ export function buildPoaCheckoutHandoff(items, cap, endpointUrl, snapshot, gener
         firstBidStartsTimer: true,
         strictIncrement: "bidMicros * 10 > highMicros * 11 (floor(highMicros * 11 / 10) + 1)",
         selfRaiseRejected: "ESCROW_SELF_RAISE",
-        outbidRefundTarget: "original payer wallet via on-chain refund queue (not returned to available credit)",
+        outbidRefundTarget: "credited instantly back to outbid bidder's available escrow balance for immediate re-bidding or signed withdraw back to original payer wallet",
         settlement: "After closes, seller signs settle transfer; seller/fee payout completes before title commits. Abandoned past closes + quiet auto-expires and refunds winner.",
       },
     } : {}),
@@ -727,13 +727,13 @@ export function renderPoaCheckoutHandoff(data) {
     `2) Auction bids: For each [AUCTION BID] within my maxBid ceiling, sign escrow bid {auction:"<auctionId>", amount:"<exact 6-decimal POA, minimum valid bid up to maxBid>"} with domain "poa-domains.escrow.v1", chainId "${data.chainId}", registryId "${data.registryId}", a unique key, and expiry within 1 hour, and POST {command,signature} to ${data.escrow.command}. Do NOT submit to /v1/intents.`,
     "   - First-bid timer nuance: If awaitingFirstBid is true (closes === 0), placing the first bid immediately starts the auction countdown timer (window) and locks that POA in escrow until outbid, cancelled/expired, or settled.",
     "   - Anti-snipe quiet period: Any bid extends closes to max(closes, now + quiet).",
-    "   - Outbid & refund nuance: If another bidder outbids me, escrow automatically queues an on-chain refund of my outbid POA back to my original wallet address (it does NOT return to available escrow credit). Only re-bid up to maxBid if I explicitly asked you to monitor/auto-bid; if the new minimum (>10%) exceeds maxBid, stop and tell me I was outbid.",
+    "   - Outbid & refund nuance: If another bidder outbids me, my outbid POA is credited instantly back to my available escrow balance so I can re-bid immediately without waiting for an on-chain refund (or withdraw it back to my original wallet anytime via signed withdraw). Only re-bid up to maxBid if I explicitly asked you to monitor/auto-bid; if the new minimum (>10%) exceeds maxBid, stop and tell me I was outbid.",
     "   - Settlement handover nuance: Winning an auction does NOT transfer title instantly at closes. After closes, the seller must submit a signed settle handover (escrow pays seller + fee before committing title). If the seller fails to settle past closes + quiet, escrow auto-expires the auction and refunds the winning bidder to the original payer.",
     ...(newNameItems.length ? [
       `3) New names: For each [NEW NAME], read my nonce, build metadata via build_metadata_witness, sign issueFromTreasury {name, asset:"POA", price:<priceMicros>, expectedDeedId:null, expectedVersion:0, metadata} (maxTotal "0", maxNetworkFee "0", deadline >= 10m ahead — do NOT submit to /v1/intents), then sign escrow issue {name, amount:<price>, registration:<that packet>} and POST to ${data.escrow.command}.`,
     ] : []),
-    `${newNameItems.length ? "4" : "3"}) Report back: Query ${marketUrl} (and ${data.origin}/v1/resolve?name=<name> for minted names) and tell me for each domain: bid placed, whether I started the timer, current leading/outbid status, close time, direct link (${data.origin}/d/<name>), and remaining available escrow balance.`,
-    `${newNameItems.length ? "5" : "4"}) Safety: Unused available POA comes back only via signed withdraw to my original payer address. On UNKNOWN outcome, query account/market and resend ONLY the identical signed request bytes (same key); never pay twice or reveal private keys.`,
+    `${newNameItems.length ? "4" : "3"}) Report back: Query ${marketUrl} (and ${data.origin}/v1/resolve?name=<name> for minted names) and tell me for each domain: bid placed, whether I started the timer, current leading/outbid status, close time, direct link (${data.origin}/d/<name>), and remaining available / locked escrow balance.`,
+    `${newNameItems.length ? "5" : "4"}) Safety & withdrawals: Unused or outbid available POA stays in my escrow balance for instant bidding and comes back to my original payer wallet anytime via signed withdraw {amount} to ${data.escrow.withdraw} (split into chunks <= limits.perTransaction if needed; never redirected to another address). Active leading bids stay locked until outbid, cancelled/expired, or settled. On UNKNOWN outcome, query account/market and resend ONLY the identical signed request bytes (same key); never pay twice or reveal private keys.`,
     "",
     "```json",
     JSON.stringify(data, null, 2),

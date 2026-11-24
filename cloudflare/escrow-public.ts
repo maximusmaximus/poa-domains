@@ -32,11 +32,14 @@ export function subnameView(s: State, parent?: string) {
     sold:l.sold.slice(-100).map(x=>({name:x.name,buyer:x.buyer,at:x.at})),
   }));
 }
-export function accountView(s:State,payer:string){address(payer);return {
-  payer,available:decimal(BigInt(s.available[payer]??"0")),
-  deposits:Object.entries(s.deposits).filter(([,d])=>d.payer===payer).slice(-100).map(([id,d])=>({intent:id,amount:d.amount,status:d.tx?"final":"waiting",txid:d.tx,createdAt:d.createdAt??null})),
-  refunds:Object.values(s.payments).filter(p=>p.kind==="refund"&&p.to===payer).slice(-100).map(p=>({id:p.id,amount:decimal(BigInt(p.amount)),status:p.status,txid:p.txid,day:p.day})),
-};}
+export function accountView(s:State,payer:string){address(payer);
+  const lockedMicros=Object.values(s.auctions).reduce((sum,a)=>a.status==="OPEN"&&a.high?.payer===payer?sum+BigInt(a.high.amount):sum,0n);
+  return {
+    payer,available:decimal(BigInt(s.available[payer]??"0")),lockedInAuctions:decimal(lockedMicros),
+    deposits:Object.entries(s.deposits).filter(([,d])=>d.payer===payer).slice(-100).map(([id,d])=>({intent:id,amount:d.amount,status:d.tx?"final":"waiting",txid:d.tx,createdAt:d.createdAt??null})),
+    refunds:Object.values(s.payments).filter(p=>p.kind==="refund"&&p.to===payer).slice(-100).map(p=>({id:p.id,amount:decimal(BigInt(p.amount)),status:p.status,txid:p.txid,day:p.day})),
+  };
+}
 export async function publicCommand(getEscrow:()=>Escrow,packetText:string,registryId:string,endpoint:string,now=Date.now(),operational=true){
   need(["intent","withdraw","account","command"].includes(endpoint),"ESCROW_ROUTE");
   const packet=parseJSON(packetText),c=verifyCommand(packet,registryId,Math.floor(now/1000));

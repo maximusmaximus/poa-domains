@@ -1,9 +1,130 @@
 import { Engine } from "../src/engine.js";
 import { Packet } from "../src/auth.js";
+import { ACTIONS } from "../src/actions.js";
+import { ownershipKey } from "../src/emoji-ownership.js";
 import { normalizeName } from "../src/names.js";
 import { need } from "../src/core.js";
-import { TitleStore } from "./escrow.js";
+import { State, TitleStore } from "./escrow.js";
 import { poaNewNamePriceMicros } from "../src/new-name-prices.js";
+
+/**
+ * Scope escrow title locks to ONLY the specific domains (plus their emoji ownership classes,
+ * active deeds, offers, and parent-mutating child actions) currently OPEN or SETTLING in escrow,
+ * plus any seller with a SETTLING handover whose pre-signed transfer nonce must remain unspent.
+ * Fails closed on malformed/untyped packets while any escrow reservation exists.
+ */
+export function escrowPacketBlocked(escrowState: State, engine: Engine, packet: unknown): boolean {
+  const reserved = Object.values(escrowState.auctions).filter(
+    (a) => a.status === "OPEN" || a.status === "SETTLING",
+  );
+  if (!reserved.length) return false;
+  if (!packet || typeof packet !== "object") return true;
+  const body = (packet as { body?: unknown }).body;
+  if (!body || typeof body !== "object") return true;
+  const b = body as { action?: unknown; signer?: unknown; coSigners?: unknown; params?: unknown };
+  if (typeof b.action !== "string" || !Object.hasOwn(ACTIONS, b.action)) return true;
+  if (typeof b.signer !== "string" || !b.signer) return true;
+  const coSigners = Array.isArray(b.coSigners) ? b.coSigners : null;
+  if (!coSigners || coSigners.some((x) => typeof x !== "string")) return true;
+  const params = b.params;
+  if (!params || typeof params !== "object") return true;
+  const p = params as Record<string, unknown>;
+
+  // Protect settling sellers so no concurrent write (even a rejected one) burns their handover nonce.
+  const settlingSigners = new Set<string>();
+  for (const a of reserved) {
+    if (a.status !== "SETTLING") continue;
+    settlingSigners.add(a.seller);
+    const st = escrowState.settlements[a.id];
+    if (st?.packet?.body?.signer) settlingSigners.add(st.packet.body.signer);
+    for (const cs of st?.packet?.body?.coSigners ?? []) settlingSigners.add(cs);
+  }
+  if (settlingSigners.has(b.signer) || coSigners.some((cs) => settlingSigners.has(cs))) {
+    return true;
+  }
+
+  const snap = engine.snapshot();
+  const reservedNames = new Set<string>();
+  const reservedKeys = new Set<string>();
+  const reservedDeedIds = new Set<string>();
+  for (const a of reserved) {
+    reservedNames.add(a.name);
+    try {
+      reservedKeys.add(ownershipKey(a.name, engine.normalizationMode));
+    } catch {
+      /* ignore non-normalizable fixture names */
+    }
+    const activeId = snap.names[a.name]?.activeId;
+    if (activeId) reservedDeedIds.add(activeId);
+  }
+
+  const isLockedName = (raw: unknown): boolean => {
+    if (typeof raw !== "string" || !raw) return true;
+    let canonicalName: string;
+    try {
+      canonicalName = normalizeName(raw, engine.normalizationMode).canonical;
+    } catch {
+      return true;
+    }
+    if (reservedNames.has(canonicalName)) return true;
+    try {
+      if (reservedKeys.has(ownershipKey(canonicalName, engine.normalizationMode))) return true;
+    } catch {
+      return true;
+    }
+    return false;
+  };
+  const isLockedDeedId = (raw: unknown): boolean =>
+    typeof raw === "string" && reservedDeedIds.has(raw);
+
+  switch (b.action) {
+    case "announceAuction":
+    case "sellFixed":
+    case "transfer":
+    case "setRecords":
+    case "setMetadata":
+      return isLockedName(p.name) || isLockedDeedId(p.expectedDeedId);
+    case "revokeChild":
+    case "renewLease":
+    case "expireLease": {
+      if (isLockedName(p.name) || isLockedDeedId(p.expectedDeedId)) return true;
+      const nameStr = typeof p.name === "string" ? p.name : "";
+      const dot = nameStr.indexOf(".");
+      if (dot > 0 && isLockedName(nameStr.slice(dot + 1))) return true;
+      const deed = typeof p.expectedDeedId === "string" ? snap.deeds[p.expectedDeedId] : null;
+      if (deed?.parentId && isLockedDeedId(deed.parentId)) return true;
+      return false;
+    }
+    case "createChildOffer":
+      return isLockedName(p.parent) || isLockedDeedId(p.parentDeedId);
+    case "fillChildOffer":
+    case "cancelOffer":
+    case "buyFixed": {
+      if (typeof p.offerId !== "string") return true;
+      const offer = snap.offers[p.offerId];
+      if (!offer) return false;
+      if (isLockedDeedId(offer.parentId)) return true;
+      const parentName = snap.deeds[offer.parentId]?.name;
+      if (parentName && isLockedName(parentName)) return true;
+      if (b.action === "fillChildOffer" && parentName && typeof p.label === "string") {
+        if (isLockedName(`${p.label}.${parentName}`)) return true;
+      }
+      return false;
+    }
+    case "bid":
+    case "finalize":
+    case "closeNoBid":
+    case "cancelAuction":
+    case "withdrawRefund": {
+      if (typeof p.auctionId !== "string") return true;
+      const auc = snap.auctions[p.auctionId];
+      if (!auc) return false;
+      return isLockedName(auc.name) || isLockedDeedId(auc.deedId);
+    }
+    default:
+      return true;
+  }
+}
 export function registryTitles(e: Engine): TitleStore {
   need(e.config.increment.kind === "eosStrict10", "ESCROW_INCREMENT_POLICY");
   return {

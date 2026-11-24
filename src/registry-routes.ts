@@ -10,7 +10,7 @@ export interface RegistryReply { status: number; jsonText: string }
 export interface RegistryRouteOptions {
   health?: Record<string,unknown>;
   capabilities?: Record<string,unknown>;
-  beforeSubmit?: () => void;
+  beforeSubmit?: (packet?: unknown) => void;
 }
 export const REGISTRY_ROUTES = Object.freeze([
   ['GET','/healthz'], ['GET','/v1/capabilities'], ['GET','/v1/state'], ['GET','/v1/resolve'],
@@ -49,14 +49,16 @@ export function registryRoute(e: Engine, call: RegistryCall, options: RegistryRo
   }
   if(call.method==='POST'&&call.path==='/v1/intents/preview') {
     // Same read-only admission guard, but never the durable submit/storage path.
-    options.beforeSubmit?.();
-    const receipt=e.preview(parseJSON(call.packet??''));
+    const packet=parseJSON(call.packet??'');
+    options.beforeSubmit?.(packet);
+    const receipt=e.preview(packet);
     return ok({previewOnly:true,accepted:false,committed:false,wouldSucceed:receipt.status==='succeeded',
       receipt:{...receipt,...(receipt.status==='rejected'?errorEnvelope(receipt.code,receipt.requestId,{accepted:false}):{})},...readContext(e)});
   }
   if(call.method==='POST'&&call.path==='/v1/intents') {
-    options.beforeSubmit?.();
-    const receipt=e.submit(parseJSON(call.packet??''));
+    const packet=parseJSON(call.packet??'');
+    options.beforeSubmit?.(packet);
+    const receipt=e.submit(packet);
     return ok({...receipt,...(receipt.status==='rejected'?errorEnvelope(receipt.code,receipt.requestId,{accepted:true}):{}),accepted:true,durability:e.durability(),finality:'registry-committed'});
   }
   return reply(405,{code:'METHOD_NOT_ALLOWED'});

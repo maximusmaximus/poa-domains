@@ -346,7 +346,7 @@ export function poaAuctionOutbidStatus(auction, { bidderAddress = "", cartItem =
   if (addr && Array.isArray(auction?.bidders) && auction.bidders.includes(addr) && currentHigh && currentHighPayer !== addr) {
     return {
       status: "outbid",
-      message: `⚠️ You were outbid! High bid is now ${poaShort(currentHigh)} POA by ${shortenPoaAddress(currentHighPayer)} (min next ${poaShort(minNext)} POA).`,
+      message: `⚠️ You were outbid! Your prior bid is back in your available escrow balance to re-bid or withdraw. High bid is now ${poaShort(currentHigh)} POA by ${shortenPoaAddress(currentHighPayer)} (min next ${poaShort(minNext)} POA).`,
       minimumNextBid: minNext,
       currentHigh,
       currentHighPayer,
@@ -465,7 +465,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=c8a3dd96f525";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=38947c454eb2";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -737,6 +737,20 @@ export function formatDuration(seconds) {
   if (h > 0 && m > 0) return `${h}h ${m}m`;
   if (h > 0) return `${h}h`;
   return `${m}m`;
+}
+
+/** Remaining ms → calm human countdown like "2d 4h left", "3h 15m left", "12m left", or "Closing now". */
+export function formatCountdown(remainingMs) {
+  const ms = Number(remainingMs);
+  if (!Number.isFinite(ms) || ms <= 0) return "Closing now";
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return "<1m left";
+  const d = Math.floor(mins / 1440);
+  const h = Math.floor((mins % 1440) / 60);
+  const m = mins % 60;
+  if (d > 0) return h > 0 ? `${d}d ${h}h left` : `${d}d left`;
+  if (h > 0) return m > 0 ? `${h}h ${m}m left` : `${h}h left`;
+  return `${m}m left`;
 }
 
 /** Unix seconds → short local Pacific clock time for humans. */

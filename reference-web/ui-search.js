@@ -1,13 +1,13 @@
-import { copyText } from "./ui-copy.js?v=c8a3dd96f525";
-import { publicNameUnavailable } from "./shared.js?v=c8a3dd96f525";
-import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, poaAuctionOutbidStatus, buildSubnamePurchasePrompt } from "./shared.js?v=c8a3dd96f525";
-import { ui } from "./ui-state.js?v=c8a3dd96f525";
-import { nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=c8a3dd96f525";
-import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=c8a3dd96f525";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=c8a3dd96f525";
-import { addToCart } from "./ui-cart.js?v=c8a3dd96f525";
-import { suggestNames } from "./ideas-generator.js?v=c8a3dd96f525";
-import { logSubmittedSearch } from "./ui-search-log.js?v=c8a3dd96f525";
+import { copyText } from "./ui-copy.js?v=38947c454eb2";
+import { publicNameUnavailable } from "./shared.js?v=38947c454eb2";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=38947c454eb2";
+import { ui } from "./ui-state.js?v=38947c454eb2";
+import { nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=38947c454eb2";
+import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=38947c454eb2";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=38947c454eb2";
+import { addToCart } from "./ui-cart.js?v=38947c454eb2";
+import { suggestNames } from "./ideas-generator.js?v=38947c454eb2";
+import { logSubmittedSearch } from "./ui-search-log.js?v=38947c454eb2";
 
 let activeSuggestionIdx = -1;
 let currentSuggestions = [];
@@ -306,7 +306,14 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
         } else {
             auctionInfo.append("No bids yet — first bid starts the countdown timer.");
         }
-        add(card, "p", `Minimum ${awaiting ? "opening" : "next"} bid: ${poaShort(minNext)} POA`, "badge-ok");
+        if (!awaiting && poaAuction.closes > 0) {
+            const nowMs = ui.escrowMarketServerTime || Date.now();
+            const timerRow = add(card, "p", "");
+            const cd = add(timerRow, "span", `⏳ ${formatCountdown(poaAuction.closes - nowMs)}`, "auction-countdown");
+            cd.dataset.closesMs = String(poaAuction.closes);
+            timerRow.append(` · Closes ${formatClock(Math.floor(poaAuction.closes / 1000))}`);
+        }
+        add(card, "p", `Minimum ${awaiting ? "opening" : "next"} bid (>10%): ${poaShort(minNext)} POA`, "badge-ok");
         const controls = add(card, "div", "", "inline-controls");
         const bidInput = document.createElement("input");
         bidInput.value = cartItem ? poaShort(cartItem.amount) : poaShort(minNext);

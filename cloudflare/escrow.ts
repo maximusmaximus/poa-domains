@@ -447,6 +447,7 @@ export class Escrow {
           const fixed=c.action==="list";exact(p,fixed?["name","price"]:["name","reserve"]); const reserve=String(fixed?p.price:p.reserve);const name=text(p.name,256), terms=this.titles.terms(name,c.actor);
           need(micros(reserve)>=micros(terms.reserve) && micros(reserve)<=micros(this.policy.perTx),"ESCROW_RESERVE");
           need(!Object.values(s.auctions).some(a=>a.name===name&&(a.status==="OPEN"||a.status==="SETTLING")),"ESCROW_TITLE_RESERVED");
+          need(!Object.values(s.subListings??{}).some(l=>l.parent===name&&l.status==="OPEN"),"ESCROW_ENCUMBERED_TITLE");
           const id=digest([rk,c]);
           s.auctions[id]=fixed
             ? {id,name,seller:c.actor,reserve:String(micros(reserve)),kind:"fixed",createdAt:this.now(),history:[{event:"Listed for POA",at:this.now()}],
@@ -465,15 +466,22 @@ export class Escrow {
           const n=micros(p.amount);if(c.action==="buy")need(n===BigInt(a.reserve),"ESCROW_PRICE");need(n<=micros(this.policy.perTx),"ESCROW_PAYOUT_LIMIT");need(c.actor!==a.seller,"ESCROW_SELF_SALE");need(a.high?.payer!==c.actor,"ESCROW_SELF_RAISE");
           // Existing strict >10% rule, in integer micros (not rounded decimal floats).
           need(n>=BigInt(a.reserve)&&(!a.high||n*10n>BigInt(a.high.amount)*11n),"ESCROW_BID_INCREMENT");
-          need(BigInt(s.available[c.actor]??"0")>=n,"ESCROW_INSUFFICIENT_FUNDS");
-          const hadHigh=a.high!==null;
-          if(a.high) this.refund(s,`outbid-${a.id}-${rk}`,a.high.payer,a.high.amount);
-          s.available[c.actor]=String(BigInt(s.available[c.actor]??"0")-n);a.high={payer:c.actor,amount:String(n)};
+          const bidderAvail=BigInt(s.available[c.actor]??"0");
+          need(bidderAvail>=n,"ESCROW_INSUFFICIENT_FUNDS");
+          const prevHigh=a.high;
+          // Debit new high bidder first, then credit displaced bidder back to available escrow balance
+          // for instant re-bidding or signed withdrawal back to their original wallet (never redirected).
+          s.available[c.actor]=String(bidderAvail-n);
+          if(prevHigh){
+            need(prevHigh.payer!==c.actor,"ESCROW_SELF_RAISE");
+            s.available[prevHigh.payer]=String(BigInt(s.available[prevHigh.payer]??"0")+BigInt(prevHigh.amount));
+          }
+          a.high={payer:c.actor,amount:String(n)};
           const now=this.now();
           if(c.action==="buy"){
             (a.history??=[]).push({event:"Purchase reserved; seller handover needed",at:now,amount:String(n),payer:c.actor});
             a.closes=now;
-          } else if(!hadHigh){
+          } else if(!prevHigh){
             a.startedAt=now;
             a.closes=awaitingFirstBid?now+(a.window??a.quiet):Math.max(a.closes,now+a.quiet);
             (a.history??=[]).push({event:"Auction started (first bid)",at:now,amount:String(n),payer:c.actor});
@@ -496,6 +504,8 @@ export class Escrow {
         case "settle": {
           exact(p,["auction","transfer"]);const a=s.auctions[text(p.auction,64)];
           need(a&&a.status==="OPEN"&&a.high&&a.closes>0&&this.now()>=a.closes&&c.actor===a.seller,"ESCROW_SETTLE_NOT_ALLOWED");
+          // Prevent one seller from pinning two concurrent handovers on the same registry nonce.
+          need(!Object.values(s.auctions).some(other=>other.status==="SETTLING"&&other.seller===c.actor),"ESCROW_TITLE_RESERVED");
           const packet=authenticate(p.transfer);this.titles.validate(packet,a.name,a.seller,a.high.payer);
           const fee=BigInt(a.high.amount)*BigInt(this.policy.feeBps)/10000n, net=BigInt(a.high.amount)-fee;
           const payments:string[]=[];
@@ -514,7 +524,7 @@ export class Escrow {
           need(n===BigInt(terms.price),"ESCROW_PRICE");need(n<=micros(this.policy.perTx),"ESCROW_PAYOUT_LIMIT");
           need(c.actor!==this.policy.treasury,"ESCROW_SELF_SALE");
           need(BigInt(s.available[c.actor]??"0")>=n,"ESCROW_INSUFFICIENT_FUNDS");
-          need(!Object.values(s.auctions).some(a=>a.name===name&&(a.status==="OPEN"||a.status==="SETTLING")),"ESCROW_TITLE_RESERVED");
+          need(!Object.values(s.auctions).some(a=>(a.name===name&&(a.status==="OPEN"||a.status==="SETTLING"))||(a.status==="SETTLING"&&a.seller===c.actor)),"ESCROW_TITLE_RESERVED");
           const packet=authenticate(p.registration);this.titles.validateIssue!(packet,name,c.actor,String(n));
           const id=`issue-${digest([rk,c])}`;need(!s.payments[id],"ESCROW_DUPLICATE");
           s.available[c.actor]=String(BigInt(s.available[c.actor]??"0")-n);
@@ -529,6 +539,7 @@ export class Escrow {
           need(this.subnames()&&this.titles.subTerms&&this.titles.validateSub&&this.titles.issueSub,"ESCROW_SUBNAMES_OFF");
           need(s.sequence<PILOT_ADMISSION_LIMIT,"ESCROW_JOURNAL_CAPACITY");
           exact(p,["parent","price"]);const parent=text(p.parent,256),t=this.titles.subTerms!(parent,c.actor);
+          need(!Object.values(s.auctions).some(a=>a.name===parent&&(a.status==="OPEN"||a.status==="SETTLING")),"ESCROW_TITLE_RESERVED");
           const listings=(s.subListings??={});
           need(!Object.values(listings).some(l=>l.parent===parent&&l.status==="OPEN"),"ESCROW_SUB_LISTED");
           const id=digest([rk,c]);
@@ -550,6 +561,7 @@ export class Escrow {
           need(name.endsWith("."+l.parent)&&name.length>l.parent.length+1,"ESCROW_SUB_NAME");
           need(n===BigInt(l.price),"ESCROW_PRICE");need(n<=micros(this.policy.perTx),"ESCROW_PAYOUT_LIMIT");
           need(c.actor!==l.seller,"ESCROW_SELF_SALE");
+          need(!Object.values(s.auctions).some(a=>(a.name===l.parent&&(a.status==="OPEN"||a.status==="SETTLING"))||(a.status==="SETTLING"&&a.seller===c.actor)),"ESCROW_TITLE_RESERVED");
           // The seller must still hold the same root, unchanged since listing (same rule as child offers).
           const t=this.titles.subTerms!(l.parent,l.seller);
           need(t.parentDeedId===l.parentDeedId&&t.ownerVersion===l.ownerVersion,"ESCROW_SUB_STALE");
