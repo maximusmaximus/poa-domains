@@ -3,7 +3,7 @@ import { DisplayReadError, type ReadTiming } from "./display-freshness.js";
 import { integer, need } from "../src/core.js";
 import { CHAIN, Transfer, address, digest, micros, txid, verifyTransfer } from "./escrow-codec.js";
 import { Context, Cut, Network, Observation, Status } from "./escrow.js";
-export const MAINNET_ENGINE_SHA256 = "d6c58f54d698965bc7473403e417bb2963a0e4d1b9fc04099164317cce3f2cfe";
+export const MAINNET_ENGINE_SHA256 = "ba3d09028751868abe095249e0dc29dc7bf8444fffbba81355314b8f73b80339";
 export const MAINNET_PARAMS_SHA256 = "34345309000008c583a918944472a337928d043ffc299152285ee962a4f78cd1";
 export const PILOT_PER_TX = "250000.000000";
 export const PILOT_DAILY = "1000000.000000";
