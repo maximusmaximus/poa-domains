@@ -1232,9 +1232,21 @@
       "retryable": false
     },
     {
+      "code": "MEDIA_HOURLY_LIMITED",
+      "httpStatus": 429,
+      "message": "The hourly image upload limit was reached. Try again after the time in Retry-After.",
+      "retryable": true
+    },
+    {
       "code": "MEDIA_RATE_LIMITED",
       "httpStatus": 429,
-      "message": "Image uploads are temporarily rate-limited. Wait a moment and try again.",
+      "message": "Image uploads are limited to 10 per minute. Wait a moment and try again.",
+      "retryable": true
+    },
+    {
+      "code": "MEDIA_RATE_UNAVAILABLE",
+      "httpStatus": 503,
+      "message": "Image upload limits could not be checked right now. Try again shortly.",
       "retryable": true
     },
     {

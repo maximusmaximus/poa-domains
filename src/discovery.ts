@@ -264,7 +264,7 @@ export function openApiDocument(): any {
       operation.responses = {"200":response("Stored in private R2; no registry action",{type:"object",properties:{saved:{const:true},key:{type:"string",pattern:"^v1/[^/]+/[a-f0-9-]+\\.jsonl$"}},required:["saved","key"]}),default:response("Not saved; normal name checking remains available",ref("Error"))};
     }
     if (path === "/v1/media/upload") {
-      operation.description = "Upload a public profile avatar image (PNG, JPG, WebP, or GIF, max 5 MB). Verified by magic bytes, stored in R2, and pinned to IPFS when configured. Returns ipfs://<cid> and /v1/media/<cid>.";
+      operation.description = "Upload a public profile avatar image (PNG, JPG, WebP, or GIF, max 5 MB). Verified by magic bytes, stored in R2, and pinned to IPFS when configured. Limited to 10 uploads per minute and 30 per hour per client (429 MEDIA_RATE_LIMITED or MEDIA_HOURLY_LIMITED with Retry-After). Returns ipfs://<cid> and /v1/media/<cid>.";
       operation["x-browser-writes"] = "Same-origin public avatar upload only; no signed intent or payment";
       operation["x-max-body-bytes"] = 5242880;
       operation.responses = {
