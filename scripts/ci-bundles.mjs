@@ -14,3 +14,7 @@ for (const [source, name] of [["escrow.test.ts", "unit.mjs"], ["escrow-public.te
 await build({entryPoints:[resolve("cloudflare/search-log.ts")],bundle:true,platform:"node",format:"esm",sourcemap:"inline",alias:{"#poa-unicode-data":resolve("cloudflare/unicode-data.ts")},outfile:resolve("dist/search-log.mjs")});
 
 await build({entryPoints:[resolve("cloudflare/public-registry-view.ts")],bundle:true,platform:"node",format:"esm",sourcemap:"inline",alias:{"#poa-unicode-data":resolve("cloudflare/unicode-data.ts")},outfile:resolve("dist/public-registry-view.mjs")});
+
+await build({entryPoints:[resolve("cloudflare/treasury.ts")],bundle:true,platform:"node",format:"esm",sourcemap:"inline",outfile:resolve("dist/treasury.mjs")});
+
+await build({entryPoints:[resolve("cloudflare/feedback.ts")],bundle:true,platform:"node",format:"esm",sourcemap:"inline",outfile:resolve("dist/feedback.mjs")});
