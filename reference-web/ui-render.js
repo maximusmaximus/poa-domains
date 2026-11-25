@@ -1,13 +1,13 @@
-import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, validPrincipal } from "./shared.js?v=c83b04d179c4";
-import { drawTicker } from "./ui-ticker.js?v=c83b04d179c4";
-import { actionLabel } from "./ui-copy.js?v=c83b04d179c4";
-import { returnFocus } from "./ui-a11y.js?v=c83b04d179c4";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=c83b04d179c4";
-import { ui } from "./ui-state.js?v=c83b04d179c4";
-import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=c83b04d179c4";
-import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=c83b04d179c4";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=c83b04d179c4";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=c83b04d179c4";
+import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, validPrincipal } from "./shared.js?v=e24f44d20e2d";
+import { drawTicker } from "./ui-ticker.js?v=e24f44d20e2d";
+import { actionLabel } from "./ui-copy.js?v=e24f44d20e2d";
+import { returnFocus } from "./ui-a11y.js?v=e24f44d20e2d";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=e24f44d20e2d";
+import { ui } from "./ui-state.js?v=e24f44d20e2d";
+import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=e24f44d20e2d";
+import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=e24f44d20e2d";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=e24f44d20e2d";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=e24f44d20e2d";
 
 export function updateLiveAuctionsBadge(state = ui.latestState) {
     const badge = el("liveAuctionsBadge");
@@ -135,6 +135,27 @@ export function openDetail(item) {
     el("detailClose").focus();
 }
 
+export function setAuctionTab(tabId, { user = false, render = false } = {}) {
+    const next = tabId === "upcoming" || tabId === "past" ? tabId : "current";
+    ui.auctionTab = next;
+    if (user)
+        ui.auctionTabChosen = true;
+    let activeBtn = null;
+    for (const t of document.querySelectorAll(".auction-tab")) {
+        const on = t.getAttribute("data-auction-tab") === next;
+        if (on)
+            activeBtn = t;
+        t.classList.toggle("is-active", on);
+        t.setAttribute("aria-selected", on ? "true" : "false");
+        t.tabIndex = on ? 0 : -1;
+    }
+    const panel = el("auctions");
+    if (panel && activeBtn?.id)
+        panel.setAttribute("aria-labelledby", activeBtn.id);
+    if (render && ui.latestState)
+        renderAuctions(ui.latestState);
+}
+
 function poaPointer(box, text) {
     add(box, "p", text, "muted");
     const go = add(box, "button", "🪙 Open My POA", "secondary small");
@@ -145,6 +166,13 @@ function renderPoaAuctions(box) {
     const nowMs = ui.escrowMarketServerTime || Date.now();
     const market = Array.isArray(ui.escrowMarket) ? ui.escrowMarket : [];
     const groups = partitionPoaAuctions(market, nowMs);
+    const nextTab = resolveDefaultAuctionTab(groups, {
+        currentTab: ui.auctionTab,
+        userSelected: ui.auctionTabChosen,
+        keepActiveTab: ui.activeSectionTab === "auctions",
+    });
+    if (nextTab !== ui.auctionTab)
+        setAuctionTab(nextTab);
     const totalAuctions = groups.current.length + groups.upcoming.length + groups.past.length;
     const bidderBar = el("auctionsBidderBar");
     if (bidderBar)
@@ -280,6 +308,13 @@ export function renderAuctions(s) {
     if (bidderBar)
         bidderBar.hidden = true;
     const groups = partitionAuctions(Object.values(s.auctions ?? {}), s.time);
+    const nextTab = resolveDefaultAuctionTab(groups, {
+        currentTab: ui.auctionTab,
+        userSelected: ui.auctionTabChosen,
+        keepActiveTab: ui.activeSectionTab === "auctions",
+    });
+    if (nextTab !== ui.auctionTab)
+        setAuctionTab(nextTab);
     const list = groups[ui.auctionTab] ?? [];
     box.replaceChildren();
     if (!list.length) {

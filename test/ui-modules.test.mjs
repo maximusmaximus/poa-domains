@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,readdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {transformSync} from 'esbuild';
-import {buildCartItem,editCartAmount,isPoaAddress,shortenPoaAddress} from '../reference-web/shared.js';
+import {buildCartItem,editCartAmount,isPoaAddress,resolveDefaultAuctionTab,shortenPoaAddress} from '../reference-web/shared.js';
 import {capabilities} from '../dist/src/interface.js';
 import {profileEngine} from './fixtures/ui-harness.mjs';
 import {auctionState,offerState} from './fixtures/ui-state.mjs';
@@ -396,5 +396,76 @@ test('router domain avatars, escrow payer autofill, management plans, and addres
   globalThis.document = prevDoc;
   globalThis.localStorage = prevStorage;
   if (prevNav) Object.defineProperty(globalThis, 'navigator', prevNav);
+ }
+});
+
+test('resolveDefaultAuctionTab defaults to upcoming when current is empty and respects user choice', async () => {
+ assert.equal(resolveDefaultAuctionTab(), 'current');
+ assert.equal(resolveDefaultAuctionTab({ current: [], upcoming: [] }), 'current');
+ assert.equal(resolveDefaultAuctionTab({ current: [], upcoming: [{ id: '1' }] }), 'upcoming');
+ assert.equal(resolveDefaultAuctionTab({ current: [{ id: '1' }], upcoming: [{ id: '2' }] }), 'current');
+ assert.equal(resolveDefaultAuctionTab({ current: [], upcoming: [{ id: '1' }] }, { currentTab: 'current', userSelected: true }), 'current');
+ assert.equal(resolveDefaultAuctionTab({ current: [], upcoming: [{ id: '1' }] }, { currentTab: 'past', userSelected: true }), 'past');
+ assert.equal(resolveDefaultAuctionTab({ current: [{ id: '1' }], upcoming: [{ id: '2' }] }, { currentTab: 'upcoming', userSelected: false, keepActiveTab: true }), 'upcoming');
+ assert.equal(resolveDefaultAuctionTab({ current: [{ id: '1' }], upcoming: [{ id: '2' }] }, { currentTab: 'upcoming', userSelected: false, keepActiveTab: false }), 'current');
+
+ const revision = /app\.js\?v=([a-f0-9]{12})/.exec(readFileSync('reference-web/index.html', 'utf8'))[1];
+ const { ui } = await import(`../reference-web/ui-state.js?v=${revision}`);
+ const renderMod = await import(`../reference-web/ui-render.js?v=${revision}`);
+ const prevUi = { ...ui };
+ const prevDoc = globalThis.document;
+ try {
+  const makeTab = (id, key) => {
+   const attrs = new Map([['data-auction-tab', key]]);
+   const classes = new Set();
+   return {
+    id,
+    tabIndex: -1,
+    getAttribute: (k) => attrs.get(k) ?? null,
+    setAttribute: (k, v) => attrs.set(k, String(v)),
+    classList: {
+     toggle: (c, f) => (f ? classes.add(c) : classes.delete(c)),
+     contains: (c) => classes.has(c),
+    },
+   };
+  };
+  const tCur = makeTab('auctionTabCurrent', 'current');
+  const tUp = makeTab('auctionTabUpcoming', 'upcoming');
+  const tPast = makeTab('auctionTabPast', 'past');
+  const panelAttrs = new Map();
+  const panel = {
+   setAttribute: (k, v) => panelAttrs.set(k, String(v)),
+   getAttribute: (k) => panelAttrs.get(k) ?? null,
+  };
+  globalThis.document = {
+   getElementById: (id) => (id === 'auctions' ? panel : null),
+   querySelectorAll: (sel) => (sel === '.auction-tab' ? [tCur, tUp, tPast] : []),
+  };
+  ui.auctionTab = 'current';
+  ui.auctionTabChosen = false;
+  ui.latestState = null;
+
+  renderMod.setAuctionTab('upcoming');
+  assert.equal(ui.auctionTab, 'upcoming');
+  assert.equal(ui.auctionTabChosen, false);
+  assert.equal(tUp.classList.contains('is-active'), true);
+  assert.equal(tUp.getAttribute('aria-selected'), 'true');
+  assert.equal(tUp.tabIndex, 0);
+  assert.equal(tCur.tabIndex, -1);
+  assert.equal(panel.getAttribute('aria-labelledby'), 'auctionTabUpcoming');
+
+  renderMod.setAuctionTab('past', { user: true });
+  assert.equal(ui.auctionTab, 'past');
+  assert.equal(ui.auctionTabChosen, true);
+  assert.equal(tPast.tabIndex, 0);
+  assert.equal(panel.getAttribute('aria-labelledby'), 'auctionTabPast');
+
+  renderMod.setAuctionTab('unknown', { render: true });
+  assert.equal(ui.auctionTab, 'current');
+  assert.equal(tCur.tabIndex, 0);
+  assert.equal(panel.getAttribute('aria-labelledby'), 'auctionTabCurrent');
+ } finally {
+  Object.assign(ui, prevUi);
+  globalThis.document = prevDoc;
  }
 });

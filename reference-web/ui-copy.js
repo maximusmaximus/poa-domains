@@ -1,4 +1,4 @@
-import { shortenPoaAddress } from "./shared.js?v=c83b04d179c4";
+import { shortenPoaAddress } from "./shared.js?v=e24f44d20e2d";
 
 // Human labels only. Machine action enums and signed payloads remain unchanged.
 const labels = {poaCheckout:"🪙 Buy with POA",poaBid:"🏷️ Bid with POA","announceAuction+bid":"Start auction + place bid",announceAuction:"Start an auction",bid:"Place a bid",finalize:"Finish auction",closeNoBid:"Close auction with no bids",cancelAuction:"Cancel auction",withdrawRefund:"Claim bid refund",createChildOffer:"Offer subdomains",fillChildOffer:"Buy a subdomain",cancelOffer:"Remove listing",sellFixed:"List for sale",buyFixed:"Buy at listed price",transfer:"Transfer a name",setRecords:"Update records",setMetadata:"Update description",revokeChild:"Retire a subdomain"};
