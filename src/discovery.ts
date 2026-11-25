@@ -615,7 +615,10 @@ export function openApiDocument(): any {
         : t.name === "submit_escrow_command"
           ? ref("EscrowSignedCommand")
           : t.inputSchema,
-      outputSchema: t.outputSchema,
+      outputSchema:
+        Array.isArray(t.outputSchema?.anyOf) && t.outputSchema.anyOf.length === 2
+          ? { ...t.outputSchema, anyOf: [t.outputSchema.anyOf[0], ref("Error")] }
+          : t.outputSchema,
     })),
   };
 }
