@@ -58,6 +58,10 @@ test("production Pages allowlist publishes external Worker discovery but no fixt
     assert.match(html, /<button id="refresh" type="button" disabled>/);
     assert.match(html, /<dl id="network-details"><\/dl>/);
     assert.match(html, /<table id="live-tools" class="availability-table">/);
+    assert.match(html, /<section id="stats-overview"/);
+    assert.match(html, /<section id="features"/);
+    assert.match(html, /<section id="how-it-works"/);
+    assert.match(html, /<section id="faq"/);
     assert.match(html, /Native on-chain registration, ownership and settlement are not verified/);
     assert.match(html, /Safety checks can hold payments/);
     assert.doesNotMatch(html, /xero\s*emoji|roadmap|coming\s+soon|future\s+plans/i);
