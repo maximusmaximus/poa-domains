@@ -1,12 +1,12 @@
-import { publicNameUnavailable } from "./shared.js?v=7db21850d21a";
-import { registryUnit } from "./shared.js?v=7db21850d21a";
-import { actionLabel } from "./ui-copy.js?v=7db21850d21a";
-import { trapDialog } from "./ui-a11y.js?v=7db21850d21a";
-import { ui } from "./ui-state.js?v=7db21850d21a";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=7db21850d21a";
-import { add, el, endpointBase } from "./ui-core.js?v=7db21850d21a";
-import { domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=7db21850d21a";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=7db21850d21a";
+import { publicNameUnavailable } from "./shared.js?v=a12c4f25ce0d";
+import { registryUnit } from "./shared.js?v=a12c4f25ce0d";
+import { actionLabel } from "./ui-copy.js?v=a12c4f25ce0d";
+import { trapDialog } from "./ui-a11y.js?v=a12c4f25ce0d";
+import { ui } from "./ui-state.js?v=a12c4f25ce0d";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=a12c4f25ce0d";
+import { add, el, endpointBase } from "./ui-core.js?v=a12c4f25ce0d";
+import { domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=a12c4f25ce0d";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=a12c4f25ce0d";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
@@ -394,6 +394,7 @@ export function renderFloatingCart() {
     }
     ui.cart.forEach((item, index) => {
         const card = add(list, "div", "", "card cart-item");
+        card.dataset.cartAction = item.action;
         const h = add(card, "h3", "");
         domainHeader(h, item.name);
         if (item.action === "poaCheckout") {
@@ -447,6 +448,7 @@ export function renderCart() {
     }
     ui.cart.forEach((item, index) => {
         const card = add(listNode, "div", "", "card cart-item");
+        card.dataset.cartAction = item.action;
         const h = add(card, "h4", "");
         domainHeader(h, item.name);
         if (item.action === "poaCheckout") {
@@ -466,7 +468,7 @@ export function renderCart() {
             const nowMs = ui.escrowMarketServerTime || Date.now();
             const review = cartReview(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, nowMs);
             const liveMin = review.minimum ?? item.latestMinimum ?? item.minimumAmount ?? item.amount;
-            add(card, "p", `${p.awaitingFirstBid ? "⏳ Starts auction on 1st bid" : "🔥 Live POA auction"} · Min ${poaShort(liveMin)} POA`, "badge-ok");
+            add(card, "p", `🔨 For Auction (${p.awaitingFirstBid ? "starts on 1st bid" : "live"}) · Min ${poaShort(liveMin)} POA`, "badge-ok");
             if (item.needsReview || item.outbid)
                 add(card, "p", "⚠️ " + (item.reviewMessage || "Auction changed — review your highest bid."), item.outbid ? "auction-outbid-badge" : "badge-warn");
             const actionBtns = add(card, "div", "", "button-row");

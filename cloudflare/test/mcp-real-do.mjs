@@ -18,7 +18,7 @@ try{
  const before=await(await mf.dispatchFetch('https://poadomains.grok.me/v1/state')).json();assert.equal(before.state.sequence,15);const receipt=Object.keys(before.state.receipts)[0];
  for(const host of ['poadomains.grok.me','poadomains-registry.maxinfeld-artshow.workers.dev']){
   assert.equal((await rpc(host,'initialize',{protocolVersion:'2025-11-25',capabilities:{},clientInfo:{name:'local-real-do-regression',version:'1'}})).protocolVersion,'2025-11-25');
-  assert.equal((await rpc(host,'tools/list')).tools.length,13);
+  assert.equal((await rpc(host,'tools/list')).tools.length,17);
   const state=await tool(host,'read_state');assert.equal(state.stateHash,before.stateHash);
   const cap=await tool(host,'read_capabilities');assert.equal(cap.livePoA,false);
   assert.equal((await tool(host,'resolve_domain',{name:'nexus'})).name,'nexus');

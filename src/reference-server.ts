@@ -126,6 +126,20 @@ export async function startReferenceServer(
         termsAgreements.set(key, rec);
         return send(201, { ok: true, actor: rec.actor, termsVersion: rec.termsVersion, termsHash: rec.termsHash, agreedAt: rec.agreedAt, recordedAt: rec.recordedAt, alreadyAgreed: false });
       }
+      if (u.pathname.startsWith("/v1/escrow/")) {
+        if (req.method === "GET" && u.pathname === "/v1/escrow/capabilities") {
+          res.setHeader("access-control-allow-origin", "*");
+          return send(200, {
+            enabled: false,
+            paused: true,
+            held: true,
+            holdReason: "POA payments not open",
+            address: null,
+            limits: { perTransaction: "250000.000000", daily: "1000000.000000" },
+          });
+        }
+        return send(503, { code: "ESCROW_DISABLED", accepted: false });
+      }
       if (req.method === "GET") {
         res.setHeader("access-control-allow-origin", "*");
         const assetPath = /^\/(d|p)\/[^/]+\/?$/.test(u.pathname) ? "/" : u.pathname;

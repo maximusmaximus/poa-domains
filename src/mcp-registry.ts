@@ -5,6 +5,7 @@ import { buildProfileWitness, extractLatestProfile } from "./profile.js";
 import { McpProfile, McpProtocolError, MCP_INSTRUCTIONS } from "./mcp-core.js";
 import {
   ACTION_SCHEMAS,
+  ESCROW_COMMAND_SCHEMA,
   PACKET_SCHEMA,
   PROFILE_DOC,
   ID,
@@ -373,11 +374,122 @@ export function registryMcpProfile(backend: McpRegistryBackend, beforeWitness?: 
       }),
       call: (a: any) => backend("POST", "/v1/terms/agree", {}, a),
     },
+    {
+      name: "get_escrow_capabilities",
+      description:
+        "Read live POA escrow & auction readiness (enabled, paused, held, holdReason, escrow address, per-tx/daily limits, new-name checkout, subname sales, freshness, serverTime).",
+      inputSchema: objectSchema({}),
+      outputSchema: output(
+        {
+          enabled: { type: "boolean" },
+          paused: { type: "boolean" },
+          held: { type: "boolean" },
+          holdReason: { anyOf: [S, { type: "null" }] },
+          address: { anyOf: [S, { type: "null" }] },
+          limits: O,
+          serverTime: { type: "integer" },
+        },
+        ["enabled", "paused", "held"],
+      ),
+      call: () => read("/v1/escrow/capabilities"),
+    },
+    {
+      name: "list_poa_auctions",
+      description:
+        "List live, queued (first-bid start), closed POA auctions and fixed-price POA listings, with reserve, high bid, strict >10% minimumNextBid, closes, window, quiet, awaitingFirstBid and history. Optional filters: name, status, kind, phase.",
+      inputSchema: objectSchema(
+        {
+          name: NAME,
+          status: { type: "string", enum: ["OPEN", "SETTLING", "COMPLETE", "CANCELLED"] },
+          kind: { type: "string", enum: ["auction", "fixed"] },
+          phase: { type: "string", enum: ["live", "queued", "closed", "all"] },
+        },
+        [],
+      ),
+      outputSchema: output({
+        items: { type: "array", items: O },
+        total: { type: "integer" },
+        counts: O,
+        serverTime: { type: "integer" },
+      }),
+      call: async (a: any) => {
+        if (a?.name) await beforeWitness?.({ name: a.name });
+        const raw = a?.name
+          ? await read("/v1/escrow/domain", { name: a.name })
+          : await read("/v1/escrow/market");
+        const now = typeof raw?.serverTime === "number" ? raw.serverTime : Date.now();
+        const all = Array.isArray(raw?.items) ? raw.items : [];
+        let live = 0, queued = 0, closed = 0, fixed = 0;
+        const phaseOf = (x: any): "live" | "queued" | "closed" => {
+          if (x?.status !== "OPEN") return "closed";
+          if (x?.awaitingFirstBid) return "queued";
+          if (typeof x?.closes === "number" && x.closes > 0 && now >= x.closes) return "closed";
+          return "live";
+        };
+        for (const item of all) {
+          if (item?.kind === "fixed") {
+            if (item.status === "OPEN") fixed++;
+            else closed++;
+          } else {
+            const ph = phaseOf(item);
+            if (ph === "live") live++;
+            else if (ph === "queued") queued++;
+            else closed++;
+          }
+        }
+        const filtered = all.filter((item: any) => {
+          if (a?.status && item?.status !== a.status) return false;
+          if (a?.kind && (item?.kind ?? "auction") !== a.kind) return false;
+          if (a?.phase && a.phase !== "all" && phaseOf(item) !== a.phase) return false;
+          return true;
+        });
+        return {
+          items: filtered,
+          total: filtered.length,
+          counts: { live, queued, closed, fixed },
+          serverTime: now,
+        };
+      },
+    },
+    {
+      name: "get_escrow_intent",
+      description:
+        "Check deposit intent status (waiting, seen, or final after PoA finality) by intent ID and optional txid.",
+      inputSchema: objectSchema({ id: ID, txid: ID }, ["id"]),
+      outputSchema: output(
+        {
+          intent: ID,
+          payer: S,
+          to: S,
+          amount: S,
+          memo: S,
+          status: { type: "string", enum: ["waiting", "seen", "final"] },
+          txid: { anyOf: [ID, { type: "null" }] },
+        },
+        ["intent", "payer", "to", "amount", "memo", "status"],
+      ),
+      call: (a: any) => read("/v1/escrow/intent", a.txid ? { id: a.id, txid: a.txid } : { id: a.id }),
+    },
+    {
+      name: "submit_escrow_command",
+      description:
+        "Submit one locally signed POA escrow command { command, signature } (view, intent, detect, open, list, bid, buy, settle, cancel, expire, withdraw, issue, list-sub, buy-sub, cancel-sub, repair-title). Never accepts private keys; outbid POA credits back immediately to available escrow balance for instant re-bidding or withdrawal back only to the original wallet.",
+      inputSchema: ESCROW_COMMAND_SCHEMA,
+      outputSchema: output(
+        {
+          action: S,
+          account: O,
+          result: {},
+        },
+        ["action", "account"],
+      ),
+      call: (a: any) => backend("POST", "/v1/escrow/command", {}, a),
+    },
   ].map((tool) => ({
     ...tool,
     annotations: {
-      readOnlyHint: tool.name !== "submit_intent" && tool.name !== "agree_terms",
-      destructiveHint: tool.name === "submit_intent",
+      readOnlyHint: !["submit_intent", "agree_terms", "submit_escrow_command"].includes(tool.name),
+      destructiveHint: tool.name === "submit_intent" || tool.name === "submit_escrow_command",
       idempotentHint: true,
       openWorldHint: false,
     },
@@ -399,6 +511,12 @@ export function registryMcpProfile(backend: McpRegistryBackend, beforeWitness?: 
       name: "update_domain_profile",
       description:
         "Read and update a domain's public versioned profile fields (POA/BTC/ETH addresses, bio, avatar image) via setMetadata.",
+      arguments: [{ name: "name", required: true }],
+    },
+    {
+      name: "bid_on_poa_auction",
+      description:
+        "Inspect a POA auction, check available/outbid escrow balance, and place a user-approved bid or withdrawal via MCP.",
       arguments: [{ name: "name", required: true }],
     },
   ];
@@ -445,11 +563,13 @@ export function registryMcpProfile(backend: McpRegistryBackend, beforeWitness?: 
         )
       )
         throw new McpProtocolError(-32602, "MCP_BAD_PARAMS");
-      if (name === "buy_a_domain" || name === "update_domain_profile") await beforeWitness?.({ name: args.name });
+      if (name === "buy_a_domain" || name === "update_domain_profile" || name === "bid_on_poa_auction") await beforeWitness?.({ name: args.name });
       const guidance =
         name === "update_domain_profile"
           ? "\nNotify the user that all domain profile fields (POA address, BTC address, ETH address, description, image) are PUBLIC and will be published publicly, backed up to R2, and pinned to IPFS. If uploading an avatar file (PNG/JPG/WebP/GIF <= 5 MB), POST it to /v1/media/upload to obtain ipfs://<cid>. Call get_domain_profile, then build_profile_witness to validate and build setMetadata params, confirm with the user, sign locally with the domain owner's key (maxTotal \"0\", maxNetworkFee \"0\"), run simulate_intent, submit_intent, and verify via get_receipt."
-          : "\nCheck identity and the explicitly approved POA amount; quote each name (poaPrice), abort/reconfirm changes, then follow the POA checkout steps above. Never send more POA than approved. Unknown outcome: keep and resend only identical signed bytes; never create a new request key or payment.";
+          : name === "bid_on_poa_auction"
+            ? "\nCall get_escrow_capabilities (abort if held/paused), then list_poa_auctions with { name } to inspect id, awaitingFirstBid, price (reserve), high, minimumNextBid (strict >10%), closes, window, and quiet. Queued auctions have closes=0 and start their timer on the first bid; bids near close extend by the anti-sniping quiet window. Call submit_escrow_command with action:\"view\" to check existing available escrow balance (including instant credits from outbid auctions). Deposit only the shortfall via intent -> finalized POA transfer -> detect. Confirm the maximum bid ceiling with the user, sign locally, and call submit_escrow_command with action:\"bid\". Unused or outbid POA stays in available balance for instant re-bidding or withdraw back only to the original wallet."
+            : "\nCheck identity and the explicitly approved POA amount; quote each name (poaPrice), abort/reconfirm changes, then follow the POA checkout steps above. Never send more POA than approved. Unknown outcome: keep and resend only identical signed bytes; never create a new request key or payment.";
       return {
         description: prompt.description,
         messages: [

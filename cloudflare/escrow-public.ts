@@ -4,7 +4,7 @@ import { verifyCommand, address, decimal, micros } from "./escrow-codec.js";
 import { exact, need, parseJSON } from "../src/core.js";
 const PUBLIC_ACTIONS=new Set(["intent","detect","withdraw","open","list","bid","buy","cancel","expire","settle","repair-title","issue","list-sub","cancel-sub","buy-sub","view"]);
 export function marketView(s: State, name?: string) {
-  return Object.values(s.auctions).filter(a=>name===undefined||a.name===name).slice(-100).map(a=>{
+  return Object.values(s.auctions).filter(a=>name===undefined||a.name===name).slice(-500).map(a=>{
     const reserveMicros=BigInt(a.reserve);
     const highMicros=a.high?BigInt(a.high.amount):null;
     const minNext=highMicros===null?reserveMicros:(highMicros*11n)/10n+1n;
