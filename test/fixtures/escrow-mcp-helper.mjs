@@ -56,7 +56,10 @@ export async function createTreasuryAuctionFixture() {
   const bidder2 = mkKey();
 
   const clock = new BootableSystemClock();
-  let nowMs = 1795600000000;
+  // Start at wall-clock now so provisionTreasuryAuctionDomains (which uses
+  // Math.max(Date.now()/1000, snap.time)) cannot jump the engine ahead of this
+  // fixture clock. A hardcoded epoch becomes CLOCK_BACKWARD once wall time passes it.
+  let nowMs = Date.now();
   clock.overrideTime = Math.floor(nowMs / 1000);
 
   const engine = new Engine(mainnetConfig(issuer.addr, treasury.addr, [bidder1.addr, bidder2.addr]), clock);
@@ -177,7 +180,8 @@ export async function createTreasuryAuctionFixture() {
   };
 
   const advanceMs = (deltaMs) => {
-    nowMs += deltaMs;
+    // Do not rewind if provision or other helpers already moved overrideTime forward.
+    nowMs = Math.max(nowMs, (clock.overrideTime ?? 0) * 1000) + deltaMs;
     clock.overrideTime = Math.floor(nowMs / 1000);
   };
 
