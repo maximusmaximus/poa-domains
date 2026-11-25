@@ -203,6 +203,23 @@ function params(method: string, path: string): any[] {
       }),
       parameter("cursor", "query", S),
     );
+  if (path === "/v1/escrow/market")
+    for (const [name, schema] of Object.entries({
+      name: { type: "string", minLength: 1, maxLength: 256 },
+      status: { enum: ["OPEN", "SETTLING", "COMPLETE", "CANCELLED"] },
+      kind: { enum: ["auction", "fixed"] },
+      phase: { enum: ["live", "queued", "closed", "all"] },
+      sort: { enum: ["closes", "price", "created"], default: "closes" },
+      order: { enum: ["asc", "desc"], default: "asc" },
+      minPrice: { type: "string", pattern: "^(0|[1-9][0-9]{0,12})(\\.[0-9]{1,6})?$" },
+      maxPrice: { type: "string", pattern: "^(0|[1-9][0-9]{0,12})(\\.[0-9]{1,6})?$" },
+      closesBefore: { type: "integer", minimum: 0, maximum: 999999999999 },
+      tier: { enum: ["standard", "premium"] },
+      limit: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+      cursor: S,
+      since: UINT,
+    }))
+      list.push(parameter(name, "query", schema));
   if (path === "/v1/escrow/subnames")
     list.push(parameter("parent", "query", { type: "string", minLength: 1, maxLength: 256 }));
   if (path === "/v1/escrow/intent")
@@ -598,7 +615,10 @@ export function openApiDocument(): any {
         : t.name === "submit_escrow_command"
           ? ref("EscrowSignedCommand")
           : t.inputSchema,
-      outputSchema: t.outputSchema,
+      outputSchema:
+        Array.isArray(t.outputSchema?.anyOf) && t.outputSchema.anyOf.length === 2
+          ? { ...t.outputSchema, anyOf: [t.outputSchema.anyOf[0], ref("Error")] }
+          : t.outputSchema,
     })),
   };
 }

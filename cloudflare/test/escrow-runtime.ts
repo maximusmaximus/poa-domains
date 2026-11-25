@@ -1,5 +1,5 @@
 import { escrowHttp } from "../escrow-http.js";
-import { marketView, publicCommand } from "../escrow-public.js";
+import { marketPage, marketView, publicCommand } from "../escrow-public.js";
 // LOCAL TEST ENTRYPOINT ONLY. Not imported by the production Worker. Synthetic, never-funded identities.
 import { DurableObject } from "cloudflare:workers";
 import { Engine } from "../../src/engine.js";
@@ -86,6 +86,7 @@ export class EscrowHarness extends DurableObject<TestEnv> {
     if(path==="ui-enabled")return this.uiEnabled;
     if(path==="capabilities"){const s=this.escrow.state(),freshness=await this.escrow.readiness();return {enabled:this.uiEnabled,mock:true,paused:s.paused,held:s.paused||!!s.halt||freshness.held,holdReason:s.paused?"POA payments paused":s.halt??freshness.reason,address:policy.wallet,limits:{perTransaction:this.escrow.policy.perTx,daily:this.escrow.policy.daily},freshness,serverTime:this.net.now,registryId:this.engine.registryId};}
     if(path==="intent")return this.escrow.depositView(query.id!,query.txid);
+    if(path==="market")return marketPage(this.escrow.state(),query,this.net.now);
     return {items:marketView(this.escrow.state(),path==="domain"?query.name:undefined),serverTime:this.net.now};
   }
   async escrowRead(path:string,query:Record<string,string>){return this.web(path,query);}

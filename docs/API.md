@@ -164,17 +164,41 @@ disarmed; adding these routes to source does not deploy them.
 | `GET /v1/names/:name` | Canonical name, name entry, current deed/auction and ownership-class conflict |
 | `GET /v1/auctions/:id` | Auction and its computed close-eligible time |
 | `GET /v1/offers/:id` | Offer and its parent deed (including rights/metadata context) |
-| `GET /v1/auctions?limit=50&cursor=...` | Deterministic ID-sorted `items` and `nextCursor` |
+| `GET /v1/auctions?limit=50&cursor=...` | Deterministic ID-sorted legacy registry-unit `items` and `nextCursor` |
 | `GET /v1/offers?limit=50&cursor=...` | Same paging contract, including historical offers |
+| `GET /v1/escrow/market?...` | Filtered, sorted, keyset-paged POA escrow auctions and fixed-price listings |
 | `GET /v1/quote?name=NAME&action=ACTION` | Current planning data and exact action-params template |
 | `POST /v1/intents/preview` | Hypothetical receipt for a complete signed packet, without committing it |
 
 Targeted missing resources return 404. Collection limits are whole numbers 1–100
 (default 50). Treat `nextCursor` as opaque; pass it unchanged until it is null.
-It is bound to collection, sequence and state hash. Any committed mutation makes
-it stale (409 `STALE_CURSOR`); restart without a cursor. No offset parameter, silent
-page mixing or implicit active-only filter is used. Reads do not advance time,
-sequence, nonce or state. `observedServerTime` is separate from committed time.
+For `/v1/auctions` and `/v1/offers`, `nextCursor` is bound to collection, sequence
+and state hash; any committed mutation makes it stale (409 `STALE_CURSOR`) so you
+restart without a cursor. No offset parameter, silent page mixing or implicit
+active-only filter is used. Reads do not advance time, sequence, nonce or state.
+`observedServerTime` is separate from committed time.
+
+### POA auction market paging (`GET /v1/escrow/market`)
+
+`GET /v1/escrow/market` (and MCP `list_poa_auctions`) exposes POA escrow auctions and fixed-price listings with optional filtering, sorting, delta reads, and stable keyset paging:
+
+- Filters: `name`, `status` (`OPEN` | `SETTLING` | `COMPLETE` | `CANCELLED`), `kind` (`auction` | `fixed`), `phase` (`live` | `queued` | `closed` | `all`), `tier` (`standard` | `premium`), `minPrice` and `maxPrice` (POA decimal strings compared against the current high bid, or reserve if no bids), `closesBefore` (unix seconds; live auctions closing before that time), and `since` (sequence number; returns only auctions changed after it).
+- Sorting: `sort` (`closes` | `price` | `created`, default `closes` with queued `closes=0` auctions sorted last) and `order` (`asc` | `desc`, default `asc`).
+- Paging: `limit` (`1`–`100`, default `50`) and `cursor` (opaque token encoding sort key and auction ID, bound to `sort` and `order`, so pages stay stable while new bids arrive).
+- Response: `items` (existing item fields unchanged), `total`, `counts`, `nextCursor` (`null` when done), `hasMore`, `sequence` (pass back as `since`), and `serverTime`. Invalid inputs or cursors return HTTP `400` using the shared error envelope (see [ERRORS.md](ERRORS.md)).
+
+Example:
+
+```bash
+# First page of standard auctions priced 100–500 POA, lowest price first
+curl -s "https://poadomains.grok.me/v1/escrow/market?tier=standard&minPrice=100&maxPrice=500&sort=price&order=asc&limit=50"
+
+# Next page using the previous response's nextCursor
+curl -s "https://poadomains.grok.me/v1/escrow/market?tier=standard&minPrice=100&maxPrice=500&sort=price&order=asc&limit=50&cursor=<nextCursor>"
+
+# Subsequent delta check using the returned sequence
+curl -s "https://poadomains.grok.me/v1/escrow/market?since=<sequence>"
+```
 
 ### Quote contract
 

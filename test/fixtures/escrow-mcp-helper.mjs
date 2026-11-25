@@ -22,7 +22,7 @@ async function loadEscrowModules() {
       contents: `
         export * from "./cloudflare/escrow.ts";
         export { CHAIN, verifyCommand, verifyTransfer, txid, micros, decimal, digest } from "./cloudflare/escrow-codec.ts";
-        export { marketView, publicCommand, accountView } from "./cloudflare/escrow-public.ts";
+        export { marketView, marketPage, parseMarketQuery, publicCommand, accountView } from "./cloudflare/escrow-public.ts";
         export { registryTitles } from "./cloudflare/escrow-titles.ts";
       `,
       resolveDir: process.cwd(),
@@ -47,7 +47,7 @@ function mkKey() {
 
 export async function createTreasuryAuctionFixture() {
   const mod = await loadEscrowModules();
-  const { Escrow, initial, nextEntry, replay, CHAIN, txid, micros, decimal, digest, marketView, publicCommand, registryTitles } = mod;
+  const { Escrow, initial, nextEntry, replay, CHAIN, txid, micros, decimal, digest, marketView, marketPage, parseMarketQuery, publicCommand, registryTitles } = mod;
 
   const issuer = mkKey();
   const treasury = mkKey();
@@ -196,6 +196,8 @@ export async function createTreasuryAuctionFixture() {
     creditFinalDeposit,
     advanceMs,
     marketView,
+    marketPage,
+    parseMarketQuery,
     publicCommand,
   };
 }

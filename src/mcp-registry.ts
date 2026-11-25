@@ -11,6 +11,7 @@ import {
   ID,
   NAME,
   PRINCIPAL,
+  UINT,
   Schema,
   objectSchema,
 } from "./mcp-schema.js";
@@ -396,13 +397,22 @@ export function registryMcpProfile(backend: McpRegistryBackend, beforeWitness?: 
     {
       name: "list_poa_auctions",
       description:
-        "List live, queued (first-bid start), closed POA auctions and fixed-price POA listings, with reserve, high bid, strict >10% minimumNextBid, closes, window, quiet, awaitingFirstBid and history. Optional filters: name, status, kind, phase.",
+        "Browse and page live, queued (first-bid start), closed POA auctions and fixed-price POA listings, with reserve, high bid, strict >10% minimumNextBid, closes, window, quiet, awaitingFirstBid and history. Optional filters: name, status, kind, phase, tier (standard|premium), minPrice, maxPrice (POA decimal strings), closesBefore (unix seconds, live auctions only), since (sequence number for deltas). Sorting: sort (closes|price|created, default closes with queued closes=0 last), order (asc|desc, default asc). Paging: limit (1-100, default 50), cursor; returns nextCursor, hasMore and sequence.",
       inputSchema: objectSchema(
         {
-          name: NAME,
+          name: { type: "string", minLength: 1, maxLength: 256, examples: ["alpha", "agent", "👍"] },
           status: { type: "string", enum: ["OPEN", "SETTLING", "COMPLETE", "CANCELLED"] },
           kind: { type: "string", enum: ["auction", "fixed"] },
           phase: { type: "string", enum: ["live", "queued", "closed", "all"] },
+          sort: { type: "string", enum: ["closes", "price", "created"] },
+          order: { type: "string", enum: ["asc", "desc"] },
+          minPrice: { type: "string", pattern: "^(0|[1-9][0-9]{0,12})(\\.[0-9]{1,6})?$", examples: ["100", "100.000000"] },
+          maxPrice: { type: "string", pattern: "^(0|[1-9][0-9]{0,12})(\\.[0-9]{1,6})?$", examples: ["1000", "1000.000000"] },
+          closesBefore: { type: "integer", minimum: 0, maximum: 999999999999 },
+          tier: { type: "string", enum: ["standard", "premium"] },
+          limit: { type: "integer", minimum: 1, maximum: 100 },
+          cursor: { type: "string", minLength: 1, maxLength: 256 },
+          since: UINT,
         },
         [],
       ),
@@ -410,45 +420,32 @@ export function registryMcpProfile(backend: McpRegistryBackend, beforeWitness?: 
         items: { type: "array", items: O },
         total: { type: "integer" },
         counts: O,
+        nextCursor: { anyOf: [S, { type: "null" }] },
+        hasMore: { type: "boolean" },
+        sequence: { type: "integer" },
         serverTime: { type: "integer" },
       }),
       call: async (a: any) => {
         if (a?.name) await beforeWitness?.({ name: a.name });
-        const raw = a?.name
-          ? await read("/v1/escrow/domain", { name: a.name })
-          : await read("/v1/escrow/market");
-        const now = typeof raw?.serverTime === "number" ? raw.serverTime : Date.now();
-        const all = Array.isArray(raw?.items) ? raw.items : [];
-        let live = 0, queued = 0, closed = 0, fixed = 0;
-        const phaseOf = (x: any): "live" | "queued" | "closed" => {
-          if (x?.status !== "OPEN") return "closed";
-          if (x?.awaitingFirstBid) return "queued";
-          if (typeof x?.closes === "number" && x.closes > 0 && now >= x.closes) return "closed";
-          return "live";
-        };
-        for (const item of all) {
-          if (item?.kind === "fixed") {
-            if (item.status === "OPEN") fixed++;
-            else closed++;
-          } else {
-            const ph = phaseOf(item);
-            if (ph === "live") live++;
-            else if (ph === "queued") queued++;
-            else closed++;
-          }
+        const query: Record<string, string> = {};
+        for (const key of [
+          "name",
+          "status",
+          "kind",
+          "phase",
+          "sort",
+          "order",
+          "minPrice",
+          "maxPrice",
+          "closesBefore",
+          "tier",
+          "limit",
+          "cursor",
+          "since",
+        ]) {
+          if (a?.[key] !== undefined) query[key] = String(a[key]);
         }
-        const filtered = all.filter((item: any) => {
-          if (a?.status && item?.status !== a.status) return false;
-          if (a?.kind && (item?.kind ?? "auction") !== a.kind) return false;
-          if (a?.phase && a.phase !== "all" && phaseOf(item) !== a.phase) return false;
-          return true;
-        });
-        return {
-          items: filtered,
-          total: filtered.length,
-          counts: { live, queued, closed, fixed },
-          serverTime: now,
-        };
+        return read("/v1/escrow/market", query);
       },
     },
     {

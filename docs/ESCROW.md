@@ -191,6 +191,40 @@ never journals, title-consent packets, signing material or administrative creden
 Receipt previews never credit a deposit: even an observed final transfer remains “seen”
 until its payer signs `detect` and the ledger independently verifies and credits it.
 
+`GET /v1/escrow/market` supports filtering, sorting, delta reads, and keyset cursor paging (shared with the MCP `list_poa_auctions` tool):
+
+| Parameter | Values / behavior |
+|---|---|
+| `name` | Exact domain name (1–256 characters) |
+| `status` | `OPEN`, `SETTLING`, `COMPLETE`, or `CANCELLED` |
+| `kind` | `auction` or `fixed` |
+| `phase` | `live`, `queued`, `closed`, or `all` |
+| `tier` | `standard` (1h window / 1h quiet) or `premium` (24h window / 24h quiet) |
+| `minPrice`, `maxPrice` | POA decimal strings (up to 6 decimal places), compared against the current high bid or reserve when unbid |
+| `closesBefore` | Unix seconds; returns only live auctions with `closes < closesBefore * 1000` |
+| `sort` | `closes` (default), `price`, or `created`; queued auctions with `closes=0` always sort last for `closes` |
+| `order` | `asc` (default) or `desc` |
+| `limit` | Whole number `1`–`100` (default `50`) |
+| `cursor` | Opaque cursor from the previous page's `nextCursor` (bound to `sort` and `order`, encoding sort key + auction ID so pages stay stable while bids arrive) |
+| `since` | Non-negative escrow sequence number; returns only auctions created or changed after `since` |
+
+Responses keep every item field unchanged (`id`, `name`, `seller`, `kind`, `price`, `minimumNextBid`, `status`, `closes`, `window`, `quiet`, `createdAt`, `startedAt`, `awaitingFirstBid`, `high`, `bidders`, `settlement`, `history`) and include `total`, `counts`, `nextCursor` (`null` on the last page), `hasMore`, `sequence`, and `serverTime`. Invalid parameters or cursors return HTTP `400` in the standard error envelope (`PAGE_LIMIT`, `PAGE_CURSOR`, `ESCROW_AMOUNT`, `INTEGER`, `INVALID_REQUEST`, `QUERY_NOT_ALLOWED`).
+
+Paging and delta example:
+
+```bash
+# Page 1: open auctions sorted soonest-closing first (queued closes=0 last)
+curl -s "https://poadomains.grok.me/v1/escrow/market?status=OPEN&sort=closes&order=asc&limit=50"
+# -> { "items": [...], "total": 99, "counts": {...}, "nextCursor": "<token>", "hasMore": true, "sequence": 350, "serverTime": ... }
+
+# Page 2: pass nextCursor unchanged with the same sort/order until hasMore is false
+curl -s "https://poadomains.grok.me/v1/escrow/market?status=OPEN&sort=closes&order=asc&limit=50&cursor=<token>"
+# -> { "items": [...], "total": 99, "counts": {...}, "nextCursor": null, "hasMore": false, "sequence": 350, "serverTime": ... }
+
+# Later delta poll: fetch only auctions changed after sequence 350
+curl -s "https://poadomains.grok.me/v1/escrow/market?since=350"
+```
+
 `POST /v1/escrow/intent`, `/withdraw`, `/account` and `/command` require the exact
 `{command,signature}` envelope above, with a valid actor signature and an expiry within
 one hour. The first three routes bind the actions `intent`, `withdraw`, and `view`.

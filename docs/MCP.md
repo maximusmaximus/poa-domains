@@ -32,7 +32,27 @@ in the Worker). Signatures and Engine validation remain authoritative.
 `read_capabilities` returns typed enabled `actionSchemas` and defaults to small
 capabilities; `includeEmoji:true` explicitly asks for the full tables. It never
 claims native-chain finality; registry `livePoA:false` is separate from the
-existing live escrow service. No escrow tools or admin/reconcile calls are added.
+existing live escrow service.
+
+### POA auction browsing (`list_poa_auctions`)
+
+`list_poa_auctions` reads `GET /v1/escrow/market` with the same optional parameters and response shape:
+
+- Filters: `name`, `status` (`OPEN` | `SETTLING` | `COMPLETE` | `CANCELLED`), `kind` (`auction` | `fixed`), `phase` (`live` | `queued` | `closed` | `all`), `tier` (`standard` | `premium`), `minPrice` / `maxPrice` (POA decimal strings compared against high bid or reserve), `closesBefore` (unix seconds; live auctions only), `since` (escrow sequence number; returns only auctions changed after it).
+- Sorting: `sort` (`closes` | `price` | `created`, default `closes`; queued auctions with `closes=0` sort last for `closes`) and `order` (`asc` | `desc`, default `asc`).
+- Paging: `limit` (`1`–`100`, default `50`) and `cursor` (opaque token from the previous page's `nextCursor`). Each response returns `items`, `total`, `counts`, `nextCursor` (`null` when done), `hasMore`, `sequence`, and `serverTime`. Invalid schema inputs return JSON-RPC `-32602` (`MCP_BAD_PARAMS`), and invalid cursors or inverted price bounds return a tool error envelope (`PAGE_CURSOR` or `ESCROW_AMOUNT`).
+
+Paging example (`tools/call`):
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_poa_auctions","arguments":{"phase":"live","tier":"standard","sort":"closes","order":"asc","limit":25}}}
+```
+
+Pass the returned `structuredContent.nextCursor` back as `cursor` with the same `sort` and `order` while `hasMore` is `true`, and pass `structuredContent.sequence` as `since` on later polls to read only changed auctions:
+
+```json
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_poa_auctions","arguments":{"phase":"live","tier":"standard","sort":"closes","order":"asc","limit":25,"cursor":"<nextCursor>"}}}
+```
 
 Resources: `poa://capabilities`, templates `poa://names/{name}` and
 `poa://receipts/{id}`. Prompts: `buy_a_domain` and `accept_cart_handoff`.
