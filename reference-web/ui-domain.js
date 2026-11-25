@@ -1,6 +1,7 @@
 import {
   activeResaleOffers,
   collectPreviousDomainFields,
+  domainPath,
   extractDomainProfile,
   findDomainSalesAndAuctions,
   formatClock,
@@ -19,12 +20,12 @@ import {
   registryUnit,
   resolveDomainView,
   unavailableKey,
-} from "./shared.js?v=a4c45bbc5a95";
-import { actionLabel, createPoaCopyButton } from "./ui-copy.js?v=a4c45bbc5a95";
-import { ui } from "./ui-state.js?v=a4c45bbc5a95";
-import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=a4c45bbc5a95";
-import { domainHeader, nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=a4c45bbc5a95";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=a4c45bbc5a95";
+} from "./shared.js?v=c83b04d179c4";
+import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=c83b04d179c4";
+import { ui } from "./ui-state.js?v=c83b04d179c4";
+import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=c83b04d179c4";
+import { domainHeader, nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=c83b04d179c4";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=c83b04d179c4";
 
 function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) {
   const wrap = document.createElement("span");
@@ -99,7 +100,6 @@ function renderDomainProfileCard(deed, { listedForSale = false } = {}) {
   if (!hasActiveProfile && !activeRecords.length) {
     if (wasReset) {
       box.hidden = false;
-      add(box, "h3", "🪪 Public profile & fields");
       add(
         box,
         "p",
@@ -115,36 +115,35 @@ function renderDomainProfileCard(deed, { listedForSale = false } = {}) {
   box.hidden = false;
   if (hasActiveProfile) {
     const p = extracted.profile;
-    const head = add(box, "div", "", "domain-profile-head");
     const mediaPath = profileImageMediaPath(p.image);
-    if (mediaPath) {
-      const img = document.createElement("img");
-      img.className = "domain-avatar";
-      img.src = mediaPath;
-      img.alt = `Avatar for ${deed.name}`;
-      img.addEventListener("error", () => {
-        img.hidden = true;
-      });
-      head.append(img);
-    }
-    const meta = add(head, "div", "", "domain-profile-meta");
-    add(
-    meta,
-    "h3",
-    extracted.metadataVersion > 1 ? `🪪 Public profile (#${extracted.metadataVersion})` : "🪪 Public profile",
-  );
-    if (p.description) add(meta, "p", p.description, "domain-profile-bio");
-    if (p.image && !mediaPath) {
-      const linkLine = add(meta, "p", "🖼️ Avatar: ", "muted");
-      if (p.image.startsWith("https://")) {
-        const a = document.createElement("a");
-        a.href = p.image;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        a.textContent = p.image;
-        linkLine.append(a);
-      } else {
-        add(linkLine, "code", p.image);
+    if (mediaPath || p.description || p.image) {
+      const head = add(box, "div", "", "domain-profile-head");
+      if (mediaPath) {
+        const img = document.createElement("img");
+        img.className = "domain-avatar";
+        img.src = mediaPath;
+        img.alt = `Avatar for ${deed.name}`;
+        img.addEventListener("error", () => {
+          img.hidden = true;
+        });
+        head.append(img);
+      }
+      if (p.description || (p.image && !mediaPath)) {
+        const meta = add(head, "div", "", "domain-profile-meta");
+        if (p.description) add(meta, "p", p.description, "domain-profile-bio");
+        if (p.image && !mediaPath) {
+          const linkLine = add(meta, "p", "🖼️ Avatar: ", "muted");
+          if (p.image.startsWith("https://")) {
+            const a = document.createElement("a");
+            a.href = p.image;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            a.textContent = p.image;
+            linkLine.append(a);
+          } else {
+            add(linkLine, "code", p.image);
+          }
+        }
       }
     }
     const fields = add(box, "div", "", "domain-profile-fields");
@@ -165,7 +164,7 @@ function renderDomainProfileCard(deed, { listedForSale = false } = {}) {
   }
   if (activeRecords.length) {
     const recBox = add(box, "div", "", hasActiveProfile ? "domain-records-list" : "");
-    add(recBox, hasActiveProfile ? "h4" : "h3", "🏷️ Attached domain records");
+    add(recBox, "h3", "🏷️ Attached domain records");
     for (const rec of activeRecords) appendRecordRow(recBox, rec, deed.name);
   }
 }
@@ -422,9 +421,34 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
   }
 }
 
+function syncDomainCopyLink(name, visible) {
+  const btn = el("domainCopyLink");
+  if (!btn) return;
+  if (!visible || !name) {
+    btn.hidden = true;
+    delete btn.dataset.copyUrl;
+    return;
+  }
+  const slugUrl = new URL(domainPath(name), location.origin).href;
+  btn.hidden = false;
+  btn.dataset.copyUrl = slugUrl;
+  btn.title = slugUrl;
+  btn.setAttribute("aria-label", `Copy link for ${name}`);
+  if (btn.dataset.wired !== "1") {
+    btn.dataset.wired = "1";
+    btn.addEventListener("click", async () => {
+      const url = btn.dataset.copyUrl;
+      if (!url) return;
+      const res = await copyText(url);
+      if (res.ok) flashCopied(btn);
+    });
+  }
+}
+
 export function renderDomainPage(name) {
   if (!ui.latestState || !name) return;
   if (publicNameUnavailable(name, ui.cap)) {
+    syncDomainCopyLink(name, false);
     el("domainTitle").classList.remove("domain-heading");
     el("domainTitle").textContent = "Name unavailable";
     el("domainStatus").textContent = "🔒 Stored record withheld — not free to register";
@@ -442,6 +466,7 @@ export function renderDomainPage(name) {
     el("domainOwnerTools").hidden = true;
     return;
   }
+  syncDomainCopyLink(name, true);
   const view = resolveDomainView(ui.latestState, name, ui.reservedSet, ownershipView());
   const poa = poaOnlyMode(ui.cap);
   const nowMs = ui.escrowMarketServerTime || Date.now();
@@ -471,7 +496,6 @@ export function renderDomainPage(name) {
   if (view.owner) {
     ownerNode.append("Owner: ");
     ownerLink(ownerNode, view.owner, person(view.owner));
-    ownerNode.append(" · ♾️ Permanent registry rights · not proof of native-chain ownership");
   } else if (view.variantOf) {
     ownerNode.append("🔒 Same emoji as ");
     nameLink(ownerNode, view.variantOf);

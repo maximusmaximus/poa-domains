@@ -574,9 +574,15 @@ try {
     image: `ipfs://${mockAvatarCid}`,
   };
   h.payload.state.deeds[agentDeedId].metadata = [{ cid: mockAvatarCid, document: committedDoc }];
-  await pageUx.goto(h.url + "/d/agent");
+  await pageUx.goto(h.url + "/d/agent?q=agent");
   await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageUx.locator("#domainOwner")).not.toContainText("Permanent registry rights");
+  await expect(pageUx.locator("#domainOwner")).not.toContainText("not proof of native-chain ownership");
+  await expect(pageUx.locator("#domainCopyLink")).toBeVisible();
+  await pageUx.locator("#domainCopyLink").click();
+  assert.equal(await pageUx.evaluate(() => navigator.clipboard.readText()), `${h.url}/d/agent`);
   await expect(pageUx.locator("#domainProfile")).toBeVisible();
+  await expect(pageUx.locator("#domainProfile")).not.toContainText("Public profile");
   await expect(pageUx.locator("#domainTitle .domain-header-avatar img")).toHaveAttribute("src", `/v1/media/${mockAvatarCid}`);
   const domainHeaderAvatarBox = await pageUx.locator("#domainTitle .domain-header-avatar").boundingBox();
   assert.ok(domainHeaderAvatarBox && Math.abs(domainHeaderAvatarBox.width - domainHeaderAvatarBox.height) < 1, "/d/<name> header avatar must be square");

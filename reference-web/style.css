@@ -510,16 +510,10 @@ h4 {
   font-size: 0.9rem;
 }
 
-.breadcrumb {
-  margin: 0.5rem 0 0;
-}
-.breadcrumb a {
-  color: #9cffe0;
-  text-decoration: none;
-}
-.breadcrumb a:hover {
-  text-decoration: underline;
-}
+.breadcrumb{margin:.5rem 0 0;}
+.breadcrumb a{color:#9cffe0;text-decoration:none;}
+.breadcrumb a:hover{text-decoration:underline;}
+.domain-top-bar{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;}
 
 .domain-link {
   color: #9cffe0;
