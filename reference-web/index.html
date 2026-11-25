@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=de8d111f721c" />
+    <link rel="stylesheet" href="/style.css?v=5c893efb34a9" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -50,9 +50,6 @@
         <span class="tab-icon" aria-hidden="true">🧭</span><span class="tab-label">Explore</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="escrow" id="tabEscrow" aria-controls="escrowSection" tabindex="-1"><span class="tab-icon" aria-hidden="true">🪙</span><span id="managedDomainsBadge" class="tab-live-badge tab-managed-badge" hidden aria-hidden="true">0</span><span class="tab-label">Manage domains</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span><span id="managedDomainsSr" class="visually-hidden"></span></button>
-      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="handoff" id="tabHandoff" aria-controls="handoffSection" tabindex="-1">
-        <span class="tab-icon" aria-hidden="true">🧾</span><span class="tab-label">Handoff</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
-      </button>
     </nav>
     </div>
 
@@ -198,8 +195,8 @@
       </section>
       </section>
 
-      <section id="handoffSection" data-section="handoff" role="tabpanel" aria-labelledby="tabHandoff" tabindex="0" hidden>
-        <h2>🧾 Handoff</h2>
+      <section id="handoffSection" data-section="handoff" aria-labelledby="handoffHeading" tabindex="0" hidden>
+        <h2 id="handoffHeading">⚙️ Advanced</h2>
         <p data-info-description class="howto">Give your agent a clear request — this page does not sign, pay or register a name.</p>
         <ol class="handoff-steps"><li>🔍 Find a name and add it to your planning cart.</li><li>🛒 Check each POA price, then copy the cart request or download its JSON.</li><li>🤖 Give it to your agent. Ask it to check prices and ownership again, preview the action, and ask for your approval before sending anything.</li></ol>
         <p data-info-description>Why? Your agent needs the exact name, POA price and current registry version. A copied request is not a payment or proof of ownership.</p>
@@ -326,6 +323,7 @@
         <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer"><svg class="github-mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg> <span>poa-domains on GitHub</span></a>
         <a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer" title="Mirror Site — static read-only landing page"><svg class="github-mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg> <span>Mirror Site</span></a>
         <a href="/terms" target="_blank" rel="noopener noreferrer">📜 Terms</a>
+        <a href="/?tab=handoff" id="advancedLink" title="Advanced agent handoff and unsigned action builder">Advanced</a>
         <button type="button" id="openFeedbackBtn" class="footer-action-btn" aria-haspopup="dialog" aria-controls="feedbackModal">💬 Bug / Feature</button>
       </nav>
       <p class="footer-credit">made with ❤️ in SF by Tesselate Army | <a href="https://maxi.grok.me" rel="noreferrer">maxi.grok.me</a></p>
@@ -471,6 +469,6 @@
       </details>
     </div>
 
-    <script type="module" src="/app.js?v=fcbe30736580"></script>
+    <script type="module" src="/app.js?v=c513cd0e5a09"></script>
   </body>
 </html>

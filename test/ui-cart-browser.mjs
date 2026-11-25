@@ -58,7 +58,7 @@ try {
       await page.keyboard.press("Escape");
       assert.ok(await page.locator('#searchResult a[href="/d/%F0%9F%9A%80"]').count());
       assert.equal(await page.locator("#siteFooter").count(), 1);
-      assert.ok(await page.locator("#sectionTabs .tab-dot").count() >= 6);
+      assert.equal(await page.locator("#sectionTabs .tab-dot").count(), 5);
       assert.ok(!/xero\s*emoji/i.test(await page.locator("body").innerText()));
       assert.deepEqual(errors, []); assert.deepEqual(h.writes, []);
       console.log(`PASS ${profile}: capability price/window parity, invalid amounts, coherent cart edit, preserved UI`);

@@ -1,12 +1,12 @@
-import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, profileImageMediaPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=fcbe30736580";
-import { ui } from "./ui-state.js?v=fcbe30736580";
-import { createPoaCopyButton } from "./ui-copy.js?v=fcbe30736580";
-import { add, el } from "./ui-core.js?v=fcbe30736580";
-import { runSearch } from "./ui-search.js?v=fcbe30736580";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=fcbe30736580";
-import { updateTabDots } from "./ui-render.js?v=fcbe30736580";
-import { syncCartShortcutNow } from "./ui-cart.js?v=fcbe30736580";
-import { renderManagement } from "./ui-manage.js?v=fcbe30736580";
+import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, profileImageMediaPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=c513cd0e5a09";
+import { ui } from "./ui-state.js?v=c513cd0e5a09";
+import { createPoaCopyButton } from "./ui-copy.js?v=c513cd0e5a09";
+import { add, el } from "./ui-core.js?v=c513cd0e5a09";
+import { runSearch } from "./ui-search.js?v=c513cd0e5a09";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=c513cd0e5a09";
+import { updateTabDots } from "./ui-render.js?v=c513cd0e5a09";
+import { syncCartShortcutNow } from "./ui-cart.js?v=c513cd0e5a09";
+import { renderManagement } from "./ui-manage.js?v=c513cd0e5a09";
 
 const LAST_POA_KEY = "poadomains.lastPoaAddress.v1";
 
@@ -291,6 +291,29 @@ export function navigateOwner(ownerId) {
     applyRoute();
 }
 
+function syncAdvancedLink() {
+    const link = el("advancedLink");
+    if (!link) return;
+    const on = ui.route.kind === "home" && ui.activeSectionTab === "handoff";
+    link.classList.toggle("is-active", on);
+    if (on) link.setAttribute("aria-current", "page");
+    else link.removeAttribute("aria-current");
+}
+
+export function openAdvanced() {
+    if (ui.route.kind !== "home") {
+        closeOverlaysBeforeNavigate();
+        ui.route = { kind: "home" };
+        ui.currentDomainName = null;
+        ui.currentOwnerId = null;
+        applyRoute();
+    }
+    setSectionTab("handoff", true);
+    const section = el("handoffSection");
+    section?.scrollIntoView?.({ block: "start" });
+    section?.focus?.({ preventScroll: true });
+}
+
 export function applyRoute() {
     const home = el("homeMain");
     const domain = el("domainMain");
@@ -322,23 +345,27 @@ export function applyRoute() {
         if (tabs)
             tabs.hidden = false;
     }
+    syncAdvancedLink();
 }
 
 export function setSectionTab(tabId, markSeen = true) {
     ui.activeSectionTab = tabId;
     if (markSeen)
-        writeViewURL();
-    for (const btn of document.querySelectorAll(".section-tab")) {
+        writeViewURL(ui.route.kind === "home" ? "/" : location.pathname);
+    const tabBtns = [...document.querySelectorAll(".section-tab")];
+    const hasActiveTab = tabBtns.some((b) => b.getAttribute("data-tab") === tabId);
+    tabBtns.forEach((btn, idx) => {
         const on = btn.getAttribute("data-tab") === tabId;
         btn.classList.toggle("is-active", on);
         btn.setAttribute("aria-selected", on ? "true" : "false");
-        btn.tabIndex = on ? 0 : -1;
-    }
+        btn.tabIndex = on || (!hasActiveTab && idx === 0) ? 0 : -1;
+    });
     for (const section of document.querySelectorAll("main#homeMain > section[data-section]")) {
         const on = section.getAttribute("data-section") === tabId;
         section.classList.toggle("is-active-section", on);
         section.hidden = !on;
     }
+    syncAdvancedLink();
     if (tabId === "escrow") {
         const ownerField = el("manageOwner");
         if (ownerField && !ownerField.value.trim() && ui.knownOwner) {

@@ -15,6 +15,7 @@ test('data age uses minutes/hours, including initial state and clock skew, never
 });
 test('shareable queries and tabs are bounded, encoded and whitelisted',()=>{
  for(const tab of ['find','auctions','market','explore','escrow','handoff']) assert.deepEqual(readViewQuery(viewPath('/', '🚀 a',tab).split('?')[1]),{query:'🚀 a',tab});
+ assert.deepEqual(readViewQuery('?tab=advanced'),{query:'',tab:'handoff'});
  assert.deepEqual(readViewQuery('?q=alpha&tab=not-real'),{query:'alpha',tab:'find'}); assert.equal(readViewQuery('?q='+ 'a'.repeat(3000)).query.length,2048);
  assert.equal(viewPath('/d/alpha','','nope'),'/d/alpha');
 });

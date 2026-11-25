@@ -18,9 +18,10 @@ for(const [name,launcher]of [['chromium',chromium],['firefox',firefox],['webkit'
  const text=await page.locator('body').innerText();for(const n of [...HIDDEN.names,...HIDDEN.accounts,...HIDDEN.auctions,...HIDDEN.offers,...HIDDEN.receipts])assert.ok(!text.includes(n),n);
  assert.ok(!await page.locator('#recentActions a.domain-link').count());assert.ok(await page.locator('#recentActions').innerText());
  await page.evaluate(()=>document.fonts.ready);
- await expect(page.locator('.section-tab .tab-dot:not([hidden])')).toHaveCount(6);
+ await expect(page.locator('.section-tab .tab-dot:not([hidden])')).toHaveCount(5);
  await expect(page.locator('#tabEscrow .tab-dot')).toHaveAttribute('title',/Registry snapshot ready; POA payments are checked separately/);
- await expect(page.locator('#tabHandoff .tab-dot')).toBeVisible();
+ await expect(page.locator('#tabHandoff')).toHaveCount(0);
+ await expect(page.locator('#siteFooter #advancedLink')).toHaveText('Advanced');
  assert.equal(await page.locator('#siteTitle').textContent(),'🅿️🅾️🅰️D🅾️Ⓜ️🅰️INS');
  const measure=()=>page.evaluate(()=>{
   const rect=n=>{const r=n.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width};};
@@ -56,7 +57,7 @@ for(const [name,launcher]of [['chromium',chromium],['firefox',firefox],['webkit'
 
  await page.locator('#cartAnchor').scrollIntoViewIfNeeded();await expect(page.locator('#floatingCartBtn')).toBeHidden();
  assert.ok(await page.locator('#cartStatus').evaluate(n=>{const r=n.getBoundingClientRect(),hit=document.elementFromPoint(r.left+20,r.top+r.height/2);return hit===n||n.contains(hit);}), 'Inline cart counter is not covered');
- await page.locator('#tabHandoff').click();await expect(page.locator('#floatingCartBtn')).toBeVisible();await page.locator('#floatingCartBtn').click();await expect(page.locator('#floatingCartPanel')).toBeVisible();await page.locator('#floatingCartClose').click();
+ await page.locator('#advancedLink').click();await expect(page.locator('#floatingCartBtn')).toBeVisible();await page.locator('#floatingCartBtn').click();await expect(page.locator('#floatingCartPanel')).toBeVisible();await page.locator('#floatingCartClose').click();
  await page.locator('#tabFind').click();await page.evaluate(()=>scrollTo(0,0));
 
  for(const [tab,box]of [['#tabAuctions','#auctions'],['#tabMarket','#market'],['#tabExplore','#balances']]){const t=page.locator(tab);if(await t.count()){await t.click();if(await page.locator(box).count())assert.equal(await page.locator(box+' .card').count(),0);}}
@@ -68,7 +69,7 @@ for(const [name,launcher]of [['chromium',chromium],['firefox',firefox],['webkit'
  // Regression (Nov 11 prod): the filtered public view must still build an unsigned handoff from its stored-state hash.
  await page.locator('#searchInput').fill('freshhandoffname');await page.locator('#searchInput').press('Enter');
  await page.locator('#searchResult #addToCartBtn').click();
- await page.locator('#tabHandoff').click();await expect(page.locator('#cartPrompt')).toContainText(h.payload.stateHash);
+ await page.locator('#advancedLink').click();await expect(page.locator('#cartPrompt')).toContainText(h.payload.stateHash);
  await expect(page.locator('#cartPrompt')).not.toContainText("Couldn't build");const handoff=JSON.parse((await page.locator('#cartPrompt').innerText()).split('```json\n')[1].split('\n```')[0]);
  assert.equal(handoff.schemaVersion,'poa-domains.poa-checkout.v1');assert.equal(handoff.livePoA,false);assert.equal(handoff.unsigned,true);assert.equal(handoff.sequence,h.payload.state.sequence);assert.equal(handoff.totalPrice,'100.000000');await expect(page.locator('#cartPrompt')).not.toContainText('registry units');
  // Last known status: instant, stale marker on the line, age only in ℹ️, and a display-only Down never holds.

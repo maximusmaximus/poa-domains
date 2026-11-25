@@ -1,8 +1,8 @@
-import { copyText } from "./ui-copy.js?v=fcbe30736580";
-import { trapDialog } from "./ui-a11y.js?v=fcbe30736580";
-import { ui } from "./ui-state.js?v=fcbe30736580";
-import { el, endpointBase, ownershipView } from "./ui-core.js?v=fcbe30736580";
-import { buildAgentTermsPrompt, buildListingPrompt, buildSubnameListingPrompt, hasAgreedToTerms, isPoaAddress, parsePublicJSON, resolveDomainView, saveTermsAgreement, shouldHoldTransactions } from "./shared.js?v=fcbe30736580";
+import { copyText } from "./ui-copy.js?v=c513cd0e5a09";
+import { trapDialog } from "./ui-a11y.js?v=c513cd0e5a09";
+import { ui } from "./ui-state.js?v=c513cd0e5a09";
+import { el, endpointBase, ownershipView } from "./ui-core.js?v=c513cd0e5a09";
+import { buildAgentTermsPrompt, buildListingPrompt, buildSubnameListingPrompt, hasAgreedToTerms, isPoaAddress, parsePublicJSON, resolveDomainView, saveTermsAgreement, shouldHoldTransactions } from "./shared.js?v=c513cd0e5a09";
 
 export function clearHandoff() {
     ui.generation++;
@@ -461,7 +461,7 @@ export function wireTermsGate() {
             releaseTermsFocus = trapDialog(
                 modal,
                 backdrop,
-                document.querySelector('.section-tab[aria-selected="true"]') || el("siteTitle"),
+                document.querySelector('.section-tab[aria-selected="true"]') || document.querySelector(".section-tab") || el("siteTitle"),
             );
         }
         agreeBtn.focus();

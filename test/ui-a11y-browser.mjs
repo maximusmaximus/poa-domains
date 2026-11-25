@@ -122,7 +122,6 @@ try {
       "tabAuctions",
       "tabMarket",
       "tabExplore",
-      "tabHandoff",
       "tabEscrow",
     ]) {
       await page.locator("#" + id).click();
@@ -132,6 +131,11 @@ try {
         1,
       );
     }
+    await page.locator("#advancedLink").click();
+    await expect(page.locator("#handoffSection")).toBeVisible();
+    await expect(page.locator("#advancedLink")).toHaveAttribute("aria-current", "page");
+    assert.equal(await page.locator('.section-tab[tabindex="0"]').count(), 1);
+    await scan(page, `explorer ${width} advancedLink`);
     await page.locator("#tabFind").click();
     await page.locator("#searchInput").fill("a11yalpha");
     await page.locator("#searchInput").press("Enter");
@@ -140,7 +144,7 @@ try {
     );
     await page.locator("#addToCartBtn").click();
     await expect(page.locator("#copyCartPrompt")).toBeEnabled();
-    await page.locator("#tabHandoff").click();
+    await page.locator("#advancedLink").click();
     await page.locator("#floatingCartBtn").click();
     await scan(page, `cart dialog ${width}`);
     await page.keyboard.press("Escape");
@@ -181,7 +185,7 @@ try {
     // The shortcut does not cover the visible inline cart. Select another panel by keyboard.
     await tabTo(page, "tabFind", "Shift+Tab");
     await page.keyboard.press("End");
-    await expect(page.locator("#handoffSection")).toBeVisible();
+    await expect(page.locator("#escrowSection")).toBeVisible();
     await tabTo(page, "floatingCartBtn");
     await page.keyboard.press("Enter");
     await expect(page.locator("#floatingCartClose")).toBeFocused();
@@ -217,14 +221,20 @@ try {
     await expect(page.locator("#tabAuctions")).toBeFocused();
     await expect(page.locator("#auctionsSection")).toBeVisible();
     await page.keyboard.press("End");
-    await expect(page.locator("#tabHandoff")).toBeFocused();
+    await expect(page.locator("#tabEscrow")).toBeFocused();
     await page.keyboard.press("ArrowRight");
     await expect(page.locator("#tabFind")).toBeFocused();
     await page.keyboard.press("ArrowLeft");
-    await expect(page.locator("#tabHandoff")).toBeFocused();
+    await expect(page.locator("#tabEscrow")).toBeFocused();
     await page.keyboard.press("Home");
     await expect(page.locator("#tabFind")).toBeFocused();
     assert.equal(await page.locator('.section-tab[tabindex="0"]').count(), 1);
+    await page.locator("#advancedLink").focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#handoffSection")).toBeVisible();
+    await expect(page.locator("#handoffSection")).toBeFocused();
+    assert.equal(await page.locator('.section-tab[tabindex="0"]').count(), 1);
+    await page.locator("#tabFind").click();
     await page.locator("#tabAuctions").click();
     await page.locator("#auctionTabCurrent").focus();
     await page.keyboard.press("End");

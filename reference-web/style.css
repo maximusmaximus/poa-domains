@@ -1070,6 +1070,7 @@ header { padding-bottom: 0.75rem; }
   font-weight: 600;
 }
 .footer-links a:hover { border-color: #65cfa8; }
+.footer-links a.is-active { border-color: #65cfa8; background: #173242; color: #e2fff4; }
 .footer-credit { margin: 0; color: #b4cad6; }
 @media (max-width: 380px) {
   .section-tab {
@@ -1328,7 +1329,7 @@ html { scroll-padding-top:6rem; }
 
 /* Public-view layout: complete controls and chips stay inside the centered column. */
 .section-tabs {
-  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
   width: 100%; box-sizing: border-box; overflow: visible;
 }
 .section-tab { min-width: 0; max-width: 100%; padding: .55rem .4rem; }

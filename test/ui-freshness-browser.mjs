@@ -44,7 +44,7 @@ try {
   h.payload.state=auctionState(); await poll(h,p); await expect(p.locator('#searchResult')).toContainText('In auction now');
   h.stateStatus=500; await p.clock.fastForward(120000); await expect(p.locator('#registryError')).toBeVisible();
   for(const age of await p.locator('.tab-age').allTextContents()) assert.equal(age,'updated 2m ago');
-  assert.equal(await p.locator('.tab-age').count(),6); assert.equal(await p.locator('.tab-dot').count(),6); assert.equal(await p.locator('#siteFooter').count(),1);
+  assert.equal(await p.locator('.tab-age').count(),5); assert.equal(await p.locator('.tab-dot').count(),5); assert.equal(await p.locator('#siteFooter').count(),1);
   assert.ok(!/xero\s*emoji/i.test(await p.locator('body').innerText()));
  });
  await scenario('outbid review persists across reload, caps never auto-rise and copies stay blocked until acknowledgement',async(h,p)=>{
@@ -61,7 +61,7 @@ try {
   await expect(p.locator('#copyCartPrompt')).toBeDisabled(); await p.getByRole('button',{name:'Review changed item'}).click();
   await expect(p.locator('#copyCartPrompt')).toBeEnabled(); assert.match(await p.locator('#cartPrompt').innerText(),/"expectedVersion":\s*3/);
   h.stateStatus=500; await poll(h,p); await expect(p.locator('#registryError')).toBeVisible(); await expect(p.locator('#copyCartPrompt')).toBeDisabled();
-  await p.locator('#tabHandoff').click(); await p.locator('#floatingCartBtn').click(); await expect(p.locator('#copyCheckoutBtn')).toBeDisabled(); await p.locator('#floatingCartClose').click(); await p.locator('#tabFind').click();
+  await p.locator('#advancedLink').click(); await p.locator('#floatingCartBtn').click(); await expect(p.locator('#copyCheckoutBtn')).toBeDisabled(); await p.locator('#floatingCartClose').click(); await p.locator('#tabFind').click();
   h.stateStatus=200; await p.locator('#registryRetry').click(); await ready(p); await expect(p.locator('#copyCartPrompt')).toBeEnabled();
  },h=>h.payload.state=auctionState());
  await scenario('typing/focus/caret survive registry and network polls, including unsubmitted cart/search drafts',async(h,p)=>{

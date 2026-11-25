@@ -1,13 +1,13 @@
-import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, validPrincipal } from "./shared.js?v=fcbe30736580";
-import { drawTicker } from "./ui-ticker.js?v=fcbe30736580";
-import { actionLabel } from "./ui-copy.js?v=fcbe30736580";
-import { returnFocus } from "./ui-a11y.js?v=fcbe30736580";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=fcbe30736580";
-import { ui } from "./ui-state.js?v=fcbe30736580";
-import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=fcbe30736580";
-import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=fcbe30736580";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=fcbe30736580";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=fcbe30736580";
+import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, validPrincipal } from "./shared.js?v=c513cd0e5a09";
+import { drawTicker } from "./ui-ticker.js?v=c513cd0e5a09";
+import { actionLabel } from "./ui-copy.js?v=c513cd0e5a09";
+import { returnFocus } from "./ui-a11y.js?v=c513cd0e5a09";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=c513cd0e5a09";
+import { ui } from "./ui-state.js?v=c513cd0e5a09";
+import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=c513cd0e5a09";
+import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=c513cd0e5a09";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=c513cd0e5a09";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=c513cd0e5a09";
 
 export function updateLiveAuctionsBadge(state = ui.latestState) {
     const badge = el("liveAuctionsBadge");
@@ -89,7 +89,7 @@ export function closeDetail() {
     const wasOpen = !el("detailView").hidden;
     ui.detailTarget = null;
     el("detailView").hidden = true;
-    if(wasOpen) returnFocus(detailOpener,document.querySelector(".section-tab[aria-selected=true]"));
+    if(wasOpen) returnFocus(detailOpener,document.querySelector(".section-tab[aria-selected=true]")||document.querySelector(".section-tab"));
     detailOpener = null;
 }
 

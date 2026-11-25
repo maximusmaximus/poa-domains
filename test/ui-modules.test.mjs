@@ -215,7 +215,11 @@ test('router domain avatars, escrow payer autofill, management plans, and addres
    },
    setAttribute: (k, v) => attrs.set(k, String(v)),
    getAttribute: (k) => attrs.get(k) ?? null,
+   removeAttribute: (k) => attrs.delete(k),
    hasAttribute: (k) => attrs.has(k),
+   focus: () => { node.focused = true; },
+   scrollIntoView: () => { node.scrolled = true; },
+   querySelector: () => null,
    append: (...xs) => { node.children.push(...xs); },
    replaceChildren: (...xs) => { node.children = [...xs]; },
    remove: () => { node.removed = true; },
@@ -328,6 +332,52 @@ test('router domain avatars, escrow payer autofill, management plans, and addres
   assert.throws(() => manageMod.managementPlan('createChildOffer', ui.latestState.deeds[childId], ui.latestState, ownerB), /Only a root/);
   assert.throws(() => manageMod.managementPlan('revokeChild', ui.latestState.deeds[deedId], ui.latestState, ownerA), /Only a subdomain/);
   assert.throws(() => manageMod.managementPlan('unknown', ui.latestState.deeds[deedId], ui.latestState, ownerA), /Unsupported/);
+
+  const prevLoc = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  const prevHist = Object.getOwnPropertyDescriptor(globalThis, 'history');
+  const pushedUrls = [];
+  Object.defineProperty(globalThis, 'location', { value: { pathname: '/d/agent', search: '' }, configurable: true });
+  Object.defineProperty(globalThis, 'history', { value: { pushState: (_s, _t, u) => pushedUrls.push(u) }, configurable: true });
+  const homeMain = makeEl('main'), domainMain = makeEl('main'), ownerMain = makeEl('main');
+  const sectionTabsEl = makeEl('nav');
+  const tabFindEl = makeEl('button'), tabEscrowEl = makeEl('button');
+  tabFindEl.setAttribute('data-tab', 'find');
+  tabEscrowEl.setAttribute('data-tab', 'escrow');
+  const searchSecEl = makeEl('section'), handoffSecEl = makeEl('section');
+  searchSecEl.setAttribute('data-section', 'find');
+  handoffSecEl.setAttribute('data-section', 'handoff');
+  const advLinkEl = makeEl('a');
+  byId.set('homeMain', homeMain);
+  byId.set('domainMain', domainMain);
+  byId.set('ownerMain', ownerMain);
+  byId.set('sectionTabs', sectionTabsEl);
+  byId.set('handoffSection', handoffSecEl);
+  byId.set('advancedLink', advLinkEl);
+  globalThis.document.querySelectorAll = (sel) => {
+   if (sel === '.section-tab') return [tabFindEl, tabEscrowEl];
+   if (sel === 'main#homeMain > section[data-section]') return [searchSecEl, handoffSecEl];
+   return [];
+  };
+  ui.route = { kind: 'domain', name: 'agent' };
+  ui.lastSearch = '';
+  routerMod.openAdvanced();
+  assert.equal(ui.route.kind, 'home');
+  assert.equal(ui.activeSectionTab, 'handoff');
+  assert.equal(homeMain.hidden, false);
+  assert.equal(domainMain.hidden, true);
+  assert.equal(handoffSecEl.hidden, false);
+  assert.equal(searchSecEl.hidden, true);
+  assert.equal(tabFindEl.tabIndex, 0);
+  assert.equal(tabEscrowEl.tabIndex, -1);
+  assert.equal(advLinkEl.getAttribute('aria-current'), 'page');
+  assert.equal(advLinkEl.classList.contains('is-active'), true);
+  assert.equal(handoffSecEl.focused, true);
+  assert.equal(pushedUrls.at(-1), '/?tab=handoff');
+  routerMod.setSectionTab('find', false);
+  assert.equal(advLinkEl.getAttribute('aria-current'), null);
+  assert.equal(advLinkEl.classList.contains('is-active'), false);
+  if (prevLoc) Object.defineProperty(globalThis, 'location', prevLoc); else delete globalThis.location;
+  if (prevHist) Object.defineProperty(globalThis, 'history', prevHist); else delete globalThis.history;
 
   const wrapParent = makeEl('p');
   coreMod.appendPoaAddress(wrapParent, ownerA, { code: true });

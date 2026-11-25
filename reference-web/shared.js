@@ -486,7 +486,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=fcbe30736580";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=c513cd0e5a09";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -1438,7 +1438,8 @@ export function updatedAge(loadedAt, now = Date.now()) {
 const SECTION_IDS = new Set(["find", "auctions", "market", "explore", "escrow", "handoff"]);
 export function readViewQuery(search) {
   const q = new URLSearchParams(search);
-  return { query: (q.get("q") ?? "").slice(0, 2048), tab: SECTION_IDS.has(q.get("tab")) ? q.get("tab") : "find" };
+  const rawTab = q.get("tab") === "advanced" ? "handoff" : q.get("tab");
+  return { query: (q.get("q") ?? "").slice(0, 2048), tab: SECTION_IDS.has(rawTab) ? rawTab : "find" };
 }
 export function viewPath(pathname, query, tab) {
   const q = new URLSearchParams();

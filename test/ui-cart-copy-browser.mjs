@@ -44,7 +44,7 @@ try {
   assert.equal(clipInline.replace(/\r\n/g, "\n"), expectedPrompt);
 
   // Open floating cart modal (visible off the Find tab), copy checkout prompt, verify clipboard, then click a link inside modal
-  await page.locator("#tabHandoff").click();
+  await page.locator("#advancedLink").click();
   await page.locator("#floatingCartBtn").click();
   await expect(page.locator("#floatingCartPanel")).toBeVisible();
   await expect(page.locator("#floatingCartExpectations")).toBeVisible();
@@ -58,17 +58,21 @@ try {
   await page.locator('#floatingCartList a[href="/d/freshpoaname"]').click();
   await expect(page.locator("#floatingCartPanel")).toBeHidden();
   assert.equal(await page.evaluate(() => document.getElementById("domainMain").inert), false);
-  await page.locator("#domainHomeLink").click();
-
-  // Clearing cart clears stale floatingCartStatus
-  await page.locator("#tabHandoff").click();
+  // Clicking the footer Advanced link from a domain page opens Advanced Handoff at /?tab=handoff
+  await page.locator("#advancedLink").click();
+  await expect(page.locator("#handoffSection")).toBeVisible();
+  await expect(page.locator("#domainMain")).toBeHidden();
+  await expect(page.locator("#advancedLink")).toHaveAttribute("aria-current", "page");
+  const advUrl = new URL(page.url());
+  assert.equal(advUrl.pathname, "/");
+  assert.equal(advUrl.searchParams.get("tab"), "handoff");
   await page.locator("#floatingCartBtn").click();
   await page.locator("#floatingCartClear").click();
   await expect(page.locator("#floatingCartStatus")).toHaveText("");
   await page.locator("#floatingCartClose").click();
 
   // Advanced handoff copy button gives visible feedback
-  await page.locator("#tabHandoff").click();
+  await page.locator("#advancedLink").click();
   await page.locator("#advancedHandoff > summary").click();
   await page.locator("#action").selectOption("transfer");
   await page.locator("#signer").fill("poa1" + "1".repeat(32));
@@ -113,7 +117,7 @@ try {
   const fallbackPrompt = await pageNoClip.locator("#cartPrompt").textContent();
   await pageNoClip.locator("#copyCartPrompt").click();
   await expect(pageNoClip.locator("#cartStatus")).toHaveText("✅ Copied");
-  await pageNoClip.locator("#tabHandoff").click();
+  await pageNoClip.locator("#advancedLink").click();
   await pageNoClip.locator("#floatingCartBtn").click();
   await pageNoClip.locator("#copyCheckoutBtn").click();
   await expect(pageNoClip.locator("#floatingCartStatus")).toHaveText("✅ Request copied — nothing sent");
@@ -145,7 +149,7 @@ try {
     (await pageManual.evaluate(() => window.getSelection().toString())).trim(),
     (await pageManual.locator("#cartPrompt").textContent()).trim(),
   );
-  await pageManual.locator("#tabHandoff").click();
+  await pageManual.locator("#advancedLink").click();
   await pageManual.locator("#floatingCartBtn").click();
   await pageManual.locator("#copyCheckoutBtn").click();
   await expect(pageManual.locator("#floatingCartPrompt")).toBeVisible();
@@ -182,7 +186,7 @@ try {
   await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("reconciliation hold");
   await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("public PoA network read timed out");
   await pageEscrow.locator("#addToCartBtn").click();
-  await pageEscrow.locator("#tabHandoff").click();
+  await pageEscrow.locator("#advancedLink").click();
   await pageEscrow.locator("#floatingCartBtn").click();
   await expect(pageEscrow.locator("#floatingCartEscrowStatus")).toBeVisible();
   await expect(pageEscrow.locator("#floatingCartEscrowStatus")).toContainText("stop at step 0");
@@ -352,7 +356,7 @@ try {
   await expect(pageUx.locator("#cartCount")).toHaveText("2");
 
   // Floating cart also uses clean price + type copy
-  await pageUx.locator("#tabHandoff").click();
+  await pageUx.locator("#advancedLink").click();
   await pageUx.locator("#floatingCartBtn").click();
   const floatCartText = await pageUx.locator("#floatingCartList").innerText();
   assert.ok(floatCartText.includes("🪙 100 POA · Standard root"), floatCartText);
