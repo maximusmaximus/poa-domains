@@ -182,15 +182,34 @@ try {
   await pageEscrow.waitForFunction(() => document.body.dataset.registryStatus === "ready");
   await pageEscrow.locator("#termsAgreeBtn").click();
   await expect(pageEscrow.locator("#cartEscrowStatus")).toBeVisible();
-  await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("currently on hold");
-  await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("reconciliation hold");
-  await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("public PoA network read timed out");
+  await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("POA checkout paused");
+  await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("Reconciliation hold awaiting operator review");
+  await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("Public PoA network read timed out");
+  await expect(pageEscrow.locator("#cartEscrowStatus")).not.toContainText("Network freshness or verification is held");
   await pageEscrow.locator("#addToCartBtn").click();
   await pageEscrow.locator("#advancedLink").click();
   await pageEscrow.locator("#floatingCartBtn").click();
   await expect(pageEscrow.locator("#floatingCartEscrowStatus")).toBeVisible();
-  await expect(pageEscrow.locator("#floatingCartEscrowStatus")).toContainText("stop at step 0");
+  await expect(pageEscrow.locator("#floatingCartEscrowStatus")).toContainText("wait to send POA until checkout reopens");
   await pageEscrow.locator("#floatingCartClose").click();
+
+  // Verbose freshness hold boilerplate is collapsed to one crisp reason with no duplication
+  h.escrowCap = {
+    ...h.escrowCap,
+    held: true,
+    holdReason: "Network freshness or verification is held. The network reading is stale or inconsistent. Payments stay held.",
+    freshness: {
+      held: true,
+      code: "ESCROW_STALE",
+      reason: "Network freshness or verification is held. The network reading is stale or inconsistent. Payments stay held.",
+    },
+  };
+  await pageEscrow.reload();
+  await pageEscrow.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageEscrow.locator("#cartEscrowStatus .cart-escrow-title")).toHaveText("⏸️ POA checkout paused");
+  await expect(pageEscrow.locator("#cartEscrowStatus .cart-escrow-reason")).toHaveText("PoA network status is stale.");
+  await expect(pageEscrow.locator("#cartEscrowStatus")).not.toContainText("Network freshness or verification is held");
+  await expect(pageEscrow.locator("#cartEscrowStatus")).not.toContainText("Payments stay held");
 
   h.escrowCap = {
     ...h.escrowCap,

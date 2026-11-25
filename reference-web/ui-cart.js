@@ -1,12 +1,12 @@
-import { publicNameUnavailable } from "./shared.js?v=d434aec15419";
-import { registryUnit } from "./shared.js?v=d434aec15419";
-import { actionLabel } from "./ui-copy.js?v=d434aec15419";
-import { trapDialog } from "./ui-a11y.js?v=d434aec15419";
-import { ui } from "./ui-state.js?v=d434aec15419";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=d434aec15419";
-import { add, el, endpointBase } from "./ui-core.js?v=d434aec15419";
-import { domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=d434aec15419";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=d434aec15419";
+import { publicNameUnavailable } from "./shared.js?v=cd984d051d71";
+import { registryUnit } from "./shared.js?v=cd984d051d71";
+import { actionLabel } from "./ui-copy.js?v=cd984d051d71";
+import { trapDialog } from "./ui-a11y.js?v=cd984d051d71";
+import { ui } from "./ui-state.js?v=cd984d051d71";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=cd984d051d71";
+import { add, el, endpointBase } from "./ui-core.js?v=cd984d051d71";
+import { domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=cd984d051d71";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=cd984d051d71";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
@@ -154,42 +154,90 @@ function observeCartArea() {
     syncCartShortcut();
 }
 
+function cleanHoldText(raw) {
+    return String(raw ?? "")
+        .replace(/^Network freshness or verification is held\.?\s*/i, "")
+        .replace(/\s*Payments stay held\.?$/i, "")
+        .replace(/\.+$/, "")
+        .trim();
+}
+
 function formatEscrowHoldReason(caps) {
     const map = {
-        ASSET_LIABILITY_MISMATCH: "reconciliation hold awaiting operator review",
-        ESCROW_NODE_TIMEOUT: "public PoA network read timed out",
+        ASSET_LIABILITY_MISMATCH: "Reconciliation hold awaiting operator review",
+        ESCROW_NODE_TIMEOUT: "Public PoA network read timed out",
+        ESCROW_NODE_UNAVAILABLE: "PoA network temporarily unreachable",
         ESCROW_NODE_AUTH: "PoA ledger is temporarily locked",
+        ESCROW_NODE_HTTP: "PoA node returned an error",
+        ESCROW_NODE_REDIRECT: "PoA node redirected a safety check",
+        ESCROW_NODE_RESPONSE_LIMIT: "PoA node response exceeded limit",
+        ESCROW_NODE_INVALID_RESPONSE: "PoA node response could not be verified",
+        ESCROW_NODE_CHAIN: "PoA network identity mismatch",
+        ESCROW_CHAIN: "PoA network identity mismatch",
         ESCROW_STALE: "PoA network status is stale",
+        ESCROW_PROTOCOL_UNPINNED: "PoA protocol update pending review",
+        ESCROW_PROTOCOL_CHANGED: "PoA protocol update pending review",
+        ESCROW_UNALIGNED_CUT: "Waiting for PoA checkpoint sync",
+        ESCROW_CHECKPOINT: "Waiting for PoA checkpoint sync",
+        ESCROW_FUTURE_CHECKPOINT: "Waiting for PoA checkpoint sync",
+        ESCROW_CHECKPOINT_ROLLBACK: "Waiting for PoA checkpoint sync",
+        ESCROW_FEE_POLICY: "PoA fee policy update pending",
     };
     const parts = [];
-    const primary = typeof caps.holdReason === "string" && caps.holdReason.trim() ? caps.holdReason.trim() : "";
-    if (primary)
-        parts.push(map[primary] ?? primary);
-    else if (caps.paused)
-        parts.push("POA payments paused");
-    const fCode = typeof caps.freshness?.code === "string" ? caps.freshness.code : "";
-    const fText = fCode ? (map[fCode] ?? caps.freshness?.reason ?? fCode) : (caps.freshness?.held && typeof caps.freshness?.reason === "string" ? caps.freshness.reason : "");
-    if (fText && !parts.some((p) => p.toLowerCase().includes(fText.toLowerCase())))
-        parts.push(fText);
-    return parts.join("; ") || "temporarily paused";
+    const pushUnique = (text) => {
+        const cleaned = cleanHoldText(text);
+        if (!cleaned)
+            return;
+        const low = cleaned.toLowerCase();
+        if (!parts.some((p) => p.toLowerCase().includes(low) || low.includes(p.toLowerCase())))
+            parts.push(cleaned);
+    };
+    const fCode = typeof caps.freshness?.code === "string" ? caps.freshness.code.trim() : "";
+    const fReason = typeof caps.freshness?.reason === "string" ? caps.freshness.reason.trim() : "";
+    const primary = typeof caps.holdReason === "string" ? caps.holdReason.trim() : "";
+    const primaryIsFreshness = Boolean(primary && ((fReason && primary === fReason) || /^Network freshness or verification is held/i.test(primary)));
+    if (primary && !primaryIsFreshness)
+        pushUnique(map[primary] ?? primary);
+    else if (!primary && caps.paused)
+        pushUnique("POA payments paused");
+    if (fCode)
+        pushUnique(map[fCode] ?? fReason ?? fCode);
+    else if (caps.freshness?.held && fReason)
+        pushUnique(fReason);
+    else if (primaryIsFreshness)
+        pushUnique(primary);
+    const out = parts.join(" · ") || "Temporarily paused";
+    return /[.!?]$/.test(out) ? out : out + ".";
 }
 
 export function renderCartEscrowStatus() {
     const show = Boolean(ui.cap && poaOnlyMode(ui.cap) && ui.escrowCaps?.enabled);
     const caps = ui.escrowCaps;
     const isHeld = Boolean(caps && (caps.held || caps.paused || caps.freshness?.held));
-    const text = show
-        ? (isHeld
-            ? `⏸️ POA checkout is currently on hold (${formatEscrowHoldReason(caps)}). You can plan your cart now, but wait before sending POA — your agent will stop at step 0 and send nothing until checkout reopens.`
-            : "🟢 POA checkout open — ready when you approve your agent.")
-        : "";
+    const reason = show && isHeld ? formatEscrowHoldReason(caps) : "";
     for (const id of ["cartEscrowStatus", "floatingCartEscrowStatus"]) {
         const node = el(id);
         if (!node)
             continue;
         node.hidden = !show;
-        node.textContent = text;
-        node.className = "cart-escrow-status " + (isHeld ? "badge-warn" : "badge-ok");
+        node.className = "cart-escrow-status " + (isHeld ? "is-held badge-warn" : "badge-ok");
+        node.replaceChildren();
+        if (!show)
+            continue;
+        if (isHeld) {
+            const title = document.createElement("strong");
+            title.className = "cart-escrow-title";
+            title.textContent = "⏸️ POA checkout paused";
+            const detail = document.createElement("span");
+            detail.className = "cart-escrow-reason";
+            detail.textContent = reason;
+            const hint = document.createElement("span");
+            hint.className = "cart-escrow-hint";
+            hint.textContent = "Plan your cart now — wait to send POA until checkout reopens.";
+            node.append(title, detail, hint);
+        } else {
+            node.textContent = "🟢 POA checkout open — ready when you approve your agent.";
+        }
     }
 }
 
