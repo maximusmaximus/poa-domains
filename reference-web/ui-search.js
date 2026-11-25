@@ -1,13 +1,13 @@
-import { copyText } from "./ui-copy.js?v=a4c45bbc5a95";
-import { publicNameUnavailable } from "./shared.js?v=a4c45bbc5a95";
-import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, activePoaFixedListings, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=a4c45bbc5a95";
-import { ui } from "./ui-state.js?v=a4c45bbc5a95";
-import { domainHeader, nameLink, navigateDomain, openManageDomain, openPoa, ownerLink, writeViewURL } from "./ui-router.js?v=a4c45bbc5a95";
-import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=a4c45bbc5a95";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=a4c45bbc5a95";
-import { addToCart } from "./ui-cart.js?v=a4c45bbc5a95";
-import { suggestNames } from "./ideas-generator.js?v=a4c45bbc5a95";
-import { logSubmittedSearch } from "./ui-search-log.js?v=a4c45bbc5a95";
+import { copyText } from "./ui-copy.js?v=c83b04d179c4";
+import { publicNameUnavailable } from "./shared.js?v=c83b04d179c4";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, activePoaFixedListings, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=c83b04d179c4";
+import { ui } from "./ui-state.js?v=c83b04d179c4";
+import { domainHeader, nameLink, navigateDomain, openManageDomain, openPoa, ownerLink, writeViewURL } from "./ui-router.js?v=c83b04d179c4";
+import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=c83b04d179c4";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=c83b04d179c4";
+import { addToCart } from "./ui-cart.js?v=c83b04d179c4";
+import { suggestNames } from "./ideas-generator.js?v=c83b04d179c4";
+import { logSubmittedSearch } from "./ui-search-log.js?v=c83b04d179c4";
 
 let activeSuggestionIdx = -1;
 let currentSuggestions = [];
