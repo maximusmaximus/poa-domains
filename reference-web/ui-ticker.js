@@ -1,6 +1,6 @@
-import { autoScroll } from "./ui-motion.js?v=29e98441152b";
-import { isPoaAuctionAwaitingFirstBid, poaShort, shapeLiveActions } from "./shared.js?v=29e98441152b";
-import { actionLabel } from "./ui-copy.js?v=29e98441152b";
+import { autoScroll } from "./ui-motion.js?v=33e97c0bc9b7";
+import { isPoaAuctionAwaitingFirstBid, poaShort, shapeLiveActions } from "./shared.js?v=33e97c0bc9b7";
+import { actionLabel } from "./ui-copy.js?v=33e97c0bc9b7";
 export function recentActions(state, escrowMarket = []) {
   const items = shapeLiveActions(state, Number.MAX_SAFE_INTEGER);
   const seen = new Set(items.map((x) => x.id));
@@ -88,7 +88,9 @@ export function drawTicker(state, escrowMarket = []) {
       const at = label.indexOf(item.name);
       chip.append(document.createTextNode(at < 0 ? "" : label.slice(0, at)));
       const name = document.createElement("span");
-      name.className = "domain-name";
+      const activeId = state?.names?.[item.name]?.activeId;
+      const isReg = Boolean(activeId && state?.deeds?.[activeId] && !state.deeds[activeId].retired);
+      name.className = isReg ? "domain-name domain-tile-inline is-registered" : "domain-name";
       name.textContent = item.name;
       chip.append(name, document.createTextNode(at < 0 ? " · " + label : label.slice(at + item.name.length)));
     } else chip.textContent = label;

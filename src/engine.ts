@@ -6,7 +6,13 @@ import {
   principal,
   DOMAIN,
 } from "./auth.js";
-import { ACTIONS, Action, ESCROW_ISSUE_ACTIONS, ESCROW_ONLY_ACTIONS } from "./actions.js";
+import {
+  ACTIONS,
+  Action,
+  ESCROW_ISSUE_ACTIONS,
+  ESCROW_ONLY_ACTIONS,
+  TREASURY_ONLY_ACTIONS,
+} from "./actions.js";
 import {
   Config,
   validateConfig,
@@ -221,6 +227,8 @@ export class Engine {
     if (!body || typeof body !== "object") return;
     const { action, params: p } = body;
     if (typeof action === "string" && ESCROW_ISSUE_ACTIONS.includes(action) && !this.escrowIssue) throw new Fault("ESCROW_ONLY");
+    if (action === "issueReserved" && (body as { signer?: unknown }).signer !== this.config.treasury)
+      throw new Fault("RESERVED_NAME");
     if (typeof action === "string" && poaOnlyRegistry(this.registryId) && POA_ONLY_CLOSED_ACTIONS.includes(action))
       throw new Fault("POA_ONLY");
     if (this.admission.permanentOnly && (action === "renewLease" || action === "expireLease"))
@@ -229,7 +237,7 @@ export class Engine {
         (p.rights === null || typeof p.rights !== "object" || p.rights.kind !== "permanent"))
       throw new Fault("PERMANENT_OWNERSHIP_ONLY");
     let name: string | null = null;
-    if ((action === "announceAuction" || action === "issueFromTreasury" || action === "issueSubname") && typeof p?.name === "string") name = p.name;
+    if ((action === "announceAuction" || action === "issueFromTreasury" || action === "issueSubname" || action === "issueReserved") && typeof p?.name === "string") name = p.name;
     if (action === "fillChildOffer" && typeof p?.label === "string" && typeof p?.offerId === "string") {
       const o = this.state.offers[p.offerId];
       if (this.admission.permanentOnly && o?.rights?.kind === "lease")
@@ -296,8 +304,22 @@ export class Engine {
       amount(b.maxTotal);
       need(b.maxNetworkFee === "0", "NETWORK_FEE_POLICY");
       need(time >= b.notBefore && time < b.deadline, "INTENT_EXPIRED");
-      need(Object.hasOwn(ACTIONS, b.action) || Object.hasOwn(ESCROW_ONLY_ACTIONS, b.action), "UNSUPPORTED_ACTION");
-      exact(b.params, [...(Object.hasOwn(ACTIONS, b.action) ? ACTIONS[b.action as Action] : ESCROW_ONLY_ACTIONS[b.action as keyof typeof ESCROW_ONLY_ACTIONS])]);
+      need(
+        Object.hasOwn(ACTIONS, b.action) ||
+          Object.hasOwn(ESCROW_ONLY_ACTIONS, b.action) ||
+          Object.hasOwn(TREASURY_ONLY_ACTIONS, b.action),
+        "UNSUPPORTED_ACTION",
+      );
+      exact(
+        b.params,
+        [
+          ...(Object.hasOwn(ACTIONS, b.action)
+            ? ACTIONS[b.action as Action]
+            : Object.hasOwn(ESCROW_ONLY_ACTIONS, b.action)
+              ? ESCROW_ONLY_ACTIONS[b.action as keyof typeof ESCROW_ONLY_ACTIONS]
+              : TREASURY_ONLY_ACTIONS[b.action as keyof typeof TREASURY_ONLY_ACTIONS]),
+        ],
+      );
       result = this.apply(next, b, id, time);
       this.assertInvariants(next);
     } catch (e) {
@@ -369,7 +391,9 @@ export class Engine {
     return { n, e: s.names[n.canonical] };
   }
   private deed(s: State, p: Obj): Deed {
-    const { e } = this.entry(s, p.name);
+    const n = canonicalName(p.name, this.normalizationMode);
+    const e = s.names[n.canonical];
+    if (!e?.activeId) need(!this.reservedSet.has(n.canonical), "RESERVED_NAME");
     need(e?.activeId, "NOT_FOUND");
     const d = s.deeds[e.activeId]!;
     need(p.expectedDeedId === d.id, "DEED_GENERATION");
@@ -501,7 +525,7 @@ export class Engine {
       this.credit(s, b.signer, "POA", 10000000n);
     }
     const p = b.params;
-    switch (b.action as Action | keyof typeof ESCROW_ONLY_ACTIONS) {
+    switch (b.action as Action | keyof typeof ESCROW_ONLY_ACTIONS | keyof typeof TREASURY_ONLY_ACTIONS) {
       case "announceAuction": {
         const { n, e } = this.entry(s, p.name);
         need(n.labels.length === 1, "ROOT_ONLY");
@@ -904,6 +928,21 @@ export class Engine {
         const d = this.mint(s, n.canonical, b.signer, r, root.id, m, time, integer(p.expectedGeneration, 1));
         root.encumbranceVersion++;
         root.version++;
+        return { deedId: d.id, name: d.name, owner: d.owner };
+      }
+      case "issueReserved": {
+        // Treasury-only claim of a reserved protocol root name under the registry's treasury principal.
+        need(b.signer === this.config.treasury, "RESERVED_NAME");
+        const n = canonicalName(p.name, this.normalizationMode);
+        need(n.labels.length === 1 && n.canonical === p.name, "ROOT_ONLY");
+        need(this.reservedSet.has(n.canonical), "RESERVED_NAME");
+        const e = s.names[n.canonical];
+        need(!e?.activeId, "NAME_TAKEN");
+        need(!e?.auctionId, "NAME_RESERVED");
+        need(p.expectedDeedId === null && p.expectedVersion === 0, "STALE_VERSION");
+        need(b.maxTotal === "0", "AMOUNT_CAP");
+        const m = metadata(p.metadata, n.canonical, rightsHash({ kind: "permanent" }, null));
+        const d = this.mint(s, n.canonical, this.config.treasury, { kind: "permanent" }, null, m, time);
         return { deedId: d.id, name: d.name, owner: d.owner };
       }
       case "transfer": {

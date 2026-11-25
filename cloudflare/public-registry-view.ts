@@ -7,7 +7,9 @@ import { normalizeName } from "../src/names.js";
 import { parseJSON } from "../src/core.js";
 import { errorReply } from "../src/errors.js";
 import { registryRoute, RegistryCall, RegistryReply, RegistryRouteOptions } from "../src/registry-routes.js";
+import { PUBLIC_PROTOCOL_DOMAIN_NAMES } from "../src/protocol-domains.js";
 export const AUDITED_REGISTRY = "4c27c2d05c20f03e3ca1dfe90bb2cea4eb24c57b72a6a5d4074dbf15b6bbbed3";
+const protocolDomainSet = new Set<string>(PUBLIC_PROTOCOL_DOMAIN_NAMES);
 // Explicit inventory approved for hiding on 2026-11-10. IDs are not record bodies.
 export const HIDDEN = {
   "deeds": [
@@ -108,10 +110,56 @@ function hintNameKey(e: Engine, name: string): string {
  }).join("\u0001")).join(".");
 }
 const tokens = new Set<string>([...HIDDEN.deeds,...HIDDEN.auctions,...HIDDEN.offers,...HIDDEN.receipts,...HIDDEN.accounts,...HIDDEN.requests]);
-function hiddenReference(value: unknown): boolean {
-  if (typeof value === "string") return tokens.has(value) || HIDDEN.names.some(n => value === n || value.endsWith("."+n));
-  if (Array.isArray(value)) return value.some(hiddenReference);
-  return !!value && typeof value === "object" && Object.entries(value).some(([k,v]) => hiddenReference(k)||hiddenReference(v));
+const hiddenDeedSet = new Set<string>(HIDDEN.deeds);
+const hiddenReceiptSet = new Set<string>(HIDDEN.receipts);
+const nonTreasuryTokens = new Set<string>([...HIDDEN.deeds,...HIDDEN.auctions,...HIDDEN.offers,...HIDDEN.receipts,...HIDDEN.requests]);
+function hiddenReference(value: unknown, allowAccount?: string): boolean {
+  if (typeof value === "string") {
+    if (allowAccount && value === allowAccount) return false;
+    return tokens.has(value) || HIDDEN.names.some(n => value === n || value.endsWith("."+n));
+  }
+  if (Array.isArray(value)) return value.some(v => hiddenReference(v, allowAccount));
+  return !!value && typeof value === "object" && Object.entries(value).some(([k,v]) => hiddenReference(k, allowAccount)||hiddenReference(v, allowAccount));
+}
+function isPublicProtocolDeed(e: Engine, value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const d = value as { id?: unknown; name?: unknown; owner?: unknown };
+  return (
+    typeof d.id === "string" &&
+    !hiddenDeedSet.has(d.id) &&
+    typeof d.name === "string" &&
+    protocolDomainSet.has(d.name) &&
+    d.owner === e.config.treasury &&
+    !hiddenReference(d, e.config.treasury)
+  );
+}
+function isPublicProtocolReceipt(e: Engine, value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const r = value as { intentId?: unknown; signer?: unknown; result?: { name?: unknown; deedId?: unknown } };
+  if (typeof r.intentId !== "string" || hiddenReceiptSet.has(r.intentId)) return false;
+  if (r.signer !== e.config.treasury) return false;
+  if (hiddenReference(r, e.config.treasury)) return false;
+  if (typeof r.result?.name === "string" && protocolDomainSet.has(r.result.name)) return true;
+  if (typeof r.result?.deedId === "string" && !hiddenDeedSet.has(r.result.deedId)) {
+    return isPublicProtocolDeed(e, e.snapshot().deeds[r.result.deedId]);
+  }
+  return hasPublicProtocolDomains(e);
+}
+function hasPublicProtocolDomains(e: Engine): boolean {
+  const s = e.snapshot();
+  return PUBLIC_PROTOCOL_DOMAIN_NAMES.some((name) => {
+    const id = s.names[name]?.activeId;
+    return Boolean(id && isPublicProtocolDeed(e, s.deeds[id]));
+  });
+}
+function isAllowedProtocolPacket(e: Engine, packet: any): boolean {
+  if (!hasPublicProtocolDomains(e) || !packet || typeof packet !== "object") return false;
+  const body = packet.body;
+  if (!body || typeof body !== "object" || body.signer !== e.config.treasury) return false;
+  const targetName = typeof body.params?.name === "string" ? body.params.name : "";
+  if (!protocolDomainSet.has(targetName)) return false;
+  if (nonTreasuryTokens.has(body.requestId)) return false;
+  return !hiddenReference(packet, e.config.treasury);
 }
 export function hiddenName(e: Engine, raw: string): boolean {
   const name=normalizeName(raw,e.normalizationMode).canonical;
@@ -129,17 +177,23 @@ export function publicRegistryRoute(e: Engine, call: RegistryCall, options: Regi
   // deployment's provenance from a sequence number or mutable requestId prefix.
   if(e.registryId!==AUDITED_REGISTRY) return registryRoute(e,call,options);
   const q=call.query;
+  const treasuryPublic = hasPublicProtocolDomains(e);
+  const allowTreasuryQuery =
+    treasuryPublic &&
+    ((call.path === "/v1/nonce" && q.signer === e.config.treasury) ||
+      (call.path === "/v1/quote" && typeof q.name === "string" && protocolDomainSet.has(q.name) && q.signer === e.config.treasury));
   if(call.method==="GET") {
     if(q.name!==undefined && hiddenName(e,q.name)) return denied(call);
     if(call.path.startsWith("/v1/names/") && hiddenName(e,decodeURIComponent(call.path.slice(10)))) return denied(call);
-    if(Object.values(q).some(hiddenReference)) return denied(call);
+    if(!allowTreasuryQuery && Object.values(q).some(v => hiddenReference(v))) return denied(call);
     const last=call.path.split("/").at(-1)!;
     if(tokens.has(last)) return denied(call,call.path.startsWith("/v1/receipts/")?"unknown":false);
   } else if(call.packet!==undefined) {
     // Guard before preview/submit: no hidden title can become apparently free,
     // mutate through an ID, or return its old receipt through idempotent replay.
     const p=parseJSON(call.packet) as any;
-    if(hiddenReference(p) || [p?.body?.params?.name,p?.body?.params?.parent].some(n=>typeof n==="string"&&hiddenName(e,n))) return denied(call);
+    const allowedProtocolWrite = isAllowedProtocolPacket(e, p);
+    if((!allowedProtocolWrite && hiddenReference(p)) || [p?.body?.params?.name,p?.body?.params?.parent].some(n=>typeof n==="string"&&hiddenName(e,n))) return denied(call);
   }
   const original=registryRoute(e,call,options);
   if(original.status>=400)return original;
@@ -149,8 +203,18 @@ export function publicRegistryRoute(e: Engine, call: RegistryCall, options: Regi
     const state=data.state;
     // Filter complete collection entries (including reference indexes, nonces and
     // balances), never individual financial fields inside an otherwise real row.
-    for(const key of ["names","deeds","auctions","offers","balances","credits","nonces","receipts","requests","bids"])
-      state[key]=Object.fromEntries(Object.entries(state[key]??{}).filter(([k,v])=>!hiddenReference(k)&&!hiddenReference(v)));
+    // Protocol domains ("escrow", "treasury") owned by config.treasury remain public,
+    // while legacy seed balances stay withheld.
+    const rawReceipts = state.receipts ?? {};
+    for(const key of ["names","deeds","auctions","offers","balances","credits","nonces","receipts","requests","bids"]) {
+      state[key]=Object.fromEntries(Object.entries(state[key]??{}).filter(([k,v])=>{
+        if (key === "deeds" && isPublicProtocolDeed(e, v)) return true;
+        if (key === "receipts" && isPublicProtocolReceipt(e, v)) return true;
+        if (key === "requests" && typeof v === "string" && isPublicProtocolReceipt(e, rawReceipts[v])) return true;
+        if (key === "nonces" && treasuryPublic && k === e.config.treasury) return true;
+        return !hiddenReference(k)&&!hiddenReference(v);
+      }));
+    }
     data.publicView={filtered:true,policy:PUBLIC_VIEW_POLICY,stateHashScope:"complete-stored-state",sequenceScope:"complete-stored-state"};
   } else if(call.path==="/v1/capabilities") {
     // No internal-unit fields on the production view: new accounts start empty and pay in POA.
@@ -172,7 +236,16 @@ export function publicRegistryRoute(e: Engine, call: RegistryCall, options: Regi
     const at=q.cursor?values.findIndex(v=>v.id===q.cursor!.split(":").at(-1))+1:0;
     data.items=values.slice(at,at+data.limit);
     data.nextCursor=at+data.limit<values.length?`v1:${kind}:${data.sequence}:${data.stateHash}:${data.items.at(-1).id}`:null;
-  } else if(hiddenReference(data)) return denied(call);
+  } else if(hiddenReference(data)) {
+    const allowedProtocolResponse =
+      isPublicProtocolDeed(e, data.deed) ||
+      isPublicProtocolDeed(e, data) ||
+      isPublicProtocolReceipt(e, data) ||
+      (treasuryPublic && call.path === "/v1/nonce" && data.signer === e.config.treasury) ||
+      (treasuryPublic && call.path === "/v1/quote" && typeof data.name === "string" && protocolDomainSet.has(data.name) && data.owner === e.config.treasury && !hiddenReference(data, e.config.treasury)) ||
+      (treasuryPublic && (call.path === "/v1/intents" || call.path === "/v1/intents/preview") && data.signer === e.config.treasury && !hiddenReference(data, e.config.treasury));
+    if (!allowedProtocolResponse) return denied(call);
+  }
   data.pricing=POA_PRICING;
   return {status:original.status,jsonText:JSON.stringify(data)};
 }

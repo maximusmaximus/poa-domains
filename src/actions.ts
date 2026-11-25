@@ -72,3 +72,9 @@ export const ESCROW_ONLY_ACTIONS = {
   issueSubname: ["name", "parentDeedId", "parentOwnerVersion", "asset", "price", "expectedGeneration", "metadata"],
 } as const;
 export const ESCROW_ISSUE_ACTIONS: readonly string[] = Object.freeze(Object.keys(ESCROW_ONLY_ACTIONS));
+// Treasury-only issuance of reserved protocol names (e.g. "escrow", "treasury") under the registry's
+// own treasury principal. Absent from public discovery/quotes/prepare; only config.treasury may sign.
+export const TREASURY_ONLY_ACTIONS = {
+  issueReserved: ["name", "expectedVersion", "expectedDeedId", "metadata"],
+} as const;
+export const TREASURY_ISSUE_ACTIONS: readonly string[] = Object.freeze(Object.keys(TREASURY_ONLY_ACTIONS));

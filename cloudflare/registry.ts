@@ -1,7 +1,9 @@
-import { publicRegistryRoute } from "./public-registry-view.js";
+import { AUDITED_REGISTRY, publicRegistryRoute } from "./public-registry-view.js";
 import { registryRoute, type RegistryCall, type RegistryReply } from "../src/registry-routes.js";
 import { marketView, publicCommand, subnameView } from "./escrow-public.js";
 import { escrowPacketBlocked, registryTitles } from "./escrow-titles.js";
+import { backupCommittedProfile } from "./profiles-storage.js";
+import { validPoaAddr } from "./treasury.js";
 import { DurableObject } from "cloudflare:workers";
 import { createPrivateKey, generateKeyPairSync, KeyObject } from "node:crypto";
 import { Escrow, Policy, SQLiteEscrowJournal, EscrowArchive, exportEscrow, restoreEscrow, reviewedCredit, replay as replayEscrow } from "./escrow.js";
@@ -14,6 +16,7 @@ import { Engine } from "../src/engine.js";
 import { Fault, exact, need, parseJSON } from "../src/core.js";
 import { capabilities } from "../src/interface.js";
 import { normalizeName } from "../src/names.js";
+import { provisionProtocolDomains, type ProvisionedProtocolDomain } from "../src/protocol-domains.js";
 import { BootableSystemClock, seedRegistry } from "../src/seed.js";
 import { SQLiteJournal } from "./sqlite-journal.js";
 import { BackupKind, JournalRow, buildBackup, encryptSecrets, journalHeadOf, secretAad, verifyBackup } from "./backup-codec.js";
@@ -52,6 +55,7 @@ export class PoaRegistry extends DurableObject<Env> {
   private engine!: CloudflareEngine;
   private escrowService?: Escrow;
   private principals!: Record<string, string>;
+  private pendingProtocolBackups: ProvisionedProtocolDomain[] = [];
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     ctx.blockConcurrencyWhile(async () => {
@@ -60,6 +64,15 @@ export class PoaRegistry extends DurableObject<Env> {
         // Private bootstrap/parser exceptions must never expose storage/key contents.
         console.error(JSON.stringify({ event: "registry-initialization-failed", code: "PRIVATE_STORAGE_INVALID" }));
         throw new Error("REGISTRY_INITIALIZATION_FAILED");
+      }
+      if (this.pendingProtocolBackups.length) {
+        const queued = this.pendingProtocolBackups.splice(0);
+        ctx.waitUntil(
+          Promise.all(queued.map(({ packet, receipt }) => backupCommittedProfile(env, packet, receipt))).then(
+            () => undefined,
+            () => undefined,
+          ),
+        );
       }
     });
   }
@@ -289,6 +302,21 @@ export class PoaRegistry extends DurableObject<Env> {
       need(this.engine.policyHash === b.policyHash, "MANIFEST_MISMATCH");
       this.engine.attach(new SQLiteJournal(this.ctx.storage, this.engine));
       this.principals = b.principals;
+      const escrowAddress = validPoaAddr(this.env.POA_ESCROW_ADDRESS);
+      const isLiveSingleton =
+        this.engine.registryId === AUDITED_REGISTRY &&
+        (!this.env.REGISTRY || this.ctx.id.equals(this.env.REGISTRY.idFromName(SINGLETON)));
+      if (isLiveSingleton && escrowAddress) {
+        const provisioned = provisionProtocolDomains(
+          this.engine,
+          clock,
+          createPrivateKey(b.keys.treasury!),
+          escrowAddress,
+        );
+        if (provisioned.length) {
+          this.pendingProtocolBackups.push(...provisioned);
+        }
+      }
     }
     console.log(JSON.stringify({ event: "registry-ready", sequence: this.engine.snapshot().sequence,
       durability: DURABILITY, livePoA: false, principals: this.principals }));

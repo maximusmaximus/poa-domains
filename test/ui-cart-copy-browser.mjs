@@ -5,6 +5,8 @@ import { chromium, expect } from "@playwright/test";
 import { uiHarness } from "./fixtures/ui-harness.mjs";
 import { auditedEngine, get } from "./fixtures/audited-engine.mjs";
 import { nativePrincipal } from "../dist/src/auth.js";
+import { rightsHash as computeRightsHash } from "../dist/src/model.js";
+import { buildProfileWitness } from "../dist/src/profile.js";
 import { TERMS_DOMAIN, TERMS_HASH, TERMS_VERSION, signTermsAgreement } from "../dist/src/terms.js";
 
 const browser = await chromium.launch({ headless: true });
@@ -459,10 +461,47 @@ try {
   assert.deepEqual(errorsUx, []);
   await ctxUx.close();
 
-  // 7. Footer Domains Treasury balance + POAScan links + shortened address copy,
+  // 7. Footer Domains Treasury balance + direct wallet links + registered protocol domains
+  //    ("escrow" & "treasury") tiled buttons + management profile fields,
   //    and Bug/Feature popup form with prefilled POA address + CAPTCHA + PoW submission.
   const escrowWallet = "poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf";
   const treasuryWallet = "poa1GHppB8pYZ43gK8yBzR1RJhzfWjzrJn29q96ykwngUP7N";
+  const rootRights = computeRightsHash({ kind: "permanent" }, null);
+  const addProtocolDeed = (name, poa, description, deedId) => {
+    const meta = buildProfileWitness({ name, rightsHash: rootRights, poa, description });
+    h.payload.state.names[name] = { name, key: deedId, generation: 1, activeId: deedId, auctionId: null };
+    h.payload.state.deeds[deedId] = {
+      id: deedId,
+      name,
+      generation: 1,
+      owner: treasuryWallet,
+      ownerVersion: 1,
+      version: 1,
+      parentId: null,
+      rights: { kind: "permanent" },
+      rightsHash: rootRights,
+      expiry: null,
+      renewals: 0,
+      retired: false,
+      metadata: [meta],
+      records: [],
+      recordsVersion: 0,
+      lock: null,
+      encumbranceVersion: 0,
+    };
+  };
+  addProtocolDeed(
+    "treasury",
+    treasuryWallet,
+    "Official PoA Domains Treasury wallet. Holds protocol fee revenue and reserved PoA Domains owned by the registry treasury.",
+    "e1".repeat(32),
+  );
+  addProtocolDeed(
+    "escrow",
+    escrowWallet,
+    "Official PoA Domains Escrow wallet. Holds buyer deposits, active POA auction bids, and checkout payouts for PoA Domains.",
+    "e2".repeat(32),
+  );
   h.treasury = {
     total: "201.000000",
     escrow: { address: escrowWallet, balance: "201.000000", poascanUrl: `https://poascan.io/address/${escrowWallet}` },
@@ -522,18 +561,56 @@ try {
   await pageFooter.waitForFunction(() => document.body.dataset.registryStatus === "ready");
   await pageFooter.locator("#termsAgreeBtn").click();
   await expect(pageFooter.locator("#domainsServedFooter")).toContainText("Number of Domains Served:");
-  await expect(pageFooter.locator("#domainsServedCount")).toHaveText("0️⃣0️⃣0️⃣0️⃣0️⃣3️⃣");
-  await expect(pageFooter.locator("#domainsServedSr")).toHaveText("3");
+  await expect(pageFooter.locator("#domainsServedCount")).toHaveText("0️⃣0️⃣0️⃣0️⃣0️⃣5️⃣");
+  await expect(pageFooter.locator("#domainsServedSr")).toHaveText("5");
   await expect(pageFooter.locator("#treasuryTotal")).toHaveText("🪙 201 POA");
   await expect(pageFooter.locator("#poascanHomeLink")).toHaveCount(0);
   await expect(pageFooter.locator('#treasuryFooter a[href="https://poascan.io/"]')).toHaveCount(0);
   await expect(pageFooter.locator("#treasuryWallets")).toBeVisible();
+  const footerEscrowTile = pageFooter.locator('#treasuryWallets a.domain-tile.is-registered[href="/d/escrow"]');
+  const footerTreasuryTile = pageFooter.locator('#treasuryWallets a.domain-tile.is-registered[href="/d/treasury"]');
+  await expect(footerEscrowTile).toHaveText("escrow");
+  await expect(footerTreasuryTile).toHaveText("treasury");
   const escrowLink = pageFooter.locator(`#treasuryWallets a[href="https://poascan.io/address/${escrowWallet}"]`);
   const treasuryLink = pageFooter.locator(`#treasuryWallets a[href="https://poascan.io/address/${treasuryWallet}"]`);
   await expect(escrowLink).toHaveText("poa1...piRf");
   await expect(treasuryLink).toHaveText("poa1...UP7N");
   await pageFooter.locator("#treasuryWallets .poa-copy-btn").first().click();
   assert.equal(await pageFooter.evaluate(() => navigator.clipboard.readText()), escrowWallet);
+
+  // Registered domain tiled buttons & owned reserved protocol domain resolution:
+  // Unregistered available name is NOT styled as a registered tile; owned "escrow" IS a tile.
+  await pageFooter.locator("#searchInput").fill("freshavailableword");
+  await pageFooter.locator("#searchBtn").click();
+  await expect(pageFooter.locator('#searchResult a.domain-link[href="/d/freshavailableword"]')).toBeVisible();
+  await expect(pageFooter.locator('#searchResult a.domain-tile[href="/d/freshavailableword"]')).toHaveCount(0);
+  await pageFooter.locator("#clearCart").click();
+  await pageFooter.locator("#searchInput").fill("google");
+  await pageFooter.locator("#searchBtn").click();
+  await expect(pageFooter.locator("#searchResult")).toContainText("Reserved — not for sale");
+  await expect(pageFooter.locator('#searchResult a.domain-tile[href="/d/google"]')).toHaveCount(0);
+  await pageFooter.locator("#searchInput").fill("escrow");
+  await pageFooter.locator("#searchBtn").click();
+  await expect(pageFooter.locator("#searchResult")).toContainText("Owned (permanent)");
+  await expect(pageFooter.locator('#searchResult a.domain-tile.is-registered[href="/d/escrow"]')).toHaveText("escrow");
+
+  // Click the footer [escrow] tiled button -> /d/escrow shows treasury owner, escrow POA address, and description
+  await footerEscrowTile.click();
+  await expect(pageFooter.locator('#domainTitle a.domain-tile.is-registered[href="/d/escrow"]')).toHaveText("escrow");
+  await expect(pageFooter.locator("#domainOwner")).toContainText("poa1...UP7N");
+  await expect(pageFooter.locator("#domainProfile")).toContainText("Official PoA Domains Escrow wallet");
+  await expect(pageFooter.locator("#domainProfile")).toContainText("poa1...piRf");
+  await pageFooter.getByRole("button", { name: "Manage escrow" }).click();
+  await expect(pageFooter.locator("#manageOwner")).toHaveValue(treasuryWallet);
+  await expect(pageFooter.locator('#manageNames a.domain-tile.is-registered[href="/d/escrow"]')).toHaveText("escrow");
+  await expect(pageFooter.locator('#manageNames a.domain-tile.is-registered[href="/d/treasury"]')).toHaveText("treasury");
+  const escrowManageCard = pageFooter.locator('#manageNames article.card[data-domain-name="escrow"]');
+  await expect(escrowManageCard.locator('textarea[data-profile-field="description"]')).toHaveValue(/Official PoA Domains Escrow wallet/);
+  await expect(escrowManageCard.locator('input[data-profile-field="poa"]')).toHaveValue(escrowWallet);
+  const treasuryManageCard = pageFooter.locator('#manageNames article.card[data-domain-name="treasury"]');
+  await treasuryManageCard.locator("details.profile-editor summary").click();
+  await expect(treasuryManageCard.locator('textarea[data-profile-field="description"]')).toHaveValue(/Official PoA Domains Treasury wallet/);
+  await expect(treasuryManageCard.locator('input[data-profile-field="poa"]')).toHaveValue(treasuryWallet);
 
   // Set user's POA address in Manage domains, then open Bug/Feature modal -> prefilled automatically
   await pageFooter.locator("#tabEscrow").click();

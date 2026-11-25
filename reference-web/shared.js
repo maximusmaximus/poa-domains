@@ -465,7 +465,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=29e98441152b";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=33e97c0bc9b7";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -881,12 +881,13 @@ export function resolveDomainView(state, name, reservedSet = new Set(), ownershi
   };
   if (!state || typeof name !== "string" || !name) return result;
   result.history = historyForTarget(state, { name });
-  if (reservedSet.has(name)) {
+  result.reserved = reservedSet.has(name);
+  const entry = state.names?.[name];
+  const activeDeed = entry?.activeId && state.deeds?.[entry.activeId] ? state.deeds[entry.activeId] : null;
+  if (result.reserved && !activeDeed) {
     result.status = "reserved";
-    result.reserved = true;
     return result;
   }
-  const entry = state.names?.[name];
   const liveAuction =
     (entry?.auctionId && state.auctions?.[entry.auctionId]) ||
     Object.values(state.auctions ?? {}).find((a) => a.name === name) ||
@@ -895,8 +896,8 @@ export function resolveDomainView(state, name, reservedSet = new Set(), ownershi
     result.auction = liveAuction;
     result.auctionBucket = classifyAuction(liveAuction, state.time);
   }
-  if (entry?.activeId && state.deeds?.[entry.activeId]) {
-    const d = state.deeds[entry.activeId];
+  if (activeDeed) {
+    const d = activeDeed;
     result.deed = d;
     result.owner = d.owner;
     const listing = Object.values(state.offers ?? {}).find(

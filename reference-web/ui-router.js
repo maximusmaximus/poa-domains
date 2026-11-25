@@ -1,12 +1,12 @@
-import { domainPath, isPoaAddress, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=29e98441152b";
-import { ui } from "./ui-state.js?v=29e98441152b";
-import { createPoaCopyButton } from "./ui-copy.js?v=29e98441152b";
-import { add, el } from "./ui-core.js?v=29e98441152b";
-import { runSearch } from "./ui-search.js?v=29e98441152b";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=29e98441152b";
-import { updateTabDots } from "./ui-render.js?v=29e98441152b";
-import { syncCartShortcutNow } from "./ui-cart.js?v=29e98441152b";
-import { renderManagement } from "./ui-manage.js?v=29e98441152b";
+import { domainPath, isPoaAddress, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=33e97c0bc9b7";
+import { ui } from "./ui-state.js?v=33e97c0bc9b7";
+import { createPoaCopyButton } from "./ui-copy.js?v=33e97c0bc9b7";
+import { add, el } from "./ui-core.js?v=33e97c0bc9b7";
+import { runSearch } from "./ui-search.js?v=33e97c0bc9b7";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=33e97c0bc9b7";
+import { updateTabDots } from "./ui-render.js?v=33e97c0bc9b7";
+import { syncCartShortcutNow } from "./ui-cart.js?v=33e97c0bc9b7";
+import { renderManagement } from "./ui-manage.js?v=33e97c0bc9b7";
 
 /** Open Manage domains tab, prefill the owner address, and focus a specific domain card. */
 export function openManageDomain(name, ownerId) {
@@ -57,12 +57,23 @@ export function restoreViewFromURL() {
     runSearch(ui.lastSearch, false);
 }
 
-export function nameLink(parent, name, css = "domain-link") {
+export function isRegisteredDomain(name) {
+    if (!name || typeof name !== "string")
+        return false;
+    const entry = ui.latestState?.names?.[name];
+    if (!entry?.activeId)
+        return false;
+    const deed = ui.latestState?.deeds?.[entry.activeId];
+    return Boolean(deed && !deed.retired);
+}
+
+export function nameLink(parent, name, css = "domain-link", opts = {}) {
     if (!name)
         return add(parent, "span", "—", css);
     const a = document.createElement("a");
     a.href = domainPath(name);
-    a.className = css + " domain-name";
+    const registered = typeof opts?.registered === "boolean" ? opts.registered : isRegisteredDomain(name);
+    a.className = css + " domain-name" + (registered ? " domain-tile is-registered" : "");
     a.textContent = name;
     a.addEventListener("click", (event) => {
         event.preventDefault();
