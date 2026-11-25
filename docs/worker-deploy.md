@@ -139,8 +139,8 @@ variables** (these are not secrets or deployment overrides):
 | `POA_ESCROW_ADDRESS` | `poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf` |
 | `POA_ESCROW_PER_TX` | `250000.000000` |
 | `POA_ESCROW_DAILY` | `1000000.000000` |
-| `POA_ESCROW_ENGINE_SHA256` | `a221f58ad128b804a0e6e0e1882685dc136cfe9536f2f9a955722578675cdc25` |
-| `POA_ESCROW_PARAMS_SHA256` | `8274922eacea7ff7dc301e85f9dfbf74d1419a1868eda2b8a9303f16aa4ca99d` |
+| `POA_ESCROW_ENGINE_SHA256` | `50464775560a94f49bbe4dae92b932c8fa7cf2c9239f2abdd31020d24c107511` |
+| `POA_ESCROW_PARAMS_SHA256` | `806fc3a0303e42a19a11d44be036739142d9c06dc9280e505c8815084eed1fd5` |
 
 Re-read live policy at approval time; do not replay this observation over a later
 operator change. The existing runner refuses missing/mismatched values, preserves
