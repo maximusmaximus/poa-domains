@@ -1,9 +1,9 @@
-import { IDEA_WORDS, IDEA_EMOJI, inspectName } from "./shared.js?v=a12c4f25ce0d";
+import { IDEA_WORDS, IDEA_EMOJI, inspectName } from "./shared.js?v=d434aec15419";
 
 // Massive curated list of obvious everyday, tech, AI, crypto, finance, nature, creative & short root words.
 const CURATED_WORD_BANK = (
   // High-demand tech, AI, agents, crypto & web
-  "ai bot agent agents mind brain neural model models prompt prompts token tokens chain block blocks node nodes " +
+  "ai bot agent agents agentic mind brain neural model models prompt prompts token tokens chain block blocks node nodes " +
   "miner mining proof stake vault wallet wallets pay payment payments cash coin coins money bank finance fund " +
   "funds trade trading market markets swap dex defi dao web net web3 cloud edge server host hosting data code " +
   "coder coding dev devs build builder builders hack hacker app apps api sdk mcp cli git repo hub lab labs " +
@@ -138,13 +138,16 @@ export function createIdeaGenerator({query="",manifest,accept=()=>true}) {
  * Compute inline autofill completion + top available dropdown suggestions for Check Availability.
  * Pure local lookup against the curated word dictionary and registry state; never mutates state.
  */
-export function suggestNames(rawQuery, { manifest, accept = () => true, limit = 8 } = {}) {
+export function suggestNames(rawQuery, { manifest, accept = () => true, limit = 8, extraWords = [] } = {}) {
  const trimmed = String(rawQuery ?? "").trim();
  if (!trimmed || !manifest) return { completion: "", items: [] };
  const stripped = trimmed.startsWith("poa:") ? trimmed.slice(4) : trimmed;
  if (!stripped || stripped.includes(".")) return { completion: "", items: [] };
  const lower = stripped.toLowerCase();
  const isAsciiPrefix = /^[a-z0-9]+$/.test(lower);
+ const wordPool = Array.isArray(extraWords) && extraWords.length
+  ? [...new Set([...SUGGESTION_WORDS, ...extraWords.map((w) => String(w ?? "").toLowerCase()).filter((w) => /^[a-z0-9]+$/.test(w))])]
+  : SUGGESTION_WORDS;
  const seen = new Set();
  const items = [];
  const tryPush = (candidate, kind = "suggestion") => {
@@ -164,7 +167,7 @@ export function suggestNames(rawQuery, { manifest, accept = () => true, limit = 
  // 2. Prefix matches from the massive curated dictionary (prefer shorter obvious words first).
  let completion = "";
  if (isAsciiPrefix) {
-  const prefixMatches = SUGGESTION_WORDS
+  const prefixMatches = wordPool
    .filter((w) => w.startsWith(lower) && w !== lower)
    .sort((a, b) => a.length - b.length || a.localeCompare(b));
   for (const w of prefixMatches) {
@@ -173,7 +176,7 @@ export function suggestNames(rawQuery, { manifest, accept = () => true, limit = 
   }
   // If user typed a full dictionary word, check if there's a natural completion only when not exact
   if (!completion && !exactAdded) {
-   const sub = SUGGESTION_WORDS.filter((w) => w.includes(lower) && !w.startsWith(lower))
+   const sub = wordPool.filter((w) => w.includes(lower) && !w.startsWith(lower))
     .sort((a, b) => a.length - b.length || a.localeCompare(b));
    for (const w of sub) {
     if (tryPush(w, "match") && !completion) completion = w;

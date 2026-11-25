@@ -966,6 +966,87 @@ try {
   await pageAuc.getByRole("button", { name: /Raise max bid to 385\.000001 POA/ }).click();
   await pageAuc.locator("#cartList").getByRole("button", { name: /Review changed item/ }).click();
   await expect(pageAuc.locator("#copyCartPrompt")).toBeEnabled();
+
+  // 9b. Exact search dropdown ALWAYS shows the searched term first with its live status:
+  //     - Queued POA auction ("Agentic") -> gold "For auction · 100 POA · + Cart" -> click auto-adds to cart
+  //     - Partial prefix ("agen") -> surfaces open POA auction ("agentic") as "For auction"
+  //     - Taken/owned ("escrow") -> red "Not available" -> click goes straight to /d/escrow without adding to cart
+  //     - Reserved ("google") -> red "Reserved · Not available" -> click goes straight to /d/google without adding to cart
+  const aucAgenticId = "a".repeat(64);
+  h.escrowMarket = {
+    serverTime: nowAuctionMs + 12000,
+    items: [
+      ...h.escrowMarket.items,
+      {
+        id: aucAgenticId, name: "agentic", seller: sellerAddr, kind: "auction",
+        price: "100.000000", minimumNextBid: "100.000000", status: "OPEN",
+        closes: 0, window: 3600000, quiet: 3600000, createdAt: nowAuctionMs - 60000,
+        startedAt: null, awaitingFirstBid: true, high: null, bidders: [], settlement: null,
+        history: [{ event: "Auction queued; timer starts on first bid", at: nowAuctionMs - 60000 }],
+      },
+    ],
+  };
+  await pageAuc.reload();
+  await pageAuc.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageAuc.locator("#tabFind").click();
+  await pageAuc.locator("#clearCart").click();
+  await expect(pageAuc.locator("#cartCount")).toHaveText("0");
+
+  // Exact typed auction word ("Agentic") appears FIRST as For auction and clicking auto-adds it to cart
+  await pageAuc.locator("#searchInput").fill("Agentic");
+  await expect(pageAuc.locator("#searchSuggestions")).toBeVisible();
+  const optAgentic = pageAuc.locator("#search-opt-0");
+  await expect(optAgentic).toContainText("agentic");
+  await expect(optAgentic).toContainText("For auction");
+  await expect(optAgentic).toContainText("100 POA");
+  await expect(optAgentic).toHaveAttribute("data-status", "auction");
+  await expect(optAgentic).toHaveAttribute("data-can-add-to-cart", "true");
+  assert.ok((await optAgentic.getAttribute("class")).includes("is-auction"));
+  await optAgentic.click();
+  await expect(pageAuc.locator("#cartCount")).toHaveText("1");
+  await expect(pageAuc.locator("#cartList")).toContainText("agentic");
+  await expect(pageAuc.locator("#searchResult")).toContainText("For Auction");
+
+  // Partial prefix ("agen") surfaces open POA auction "agentic" marked For auction
+  await pageAuc.locator("#searchInput").fill("agen");
+  await expect(pageAuc.locator("#searchSuggestions")).toBeVisible();
+  const prefixAgentic = pageAuc.locator("#searchSuggestions [role='option']", { hasText: "agentic" }).first();
+  await expect(prefixAgentic).toContainText("For auction");
+
+  // Taken/owned domain ("escrow") appears FIRST in RED as Not available; clicking opens /d/escrow without adding to cart
+  await pageAuc.locator("#searchInput").fill("escrow");
+  await expect(pageAuc.locator("#searchSuggestions")).toBeVisible();
+  const optTaken = pageAuc.locator("#search-opt-0");
+  await expect(optTaken).toContainText("escrow");
+  await expect(optTaken).toContainText("Not available");
+  await expect(optTaken).toHaveAttribute("data-status", "taken");
+  await expect(optTaken).toHaveAttribute("data-can-add-to-cart", "false");
+  assert.ok((await optTaken.getAttribute("class")).includes("is-unavailable"));
+  await optTaken.click();
+  await expect(pageAuc.locator("#domainMain")).toBeVisible();
+  assert.equal(new URL(pageAuc.url()).pathname, "/d/escrow", pageAuc.url());
+  await expect(pageAuc.locator("#domainTitle")).toContainText("escrow");
+  await expect(pageAuc.locator("#cartCount")).toHaveText("1");
+
+  // Reserved domain ("google") appears FIRST in RED as Reserved · Not available; clicking opens /d/google without adding to cart
+  await pageAuc.locator("#domainHomeLink").click();
+  await expect(pageAuc.locator("#homeMain")).toBeVisible();
+  await pageAuc.locator("#searchInput").fill("google");
+  await expect(pageAuc.locator("#searchSuggestions")).toBeVisible();
+  const optReserved = pageAuc.locator("#search-opt-0");
+  await expect(optReserved).toContainText("google");
+  await expect(optReserved).toContainText("Reserved");
+  await expect(optReserved).toContainText("Not available");
+  await expect(optReserved).toHaveAttribute("data-status", "reserved");
+  await expect(optReserved).toHaveAttribute("data-can-add-to-cart", "false");
+  assert.ok((await optReserved.getAttribute("class")).includes("is-unavailable"));
+  await optReserved.click();
+  await expect(pageAuc.locator("#domainMain")).toBeVisible();
+  assert.equal(new URL(pageAuc.url()).pathname, "/d/google", pageAuc.url());
+  await expect(pageAuc.locator("#domainTitle")).toContainText("google");
+  await expect(pageAuc.locator("#domainStatus")).toContainText("Reserved");
+  await expect(pageAuc.locator("#cartCount")).toHaveText("1");
+
   assert.deepEqual(errorsAuc, []);
   await ctxAuc.close();
 
