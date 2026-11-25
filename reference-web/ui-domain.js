@@ -19,12 +19,12 @@ import {
   registryUnit,
   resolveDomainView,
   unavailableKey,
-} from "./shared.js?v=21431e1ecef6";
-import { actionLabel, createPoaCopyButton } from "./ui-copy.js?v=21431e1ecef6";
-import { ui } from "./ui-state.js?v=21431e1ecef6";
-import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=21431e1ecef6";
-import { domainHeader, nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=21431e1ecef6";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=21431e1ecef6";
+} from "./shared.js?v=fcbe30736580";
+import { actionLabel, createPoaCopyButton } from "./ui-copy.js?v=fcbe30736580";
+import { ui } from "./ui-state.js?v=fcbe30736580";
+import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=fcbe30736580";
+import { domainHeader, nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=fcbe30736580";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=fcbe30736580";
 
 function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) {
   const wrap = document.createElement("span");

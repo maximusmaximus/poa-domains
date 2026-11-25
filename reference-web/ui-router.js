@@ -1,12 +1,12 @@
-import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, profileImageMediaPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=21431e1ecef6";
-import { ui } from "./ui-state.js?v=21431e1ecef6";
-import { createPoaCopyButton } from "./ui-copy.js?v=21431e1ecef6";
-import { add, el } from "./ui-core.js?v=21431e1ecef6";
-import { runSearch } from "./ui-search.js?v=21431e1ecef6";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=21431e1ecef6";
-import { updateTabDots } from "./ui-render.js?v=21431e1ecef6";
-import { syncCartShortcutNow } from "./ui-cart.js?v=21431e1ecef6";
-import { renderManagement } from "./ui-manage.js?v=21431e1ecef6";
+import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, profileImageMediaPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=fcbe30736580";
+import { ui } from "./ui-state.js?v=fcbe30736580";
+import { createPoaCopyButton } from "./ui-copy.js?v=fcbe30736580";
+import { add, el } from "./ui-core.js?v=fcbe30736580";
+import { runSearch } from "./ui-search.js?v=fcbe30736580";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=fcbe30736580";
+import { updateTabDots } from "./ui-render.js?v=fcbe30736580";
+import { syncCartShortcutNow } from "./ui-cart.js?v=fcbe30736580";
+import { renderManagement } from "./ui-manage.js?v=fcbe30736580";
 
 const LAST_POA_KEY = "poadomains.lastPoaAddress.v1";
 

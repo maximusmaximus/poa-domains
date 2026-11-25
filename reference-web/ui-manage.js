@@ -1,9 +1,9 @@
-import { ui } from "./ui-state.js?v=21431e1ecef6";
-import { add, el, endpointBase } from "./ui-core.js?v=21431e1ecef6";
-import { createDomainAvatar, domainHeader, nameLink, openPoa, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=21431e1ecef6";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=21431e1ecef6";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=21431e1ecef6";
-import { createInlineInfo } from "./ui-help.js?v=21431e1ecef6";
+import { ui } from "./ui-state.js?v=fcbe30736580";
+import { add, el, endpointBase } from "./ui-core.js?v=fcbe30736580";
+import { createDomainAvatar, domainHeader, nameLink, openPoa, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=fcbe30736580";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=fcbe30736580";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=fcbe30736580";
+import { createInlineInfo } from "./ui-help.js?v=fcbe30736580";
 import {
   buildProfileUpdatePrompt,
   checkBtcAddress,
@@ -21,7 +21,7 @@ import {
   SALE_FIELDS_WARNING,
   saveKnownOwner,
   validPrincipal,
-} from "./shared.js?v=21431e1ecef6";
+} from "./shared.js?v=fcbe30736580";
 
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const IDLE_MANAGE_PROMPT = "Edit profile fields or choose an action above to preview the code for your agent.";
