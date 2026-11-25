@@ -303,6 +303,44 @@
         "cloudflare/test/escrow-admin-runtime.mjs",
         ".poa-compat/surface.json"
       ]
+    },
+    {
+      "at": "2026-11-25T17:37:19.960Z",
+      "classification": "breaking",
+      "reasons": [
+        "pinned params no longer match the network, and this project refuses to run on unpinned values"
+      ],
+      "from": {
+        "engine": "50464775560a94f49bbe4dae92b932c8fa7cf2c9239f2abdd31020d24c107511",
+        "params": "806fc3a0303e42a19a11d44be036739142d9c06dc9280e505c8815084eed1fd5",
+        "client": "50464775560a94f49bbe4dae92b932c8fa7cf2c9239f2abdd31020d24c107511",
+        "release": null
+      },
+      "to": {
+        "engine": "50464775560a94f49bbe4dae92b932c8fa7cf2c9239f2abdd31020d24c107511",
+        "params": "552ccbddc8671c390dd3dfd1774e4e7d64345775f8c47ec2c7e5191738a98f71",
+        "client": null,
+        "clientSize": null,
+        "clientLastModified": null,
+        "release": null,
+        "releaseTxid": null
+      },
+      "sources": {
+        "facts": "https://minepoa.com/chain/poa-mainnet-1/api/network-facts",
+        "release": null,
+        "client": null
+      },
+      "surface": {
+        "state": "unknown (client bundle could not be downloaded)"
+      },
+      "files": [
+        "wrangler.jsonc",
+        "cloudflare/escrow-network.ts",
+        "worker-configuration.d.ts",
+        "docs/worker-deploy.md",
+        "cloudflare/test/display-freshness-runtime.mjs",
+        "cloudflare/test/escrow-admin-runtime.mjs"
+      ]
     }
   ],
   "selftestAt": "2026-11-21T23:44:00.280Z"
