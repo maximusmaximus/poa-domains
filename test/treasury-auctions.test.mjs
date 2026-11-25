@@ -344,8 +344,20 @@ test("Escrow seedInventoryAuctions + MCP POA auction tools: atomic 100-auction o
   assert.equal(engine.resolve("defi").deed.owner, bidder2.addr);
   assert.equal(escrow.state().auctions[defiAuction.id].status, "COMPLETE");
 
-  // Re-seeding NEVER re-lists the sold "defi" domain!
+  // Re-seeding NEVER re-lists the sold "defi" domain (neither v1 nor v2)!
   assert.deepEqual(escrow.seedInventoryAuctions(treasury.addr, seedSpecs), []);
+  assert.deepEqual(escrow.seedInventoryAuctions(treasury.addr, seedSpecs, "treasury-inventory-auction-v2"), []);
+
+  // If a Treasury-owned auction was CANCELLED (still owned by Treasury), v2 re-lists ONLY that cancelled name once.
+  const coinLookup = await callTool(16, "list_poa_auctions", { name: "coin" });
+  const coinV1 = coinLookup.items[0];
+  await callTool(17, "submit_escrow_command", signEscrowCommand(treasury, "treasury_cancel_coin_v1", "cancel", { auction: coinV1.id }));
+  const relisted = escrow.seedInventoryAuctions(treasury.addr, seedSpecs, "treasury-inventory-auction-v2");
+  assert.equal(relisted.length, 1);
+  assert.equal(escrow.state().auctions[relisted[0]].name, "coin");
+  assert.equal(escrow.state().auctions[relisted[0]].status, "OPEN");
+  // Re-running v2 is a 100% idempotent no-op.
+  assert.deepEqual(escrow.seedInventoryAuctions(treasury.addr, seedSpecs, "treasury-inventory-auction-v2"), []);
 });
 
 test("publicRegistryRoute exposes all 100 Treasury Crypto+AI auction domains while withholding legacy hidden records", () => {

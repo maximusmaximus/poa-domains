@@ -76,6 +76,12 @@ export class PoaRegistry extends DurableObject<Env> {
           ),
         );
       }
+      if (String(env.POA_ESCROW_ENABLED) === "true" && String(env.POA_ESCROW_NETWORK_WRITES) === "approved-v1") {
+        const existingAlarm = await ctx.storage.getAlarm();
+        if (existingAlarm === null || existingAlarm > Date.now() + 15000) {
+          await ctx.storage.setAlarm(Date.now() + 2000);
+        }
+      }
     });
   }
   /** Display-only last known PoA network status. Separate table: never registry state, journal, hash, sequence or backup. */
@@ -329,13 +335,15 @@ export class PoaRegistry extends DurableObject<Env> {
         }
         if (String(this.env.POA_ESCROW_ENABLED) === "true") {
           try {
-            const opened = this.escrow().seedInventoryAuctions(
-              this.engine.config.treasury,
-              TREASURY_CRYPTO_AI_AUCTION_NAMES.map((name) => ({
-                name,
-                reserve: treasuryAuctionReservePoa(name),
-              })),
-            );
+            const specs = TREASURY_CRYPTO_AI_AUCTION_NAMES.map((name) => ({
+              name,
+              reserve: treasuryAuctionReservePoa(name),
+            }));
+            const opened = [
+              ...this.escrow().seedInventoryAuctions(this.engine.config.treasury, specs),
+              // Idempotently re-open any Treasury catalog name whose v1 auction expired while still Treasury-owned.
+              ...this.escrow().seedInventoryAuctions(this.engine.config.treasury, specs, "treasury-inventory-auction-v2"),
+            ];
             if (opened.length) {
               console.log(JSON.stringify({ event: "treasury-auctions-seeded", count: opened.length }));
             }
@@ -447,73 +455,122 @@ export class PoaRegistry extends DurableObject<Env> {
     const es = escrow.state();
     if (es.paused || es.halt) return;
     const treasury = this.engine.config.treasury;
-    if (Object.values(es.auctions).some((a) => a.status === "SETTLING" && a.seller === treasury)) return;
     const nowMs = Date.now();
+    const snap = this.engine.snapshot();
+    const nowSec = Math.max(Math.floor(nowMs / 1000), snap.time);
+
+    const signAndSubmit = async (
+      target: { id: string; name: string; high: { payer: string; amount: string } },
+      action: "settle" | "repair-title",
+    ) => {
+      const savedRow = this.ctx.storage.sql.exec<{ value: string }>("SELECT value FROM bootstrap WHERE id=1").toArray()[0];
+      if (!savedRow) return;
+      const bootstrap = JSON.parse(savedRow.value) as Bootstrap;
+      const treasuryKey = createPrivateKey(bootstrap.keys.treasury!);
+      const deedId = snap.names[target.name]?.activeId;
+      const deed = deedId ? snap.deeds[deedId] : null;
+      if (!deed || deed.owner !== treasury || deed.retired) return;
+      const requestId =
+        action === "repair-title"
+          ? `treasury-repair-${target.id.slice(0, 24)}-${nowSec}`
+          : `treasury-settle-${target.id.slice(0, 32)}`;
+      const key =
+        action === "repair-title"
+          ? `treasury_repair_${target.id.slice(0, 24)}_${nowSec}`
+          : `treasury_settle_${target.id.slice(0, 44)}`;
+      const transfer = signBody(
+        {
+          domain: DOMAIN,
+          revision: this.engine.config.revision,
+          chainId: this.engine.config.chainId,
+          genesisHash: this.engine.config.genesisHash,
+          registryId: this.engine.registryId,
+          policyHash: this.engine.policyHash,
+          normalizationHash: this.engine.config.normalizationHash,
+          signer: treasury,
+          coSigners: [],
+          requestId,
+          nonce: this.engine.nextNonce(treasury),
+          notBefore: 0,
+          deadline: nowSec + 7 * 86400,
+          maxTotal: "0",
+          maxNetworkFee: "0",
+          action: "transfer",
+          params: {
+            name: target.name,
+            expectedDeedId: deed.id,
+            expectedVersion: deed.version,
+            recipient: target.high.payer,
+          },
+        },
+        [treasuryKey],
+      );
+      const command: Command = {
+        domain: "poa-domains.escrow.v1",
+        chainId: CHAIN,
+        registryId: this.engine.registryId,
+        actor: treasury,
+        key,
+        expires: nowSec + 600,
+        action,
+        params: { auction: target.id, transfer },
+      };
+      const signature = base58(sign(null, Buffer.from(canonical(command)), treasuryKey));
+      const verified = verifyCommand({ command, signature }, this.engine.registryId, nowSec);
+      await escrow.command(verified);
+    };
+
+    const settling = Object.values(es.auctions).find((a) => a.status === "SETTLING" && a.seller === treasury);
+    if (settling) {
+      const st = es.settlements[settling.id];
+      const deadline = st?.packet?.body?.deadline;
+      const needsRepair =
+        st &&
+        settling.high &&
+        (st.status === "TITLE_PENDING" ||
+          (st.status === "PAYING" && (typeof deadline !== "number" || deadline <= nowSec + 600)));
+      if (needsRepair) {
+        await signAndSubmit({ id: settling.id, name: settling.name, high: settling.high! }, "repair-title");
+      }
+      return;
+    }
+
     const ready = Object.values(es.auctions)
       .filter((a) => a.status === "OPEN" && a.seller === treasury && a.high !== null && a.closes > 0 && nowMs >= a.closes)
       .sort((a, b) => a.closes - b.closes || a.id.localeCompare(b.id))[0];
     if (!ready || !ready.high) return;
-    const savedRow = this.ctx.storage.sql.exec<{ value: string }>("SELECT value FROM bootstrap WHERE id=1").toArray()[0];
-    if (!savedRow) return;
-    const bootstrap = JSON.parse(savedRow.value) as Bootstrap;
-    const treasuryKey = createPrivateKey(bootstrap.keys.treasury!);
-    const snap = this.engine.snapshot();
-    const deedId = snap.names[ready.name]?.activeId;
-    const deed = deedId ? snap.deeds[deedId] : null;
-    if (!deed || deed.owner !== treasury || deed.retired) return;
-    const nowSec = Math.max(Math.floor(nowMs / 1000), snap.time);
-    const transfer = signBody(
-      {
-        domain: DOMAIN,
-        revision: this.engine.config.revision,
-        chainId: this.engine.config.chainId,
-        genesisHash: this.engine.config.genesisHash,
-        registryId: this.engine.registryId,
-        policyHash: this.engine.policyHash,
-        normalizationHash: this.engine.config.normalizationHash,
-        signer: treasury,
-        coSigners: [],
-        requestId: `treasury-settle-${ready.id.slice(0, 32)}`,
-        nonce: this.engine.nextNonce(treasury),
-        notBefore: 0,
-        deadline: nowSec + 3600,
-        maxTotal: "0",
-        maxNetworkFee: "0",
-        action: "transfer",
-        params: {
-          name: ready.name,
-          expectedDeedId: deed.id,
-          expectedVersion: deed.version,
-          recipient: ready.high.payer,
-        },
-      },
-      [treasuryKey],
-    );
-    const command: Command = {
-      domain: "poa-domains.escrow.v1",
-      chainId: CHAIN,
-      registryId: this.engine.registryId,
-      actor: treasury,
-      key: `treasury_settle_${ready.id.slice(0, 44)}`,
-      expires: nowSec + 600,
-      action: "settle",
-      params: { auction: ready.id, transfer },
-    };
-    const signature = base58(sign(null, Buffer.from(canonical(command)), treasuryKey));
-    const verified = verifyCommand({ command, signature }, this.engine.registryId, nowSec);
-    await escrow.command(verified);
+    await signAndSubmit({ id: ready.id, name: ready.name, high: ready.high }, "settle");
   }
   async alarm(): Promise<void> {
     if (String(this.env.POA_ESCROW_ENABLED) !== "true" || String(this.env.POA_ESCROW_NETWORK_WRITES) !== "approved-v1") return;
-    try {
-      await this.autoSettleTreasuryAuctions();
-      await this.escrow().tick();
-    }
-    catch (error) {
-      if (!(error instanceof Error && /^ESCROW_[A-Z_]+$/.test(error.message))) this.ctx.abort("Escrow recovery failure; restart and reconcile");
-    }
-    // Continue lookup/recovery without replaying a command or regenerating a transaction.
-    await this.ctx.storage.setAlarm(Date.now() + 60000);
+    const runStep = async (step: string, fn: () => Promise<unknown>) => {
+      try {
+        await fn();
+      } catch (error) {
+        if (error instanceof Error && /^ESCROW_[A-Z_]+$/.test(error.message)) {
+          console.error(JSON.stringify({ event: "escrow-alarm-held", step, code: error.message }));
+          return;
+        }
+        this.ctx.abort("Escrow recovery failure; restart and reconcile");
+        throw error;
+      }
+    };
+    await runStep("auto-settle-pre", () => this.autoSettleTreasuryAuctions());
+    await runStep("tick", () => this.escrow().tick());
+    await runStep("auto-settle-post", () => this.autoSettleTreasuryAuctions());
+    const s = this.escrow().state();
+    const nowMs = Date.now();
+    const treasury = this.engine.config.treasury;
+    const hasActiveWork =
+      !s.paused &&
+      !s.halt &&
+      (Object.values(s.payments).some((p) => p.status !== "FINAL") ||
+        Object.values(s.settlements).some((st) => st.status !== "COMPLETE") ||
+        Object.values(s.auctions).some(
+          (a) => a.status === "OPEN" && a.seller === treasury && a.high !== null && a.closes > 0 && nowMs >= a.closes,
+        ));
+    // Drain active payouts/settlements every 15s; fall back to 60s when idle.
+    await this.ctx.storage.setAlarm(Date.now() + (hasActiveWork ? 15000 : 60000));
   }
   /** Authenticated Worker RPC only. There is no browser signing, key-read, or generic send route. */
   async escrowAdmin(packetText: string): Promise<RegistryReply> {
