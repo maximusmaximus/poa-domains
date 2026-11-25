@@ -851,6 +851,36 @@ try {
   assert.ok(tickerInitial.includes("Auction started") && tickerInitial.includes("comet"), tickerInitial);
   assert.equal(tickerInitial.includes("vault"), false, tickerInitial);
 
+  // Search for a POA auction domain ("comet") -> auto-adds to cart, clearly warns it's For Auction,
+  // and explains all auction nuances inside both the Search card ℹ️ icon and Cart item ℹ️ icon!
+  await pageAuc.locator("#searchInput").fill("comet");
+  await pageAuc.locator("#searchBtn").click();
+  await expect(pageAuc.locator("#searchResult")).toContainText("For Auction — live POA auction");
+  await expect(pageAuc.locator("#searchResult")).toContainText("not a fixed-price buy");
+  await expect(pageAuc.locator("#searchResult")).toContainText("Added to your cart as a POA auction bid");
+  await expect(pageAuc.locator("#cartCount")).toHaveText("1");
+  await expect(pageAuc.locator('#cartList input[aria-label="Highest bid in POA for comet"]')).toHaveValue("220.000001");
+  await pageAuc.locator("#help-searchResult").click();
+  await expect(pageAuc.locator("#info-searchResult")).toBeVisible();
+  await expect(pageAuc.locator("#info-searchResult")).toContainText("First-bid start");
+  await expect(pageAuc.locator("#info-searchResult")).toContainText("Strict >10% increment");
+  await expect(pageAuc.locator("#info-searchResult")).toContainText("Anti-sniping extension");
+  await expect(pageAuc.locator("#info-searchResult")).toContainText("available escrow balance");
+  await expect(pageAuc.locator("#info-searchResult")).toContainText("original sending wallet");
+  await pageAuc.keyboard.press("Escape");
+  await pageAuc.locator("#cartList .cart-item .module-info").click();
+  await expect(pageAuc.locator("#cartList .cart-item .info-popover")).toContainText("unsigned POA auction bid");
+  await expect(pageAuc.locator("#cartList .cart-item .info-popover")).toContainText("anti-sniping quiet window");
+  await pageAuc.keyboard.press("Escape");
+  // Raise bid via search card and confirm re-searching "comet" preserves the higher custom cap
+  await pageAuc.locator('#searchResult input[aria-label="Highest bid in POA for comet"]').fill("260");
+  await pageAuc.locator("#addToCartBtn").click();
+  await expect(pageAuc.locator('#cartList input[aria-label="Highest bid in POA for comet"]')).toHaveValue("260");
+  await pageAuc.locator("#searchBtn").click();
+  await expect(pageAuc.locator('#cartList input[aria-label="Highest bid in POA for comet"]')).toHaveValue("260");
+  await pageAuc.locator("#clearCart").click();
+  await expect(pageAuc.locator("#cartCount")).toHaveText("0");
+
   // Auctions tab: Current shows live "comet" with countdown timer, Upcoming shows queued "vault" ("Starts on first bid")
   await pageAuc.locator("#tabAuctions").click();
   await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"]`)).toBeVisible();

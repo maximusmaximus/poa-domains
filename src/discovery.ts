@@ -595,7 +595,9 @@ export function openApiDocument(): any {
       name: t.name,
       inputSchema: ["simulate_intent", "submit_intent"].includes(t.name)
         ? ref("SignedPacket")
-        : t.inputSchema,
+        : t.name === "submit_escrow_command"
+          ? ref("EscrowSignedCommand")
+          : t.inputSchema,
       outputSchema: t.outputSchema,
     })),
   };
@@ -660,7 +662,7 @@ export function discoveryDocuments(): Record<
         API_ORIGIN +
         "/agent-cart-v2.schema.json)\n- [Escrow status](" +
         API_ORIGIN +
-        "/v1/escrow/capabilities): POA checkout status (enabled/paused/held), escrow address, limits and new-name prices.\n- [Public Domain Profiles (v1)](" +
+        "/v1/escrow/capabilities): POA checkout status (enabled/paused/held), escrow address, limits and new-name prices. Live & queued first-bid POA auctions and signed escrow commands are also available over Remote MCP (`get_escrow_capabilities`, `list_poa_auctions`, `get_escrow_intent`, `submit_escrow_command`, prompt `bid_on_poa_auction`).\n- [Public Domain Profiles (v1)](" +
         API_ORIGIN +
         "/v1/media/upload): Read profiles via MCP get_domain_profile, validate/build poa-domains.profile.v1 witnesses via build_profile_witness (POA/BTC/ETH addresses, <=280-char plain-text bio, https/ipfs image), upload PNG/JPG/WebP/GIF avatars <= 5 MB via POST /v1/media/upload, then sign and submit setMetadata. All profile fields are public, backed up to R2, and pinned to IPFS.\n- [Terms & Signed Agent Agreement](" +
         API_ORIGIN +

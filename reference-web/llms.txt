@@ -9,7 +9,7 @@
 - [Signed packet schema](https://poadomains.grok.me/schemas/signed-packet.json)
 - [MCP tool schemas](https://poadomains.grok.me/schemas/mcp-tools.json)
 - [Cart v2 schema](https://poadomains.grok.me/agent-cart-v2.schema.json)
-- [Escrow status](https://poadomains.grok.me/v1/escrow/capabilities): POA checkout status (enabled/paused/held), escrow address, limits and new-name prices.
+- [Escrow status](https://poadomains.grok.me/v1/escrow/capabilities): POA checkout status (enabled/paused/held), escrow address, limits and new-name prices. Live & queued first-bid POA auctions and signed escrow commands are also available over Remote MCP (`get_escrow_capabilities`, `list_poa_auctions`, `get_escrow_intent`, `submit_escrow_command`, prompt `bid_on_poa_auction`).
 - [Public Domain Profiles (v1)](https://poadomains.grok.me/v1/media/upload): Read profiles via MCP get_domain_profile, validate/build poa-domains.profile.v1 witnesses via build_profile_witness (POA/BTC/ETH addresses, <=280-char plain-text bio, https/ipfs image), upload PNG/JPG/WebP/GIF avatars <= 5 MB via POST /v1/media/upload, then sign and submit setMetadata. All profile fields are public, backed up to R2, and pinned to IPFS.
 - [Terms & Signed Agent Agreement](https://poadomains.grok.me/v1/terms): Read current Terms version/hash via GET /v1/terms or MCP get_terms; agents can cryptographically sign poa-domains.terms.v1 and record agreement via POST /v1/terms/agree or MCP agree_terms.
 

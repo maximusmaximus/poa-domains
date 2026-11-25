@@ -173,6 +173,55 @@ export async function mcpHttp(request: Request, env: Env, ctx?: ExecutionContext
           alreadyAgreed: saved.alreadyAgreed,
         };
       }
+      if (path.startsWith("/v1/escrow/")) {
+        const part = path.slice("/v1/escrow/".length);
+        const escrowEnabled = String(env.POA_ESCROW_ENABLED) === "true";
+        if (method === "GET" && part === "capabilities" && !escrowEnabled) {
+          return {
+            enabled: false,
+            paused: true,
+            held: true,
+            holdReason: "POA payments not open",
+            address: null,
+            limits: {
+              perTransaction: env.POA_ESCROW_PER_TX ?? "250000.000000",
+              daily: env.POA_ESCROW_DAILY ?? "1000000.000000",
+            },
+          };
+        }
+        if (!escrowEnabled) {
+          throw Object.assign(new Fault("ESCROW_DISABLED"), {
+            detail: errorEnvelope("ESCROW_DISABLED", requestId),
+          });
+        }
+        if (method === "GET" && ["capabilities", "market", "domain", "subnames", "intent"].includes(part)) {
+          try {
+            return await env.REGISTRY.getByName(SINGLETON).escrowRead(part, { ...query });
+          } catch (error) {
+            const code = error instanceof Fault ? error.code : error instanceof Error && /^ESCROW_[A-Z_]+$/.test(error.message) ? error.message : "ESCROW_UNAVAILABLE";
+            throw Object.assign(new Fault(code), { detail: errorEnvelope(code, requestId) });
+          }
+        }
+        if (method === "POST" && part === "command") {
+          const isWrite = packet?.command?.action !== "view";
+          if (isWrite && networkStatusMonitor.peekStatus().hold) {
+            throw Object.assign(new Fault("NETWORK_HELD"), {
+              detail: errorEnvelope("NETWORK_HELD", requestId),
+            });
+          }
+          try {
+            return await env.REGISTRY.getByName(SINGLETON).escrowCommand(JSON.stringify(packet), "command");
+          } catch (error) {
+            const knownCode = error instanceof Fault ? error.code : error instanceof Error && /^ESCROW_[A-Z_]+$/.test(error.message) ? error.message : null;
+            const unknown = !knownCode || knownCode === "ESCROW_UNAVAILABLE" || knownCode === "ESCROW_HELD";
+            const code = knownCode ?? "ESCROW_UNAVAILABLE";
+            throw Object.assign(new Fault(code), {
+              detail: errorEnvelope(code, requestId, { accepted: unknown && isWrite ? "unknown" : false }),
+            });
+          }
+        }
+        throw Object.assign(new Fault("ESCROW_ROUTE"), { detail: errorEnvelope("ESCROW_ROUTE", requestId) });
+      }
       const submitting = method === "POST" && path === "/v1/intents";
       if (submitting && networkStatusMonitor.peekStatus().hold)
         throw Object.assign(new Fault("NETWORK_HELD"), {

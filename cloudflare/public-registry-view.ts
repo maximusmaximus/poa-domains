@@ -8,8 +8,12 @@ import { parseJSON } from "../src/core.js";
 import { errorReply } from "../src/errors.js";
 import { registryRoute, RegistryCall, RegistryReply, RegistryRouteOptions } from "../src/registry-routes.js";
 import { PUBLIC_PROTOCOL_DOMAIN_NAMES } from "../src/protocol-domains.js";
+import { TREASURY_CRYPTO_AI_AUCTION_NAMES } from "../src/treasury-auctions.js";
 export const AUDITED_REGISTRY = "4c27c2d05c20f03e3ca1dfe90bb2cea4eb24c57b72a6a5d4074dbf15b6bbbed3";
-const protocolDomainSet = new Set<string>(PUBLIC_PROTOCOL_DOMAIN_NAMES);
+const protocolDomainSet = new Set<string>([
+  ...PUBLIC_PROTOCOL_DOMAIN_NAMES,
+  ...TREASURY_CRYPTO_AI_AUCTION_NAMES,
+]);
 // Explicit inventory approved for hiding on 2026-11-10. IDs are not record bodies.
 export const HIDDEN = {
   "deeds": [
@@ -141,16 +145,20 @@ function isPublicProtocolReceipt(e: Engine, value: unknown): boolean {
   if (hiddenReference(r, e.config.treasury)) return false;
   if (typeof r.result?.name === "string" && protocolDomainSet.has(r.result.name)) return true;
   if (typeof r.result?.deedId === "string" && !hiddenDeedSet.has(r.result.deedId)) {
-    return isPublicProtocolDeed(e, e.snapshot().deeds[r.result.deedId]);
+    const deed = e.snapshot().deeds[r.result.deedId];
+    if (deed && typeof deed.name === "string" && protocolDomainSet.has(deed.name) && !hiddenReference(deed, e.config.treasury)) {
+      return true;
+    }
   }
   return hasPublicProtocolDomains(e);
 }
 function hasPublicProtocolDomains(e: Engine): boolean {
   const s = e.snapshot();
-  return PUBLIC_PROTOCOL_DOMAIN_NAMES.some((name) => {
+  for (const name of protocolDomainSet) {
     const id = s.names[name]?.activeId;
-    return Boolean(id && isPublicProtocolDeed(e, s.deeds[id]));
-  });
+    if (id && isPublicProtocolDeed(e, s.deeds[id])) return true;
+  }
+  return false;
 }
 function isAllowedProtocolPacket(e: Engine, packet: any): boolean {
   if (!hasPublicProtocolDomains(e) || !packet || typeof packet !== "object") return false;

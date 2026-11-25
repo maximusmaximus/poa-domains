@@ -1,13 +1,13 @@
-import { copyText } from "./ui-copy.js?v=7db21850d21a";
-import { publicNameUnavailable } from "./shared.js?v=7db21850d21a";
-import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=7db21850d21a";
-import { ui } from "./ui-state.js?v=7db21850d21a";
-import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=7db21850d21a";
-import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=7db21850d21a";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=7db21850d21a";
-import { addToCart } from "./ui-cart.js?v=7db21850d21a";
-import { suggestNames } from "./ideas-generator.js?v=7db21850d21a";
-import { logSubmittedSearch } from "./ui-search-log.js?v=7db21850d21a";
+import { copyText } from "./ui-copy.js?v=a12c4f25ce0d";
+import { publicNameUnavailable } from "./shared.js?v=a12c4f25ce0d";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=a12c4f25ce0d";
+import { ui } from "./ui-state.js?v=a12c4f25ce0d";
+import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=a12c4f25ce0d";
+import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=a12c4f25ce0d";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=a12c4f25ce0d";
+import { addToCart } from "./ui-cart.js?v=a12c4f25ce0d";
+import { suggestNames } from "./ideas-generator.js?v=a12c4f25ce0d";
+import { logSubmittedSearch } from "./ui-search-log.js?v=a12c4f25ce0d";
 
 let activeSuggestionIdx = -1;
 let currentSuggestions = [];
@@ -292,9 +292,37 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
     if (poaAuction) {
         const awaiting = isPoaAuctionAwaitingFirstBid(poaAuction);
         const minNext = poaMinimumNextBid(poaAuction);
+        const existingCartItem = ui.cart.find((x) => x.action === "poaBid" && x.params?.auctionId === poaAuction.id) ?? null;
+        let autoAdded = false;
+        if (autoAdd && !existingCartItem) {
+            addToCart({
+                name,
+                action: "poaBid",
+                amount: minNext,
+                auctionId: poaAuction.id,
+            });
+            autoAdded = true;
+        }
         const cartItem = ui.cart.find((x) => x.action === "poaBid" && x.params?.auctionId === poaAuction.id) ?? null;
         const outbidInfo = poaAuctionOutbidStatus(poaAuction, { bidderAddress: ui.bidderAddress, cartItem });
-        add(card, "p", awaiting ? "⏳ POA Auction queued — starts on first bid" : "🔥 Live POA Auction", awaiting ? "badge" : "badge-ok");
+        add(card, "p", awaiting ? "🔨 For Auction — queued (timer starts on first bid)" : "🔥 For Auction — live POA auction", awaiting ? "badge" : "badge-ok");
+        add(
+            card,
+            "p",
+            autoAdded
+                ? `🔨 Added to your cart as a POA auction bid at the ${awaiting ? "opening minimum" : "current minimum"} (${poaShort(minNext)} POA). This domain is for auction, not a fixed-price buy — adjust your highest bid below or in your cart. Tap ℹ️ for how auctions work.`
+                : cartItem
+                    ? `🔨 In your cart as a POA auction bid (cap ${poaShort(cartItem.amount)} POA). This domain is for auction, not a fixed-price buy — adjust your highest bid below or in your cart. Tap ℹ️ for how auctions work.`
+                    : `🔨 This domain is for POA auction, not a fixed-price buy — enter your highest bid (at least ${poaShort(minNext)} POA) and add it to your cart. Tap ℹ️ for how auctions work.`,
+            "muted poa-search-expect",
+        );
+        const windowSec = Math.round((poaAuction.window ?? poaAuction.quiet ?? 3600000) / 1000);
+        const quietSec = Math.round((poaAuction.quiet ?? 3600000) / 1000);
+        add(
+            card,
+            "p",
+            `How POA auctions work: (1) First-bid start: queued auctions have no countdown until the first valid bid lands, which starts the ${formatDuration(windowSec)} timer. (2) Strict >10% increment: each new bid must exceed the current high bid by more than 10% (at least the ${poaShort(poaAuction.price)} POA reserve to open). (3) Anti-sniping extension: bids placed near the end extend closing by ${formatDuration(quietSec)} so last-second snipes cannot steal the auction. (4) Outbid funds & withdrawals: if another bidder outbids you, your POA immediately returns to your available escrow balance so you can re-bid right away — or withdraw anytime back only to your original sending wallet. (5) Unsigned agent ceiling & clean handover: your cart bid is a maximum ceiling for your agent (never exceeded; nothing is paid here), and prior profile fields pause during auction and reset on transfer.`,
+        ).setAttribute("data-info-description", "");
         if (outbidInfo.status === "leading")
             add(card, "p", outbidInfo.message, "auction-leading-badge");
         else if (outbidInfo.status === "outbid" || outbidInfo.status === "outbid-covered")
@@ -328,6 +356,7 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
         const btn = add(controls, "button", cartItem ? "Update cart bid" : "Add to cart", "small");
         btn.id = "addToCartBtn";
         btn.type = "button";
+        btn.setAttribute("aria-label", cartItem ? `Update cart bid for ${name} auction` : `Add to cart: ${name} auction bid`);
         const inputError = add(card, "p", "", "badge-warn");
         inputError.setAttribute("role", "alert");
         btn.addEventListener("click", () => {
@@ -343,7 +372,8 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
                     amount: exact,
                     auctionId: poaAuction.id,
                 });
-                btn.textContent = "✅ Added to cart";
+                btn.textContent = "✅ Bid updated";
+                btn.setAttribute("aria-label", `Bid updated for ${name} auction`);
             } catch (e) {
                 inputError.textContent = e?.message || `⚠️ Enter at least ${poaShort(minNext)} POA.`;
                 bidInput.setAttribute("aria-invalid", "true");

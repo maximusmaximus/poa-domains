@@ -155,6 +155,7 @@ export function replay(rows: Entry[], policy: Policy): State {
   return structuredClone(s);
 }
 export class SQLiteEscrowJournal implements Journal {
+  private cached?: { sequence: number; checksum: string; state: State };
   constructor(private storage: DurableObjectStorage, private policy: Policy) {
     storage.sql.exec("CREATE TABLE IF NOT EXISTS escrow_journal (sequence INTEGER PRIMARY KEY, record TEXT NOT NULL); CREATE TABLE IF NOT EXISTS escrow_policy (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL)");
     const saved = storage.sql.exec<{value:string}>("SELECT value FROM escrow_policy WHERE id=1").toArray()[0];
@@ -162,15 +163,43 @@ export class SQLiteEscrowJournal implements Journal {
     if(saved && hasLedger) need(saved.value === canonical(policy),"ESCROW_POLICY_CHANGED");
     else storage.sql.exec("INSERT OR REPLACE INTO escrow_policy(id,value) VALUES (1,?)",canonical(policy));
   }
+  private latestSeq(): number {
+    const r = this.storage.sql.exec<{seq:number|null}>("SELECT MAX(sequence) AS seq FROM escrow_journal").one();
+    return r.seq === null ? 0 : Number(r.seq);
+  }
   rows(): Entry[] { return this.storage.sql.exec<{record:string}>("SELECT record FROM escrow_journal ORDER BY sequence").toArray().map(r=>JSON.parse(r.record) as Entry); }
-  load(): State { return replay(this.rows(),this.policy); }
+  load(): State {
+    const seq = this.latestSeq();
+    if(this.cached && this.cached.sequence === seq) return structuredClone(this.cached.state);
+    const rows = this.rows();
+    const state = replay(rows, this.policy);
+    const checksum = rows.at(-1)?.checksum ?? digest(["escrow-genesis/v1", state.policy]);
+    this.cached = { sequence: state.sequence, checksum, state: structuredClone(state) };
+    return state;
+  }
   append(event:string,payload:unknown,change:(s:State)=>void): State {
-    return this.storage.transactionSync(()=>{
-      const rows=this.rows(),s=replay(rows,this.policy);
-      // Admission budgets include recovery; legacy financial drains may exceed the old cap.
-      const e=nextEntry(s,rows.at(-1)?.checksum ?? digest(["escrow-genesis/v1",s.policy]),event,payload,change,this.policy);
-      this.storage.sql.exec("INSERT INTO escrow_journal(sequence,record) VALUES (?,?)",e.sequence,canonical(e)); return e.state;
-    });
+    try {
+      return this.storage.transactionSync(()=>{
+        const seq = this.latestSeq();
+        let s: State, prev: string;
+        if(this.cached && this.cached.sequence === seq) {
+          s = structuredClone(this.cached.state);
+          prev = this.cached.checksum;
+        } else {
+          const rows = this.rows();
+          s = replay(rows, this.policy);
+          prev = rows.at(-1)?.checksum ?? digest(["escrow-genesis/v1", s.policy]);
+        }
+        // Admission budgets include recovery; legacy financial drains may exceed the old cap.
+        const e=nextEntry(s,prev,event,payload,change,this.policy);
+        this.storage.sql.exec("INSERT INTO escrow_journal(sequence,record) VALUES (?,?)",e.sequence,canonical(e));
+        this.cached = { sequence: e.sequence, checksum: e.checksum, state: structuredClone(e.state) };
+        return e.state;
+      });
+    } catch (error) {
+      this.cached = undefined;
+      throw error;
+    }
   }
 }
 export class Escrow {
@@ -185,6 +214,64 @@ export class Escrow {
   }
   state(): State { return this.journal.load(); }
   titleLocked(): boolean { return Object.values(this.state().auctions).some(a=>a.status==="OPEN"||a.status==="SETTLING"); }
+  /**
+   * Idempotently open first-bid POA auctions for Treasury-owned inventory in a single atomic
+   * journal entry (zero POA moved, timer starts on first bid). Never re-lists previously seeded,
+   * active, settled, or cancelled auctions and fails closed if escrow is disabled or halted.
+   */
+  seedInventoryAuctions(seller: string, items: readonly { name: string; reserve: string }[]): string[] {
+    need(this.enabled(), "ESCROW_DISABLED");
+    address(seller);
+    need(seller !== this.policy.wallet, "ESCROW_SELF_DEPOSIT");
+    const s0 = this.state();
+    if (s0.halt) return [];
+    const eligible: { id: string; name: string; reserveMicros: string; window: number; quiet: number }[] = [];
+    const seenNames = new Set<string>();
+    for (const item of items) {
+      const name = text(item.name, 256);
+      if (seenNames.has(name)) continue;
+      seenNames.add(name);
+      const id = digest(["treasury-inventory-auction-v1", seller, name]);
+      if (s0.auctions[id]) continue;
+      if (Object.values(s0.auctions).some((a) => a.name === name && (a.status === "OPEN" || a.status === "SETTLING"))) continue;
+      if (Object.values(s0.subListings ?? {}).some((l) => l.parent === name && l.status === "OPEN")) continue;
+      let terms: { reserve: string; window: number; quiet: number };
+      try { terms = this.titles.terms(name, seller); } catch { continue; }
+      const rMicros = micros(item.reserve);
+      if (rMicros < micros(terms.reserve) || rMicros > micros(this.policy.perTx)) continue;
+      eligible.push({ id, name, reserveMicros: String(rMicros), window: terms.window, quiet: terms.quiet });
+    }
+    if (!eligible.length) return [];
+    const now = this.now();
+    const opened: string[] = [];
+    this.journal.append("open-inventory", { seller, count: eligible.length }, (s) => {
+      need(this.enabled(), "ESCROW_DISABLED");
+      need(!s.halt, "ESCROW_HALTED");
+      need(s.sequence < PILOT_ADMISSION_LIMIT, "ESCROW_JOURNAL_CAPACITY");
+      for (const item of eligible) {
+        if (s.auctions[item.id]) continue;
+        if (Object.values(s.auctions).some((a) => a.name === item.name && (a.status === "OPEN" || a.status === "SETTLING"))) continue;
+        if (Object.values(s.subListings ?? {}).some((l) => l.parent === item.name && l.status === "OPEN")) continue;
+        s.auctions[item.id] = {
+          id: item.id,
+          name: item.name,
+          seller,
+          reserve: item.reserveMicros,
+          kind: "auction",
+          createdAt: now,
+          window: item.window,
+          startedAt: null,
+          history: [{ event: "Auction queued; timer starts on first bid", at: now }],
+          closes: 0,
+          quiet: item.quiet,
+          high: null,
+          status: "OPEN",
+        };
+        opened.push(item.id);
+      }
+    });
+    return opened;
+  }
   private gate(): void { need(this.enabled(),"ESCROW_DISABLED"); const s=this.state(); need(!s.paused&&!pendingPauses.has(this.journal),"ESCROW_PAUSED"); need(!s.halt,"ESCROW_HALTED"); }
   pause(paused:boolean): Promise<void> {
     need(this.enabled(),"ESCROW_DISABLED"); need(typeof paused==="boolean","ESCROW_PAUSE");

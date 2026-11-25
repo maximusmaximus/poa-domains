@@ -185,6 +185,37 @@ export const PACKET_SCHEMA: Schema = objectSchema({
     },
   },
 });
+export const ESCROW_PUBLIC_ACTIONS = [
+  "view",
+  "intent",
+  "detect",
+  "withdraw",
+  "open",
+  "list",
+  "bid",
+  "buy",
+  "cancel",
+  "expire",
+  "settle",
+  "repair-title",
+  "issue",
+  "list-sub",
+  "cancel-sub",
+  "buy-sub",
+] as const;
+export const ESCROW_COMMAND_SCHEMA: Schema = objectSchema({
+  command: objectSchema({
+    domain: { const: "poa-domains.escrow.v1" },
+    chainId: { const: "poa-mainnet-1" },
+    registryId: ID,
+    actor: { type: "string", maxLength: 80, pattern: "^poa1[1-9A-HJ-NP-Za-km-z]{32,50}$" },
+    key: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,64}$" },
+    expires: UINT,
+    action: { type: "string", enum: [...ESCROW_PUBLIC_ACTIONS] },
+    params: { type: "object" },
+  }),
+  signature: { type: "string", pattern: "^[1-9A-HJ-NP-Za-km-z]{64,100}$" },
+});
 /** Deliberately small, eval-free validator for the schema keywords used above.
  * Tests cross-check it against Ajv 2020. No schemas are supplied by callers. */
 export function matches(schema: Schema, value: any): boolean {
