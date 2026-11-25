@@ -341,6 +341,39 @@
         "cloudflare/test/display-freshness-runtime.mjs",
         "cloudflare/test/escrow-admin-runtime.mjs"
       ]
+    },
+    {
+      "at": "2026-11-25T18:27:18.999Z",
+      "classification": "needs-update",
+      "reasons": [
+        "client bundle changed since the recorded surface snapshot; no breaking surface change found"
+      ],
+      "from": {
+        "engine": "50464775560a94f49bbe4dae92b932c8fa7cf2c9239f2abdd31020d24c107511",
+        "params": "552ccbddc8671c390dd3dfd1774e4e7d64345775f8c47ec2c7e5191738a98f71",
+        "client": "50464775560a94f49bbe4dae92b932c8fa7cf2c9239f2abdd31020d24c107511",
+        "release": "v0.134.1-s5b-e127"
+      },
+      "to": {
+        "engine": "50464775560a94f49bbe4dae92b932c8fa7cf2c9239f2abdd31020d24c107511",
+        "params": "552ccbddc8671c390dd3dfd1774e4e7d64345775f8c47ec2c7e5191738a98f71",
+        "client": "50464775560a94f49bbe4dae92b932c8fa7cf2c9239f2abdd31020d24c107511",
+        "clientSize": 481748,
+        "clientLastModified": "Wed, 25 Nov 2026 13:57:57 GMT",
+        "release": "v0.134.1-s5b-e127",
+        "releaseTxid": "dac3b266b99ae96c3d0986136578558f2cec4a6a427004daf047c6e3fb6efcce"
+      },
+      "sources": {
+        "facts": "https://minepoa.com/chain/poa-mainnet-1/api/network-facts",
+        "release": "https://minepoa.com/api/release",
+        "client": "https://minepoa.com/chain/poa-mainnet-1/client/poa.mjs"
+      },
+      "surface": {
+        "state": "unchanged"
+      },
+      "files": [
+        ".poa-compat/surface.json"
+      ]
     }
   ],
   "selftestAt": "2026-11-21T23:44:00.280Z"

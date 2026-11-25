@@ -129,6 +129,8 @@ export function checkoutPlan(expected, liveBindings) {
 // network-facts advertised engine 50464775… / params 806fc3a0…. The official release manifest current still listed v0.133-t1-k124 / a221f58a… / 8274922e….
 // Structural diff against the a221f58a surface snapshot: 0 breaking, 1 review (blobFor gained an optional trailing parameter; this project does not use blobFor), 19 informational
 // (additional state-blob/sig helper exports and non-transfer body/params fields). Canonical encoding, signBody/verifyBody, txidOf, transfer body and receipt code unchanged.
+// Same 481,748-byte client (Last-Modified 2026-11-25T13:57:57Z) re-hashed on the box on Nov 25 2026 while network-facts advertised
+// engine 50464775… (unchanged) / params 552ccbdd…. Release current is v0.134.1-s5b-e127. Client surface unchanged; engine remains in this allowlist.
 export const REPIN_CLIENT_EVIDENCE = Object.freeze({
   "e01abd959dd0439dd89af8e8c187d1bed3897deb2a855a615e7dfa2d0222f1fb": true,
   "92658c61bc75d24572b8eef6182af27436a4f00019854718dcf0de3c6d2b54f6": true,
