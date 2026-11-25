@@ -1,12 +1,12 @@
-import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, profileImageMediaPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=c513cd0e5a09";
-import { ui } from "./ui-state.js?v=c513cd0e5a09";
-import { createPoaCopyButton } from "./ui-copy.js?v=c513cd0e5a09";
-import { add, el } from "./ui-core.js?v=c513cd0e5a09";
-import { runSearch } from "./ui-search.js?v=c513cd0e5a09";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=c513cd0e5a09";
-import { updateTabDots } from "./ui-render.js?v=c513cd0e5a09";
-import { syncCartShortcutNow } from "./ui-cart.js?v=c513cd0e5a09";
-import { renderManagement } from "./ui-manage.js?v=c513cd0e5a09";
+import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, profileImageMediaPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=7db21850d21a";
+import { ui } from "./ui-state.js?v=7db21850d21a";
+import { createPoaCopyButton } from "./ui-copy.js?v=7db21850d21a";
+import { add, el } from "./ui-core.js?v=7db21850d21a";
+import { runSearch } from "./ui-search.js?v=7db21850d21a";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=7db21850d21a";
+import { updateTabDots } from "./ui-render.js?v=7db21850d21a";
+import { syncCartShortcutNow } from "./ui-cart.js?v=7db21850d21a";
+import { renderManagement } from "./ui-manage.js?v=7db21850d21a";
 
 const LAST_POA_KEY = "poadomains.lastPoaAddress.v1";
 
@@ -301,14 +301,15 @@ function syncAdvancedLink() {
 }
 
 export function openAdvanced() {
-    if (ui.route.kind !== "home") {
+    const fromSubpage = ui.route.kind !== "home";
+    if (fromSubpage) {
         closeOverlaysBeforeNavigate();
         ui.route = { kind: "home" };
         ui.currentDomainName = null;
         ui.currentOwnerId = null;
         applyRoute();
     }
-    setSectionTab("handoff", true);
+    setSectionTab("handoff", true, fromSubpage ? "/" : undefined);
     const section = el("handoffSection");
     section?.scrollIntoView?.({ block: "start" });
     section?.focus?.({ preventScroll: true });
@@ -348,10 +349,10 @@ export function applyRoute() {
     syncAdvancedLink();
 }
 
-export function setSectionTab(tabId, markSeen = true) {
+export function setSectionTab(tabId, markSeen = true, path = location.pathname) {
     ui.activeSectionTab = tabId;
     if (markSeen)
-        writeViewURL(ui.route.kind === "home" ? "/" : location.pathname);
+        writeViewURL(path);
     const tabBtns = [...document.querySelectorAll(".section-tab")];
     const hasActiveTab = tabBtns.some((b) => b.getAttribute("data-tab") === tabId);
     tabBtns.forEach((btn, idx) => {
