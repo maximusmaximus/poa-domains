@@ -328,8 +328,21 @@ test("payout context on the current receipt shape: nonce from the journal-bound 
  // Explorer record or receipt missing (404 + paused chain mirror) => held.
  await assert.rejects(build({extra:{[`/api/explorer/tx/${outId}`]:undefined}}).context(W));
  await assert.rejects(build({extra:{[`/api/receipt/${outId}`]:undefined}}).context(W));
- // No outgoing tx visible at all => the wallet is not an enrolled sender; hold.
- await assert.rejects(build({addr:{address:W,txs:[row(incoming)]}}).context(W),/ESCROW_ENROLLED_SENDER_REQUIRED/);
+ // No outgoing tx visible at all: funded, aligned, untruncated strictly-incoming wallet starts at nonce 1;
+ // anything missing balance/alignment, empty, truncated (>=100 rows), or malformed still holds fail-closed.
+ const firstPayoutAddr={address:W,balance:"9.000000",balance_as_of:{checkpoint_height:10},txs:[row(incoming)]};
+ const firstCtx=await build({addr:firstPayoutAddr}).context(W);
+ assert.equal(firstCtx.nextNonce,1);assert.deepEqual(firstCtx.parents,[p1,p2]);
+ for(const [label,addr] of [
+  ["missing balance/cut",{address:W,txs:[row(incoming)]}],
+  ["zero balance",{...firstPayoutAddr,balance:"0.000000"}],
+  ["unaligned checkpoint",{...firstPayoutAddr,balance_as_of:{checkpoint_height:9}}],
+  ["empty txs",{...firstPayoutAddr,txs:[]}],
+  ["truncated 100 txs",{...firstPayoutAddr,txs:Array.from({length:100},(_,i)=>row(incoming,{ts:CUTOFF_V2+100-i}))}],
+  ["row missing from_addr",{...firstPayoutAddr,txs:[row(incoming,{from_addr:undefined})]}],
+ ] as const) await assert.rejects(build({addr}).context(W),/ESCROW_ENROLLED_SENDER_REQUIRED/,label);
+ // If the journal already knows a prior outgoing tx, missing it in explorer must never fall back to nonce 1.
+ await assert.rejects(build({addr:firstPayoutAddr}).context(W,outId),/ESCROW_ENROLLED_SENDER_REQUIRED|ESCROW_NONCE_CONTEXT/);
  // Parents must be final in the listing and included in their receipt.
  await assert.rejects(build({list:[{id:p1,final:1},{id:p0,final:0},{id:p2,final:0}]}).context(W),/ESCROW_PARENTS/);
  await assert.rejects(build({list:[{id:p1,final:1},{id:p1,final:1}]}).context(W),/ESCROW_PARENTS/);
@@ -1243,4 +1256,116 @@ test("per-domain escrowPacketBlocked scopes locks to reserved domains & emoji cl
  assert.equal(e.state().auctions[opened.auction]!.status,"COMPLETE");
  assert.equal(owner(engine,"👩‍🦰"),who(3));
  assert.equal(escrowPacketBlocked(e.state(),engine,sellerStarWrite),false);
+});
+
+test("multi-auction seller handover protection, active-settlement payout priority, and single-payout Treasury settle",async()=>{
+ const journal=new MemoryJournal(policy),net=new MockNetwork();
+ const refEngine=new Engine(mainnetConfig(who(6),who(5),[who(2),who(3),who(4)]),{now:()=>Math.floor(net.now/1000)});
+ const owners:Record<string,string>={a1:who(2),a2:who(2),a3:who(2),t1:who(5)};
+ let failTitleFor:string|null=null;
+ const titles={
+  terms:(name:string,seller:string)=>{if(owners[name]!==seller)throw Error("ESCROW_TITLE");return {reserve:"1.000000",window:1000,quiet:1000};},
+  validate:(p:any,name:string,seller:string,buyer:string)=>{
+   if(failTitleFor===name)throw Error("ESCROW_TITLE_NOT_READY");
+   if(!(p.body.params.name===name&&p.body.signer===seller&&p.body.params.recipient===buyer&&owners[name]===seller))throw Error("ESCROW_TITLE_NOT_READY");
+  },
+  commit:(p:any)=>{owners[p.body.params.name]=p.body.params.recipient;},
+  issueTerms:()=>({price:"100000000"}),
+  validateIssue:()=>{},
+  issue:()=>{},
+ };
+ const e=new Escrow(journal,net,signer(),titles,policy,()=>net.now,()=>true,undefined,()=>true);
+ await e.pause(false);
+ const f={e,journal,net};
+ await fund(f as any,3,"300.000000","b3");
+ await fund(f as any,4,"50.000000","b4");
+ const xfer=(sellerIdx:number,name:string,buyerIdx:number,reqId:string)=>signBody({
+  domain:"poa-domains.local.intent.v1",revision:refEngine.config.revision,chainId:CHAIN,genesisHash:refEngine.config.genesisHash,
+  registryId:refEngine.registryId,policyHash:refEngine.policyHash,normalizationHash:refEngine.config.normalizationHash,
+  signer:who(sellerIdx),coSigners:[],requestId:reqId,nonce:0,notBefore:0,deadline:2000000000,
+  maxTotal:"0",maxNetworkFee:"0",action:"transfer",params:{name,expectedDeedId:"0".repeat(64),expectedVersion:1,recipient:who(buyerIdx)},
+ },[key(sellerIdx)]);
+
+ // Queue an already-delivered issue payout ("issue-..." sorts alphabetically before "seller-...").
+ const reg=signBody({
+  domain:"poa-domains.local.intent.v1",revision:refEngine.config.revision,chainId:CHAIN,genesisHash:refEngine.config.genesisHash,
+  registryId:refEngine.registryId,policyHash:refEngine.policyHash,normalizationHash:refEngine.config.normalizationHash,
+  signer:who(3),coSigners:[],requestId:"issue-fresh",nonce:0,notBefore:0,deadline:2000000000,
+  maxTotal:"0",maxNetworkFee:"0",action:"issueFromTreasury",
+  params:{name:"fresh1",asset:"POA",price:"100000000",expectedDeedId:null,expectedVersion:0,metadata:buildMetadataWitness("fresh1",{kind:"permanent"},null,"Fresh")},
+ },[key(3)]);
+ const issued=await e.command(command(who(3),"issue-1","issue",{name:"fresh1",amount:"100.000000",registration:reg})) as any;
+
+ // Seller who(2) opens three auctions (a1, a2, a3) that all get bids and close together.
+ const o1=await e.command(command(who(2),"o1","open",{name:"a1",reserve:"1.000000"})) as any;
+ const o2=await e.command(command(who(2),"o2","open",{name:"a2",reserve:"1.000000"})) as any;
+ const o3=await e.command(command(who(2),"o3","open",{name:"a3",reserve:"1.000000"})) as any;
+ await e.command(command(who(3),"bid-a1","bid",{auction:o1.auction,amount:"10.000000"}));
+ await e.command(command(who(3),"bid-a2","bid",{auction:o2.auction,amount:"10.000000"}));
+ await e.command(command(who(4),"bid-a3","bid",{auction:o3.auction,amount:"10.000000"}));
+ net.now+=1001; // all three closed
+
+ // Seller starts settling a1; cannot settle a2 concurrently, and a2/a3 must NOT expire while a1 is SETTLING.
+ await e.command(command(who(2),"settle-a1","settle",{auction:o1.auction,transfer:xfer(2,"a1",3,"x-a1")}));
+ await assert.rejects(e.command(command(who(2),"settle-a2-early","settle",{auction:o2.auction,transfer:xfer(2,"a2",3,"x-a2")})),/ESCROW_TITLE_RESERVED/);
+ net.now+=2500; // well past original closes + quiet for a2 and a3
+ await assert.rejects(e.command(command(who(4),"snipe-a2","expire",{auction:o2.auction})),/ESCROW_CANCEL_NOT_ALLOWED/);
+
+ // First tick must prioritize a1's active SETTLING seller payout ahead of the earlier "issue-..." payout,
+ // AND must NOT auto-expire a2 or a3 while a1 is SETTLING.
+ await e.tick();
+ assert.equal(e.state().auctions[o2.auction]!.status,"OPEN");
+ assert.equal(e.state().auctions[o3.auction]!.status,"OPEN");
+ assert.equal(e.state().payments[`seller-${o1.auction}`]!.status,"UNKNOWN");
+ assert.equal(e.state().payments[issued.payment]!.status,"READY","issue payout waits behind active SETTLING handover");
+
+ // Finish a1 -> title commits AND a2/a3 receive a fresh handoverUntil grace window so an immediate tick/expire never cancels them!
+ await e.tick(); // seller final + fee unknown
+ await e.tick(); // fee final + a1 COMPLETE + extends a2/a3 handoverUntil
+ assert.equal(e.state().auctions[o1.auction]!.status,"COMPLETE");
+ assert.equal(owners.a1,who(3));
+ assert.equal(e.state().auctions[o2.auction]!.status,"OPEN");
+ assert.equal(e.state().auctions[o3.auction]!.status,"OPEN");
+ assert.ok((e.state().auctions[o2.auction]!.handoverUntil??0)>=net.now+1000);
+ await assert.rejects(e.command(command(who(4),"snipe-a2-after","expire",{auction:o2.auction})),/ESCROW_CANCEL_NOT_ALLOWED/);
+
+ // Seller settles a2 via repair-title path (simulate expired consent -> TITLE_PENDING -> repair-title -> COMPLETE),
+ // verifying repair-title also extends a3's handoverUntil!
+ await e.command(command(who(2),"settle-a2","settle",{auction:o2.auction,transfer:xfer(2,"a2",3,"x-a2")}));
+ failTitleFor="a2";
+ for(let i=0;i<5;i++)await e.tick();
+ assert.equal(e.state().settlements[o2.auction]!.status,"TITLE_PENDING");
+ net.now+=2500;
+ await e.tick(); // a3 still protected while a2 is SETTLING (TITLE_PENDING)
+ assert.equal(e.state().auctions[o3.auction]!.status,"OPEN");
+ failTitleFor=null;
+ await e.command(command(who(2),"repair-a2","repair-title",{auction:o2.auction,transfer:xfer(2,"a2",3,"x-a2-repair")}));
+ assert.equal(e.state().auctions[o2.auction]!.status,"COMPLETE");
+ assert.equal(owners.a2,who(3));
+ assert.ok((e.state().auctions[o3.auction]!.handoverUntil??0)>=net.now+1000);
+
+ // If seller genuinely abandons a3 past its extended handoverUntil with no SETTLING auction, a3 auto-expires cleanly.
+ net.now+=1500;
+ await e.tick();
+ assert.equal(e.state().auctions[o3.auction]!.status,"CANCELLED");
+ assert.ok(e.state().payments[`cancel-${o3.auction}`]);
+
+ // Treasury-owned auction (seller === policy.treasury) collapses seller + fee into ONE single treasury payout.
+ const ot=await e.command(command(who(5),"ot1","open",{name:"t1",reserve:"5.000000"})) as any;
+ await e.command(command(who(3),"bid-t1","bid",{auction:ot.auction,amount:"20.000000"}));
+ net.now+=1001;
+ assert.equal(e.hasActiveWork(who(5)),true);
+ await e.command(command(who(5),"settle-t1","settle",{auction:ot.auction,transfer:xfer(5,"t1",3,"x-t1")}));
+ const tSettlement=e.state().settlements[ot.auction]!;
+ assert.deepEqual(tSettlement.payments,[`seller-${ot.auction}`]);
+ assert.equal(e.state().payments[`seller-${ot.auction}`]!.amount,"20000000");
+ assert.equal(e.state().payments[`fee-${ot.auction}`],undefined);
+ assert.equal(e.hasActiveWork(who(5)),true);
+ for(let i=0;i<5;i++)await e.tick();
+ assert.equal(e.state().auctions[ot.auction]!.status,"COMPLETE");
+ assert.equal(owners.t1,who(3));
+ assert.equal(e.hasActiveWork(who(5)),false);
+ await e.pause(true);
+ assert.equal(e.hasActiveWork(who(5)),false);
+ invariant(e.state());
 });

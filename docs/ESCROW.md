@@ -131,8 +131,11 @@ transactions at the same checkpoint cut, not open-window balances. An unsupporte
 response schema, missing freshness/chain/cutoff/receipt context, stale status, fee
 change, inconsistent cut, nonce gap, unavailable node, or asset mismatch holds writes.
 The native context reader deliberately refuses oversized snapshots (>8 MB) or an
-unestablished enrolled-sender nonce rather than guessing. These guards may prevent
-operation against a node that omits required observations. Source `stale: false`
+unestablished sender nonce rather than guessing: a brand-new escrow wallet with zero
+prior outgoing transfers may start at `nonce: 1` only when our journal has never
+finalized an outgoing transfer and the checkpoint-aligned, funded, non-empty,
+untruncated (`< 100` rows) explorer listing shows strictly incoming transactions. These
+guards may prevent operation against a node that omits required observations. Source `stale: false`
 and a recent valid `as_of` are required; observing a checkpoint locally never
 substitutes for source freshness.
 

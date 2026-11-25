@@ -299,10 +299,25 @@ export class PoaHttpNetwork implements Network {
     const explorerTxId=own.txs.find((t:any)=>t?.from_addr===wallet)?.id;
     const candidateIds=[explorerTxId,knownTxid].filter((x):x is string=>typeof x==="string"&&/^[0-9a-f]{64}$/.test(x));
     const firstId=candidateIds[0];
-    need(typeof firstId==="string","ESCROW_ENROLLED_SENDER_REQUIRED");
-    const first=await this.getReceipt(firstId);
-    const legacy=first!==null&&typeof first==="object"&&(first.from!==undefined||first.next_nonce!==undefined);
-    const nextNonce=legacy?await this.legacyNonce(wallet,candidateIds):await this.explorerNonce(wallet,own.txs,knownTxid);
+    let nextNonce:number;
+    if(typeof firstId==="string"){
+      const first=await this.getReceipt(firstId);
+      const legacy=first!==null&&typeof first==="object"&&(first.from!==undefined||first.next_nonce!==undefined);
+      nextNonce=legacy?await this.legacyNonce(wallet,candidateIds):await this.explorerNonce(wallet,own.txs,knownTxid);
+    } else {
+      // PoA mainnet transfers start at nonce 1 without requiring a prior `join` tx (`nonces.get(from) ?? 0`).
+      // Allow nonce 1 only when our journal has no finalized outgoing tx, the address listing is non-empty and
+      // untruncated (<100 rows), aligned to the current checkpoint cut, funded, and strictly incoming.
+      need(
+        knownTxid===undefined &&
+        own.txs.length>0 && own.txs.length<100 &&
+        own.balance_as_of?.checkpoint_height===s.height &&
+        typeof own.balance==="string" && micros(own.balance)>0n &&
+        own.txs.every((t:any)=>t&&typeof t==="object"&&typeof t.from_addr==="string"&&t.from_addr!==wallet),
+        "ESCROW_ENROLLED_SENDER_REQUIRED",
+      );
+      nextNonce=1;
+    }
     const list=await this.getFirst(["/api/explorer/txs",`/chain/${CHAIN}/api/explorer/txs`]);
     need(Array.isArray(list),"ESCROW_PARENTS");const parents:string[]=[];
     for(const t of list.slice(0,8)){

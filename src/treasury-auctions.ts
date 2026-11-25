@@ -1,10 +1,11 @@
-import type { KeyObject } from "node:crypto";
+import { sign, type KeyObject } from "node:crypto";
 import { Body, DOMAIN, Packet, signBody } from "./auth.js";
-import { need } from "./core.js";
+import { canonical, need } from "./core.js";
 import { Engine } from "./engine.js";
 import { cidFor } from "./metadata.js";
 import { Receipt, rightsHash } from "./model.js";
 import { normalizeName } from "./names.js";
+import { base58 } from "./native-crypto.js";
 import { POA_NEW_NAME_PRICES } from "./new-name-prices.js";
 import { BootableSystemClock } from "./seed.js";
 
@@ -203,4 +204,131 @@ export function provisionTreasuryAuctionDomains(
     clock.overrideTime = prevOverride;
   }
   return provisioned;
+}
+
+export interface TreasuryHandoverAuctionView {
+  id: string;
+  name: string;
+  seller: string;
+  status: "OPEN" | "CANCELLED" | "SETTLING" | "COMPLETE";
+  closes: number;
+  high: { payer: string; amount: string } | null;
+}
+
+export interface TreasuryHandoverSettlementView {
+  status: "PAYING" | "TITLE_PENDING" | "COMPLETE";
+  packet?: { body?: { deadline?: number } } | null;
+}
+
+export interface TreasuryHandoverCommand {
+  action: "settle" | "repair-title";
+  auctionId: string;
+  name: string;
+  packet: {
+    command: {
+      domain: "poa-domains.escrow.v1";
+      chainId: string;
+      registryId: string;
+      actor: string;
+      key: string;
+      expires: number;
+      action: "settle" | "repair-title";
+      params: { auction: string; transfer: Packet };
+    };
+    signature: string;
+  };
+}
+
+/**
+ * Pick the next Treasury auction handover to submit (auto-repairing TITLE_PENDING or
+ * expiring PAYING consents first, otherwise settling the earliest closed won auction)
+ * and build the locally signed escrow command + 7-day registry transfer packet.
+ */
+export function buildTreasuryAutoHandover(input: {
+  engine: Engine;
+  treasuryKey: KeyObject;
+  auctions: Record<string, TreasuryHandoverAuctionView>;
+  settlements: Record<string, TreasuryHandoverSettlementView>;
+  nowMs: number;
+  chainId?: string;
+}): TreasuryHandoverCommand | null {
+  const { engine, treasuryKey, auctions, settlements, nowMs, chainId = "poa-mainnet-1" } = input;
+  const treasury = engine.config.treasury;
+  const snap = engine.snapshot();
+  const nowSec = Math.max(Math.floor(nowMs / 1000), snap.time);
+
+  let target: { id: string; name: string; high: { payer: string; amount: string } } | null = null;
+  let action: "settle" | "repair-title" = "settle";
+
+  const settling = Object.values(auctions).find((a) => a.status === "SETTLING" && a.seller === treasury);
+  if (settling) {
+    const st = settlements[settling.id];
+    const deadline = st?.packet?.body?.deadline;
+    const needsRepair =
+      Boolean(st && settling.high) &&
+      (st!.status === "TITLE_PENDING" ||
+        (st!.status === "PAYING" && (typeof deadline !== "number" || deadline <= nowSec + 600)));
+    if (!needsRepair || !settling.high) return null;
+    target = { id: settling.id, name: settling.name, high: settling.high };
+    action = "repair-title";
+  } else {
+    const ready = Object.values(auctions)
+      .filter((a) => a.status === "OPEN" && a.seller === treasury && a.high !== null && a.closes > 0 && nowMs >= a.closes)
+      .sort((a, b) => a.closes - b.closes || a.id.localeCompare(b.id))[0];
+    if (!ready || !ready.high) return null;
+    target = { id: ready.id, name: ready.name, high: ready.high };
+    action = "settle";
+  }
+
+  const deedId = snap.names[target.name]?.activeId;
+  const deed = deedId ? snap.deeds[deedId] : null;
+  if (!deed || deed.owner !== treasury || deed.retired) return null;
+
+  const requestId =
+    action === "repair-title"
+      ? `treasury-repair-${target.id.slice(0, 24)}-${nowSec}`
+      : `treasury-settle-${target.id.slice(0, 32)}`;
+  const key =
+    action === "repair-title"
+      ? `treasury_repair_${target.id.slice(0, 24)}_${nowSec}`
+      : `treasury_settle_${target.id.slice(0, 44)}`;
+  const transfer = signBody(
+    {
+      domain: DOMAIN,
+      revision: engine.config.revision,
+      chainId: engine.config.chainId,
+      genesisHash: engine.config.genesisHash,
+      registryId: engine.registryId,
+      policyHash: engine.policyHash,
+      normalizationHash: engine.config.normalizationHash,
+      signer: treasury,
+      coSigners: [],
+      requestId,
+      nonce: engine.nextNonce(treasury),
+      notBefore: 0,
+      deadline: nowSec + 7 * 86400,
+      maxTotal: "0",
+      maxNetworkFee: "0",
+      action: "transfer",
+      params: {
+        name: target.name,
+        expectedDeedId: deed.id,
+        expectedVersion: deed.version,
+        recipient: target.high.payer,
+      },
+    },
+    [treasuryKey],
+  );
+  const command = {
+    domain: "poa-domains.escrow.v1" as const,
+    chainId,
+    registryId: engine.registryId,
+    actor: treasury,
+    key,
+    expires: nowSec + 600,
+    action,
+    params: { auction: target.id, transfer },
+  };
+  const signature = base58(sign(null, Buffer.from(canonical(command)), treasuryKey));
+  return { action, auctionId: target.id, name: target.name, packet: { command, signature } };
 }
