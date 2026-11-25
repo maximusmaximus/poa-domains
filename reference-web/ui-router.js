@@ -1,12 +1,12 @@
-import { domainPath, isPoaAddress, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=33e97c0bc9b7";
-import { ui } from "./ui-state.js?v=33e97c0bc9b7";
-import { createPoaCopyButton } from "./ui-copy.js?v=33e97c0bc9b7";
-import { add, el } from "./ui-core.js?v=33e97c0bc9b7";
-import { runSearch } from "./ui-search.js?v=33e97c0bc9b7";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=33e97c0bc9b7";
-import { updateTabDots } from "./ui-render.js?v=33e97c0bc9b7";
-import { syncCartShortcutNow } from "./ui-cart.js?v=33e97c0bc9b7";
-import { renderManagement } from "./ui-manage.js?v=33e97c0bc9b7";
+import { domainPath, isPoaAddress, parseDomainPath, parseOwnerPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=9e213075b5f0";
+import { ui } from "./ui-state.js?v=9e213075b5f0";
+import { createPoaCopyButton } from "./ui-copy.js?v=9e213075b5f0";
+import { add, el } from "./ui-core.js?v=9e213075b5f0";
+import { runSearch } from "./ui-search.js?v=9e213075b5f0";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=9e213075b5f0";
+import { updateTabDots } from "./ui-render.js?v=9e213075b5f0";
+import { syncCartShortcutNow } from "./ui-cart.js?v=9e213075b5f0";
+import { renderManagement } from "./ui-manage.js?v=9e213075b5f0";
 
 /** Open Manage domains tab, prefill the owner address, and focus a specific domain card. */
 export function openManageDomain(name, ownerId) {
@@ -188,6 +188,13 @@ export function setSectionTab(tabId, markSeen = true) {
         const on = section.getAttribute("data-section") === tabId;
         section.classList.toggle("is-active-section", on);
         section.hidden = !on;
+    }
+    if (tabId === "escrow") {
+        const ownerField = el("manageOwner");
+        if (ownerField && !ownerField.value.trim() && ui.knownOwner) {
+            ownerField.value = ui.knownOwner;
+            renderManagement();
+        }
     }
     syncCartShortcutNow();
     if (markSeen && ui.latestState) {

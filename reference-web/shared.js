@@ -392,6 +392,27 @@ export function saveBidderAddress(storage, value) {
     else if (!v) storage?.removeItem?.(BIDDER_ADDRESS_KEY);
   } catch { /* ignore */ }
 }
+export const KNOWN_OWNER_KEY = "poadomains.knownOwner.v1";
+export function loadKnownOwner(storage) {
+  try {
+    const raw = String(storage?.getItem?.(KNOWN_OWNER_KEY) ?? "").trim();
+    return validPrincipal(raw) ? raw : "";
+  } catch { return ""; }
+}
+export function saveKnownOwner(storage, value) {
+  try {
+    const v = String(value ?? "").trim();
+    if (validPrincipal(v)) storage?.setItem?.(KNOWN_OWNER_KEY, v);
+    else if (!v) storage?.removeItem?.(KNOWN_OWNER_KEY);
+  } catch { /* ignore */ }
+}
+export function countOwnedDomains(state, owner) {
+  const addr = String(owner ?? "").trim();
+  if (!state || !validPrincipal(addr)) return 0;
+  return Object.values(state.names ?? {})
+    .map((n) => state.deeds?.[n?.activeId])
+    .filter((d) => d && !d.retired && d.owner === addr).length;
+}
 export function compactAmount(value) {
   const n = BigInt(value);
   return n >= 1000n && n % 1000n === 0n ? `${n / 1000n}k` : n.toString();
@@ -465,7 +486,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=33e97c0bc9b7";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=9e213075b5f0";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {

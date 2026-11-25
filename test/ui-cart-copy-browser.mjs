@@ -360,18 +360,29 @@ try {
   assert.equal(floatCartText.includes("Buy with POA"), false, floatCartText);
   await pageUx.locator("#floatingCartClose").click();
 
-  // (c) All cart items turn unavailable -> prefill Manage domains owner address
+  // (c) Settled cart items identify owner, prefill Manage domains, and drive the live
+  //     Manage domains inventory badge (increases on acquisition, decreases on sale/transfer).
+  await expect(pageUx.locator("#managedDomainsBadge")).toBeHidden();
   const buyerOwner = "poa1Buyer9mN3pQ7rS2tU5vW8xY4zA6bC1dE3fG5hJ7kL9mN";
+  const otherOwner = "poa1Other2aB4cD6eF8gH1jK3mN5pQ7rS9tU2vW4xY6zA8b";
   const agentDeedId = "d".repeat(64);
   const lunarDeedId = "e".repeat(64);
+  const solarDeedId = "9".repeat(64);
   const rightsHash = "f".repeat(64);
+  // Partial settlement first (1 of 2 cart items settled) -> badge lights up with 🌱1
   h.payload.state.names.agent = { name: "agent", generation: 1, activeId: agentDeedId, auctionId: null, version: 1 };
-  h.payload.state.names.lunar = { name: "lunar", generation: 1, activeId: lunarDeedId, auctionId: null, version: 1 };
   h.payload.state.deeds[agentDeedId] = {
     id: agentDeedId, name: "agent", parentId: null, generation: 1, owner: buyerOwner,
     version: 1, ownerVersion: 1, rights: { kind: "permanent" }, rightsHash, records: [],
     metadata: [{ cid: "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi" }],
   };
+  await pageUx.reload();
+  await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageUx.locator("#managedDomainsBadge")).toBeVisible();
+  await expect(pageUx.locator("#managedDomainsBadge")).toHaveText("🌱1");
+
+  // Full settlement (both cart items settled) -> badge ticks up to 🌱2 and shows all-registered banner
+  h.payload.state.names.lunar = { name: "lunar", generation: 1, activeId: lunarDeedId, auctionId: null, version: 1 };
   h.payload.state.deeds[lunarDeedId] = {
     id: lunarDeedId, name: "lunar", parentId: null, generation: 1, owner: buyerOwner,
     version: 1, ownerVersion: 1, rights: { kind: "permanent" }, rightsHash, records: [],
@@ -383,6 +394,40 @@ try {
   await expect(pageUx.locator("#cartOwnedNotice")).toBeVisible();
   await expect(pageUx.locator("#cartOwnedNotice")).toContainText("All names in your cart are now registered");
   assert.equal(await pageUx.locator("#manageOwner").inputValue(), buyerOwner);
+  await expect(pageUx.locator("#managedDomainsBadge")).toHaveText("🌱2");
+
+  // Acquiring a 3rd domain increases the badge to 🌱3; losing domains decreases it to 🌱1 and hides at 0
+  h.payload.state.names.solar = { name: "solar", generation: 1, activeId: solarDeedId, auctionId: null, version: 1 };
+  h.payload.state.deeds[solarDeedId] = {
+    id: solarDeedId, name: "solar", parentId: null, generation: 1, owner: buyerOwner,
+    version: 1, ownerVersion: 1, rights: { kind: "permanent" }, rightsHash, records: [],
+    metadata: [{ cid: "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi" }],
+  };
+  await pageUx.reload();
+  await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageUx.locator("#managedDomainsBadge")).toHaveText("🌱3");
+
+  // Transfer 2 domains away -> badge decreases to 🌱1
+  h.payload.state.deeds[solarDeedId].owner = otherOwner;
+  h.payload.state.deeds[lunarDeedId].owner = otherOwner;
+  await pageUx.reload();
+  await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageUx.locator("#managedDomainsBadge")).toHaveText("🌱1");
+
+  // Transfer final domain away -> badge hides (0 owned), then restore buyerOwner for remaining checks
+  h.payload.state.deeds[agentDeedId].owner = otherOwner;
+  await pageUx.reload();
+  await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageUx.locator("#managedDomainsBadge")).toBeHidden();
+
+  delete h.payload.state.names.solar;
+  delete h.payload.state.deeds[solarDeedId];
+  h.payload.state.deeds[agentDeedId].owner = buyerOwner;
+  h.payload.state.deeds[lunarDeedId].owner = buyerOwner;
+  await pageUx.reload();
+  await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageUx.locator("#tabFind").click();
+  await expect(pageUx.locator("#managedDomainsBadge")).toHaveText("🌱2");
 
   // (d) "Manage this domain" button on sold search result navigates to Manage domains & opens profile editor
   await pageUx.locator("#searchInput").fill("agent");

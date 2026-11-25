@@ -30,7 +30,7 @@ for(const [name,launcher]of [['chromium',chromium],['firefox',firefox],['webkit'
   const mask=stripStyle.maskImage&&stripStyle.maskImage!=='none'?stripStyle.maskImage:stripStyle.webkitMaskImage;
   const color=getComputedStyle(document.querySelector('#tabFind .tab-age')).color;
   const rgb=color.match(/[\d.]+/g).slice(0,3).map(Number),lum=rgb=>rgb.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((a,v,i)=>a+v*[.2126,.7152,.0722][i],0);
-  return{width:innerWidth,tabs:rect(tabs),tabOverflow:tabs.scrollWidth>tabs.clientWidth+1,buttons:[...tabs.querySelectorAll('.section-tab')].map(rect),section:rect(section),strip:rect(strip),row:rect(row),rowScrollWidth:row.scrollWidth,rowClientWidth:row.clientWidth,overflowX:rowStyle.overflowX,touchAction:rowStyle.touchAction,mask,clipped:row.querySelectorAll('.idea.is-clipped').length,help:rect(help),visible,ticker:rect(document.querySelector('#recentActions')),header:rect(document.querySelector('header')),empty:rect(document.querySelector('.ticker-empty')),tickerHelp:rect(document.querySelector('#recentActions > .module-info')),contrast:(lum([79,191,149])+.05)/(lum(rgb)+.05)};
+  return{width:innerWidth,tabs:rect(tabs),tabOverflow:tabs.scrollWidth>tabs.clientWidth+1,buttons:[...tabs.querySelectorAll('.section-tab')].map(rect),section:rect(section),strip:rect(strip),row:rect(row),rowScrollWidth:row.scrollWidth,rowClientWidth:row.clientWidth,overflowX:rowStyle.overflowX,touchAction:rowStyle.touchAction,mask,clipped:row.querySelectorAll('.idea.is-clipped').length,help:rect(help),visible,ticker:rect(document.querySelector('#recentActions')),topBar:rect(document.querySelector('.site-top')),header:rect(document.querySelector('header')),statusBar:rect(document.querySelector('#networkStatusBar')),empty:rect(document.querySelector('.ticker-empty')),tickerHelp:rect(document.querySelector('#recentActions > .module-info')),contrast:(lum([79,191,149])+.05)/(lum(rgb)+.05)};
  });
  const m=await measure();assert.ok(!m.tabOverflow&&m.buttons.every(r=>r.left>=m.tabs.left-.5&&r.right<=m.tabs.right+.5),JSON.stringify(m));
  assert.ok(m.visible.length>0&&m.clipped===0&&m.rowScrollWidth>m.rowClientWidth,JSON.stringify(m));
@@ -38,7 +38,8 @@ for(const [name,launcher]of [['chromium',chromium],['firefox',firefox],['webkit'
  assert.ok(/linear-gradient\(.+(transparent|rgba\(0,\s*0,\s*0,\s*0\)).+(transparent|rgba\(0,\s*0,\s*0,\s*0\))/i.test(m.mask||''),'Ideas strip must fade on both ends: '+m.mask);
  assert.equal(m.overflowX,'auto');
  assert.ok(m.row.left>=0&&m.row.right<=width+.5&&m.visible.every(r=>r.top>=m.help.bottom+3),JSON.stringify(m));
- assert.ok(m.ticker.left>=m.header.left-.5&&m.ticker.right<=m.header.right+.5&&m.empty.left>=m.ticker.left&&m.empty.right<=m.tickerHelp.left,JSON.stringify(m));
+ assert.ok(m.ticker.left>=m.topBar.left-.5&&m.ticker.right<=m.topBar.right+.5&&m.empty.left>=m.ticker.left&&m.empty.right<=m.tickerHelp.left,JSON.stringify(m));
+ if(width>=900)assert.ok(m.statusBar.left>=m.header.right+10&&m.statusBar.top<m.header.bottom,'Desktop network status sits next to POADOMAINS logo '+JSON.stringify({header:m.header,statusBar:m.statusBar}));
  assert.ok(m.tickerHelp.left-m.empty.right<=12,'Empty ticker help stays beside its label, not alone at the far right');
  assert.ok(m.contrast>=4.5,'Active Find freshness text contrast '+m.contrast);
  // Slow continuous scroll with seamless faded edges and non-fighting horizontal manual scroll.

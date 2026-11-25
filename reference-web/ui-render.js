@@ -1,13 +1,13 @@
-import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, activePoaFixedListings, countLiveAuctions, poaAuctionOutbidStatus } from "./shared.js?v=33e97c0bc9b7";
-import { drawTicker } from "./ui-ticker.js?v=33e97c0bc9b7";
-import { actionLabel } from "./ui-copy.js?v=33e97c0bc9b7";
-import { returnFocus } from "./ui-a11y.js?v=33e97c0bc9b7";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=33e97c0bc9b7";
-import { ui } from "./ui-state.js?v=33e97c0bc9b7";
-import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=33e97c0bc9b7";
-import { nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=33e97c0bc9b7";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=33e97c0bc9b7";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=33e97c0bc9b7";
+import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, validPrincipal } from "./shared.js?v=9e213075b5f0";
+import { drawTicker } from "./ui-ticker.js?v=9e213075b5f0";
+import { actionLabel } from "./ui-copy.js?v=9e213075b5f0";
+import { returnFocus } from "./ui-a11y.js?v=9e213075b5f0";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=9e213075b5f0";
+import { ui } from "./ui-state.js?v=9e213075b5f0";
+import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=9e213075b5f0";
+import { nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=9e213075b5f0";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=9e213075b5f0";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=9e213075b5f0";
 
 export function updateLiveAuctionsBadge(state = ui.latestState) {
     const badge = el("liveAuctionsBadge");
@@ -26,6 +26,23 @@ export function updateLiveAuctionsBadge(state = ui.latestState) {
     badge.title = count > 0 ? `${count} live ${count === 1 ? "auction" : "auctions"}` : "";
     if (sr)
         sr.textContent = count > 0 ? ` (${count} live)` : "";
+}
+
+export function updateManagedDomainsBadge(state = ui.latestState) {
+    const badge = el("managedDomainsBadge");
+    const sr = el("managedDomainsSr");
+    if (!badge)
+        return;
+    const inputOwner = el("manageOwner")?.value.trim() ?? "";
+    const owner = validPrincipal(inputOwner)
+        ? inputOwner
+        : (validPrincipal(ui.knownOwner) ? ui.knownOwner : "");
+    const count = owner && state ? countOwnedDomains(state, owner) : 0;
+    badge.hidden = count <= 0;
+    badge.textContent = count > 0 ? `🌱${count}` : "0";
+    badge.title = count > 0 ? `${count} ${count === 1 ? "domain" : "domains"} to manage` : "";
+    if (sr)
+        sr.textContent = count > 0 ? ` (${count} to manage)` : "";
 }
 
 export function updateTabDots(state) {
@@ -480,6 +497,7 @@ export function render(payload) {
     renderMarketplace(s);
     updateTabDots(s);
     updateLiveAuctionsBadge(s);
+    updateManagedDomainsBadge(s);
     if (ui.route.kind === "domain" && ui.currentDomainName)
         renderDomainPage(ui.currentDomainName);
     if (ui.route.kind === "owner" && ui.currentOwnerId)

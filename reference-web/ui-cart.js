@@ -1,11 +1,12 @@
-import { publicNameUnavailable } from "./shared.js?v=33e97c0bc9b7";
-import { registryUnit } from "./shared.js?v=33e97c0bc9b7";
-import { actionLabel } from "./ui-copy.js?v=33e97c0bc9b7";
-import { trapDialog } from "./ui-a11y.js?v=33e97c0bc9b7";
-import { ui } from "./ui-state.js?v=33e97c0bc9b7";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions, validPrincipal } from "./shared.js?v=33e97c0bc9b7";
-import { add, el, endpointBase } from "./ui-core.js?v=33e97c0bc9b7";
-import { nameLink, openManageDomain } from "./ui-router.js?v=33e97c0bc9b7";
+import { publicNameUnavailable } from "./shared.js?v=9e213075b5f0";
+import { registryUnit } from "./shared.js?v=9e213075b5f0";
+import { actionLabel } from "./ui-copy.js?v=9e213075b5f0";
+import { trapDialog } from "./ui-a11y.js?v=9e213075b5f0";
+import { ui } from "./ui-state.js?v=9e213075b5f0";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=9e213075b5f0";
+import { add, el, endpointBase } from "./ui-core.js?v=9e213075b5f0";
+import { nameLink, openManageDomain } from "./ui-router.js?v=9e213075b5f0";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=9e213075b5f0";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
@@ -271,35 +272,77 @@ export function inferOwnerFromPurchasedCart(state) {
     return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
 }
 
+export function inferAnySettledCartOwner(state) {
+    if (!state || !ui.cap || !ui.cart.length)
+        return null;
+    const owners = [];
+    for (const item of ui.cart) {
+        const entry = state.names?.[item.name];
+        const deed = entry?.activeId ? state.deeds?.[entry.activeId] : null;
+        if (!deed || deed.retired || !validPrincipal(deed.owner))
+            continue;
+        if (item.action === "poaCheckout" || item.action === "announceAuction+bid") {
+            owners.push(deed.owner);
+            continue;
+        }
+        if (item.action === "poaBid") {
+            const auction = Array.isArray(ui.escrowMarket)
+                ? ui.escrowMarket.find((a) => a && a.id === item.params?.auctionId)
+                : null;
+            if (auction && auction.status === "COMPLETE" && auction.high?.payer && auction.high.payer === deed.owner) {
+                owners.push(deed.owner);
+            }
+        }
+    }
+    if (!owners.length)
+        return null;
+    const counts = new Map();
+    for (const o of owners)
+        counts.set(o, (counts.get(o) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+}
+
 export function maybePrefillOwnerFromPurchasedCart(state) {
-    const inferred = inferOwnerFromPurchasedCart(state);
+    const allInferred = inferOwnerFromPurchasedCart(state);
+    const settledOwner = allInferred || inferAnySettledCartOwner(state);
     const notice = el("cartOwnedNotice");
-    if (!inferred) {
+    if (settledOwner) {
+        const ownerToUse = validPrincipal(ui.knownOwner) ? ui.knownOwner : settledOwner;
+        if (!validPrincipal(ui.knownOwner)) {
+            ui.knownOwner = ownerToUse;
+            saveKnownOwner(globalThis.localStorage, ownerToUse);
+        }
+        const ownerInput = el("manageOwner");
+        const manageNotice = el("manageOwnerNotice");
+        if (ownerInput && (!ownerInput.value.trim() || ownerInput.value.trim() === ui.inferredCartOwner)) {
+            ownerInput.value = ownerToUse;
+            ui.inferredCartOwner = ownerToUse;
+            if (manageNotice) {
+                manageNotice.textContent = allInferred
+                    ? "🎉 Prefilled from your recently registered cart names (view-only until your agent signs an update)."
+                    : "🎉 Prefilled from a settled name in your cart (view-only until your agent signs an update).";
+                manageNotice.hidden = false;
+            }
+        }
+    }
+    updateManagedDomainsBadge(state);
+    if (!allInferred) {
         if (notice) {
             notice.hidden = true;
             notice.replaceChildren();
         }
-        return null;
+        return settledOwner;
     }
-    const ownerInput = el("manageOwner");
-    const manageNotice = el("manageOwnerNotice");
-    if (ownerInput && (!ownerInput.value.trim() || ownerInput.value.trim() === ui.inferredCartOwner)) {
-        ownerInput.value = inferred;
-        ui.inferredCartOwner = inferred;
-        if (manageNotice) {
-            manageNotice.textContent = "🎉 Prefilled from your recently registered cart names (view-only until your agent signs an update).";
-            manageNotice.hidden = false;
-        }
-    }
+    const targetOwner = validPrincipal(ui.knownOwner) ? ui.knownOwner : allInferred;
     if (notice) {
         notice.hidden = false;
         notice.replaceChildren();
         add(notice, "span", "🎉 All names in your cart are now registered! We prefilled their owner address in Manage domains. ");
         const btn = add(notice, "button", "⚙️ Manage these domains", "secondary small");
         btn.type = "button";
-        btn.addEventListener("click", () => openManageDomain(ui.cart[0]?.name ?? "", inferred));
+        btn.addEventListener("click", () => openManageDomain(ui.cart[0]?.name ?? "", targetOwner));
     }
-    return inferred;
+    return targetOwner;
 }
 
 export function renderFloatingCart() {

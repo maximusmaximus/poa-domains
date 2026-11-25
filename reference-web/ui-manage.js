@@ -1,8 +1,9 @@
-import { ui } from "./ui-state.js?v=33e97c0bc9b7";
-import { add, el, endpointBase } from "./ui-core.js?v=33e97c0bc9b7";
-import { nameLink, openPoa } from "./ui-router.js?v=33e97c0bc9b7";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=33e97c0bc9b7";
-import { createInlineInfo } from "./ui-help.js?v=33e97c0bc9b7";
+import { ui } from "./ui-state.js?v=9e213075b5f0";
+import { add, el, endpointBase } from "./ui-core.js?v=9e213075b5f0";
+import { nameLink, openPoa } from "./ui-router.js?v=9e213075b5f0";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=9e213075b5f0";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=9e213075b5f0";
+import { createInlineInfo } from "./ui-help.js?v=9e213075b5f0";
 import {
   buildProfileUpdatePrompt,
   checkBtcAddress,
@@ -17,8 +18,9 @@ import {
   PROFILE_SCHEMA_V1,
   profileImageMediaPath,
   SALE_FIELDS_WARNING,
+  saveKnownOwner,
   validPrincipal,
-} from "./shared.js?v=33e97c0bc9b7";
+} from "./shared.js?v=9e213075b5f0";
 
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
@@ -350,16 +352,19 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
   if (!owner) {
     delete box.dataset.renderedOwner;
     showManagePrompt("");
+    updateManagedDomainsBadge();
     return;
   }
   if (!/^(poa1[1-9A-HJ-NP-Za-km-z]{30,60}|ed25519:[0-9a-f]{64})$/.test(owner)) {
     delete box.dataset.renderedOwner;
     showManagePrompt("");
     add(box, "p", "Use a public owner address only — never a private key.", "badge-warn");
+    updateManagedDomainsBadge();
     return;
   }
   const names = managedNames(ui.latestState, owner);
   box.dataset.renderedOwner = owner;
+  updateManagedDomainsBadge();
   if (force) showManagePrompt("");
   if (!names.length) {
     add(box, "p", "No active names for this address in the current registry snapshot.", "muted");
@@ -469,15 +474,24 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
 }
 
 export function wireManagement() {
-  el("manageLookup")?.addEventListener("click", () => {
+  const onLookup = () => {
     ui.focusedManageDomain = null;
+    const raw = el("manageOwner")?.value.trim() ?? "";
+    if (!raw) {
+      ui.knownOwner = "";
+      ui.inferredCartOwner = "";
+      saveKnownOwner(globalThis.localStorage, "");
+    } else if (validPrincipal(raw)) {
+      ui.knownOwner = raw;
+      saveKnownOwner(globalThis.localStorage, raw);
+    }
     renderManagement({ force: true });
-  });
+  };
+  el("manageLookup")?.addEventListener("click", onLookup);
   el("manageOwner")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      ui.focusedManageDomain = null;
-      renderManagement({ force: true });
+      onLookup();
     }
   });
   el("copyManagePrompt")?.addEventListener("click", async () => {
