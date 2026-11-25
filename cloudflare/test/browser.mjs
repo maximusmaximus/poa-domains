@@ -35,7 +35,8 @@ export async function browserSmoke(base, evidence) {
     assert.equal(await page.locator("#domainMain").count(),1);
     await page.goto(base + "/d/nexus",{waitUntil:"networkidle"});
     await page.waitForFunction(()=>document.querySelector("#domainTitle") && document.querySelector("#domainTitle").textContent.includes("nexus"));
-    assert.match(await page.locator("#domainStatus").innerText(), /Owned|For sale|Auction|Available|Leased|Reserved/i);
+    assert.match(await page.locator("#domainOwner").innerText(), /Owner:/i);
+    assert.equal(await page.locator("#domainStatus").isVisible(), false);
     await page.goto(base,{waitUntil:"networkidle"});
     if(await page.locator("#termsAgreeBtn").isVisible()) await page.locator("#termsAgreeBtn").click();
     assert.equal(await page.locator("#floatingCartBtn").count(),1);

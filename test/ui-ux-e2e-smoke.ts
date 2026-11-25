@@ -376,11 +376,11 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#searchBtn").click();
   assert.match(
     await searchDetails(page),
-    /OWNED \(PERMANENT DEED\)/,
+    /Unavailable/,
   );
   assert.match(
     await searchDetails(page),
-    /Active fixed-price resale listing: 2500 registry units/,
+    /For sale · 2500 registry units/,
   );
 
   // 4. Add items to cart directly from #auctions and #offers cards
