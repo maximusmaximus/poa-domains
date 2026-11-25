@@ -177,3 +177,224 @@ test('copyText tries Clipboard API, falls back to execCommand inside dialog/body
   globalThis.window = prevWin;
  }
 });
+
+test('router domain avatars, escrow payer autofill, management plans, and address copy helpers work in isolation', async () => {
+ const revision = /app\.js\?v=([a-f0-9]{12})/.exec(readFileSync('reference-web/index.html', 'utf8'))[1];
+ const routerMod = await import(`../reference-web/ui-router.js?v=${revision}`);
+ const manageMod = await import(`../reference-web/ui-manage.js?v=${revision}`);
+ const copyMod = await import(`../reference-web/ui-copy.js?v=${revision}`);
+ const coreMod = await import(`../reference-web/ui-core.js?v=${revision}`);
+ const { ui } = await import(`../reference-web/ui-state.js?v=${revision}`);
+ const prevUi = { ...ui };
+ const prevDoc = globalThis.document;
+ const prevStorage = globalThis.localStorage;
+ const prevNav = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+ const store = new Map();
+ const makeEl = (tag) => {
+  const listeners = new Map();
+  const attrs = new Map();
+  const classes = new Set();
+  const node = {
+   tagName: tag.toUpperCase(),
+   children: [],
+   dataset: {},
+   textContent: '',
+   value: '',
+   title: '',
+   href: '',
+   src: '',
+   alt: '',
+   type: '',
+   get className() { return [...classes].join(' '); },
+   set className(v) { classes.clear(); for (const c of String(v || '').split(/\s+/).filter(Boolean)) classes.add(c); },
+   classList: {
+    add: (...xs) => xs.forEach((x) => classes.add(x)),
+    remove: (...xs) => xs.forEach((x) => classes.delete(x)),
+    contains: (x) => classes.has(x),
+    toggle: (x, on) => { if (on === undefined ? !classes.has(x) : on) classes.add(x); else classes.delete(x); },
+   },
+   setAttribute: (k, v) => attrs.set(k, String(v)),
+   getAttribute: (k) => attrs.get(k) ?? null,
+   removeAttribute: (k) => attrs.delete(k),
+   hasAttribute: (k) => attrs.has(k),
+   focus: () => { node.focused = true; },
+   scrollIntoView: () => { node.scrolled = true; },
+   querySelector: () => null,
+   append: (...xs) => { node.children.push(...xs); },
+   replaceChildren: (...xs) => { node.children = [...xs]; },
+   remove: () => { node.removed = true; },
+   addEventListener: (ev, fn) => { listeners.set(ev, [...(listeners.get(ev) ?? []), fn]); },
+   dispatchEvent: (ev) => { for (const fn of listeners.get(ev.type) ?? []) fn(ev); return true; },
+   _listeners: listeners,
+  };
+  return node;
+ };
+ try {
+  const byId = new Map();
+  const payerEl = makeEl('input');
+  const manageOwnerEl = makeEl('input');
+  byId.set('escrowPayer', payerEl);
+  byId.set('manageOwner', manageOwnerEl);
+  globalThis.document = {
+   getElementById: (id) => byId.get(id) ?? null,
+   createElement: (tag) => makeEl(tag),
+   createElementNS: (_ns, tag) => makeEl(tag),
+  };
+  globalThis.localStorage = {
+   getItem: (k) => (store.has(k) ? store.get(k) : null),
+   setItem: (k, v) => store.set(k, String(v)),
+   removeItem: (k) => store.delete(k),
+  };
+  const copied = [];
+  Object.defineProperty(globalThis, 'navigator', {
+   value: { clipboard: { writeText: async (v) => copied.push(v) } },
+   configurable: true,
+  });
+
+  const ownerA = 'poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf';
+  const ownerB = 'poa1GHppB8pYZ43gK8yBzR1RJhzfWjzrJn29q96ykwngUP7N';
+  const avatarCid = 'bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku';
+
+  ui.knownOwner = ownerA;
+  ui.inferredCartOwner = '';
+  ui.bidderAddress = '';
+  let changes = 0;
+  payerEl.addEventListener('change', () => changes++);
+  assert.equal(routerMod.resolveKnownPoaAddress(), ownerA);
+  assert.equal(routerMod.syncEscrowPayerAddress(), ownerA);
+  assert.equal(payerEl.value, ownerA);
+  assert.equal(changes, 1);
+  payerEl.value = ownerB;
+  assert.equal(routerMod.syncEscrowPayerAddress(ownerA), ownerA);
+  assert.equal(payerEl.value, ownerB);
+  assert.equal(routerMod.syncEscrowPayerAddress(ownerA, { force: true }), ownerA);
+  assert.equal(payerEl.value, ownerA);
+  assert.equal(changes, 2);
+
+  const deedId = 'a'.repeat(64);
+  const childId = 'b'.repeat(64);
+  ui.latestState = {
+   time: 1000,
+   names: {
+    agent: { name: 'agent', activeId: deedId },
+    'sub.agent': { name: 'sub.agent', activeId: childId },
+   },
+   deeds: {
+    [deedId]: {
+     id: deedId, name: 'agent', parentId: null, owner: ownerA, version: 2, ownerVersion: 1, retired: false,
+     rights: { kind: 'permanent' }, rightsHash: 'f'.repeat(64), records: [],
+     metadata: [{ cid: avatarCid, document: { schema: 'poa-domains.profile.v1', version: 1, name: 'agent', rightsHash: 'f'.repeat(64), poa: ownerA, btc: null, eth: null, description: 'bio', image: `ipfs://${avatarCid}` } }],
+    },
+    [childId]: {
+     id: childId, name: 'sub.agent', parentId: deedId, owner: ownerB, version: 1, ownerVersion: 1, retired: false,
+     rights: { kind: 'permanent' }, rightsHash: 'e'.repeat(64), records: [], metadata: [],
+    },
+   },
+   offers: {},
+   auctions: {},
+  };
+  ui.escrowMarket = [];
+  assert.equal(routerMod.isRegisteredDomain('agent'), true);
+  assert.equal(routerMod.isRegisteredDomain('unregistered'), false);
+  assert.equal(routerMod.domainAvatarMediaPath('agent'), `/v1/media/${avatarCid}`);
+  assert.equal(routerMod.domainAvatarMediaPath('sub.agent'), null);
+  assert.equal(routerMod.domainAvatarMediaPath('unregistered'), null);
+
+  ui.escrowMarket = [{ id: '1'.repeat(64), name: 'agent', kind: 'auction', status: 'OPEN', price: '100.000000', closes: 0, awaitingFirstBid: true }];
+  assert.equal(routerMod.domainAvatarMediaPath('agent'), null);
+  ui.escrowMarket = [];
+
+  const h = makeEl('h2');
+  const { avatar, link } = routerMod.domainHeader(h, 'agent', { size: 'lg', prefix: 'Name: ', suffix: '!' });
+  assert.equal(h.classList.contains('domain-heading'), true);
+  assert.equal(avatar.classList.contains('domain-header-avatar-lg'), true);
+  assert.equal(avatar.classList.contains('has-image'), true);
+  assert.equal(link.classList.contains('domain-tile'), true);
+  const imgNode = avatar.children.find((c) => c.tagName === 'IMG');
+  assert.equal(imgNode.src, `/v1/media/${avatarCid}`);
+  imgNode.dispatchEvent({ type: 'error' });
+  assert.equal(avatar.classList.contains('has-image'), false);
+  assert.equal(imgNode.removed, true);
+  const emojiAvatar = routerMod.createDomainAvatar('🚀', { size: 'sm' });
+  assert.equal(emojiAvatar.children[0].classList.contains('domain-name'), true);
+  assert.equal(emojiAvatar.children[0].textContent, '🚀');
+
+  assert.equal(manageMod.managedNames(ui.latestState, ownerA).length, 1);
+  const childOffer = manageMod.managementPlan('createChildOffer', ui.latestState.deeds[deedId], ui.latestState, ownerA, '50', '24');
+  assert.equal(childOffer.action, 'createChildOffer');
+  assert.equal(childOffer.params.validUntil, 1000 + 24 * 3600);
+  const fixedPlan = manageMod.managementPlan('sellFixed', ui.latestState.deeds[deedId], ui.latestState, ownerA, '200', '48');
+  assert.equal(fixedPlan.params.price, '200');
+  const revokePlan = manageMod.managementPlan('revokeChild', ui.latestState.deeds[childId], ui.latestState, ownerB, '100', '24');
+  assert.deepEqual(revokePlan.coSigners, [ownerA]);
+  assert.throws(() => manageMod.managementPlan('sellFixed', ui.latestState.deeds[deedId], ui.latestState, ownerB), /not the active registry holder/);
+  assert.throws(() => manageMod.managementPlan('sellFixed', ui.latestState.deeds[deedId], ui.latestState, ownerA, '0'), /whole-number/);
+  assert.throws(() => manageMod.managementPlan('createChildOffer', ui.latestState.deeds[childId], ui.latestState, ownerB), /Only a root/);
+  assert.throws(() => manageMod.managementPlan('revokeChild', ui.latestState.deeds[deedId], ui.latestState, ownerA), /Only a subdomain/);
+  assert.throws(() => manageMod.managementPlan('unknown', ui.latestState.deeds[deedId], ui.latestState, ownerA), /Unsupported/);
+
+  const prevLoc = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  const prevHist = Object.getOwnPropertyDescriptor(globalThis, 'history');
+  const pushedUrls = [];
+  Object.defineProperty(globalThis, 'location', { value: { pathname: '/d/agent', search: '' }, configurable: true });
+  Object.defineProperty(globalThis, 'history', { value: { pushState: (_s, _t, u) => pushedUrls.push(u) }, configurable: true });
+  const homeMain = makeEl('main'), domainMain = makeEl('main'), ownerMain = makeEl('main');
+  const sectionTabsEl = makeEl('nav');
+  const tabFindEl = makeEl('button'), tabEscrowEl = makeEl('button');
+  tabFindEl.setAttribute('data-tab', 'find');
+  tabEscrowEl.setAttribute('data-tab', 'escrow');
+  const searchSecEl = makeEl('section'), handoffSecEl = makeEl('section');
+  searchSecEl.setAttribute('data-section', 'find');
+  handoffSecEl.setAttribute('data-section', 'handoff');
+  const advLinkEl = makeEl('a');
+  byId.set('homeMain', homeMain);
+  byId.set('domainMain', domainMain);
+  byId.set('ownerMain', ownerMain);
+  byId.set('sectionTabs', sectionTabsEl);
+  byId.set('handoffSection', handoffSecEl);
+  byId.set('advancedLink', advLinkEl);
+  globalThis.document.querySelectorAll = (sel) => {
+   if (sel === '.section-tab') return [tabFindEl, tabEscrowEl];
+   if (sel === 'main#homeMain > section[data-section]') return [searchSecEl, handoffSecEl];
+   return [];
+  };
+  ui.route = { kind: 'domain', name: 'agent' };
+  ui.lastSearch = '';
+  routerMod.openAdvanced();
+  assert.equal(ui.route.kind, 'home');
+  assert.equal(ui.activeSectionTab, 'handoff');
+  assert.equal(homeMain.hidden, false);
+  assert.equal(domainMain.hidden, true);
+  assert.equal(handoffSecEl.hidden, false);
+  assert.equal(searchSecEl.hidden, true);
+  assert.equal(tabFindEl.tabIndex, 0);
+  assert.equal(tabEscrowEl.tabIndex, -1);
+  assert.equal(advLinkEl.getAttribute('aria-current'), 'page');
+  assert.equal(advLinkEl.classList.contains('is-active'), true);
+  assert.equal(handoffSecEl.focused, true);
+  assert.equal(pushedUrls.at(-1), '/?tab=handoff');
+  routerMod.setSectionTab('find', false);
+  assert.equal(advLinkEl.getAttribute('aria-current'), null);
+  assert.equal(advLinkEl.classList.contains('is-active'), false);
+  if (prevLoc) Object.defineProperty(globalThis, 'location', prevLoc); else delete globalThis.location;
+  if (prevHist) Object.defineProperty(globalThis, 'history', prevHist); else delete globalThis.history;
+
+  const wrapParent = makeEl('p');
+  coreMod.appendPoaAddress(wrapParent, ownerA, { code: true });
+  coreMod.appendPoaAddress(wrapParent, 'not-a-poa', { code: true });
+  coreMod.appendPoaAddress(wrapParent, 'plain-text');
+  coreMod.appendPrincipal(wrapParent, ownerB);
+  const copyBtn = copyMod.createPoaCopyButton(ownerA);
+  await copyBtn._listeners.get('click')[0]({ preventDefault() {}, stopPropagation() {} });
+  assert.deepEqual(copied, [ownerA]);
+  assert.equal(copyBtn.classList.contains('is-copied'), true);
+  assert.equal(copyMod.createCopyIconSvg(true).children.length, 1);
+  await new Promise((r) => setTimeout(r, 1700));
+  assert.equal(copyBtn.classList.contains('is-copied'), false);
+ } finally {
+  Object.assign(ui, prevUi);
+  globalThis.document = prevDoc;
+  globalThis.localStorage = prevStorage;
+  if (prevNav) Object.defineProperty(globalThis, 'navigator', prevNav);
+ }
+});

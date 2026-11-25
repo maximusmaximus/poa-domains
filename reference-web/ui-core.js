@@ -1,6 +1,6 @@
-import { createPoaCopyButton, decorateEmojiButton } from "./ui-copy.js?v=38947c454eb2";
-import { buildOwnershipIndex, isPoaAddress, ownershipConflict, safeObject, shortenPoaAddress } from "./shared.js?v=38947c454eb2";
-import { ui } from "./ui-state.js?v=38947c454eb2";
+import { createPoaCopyButton, decorateEmojiButton } from "./ui-copy.js?v=7db21850d21a";
+import { buildOwnershipIndex, isPoaAddress, ownershipConflict, safeObject, shortenPoaAddress } from "./shared.js?v=7db21850d21a";
+import { ui } from "./ui-state.js?v=7db21850d21a";
 
 export const el = (id) => document.getElementById(id);
 
@@ -191,7 +191,10 @@ export function namedText(node, text, names = Object.keys(ui.latestState?.names 
         if (at < 0) { node.append(rest); break; }
         node.append(rest.slice(0, at));
         const a = document.createElement("a");
-        a.className = "domain-name"; a.href = "/d/" + encodeURIComponent(match); a.textContent = match;
+        const entry = ui.latestState?.names?.[match];
+        const isReg = Boolean(entry?.activeId && ui.latestState?.deeds?.[entry.activeId] && !ui.latestState.deeds[entry.activeId].retired);
+        a.className = isReg ? "domain-name domain-link domain-tile is-registered" : "domain-name";
+        a.href = "/d/" + encodeURIComponent(match); a.textContent = match;
         node.append(a); rest = rest.slice(at + match.length);
     }
     return node;

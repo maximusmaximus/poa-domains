@@ -91,7 +91,7 @@ export async function verifyReferenceStaticPage(
     const actions = await page
       .locator("#action option")
       .evaluateAll((nodes) => nodes.map((n) => (n as HTMLOptionElement).value));
-    await page.locator("#tabHandoff").click();
+    await page.locator("#advancedLink").click();
     for (const action of actions) {
       await page.locator("#advancedHandoff").evaluate((n) => { (n as HTMLDetailsElement).open = true; });
     await page.locator("#action").selectOption(action);

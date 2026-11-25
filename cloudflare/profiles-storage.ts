@@ -369,7 +369,7 @@ export async function backupCommittedProfile(
   try {
     if (
       !packet ||
-      packet.body?.action !== "setMetadata" ||
+      (packet.body?.action !== "setMetadata" && packet.body?.action !== "issueReserved") ||
       receipt?.status !== "succeeded" ||
       packet.body?.params?.metadata?.document?.schema !== PROFILE_SCHEMA_V1
     )

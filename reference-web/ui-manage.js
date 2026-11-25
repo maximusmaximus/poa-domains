@@ -1,8 +1,9 @@
-import { ui } from "./ui-state.js?v=38947c454eb2";
-import { add, el, endpointBase } from "./ui-core.js?v=38947c454eb2";
-import { nameLink, openPoa } from "./ui-router.js?v=38947c454eb2";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=38947c454eb2";
-import { createInlineInfo } from "./ui-help.js?v=38947c454eb2";
+import { ui } from "./ui-state.js?v=7db21850d21a";
+import { add, el, endpointBase } from "./ui-core.js?v=7db21850d21a";
+import { createDomainAvatar, domainHeader, nameLink, openPoa, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=7db21850d21a";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=7db21850d21a";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=7db21850d21a";
+import { createInlineInfo } from "./ui-help.js?v=7db21850d21a";
 import {
   buildProfileUpdatePrompt,
   checkBtcAddress,
@@ -12,15 +13,25 @@ import {
   cidForDocument,
   extractDomainProfile,
   findDomainSalesAndAuctions,
+  isPoaAddress,
   MAX_PROFILE_DESCRIPTION_CHARS,
   MAX_PROFILE_IMAGE_BYTES,
   PROFILE_SCHEMA_V1,
   profileImageMediaPath,
   SALE_FIELDS_WARNING,
+  saveKnownOwner,
   validPrincipal,
-} from "./shared.js?v=38947c454eb2";
+} from "./shared.js?v=7db21850d21a";
 
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+const IDLE_MANAGE_PROMPT = "Edit profile fields or choose an action above to preview the code for your agent.";
+let managePromptState = { text: "", payload: null, filename: "poa-domains-manage.json", ready: false };
+let profilePreviewSeq = 0;
+
+function safeSlug(name) {
+  const s = String(name ?? "domain").replace(/[^a-z0-9._-]/gi, "_").replace(/^_+|_+$/g, "");
+  return s || "domain";
+}
 
 export function managedNames(state, owner) {
   return Object.values(state?.names ?? {})
@@ -61,16 +72,63 @@ export function managementPlan(action, deed, state, owner, price = "100", hours 
   return { action, signer: owner, coSigners, params };
 }
 
-function showManagePrompt(text) {
+function showManagePrompt(text, { meta = "", payload = null, filename = "", ready = Boolean(text), showPanel } = {}) {
+  const panel = el("managePromptPanel");
   const promptEl = el("managePrompt");
-  const actionsEl = el("managePromptActions");
+  const metaEl = el("managePromptMeta");
+  const copyBtn = el("copyManagePrompt");
+  const dlBtn = el("downloadManageJSON");
+  const clearBtn = el("clearManagePrompt");
   const statusEl = el("managePromptStatus");
-  if (promptEl) promptEl.textContent = text;
-  if (actionsEl) actionsEl.hidden = !text;
+  const hasDomains = Boolean(el("manageNames")?.querySelector("article.card"));
+  const visible = typeof showPanel === "boolean" ? showPanel : Boolean(text || hasDomains);
+  if (panel) panel.hidden = !visible;
+  if (!visible) {
+    managePromptState = { text: "", payload: null, filename: "poa-domains-manage.json", ready: false };
+    if (promptEl) promptEl.textContent = "";
+    if (metaEl) metaEl.textContent = IDLE_MANAGE_PROMPT;
+    if (copyBtn) copyBtn.disabled = true;
+    if (dlBtn) dlBtn.disabled = true;
+    if (clearBtn) clearBtn.disabled = true;
+    if (statusEl) statusEl.textContent = "";
+    return;
+  }
+  const hasText = Boolean(text);
+  const canCopy = Boolean(ready && hasText);
+  managePromptState = {
+    text: canCopy ? text : "",
+    payload: canCopy ? payload : null,
+    filename: filename || "poa-domains-manage.json",
+    ready: canCopy,
+  };
+  if (promptEl) promptEl.textContent = hasText ? text : IDLE_MANAGE_PROMPT;
+  if (metaEl) {
+    metaEl.textContent = meta || (canCopy
+      ? "Generated from your actions and fields above — review before approving with your agent."
+      : IDLE_MANAGE_PROMPT);
+  }
+  if (copyBtn) copyBtn.disabled = !canCopy;
+  if (dlBtn) dlBtn.disabled = !(canCopy && payload !== null);
+  if (clearBtn) clearBtn.disabled = !hasText;
   if (statusEl) statusEl.textContent = "";
 }
 
-function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = false } = {}) {
+function downloadManageJSON() {
+  if (!managePromptState.ready || managePromptState.payload === null) return;
+  const blob = new Blob([JSON.stringify(managePromptState.payload, null, 2) + "\n"], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = managePromptState.filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const status = el("managePromptStatus");
+  if (status) status.textContent = "📥 JSON downloaded — unsigned, nothing submitted.";
+}
+
+function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = false, headerAvatar = null } = {}) {
   const extracted = extractDomainProfile(deed);
   const current = extracted?.profile ?? {
     poa: deed.owner,
@@ -84,10 +142,10 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
   if (startOpen) details.open = true;
   const summary = document.createElement("summary");
   summary.textContent = listedForSale
-    ? "⏸️ Public profile (paused while listed — drops on transfer)"
+    ? "⏸️ Public profile (paused while listed)"
     : extracted && !extracted.isDefault
-      ? `🪪 Public profile (v1 · #${extracted.metadataVersion})`
-      : "🪪 Public profile (v1 — set addresses, bio & avatar)";
+      ? `🪪 Public profile (#${extracted.metadataVersion})`
+      : "🪪 Public profile";
   details.append(summary);
 
   const form = add(details, "div", "", "profile-form");
@@ -95,7 +153,7 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
     const pausedNote = add(
       form,
       "p",
-      "⏸️ This domain is currently listed for sale or in an auction. Attached domain fields and profile links are paused while listed and will be dropped when ownership transfers to a new holder.",
+      "⏸️ Paused while listed or in auction. Profile fields are dropped when ownership transfers.",
       "sale-fields-warning",
     );
     pausedNote.setAttribute("role", "note");
@@ -104,19 +162,27 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
   add(
     noticeRow,
     "span",
-    "🌐 Public record: Everything you save here is public and will be published publicly in the registry, backed up to R2, and pinned to IPFS.",
+    "🌐 Public info: Everything you save here is public and visible to everyone once published.",
   );
   noticeRow.append(
     createInlineInfo(
       `profile-v1-${deed.id.slice(0, 12)}`,
-      `About public profile v1 for ${deed.name}`,
-      "Profile fields use versioned schema poa-domains.profile.v1 (v1: POA, BTC mainnet, EIP-55 ETH/EVM, 280-char plain-text bio, and PNG/JPG/WebP/GIF avatar up to 5 MB). Saved profiles are published publicly on-registry, backed up to R2, pinned to IPFS, and accessible to agents via MCP (get_domain_profile, build_profile_witness, update_domain_profile).",
+      `About public profile for ${deed.name}`,
+      "Optional public fields for your domain: POA, BTC, and ETH/EVM addresses, a short plain-text bio (up to 280 characters), and a square avatar image (PNG, JPG, WebP, or GIF up to 5 MB). Saved profiles are public and readable by apps and agents.",
     ),
   );
 
   const markDirty = () => {
     const box = el("manageNames");
     if (box) box.dataset.dirty = "1";
+  };
+
+  let liveTimer = null;
+  const scheduleLivePreview = () => {
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(() => {
+      void buildProfilePrompt({ reportInlineError: false });
+    }, 90);
   };
 
   // 1. POA address (defaults to owner wallet)
@@ -127,7 +193,10 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
   poaInput.placeholder = deed.owner;
   poaInput.value = current.poa || deed.owner;
   poaInput.dataset.profileField = "poa";
-  poaInput.addEventListener("input", markDirty);
+  poaInput.addEventListener("input", () => {
+    markDirty();
+    scheduleLivePreview();
+  });
   add(form, "small", "Where POA payments sent to this name go.", "muted profile-hint");
 
   // 2. BTC address
@@ -138,7 +207,10 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
   btcInput.placeholder = "bc1q… or 1… / 3…";
   btcInput.value = current.btc ?? "";
   btcInput.dataset.profileField = "btc";
-  btcInput.addEventListener("input", markDirty);
+  btcInput.addEventListener("input", () => {
+    markDirty();
+    scheduleLivePreview();
+  });
 
   // 3. ETH address (with EIP-55 checksum assist)
   const ethLabel = add(form, "label", "ETH address (optional — 0x… with EIP-55 checksum; also works on Base/EVM)");
@@ -168,12 +240,14 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
   ethInput.addEventListener("input", () => {
     markDirty();
     refreshEthHint();
+    scheduleLivePreview();
   });
   ethFixBtn.addEventListener("click", () => {
     if (pendingChecksum) {
       ethInput.value = pendingChecksum;
       markDirty();
       refreshEthHint();
+      scheduleLivePreview();
     }
   });
 
@@ -189,19 +263,21 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
   descInput.addEventListener("input", () => {
     markDirty();
     descCount.textContent = `${[...descInput.value].length} / ${MAX_PROFILE_DESCRIPTION_CHARS}`;
+    scheduleLivePreview();
   });
 
-  // 5. Image / Avatar (URL or upload PNG/JPG/WebP/GIF <= 5 MB pinned to IPFS + R2)
-  const imgLabel = add(form, "label", "Avatar image (https:// or ipfs:// link, or upload PNG/JPG/WebP/GIF up to 5 MB)");
+  // 5. Image / Avatar (square image — URL or upload PNG/JPG/WebP/GIF <= 5 MB)
+  const imgLabel = add(form, "label", "Avatar image (square · link or upload PNG, JPG, WebP, or GIF up to 5 MB)");
   const imgInput = add(imgLabel, "input", "");
   imgInput.type = "text";
   imgInput.autocomplete = "off";
-  imgInput.placeholder = "ipfs://bafkrei… or https://…";
+  imgInput.placeholder = "https://… or ipfs://…";
   imgInput.value = current.image ?? "";
   imgInput.dataset.profileField = "image";
   imgInput.addEventListener("input", () => {
     markDirty();
     renderAvatarPreview(imgInput.value.trim());
+    scheduleLivePreview();
   });
 
   const uploadRow = add(form, "div", "", "profile-upload-row");
@@ -210,7 +286,7 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
   fileInput.accept = "image/png,image/jpeg,image/webp,image/gif";
   fileInput.className = "visually-hidden";
   fileInput.setAttribute("aria-label", `Upload avatar image for ${deed.name}`);
-  const uploadBtn = add(uploadRow, "button", "📤 Upload image to IPFS & R2", "secondary small");
+  const uploadBtn = add(uploadRow, "button", "📤 Upload", "secondary small");
   uploadBtn.type = "button";
   const uploadStatus = add(uploadRow, "span", "", "muted");
   uploadStatus.setAttribute("role", "status");
@@ -220,19 +296,11 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
   const renderAvatarPreview = (uri) => {
     previewBox.replaceChildren();
     const mediaPath = profileImageMediaPath(uri);
-    if (!mediaPath) {
-      previewBox.hidden = true;
-      return;
-    }
     previewBox.hidden = false;
-    const img = document.createElement("img");
-    img.className = "domain-avatar";
-    img.src = mediaPath;
-    img.alt = `Avatar preview for ${deed.name}`;
-    img.addEventListener("error", () => {
-      previewBox.hidden = true;
-    });
-    previewBox.append(img);
+    previewBox.append(createDomainAvatar(deed.name, { size: "lg", mediaPath }));
+    if (headerAvatar && !listedForSale) {
+      updateDomainAvatarElement(headerAvatar, deed.name, mediaPath);
+    }
   };
   renderAvatarPreview(imgInput.value.trim());
 
@@ -250,7 +318,7 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
       return;
     }
     uploadBtn.disabled = true;
-    uploadStatus.textContent = "⏳ Uploading & pinning…";
+    uploadStatus.textContent = "⏳ Uploading…";
     try {
       const res = await fetch(endpointBase() + "/v1/media/upload", {
         method: "POST",
@@ -264,9 +332,8 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
       imgInput.value = body.uri;
       markDirty();
       renderAvatarPreview(body.uri);
-      uploadStatus.textContent = body.ipfsPinned
-        ? "✅ Pinned to IPFS & backed up to R2"
-        : "✅ Stored in R2 (IPFS CIDv1 ready)";
+      uploadStatus.textContent = "✅ Image uploaded";
+      void buildProfilePrompt({ reportInlineError: false });
     } catch (error) {
       uploadStatus.textContent = "⚠️ " + (error?.message || "Image upload failed");
     } finally {
@@ -282,9 +349,12 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
   const statusNode = add(actionRow, "span", "", "muted");
   statusNode.setAttribute("role", "status");
 
-  saveBtn.addEventListener("click", async () => {
-    errNode.textContent = "";
-    statusNode.textContent = "";
+  async function buildProfilePrompt({ reportInlineError = false } = {}) {
+    const seq = ++profilePreviewSeq;
+    if (reportInlineError) {
+      errNode.textContent = "";
+      statusNode.textContent = "";
+    }
     try {
       if (ui.registryReadFailed)
         throw Error("Refresh registry data before preparing a profile update.");
@@ -293,6 +363,7 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
       if (!poaVal.startsWith("poa1") || !validPrincipal(poaVal))
         throw Error("Enter a valid public poa1… POA address.");
       const btcCheck = await checkBtcAddress(btcInput.value);
+      if (seq !== profilePreviewSeq) return null;
       if (!btcCheck.ok) throw Error(btcCheck.error);
       const ethCheck = checkEthAddress(ethInput.value);
       if (!ethCheck.ok) {
@@ -316,22 +387,66 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
         image: imgCheck.value,
       };
       const cid = await cidForDocument(doc);
+      if (seq !== profilePreviewSeq) return null;
+      const metadata = { cid, document: doc };
       const promptText = buildProfileUpdatePrompt({
         name: fresh.name,
         deed: fresh,
-        metadata: { cid, document: doc },
+        metadata,
         endpointUrl: endpointBase(),
       });
-      showManagePrompt(promptText);
-      const copied = await copyText(promptText, el("managePrompt"));
-      statusNode.textContent = copied.ok
-        ? "✅ Prompt copied — paste to your agent to sign & publish"
-        : "📋 Copy the prompt below for your agent.";
-      const box = el("manageNames");
-      if (box) delete box.dataset.dirty;
+      const payload = {
+        action: "setMetadata",
+        endpoint: endpointBase(),
+        signer: fresh.owner,
+        coSigners: [],
+        maxTotal: "0",
+        maxNetworkFee: "0",
+        params: {
+          name: fresh.name,
+          expectedDeedId: fresh.id,
+          expectedVersion: fresh.version,
+          metadata,
+        },
+      };
+      errNode.textContent = "";
+      showManagePrompt(promptText, {
+        meta: `🪪 Live preview · Public profile for "${fresh.name}" (setMetadata)`,
+        payload,
+        filename: `poa-domains-${safeSlug(fresh.name)}-profile.json`,
+        ready: true,
+        showPanel: true,
+      });
+      return { promptText, payload };
     } catch (error) {
-      errNode.textContent = "⚠️ " + (error?.message || "Check your profile fields.");
+      if (seq !== profilePreviewSeq) return null;
+      const msg = error?.message || "Check your profile fields.";
+      if (reportInlineError) {
+        errNode.textContent = "⚠️ " + msg;
+      }
+      showManagePrompt("⚠️ " + msg, {
+        meta: `⚠️ Fix field above to generate code for "${deed.name}"`,
+        payload: null,
+        ready: false,
+        showPanel: true,
+      });
+      return null;
     }
+  }
+
+  saveBtn.addEventListener("click", async () => {
+    clearTimeout(liveTimer);
+    const built = await buildProfilePrompt({ reportInlineError: true });
+    if (!built) return;
+    const copied = await copyText(built.promptText, el("managePrompt"));
+    if (copied.ok) flashCopied(el("copyManagePrompt"));
+    statusNode.textContent = copied.ok
+      ? "✅ Prompt copied — paste to your agent to sign & publish"
+      : "📋 Copy the prompt below for your agent.";
+    const promptStatus = el("managePromptStatus");
+    if (promptStatus) promptStatus.textContent = copied.ok ? "✅ Copied" : "";
+    const box = el("manageNames");
+    if (box) delete box.dataset.dirty;
   });
 
   card.append(details);
@@ -349,19 +464,23 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
   delete box.dataset.dirty;
   if (!owner) {
     delete box.dataset.renderedOwner;
-    showManagePrompt("");
+    showManagePrompt("", { showPanel: false });
+    updateManagedDomainsBadge();
     return;
   }
   if (!/^(poa1[1-9A-HJ-NP-Za-km-z]{30,60}|ed25519:[0-9a-f]{64})$/.test(owner)) {
     delete box.dataset.renderedOwner;
-    showManagePrompt("");
+    showManagePrompt("", { showPanel: false });
     add(box, "p", "Use a public owner address only — never a private key.", "badge-warn");
+    updateManagedDomainsBadge();
     return;
   }
+  if (isPoaAddress(owner)) syncEscrowPayerAddress(owner);
   const names = managedNames(ui.latestState, owner);
   box.dataset.renderedOwner = owner;
-  if (force) showManagePrompt("");
+  updateManagedDomainsBadge();
   if (!names.length) {
+    showManagePrompt("", { showPanel: false });
     add(box, "p", "No active names for this address in the current registry snapshot.", "muted");
     return;
   }
@@ -373,8 +492,8 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
     const isFocused = activeFocus === d.name;
     const card = add(box, "article", "", isFocused ? "card is-focused-domain" : "card");
     card.dataset.domainName = d.name;
-    const h = add(card, "h4", "");
-    nameLink(h, d.name);
+    const h = add(card, "h3", "");
+    const { avatar: headerAvatar } = domainHeader(h, d.name);
     add(
       card,
       "p",
@@ -392,31 +511,47 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
       escrowMarket: ui.escrowMarket,
       nowMs: ui.escrowMarketServerTime || Date.now(),
     });
+    const availableToList = !saleInfo.listedForSale && !d.lock;
     if (saleInfo.listedForSale) {
       const liveWarn = add(
         card,
         "p",
-        "⏸️ Listed for sale / in auction — attached domain fields (tags & profile) are paused and will drop on transfer.",
+        "⏸️ Listed for sale or in auction — profile fields are paused and will be dropped on transfer.",
         "sale-fields-warning",
       );
       liveWarn.setAttribute("role", "note");
     }
     buildProfileEditor(card, d, owner, isFocused || ordered.length === 1, {
       listedForSale: saleInfo.listedForSale,
+      headerAvatar,
     });
     const poa = ui.cap?.poaOnly?.status === "on";
-    const sellWarn = add(
-      card,
-      "p",
-      "⚠️ Selling or auctioning pauses attached domain fields (tags & public profile) while listed and drops them when transferred to a new holder (archived on the domain page).",
-      "sale-fields-warning",
-    );
-    sellWarn.setAttribute("role", "note");
+    if (availableToList) {
+      const sellWarn = add(
+        card,
+        "p",
+        "⚠️ Listing or auctioning pauses your profile fields and drops them for the next owner (archived on the domain page).",
+        "sale-fields-warning",
+      );
+      sellWarn.setAttribute("role", "note");
+    }
     if (poa) {
-      const sell = add(card, "button", "🏷️ Sell for POA", "secondary small");
-      sell.type = "button";
-      sell.setAttribute("aria-label", "Sell " + d.name + " for POA");
-      sell.addEventListener("click", () => openPoa(d.name));
+      const poaRow = add(card, "div", "", "button-row manage-poa-actions");
+      if (availableToList) {
+        const sell = add(poaRow, "button", "🏷️ Sell for POA", "secondary small");
+        sell.type = "button";
+        sell.setAttribute("aria-label", "Sell for POA: " + d.name);
+        sell.addEventListener("click", () => openPoa(d.name, { mode: "sell", owner }));
+        const auction = add(poaRow, "button", "🔨 Auction for POA", "secondary small");
+        auction.type = "button";
+        auction.setAttribute("aria-label", "Auction for POA: " + d.name);
+        auction.addEventListener("click", () => openPoa(d.name, { mode: "auction", owner }));
+      } else {
+        const viewPoa = add(poaRow, "button", "🪙 Open in My POA", "secondary small");
+        viewPoa.type = "button";
+        viewPoa.setAttribute("aria-label", "Open in My POA: " + d.name);
+        viewPoa.addEventListener("click", () => openPoa("", { owner }));
+      }
     }
     const label = add(card, "label", "Listing / subdomain price (registry units)"),
       price = add(label, "input", "");
@@ -425,31 +560,49 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
     price.setAttribute("aria-label", "Registry-unit listing price for " + d.name);
     label.hidden = poa;
     const controls = add(card, "div", "", "button-row");
+    let activeCardAction = null;
+    const buildActionPrompt = (action) => {
+      try {
+        if (ui.registryReadFailed) throw Error("Refresh registry data before preparing a request.");
+        const fresh = ui.latestState.deeds[d.id];
+        const plan = managementPlan(action, fresh, ui.latestState, owner, price.value);
+        const promptText = [
+          actionLabel(action) + " — unsigned request for your agent.",
+          "Endpoint: " + endpointBase(),
+          "Re-quote, preview and verify current ownership before signing. Ask me before submitting. No action was sent.",
+          action === "createChildOffer"
+            ? "Offers one permanent direct subdomain; the buyer chooses its label. Existing subdomains do not disappear."
+            : action === "revokeChild"
+              ? "Retiring requires the child holder AND parent owner's signatures. A permanent path stays reserved; it does not become available again."
+              : `This prepares a registry-unit listing only; it does not sell the name now.\n${SALE_FIELDS_WARNING}`,
+          JSON.stringify(plan, null, 2),
+        ].join("\n");
+        showManagePrompt(promptText, {
+          meta: `⚙️ Generated · ${actionLabel(action)} for "${d.name}"`,
+          payload: { ...plan, endpoint: endpointBase() },
+          filename: `poa-domains-${safeSlug(d.name)}-${action}.json`,
+          ready: true,
+          showPanel: true,
+        });
+      } catch (e) {
+        showManagePrompt(e.message, {
+          meta: `⚠️ Could not build ${actionLabel(action)} for "${d.name}"`,
+          payload: null,
+          ready: false,
+          showPanel: true,
+        });
+      }
+    };
+    price.addEventListener("input", () => {
+      if (activeCardAction) buildActionPrompt(activeCardAction);
+    });
     for (const action of ["sellFixed", d.parentId ? "revokeChild" : "createChildOffer"]) {
       if (ui.cap?.ownership?.disabledActions?.includes(action) || !ui.cap?.actions?.[action]) continue;
       const b = add(controls, "button", "Prepare: " + actionLabel(action), "secondary small");
       b.type = "button";
       b.addEventListener("click", () => {
-        try {
-          if (ui.registryReadFailed) throw Error("Refresh registry data before preparing a request.");
-          const fresh = ui.latestState.deeds[d.id];
-          const plan = managementPlan(action, fresh, ui.latestState, owner, price.value);
-          showManagePrompt(
-            [
-              actionLabel(action) + " — unsigned request for your agent.",
-              "Endpoint: " + endpointBase(),
-              "Re-quote, preview and verify current ownership before signing. Ask me before submitting. No action was sent.",
-              action === "createChildOffer"
-                ? "Offers one permanent direct subdomain; the buyer chooses its label. Existing subdomains do not disappear."
-                : action === "revokeChild"
-                  ? "Retiring requires the child holder AND parent owner's signatures. A permanent path stays reserved; it does not become available again."
-                  : `This prepares a registry-unit listing only; it does not sell the name now.\n${SALE_FIELDS_WARNING}`,
-              JSON.stringify(plan, null, 2),
-            ].join("\n"),
-          );
-        } catch (e) {
-          showManagePrompt(e.message);
-        }
+        activeCardAction = action;
+        buildActionPrompt(action);
       });
     }
     for (const o of Object.values(ui.latestState.offers ?? {}).filter(
@@ -459,30 +612,54 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
       const b = add(p, "button", "Prepare removal", "secondary small");
       b.type = "button";
       b.addEventListener("click", () => {
+        const cancelPlan = { action: "cancelOffer", signer: owner, params: { offerId: o.id, expectedVersion: o.version } };
         showManagePrompt(
           "Remove listing — unsigned. Ask the owner's agent to re-quote and preview, then request approval before submitting. Nothing was sent.\n" +
-            JSON.stringify({ action: "cancelOffer", signer: owner, params: { offerId: o.id, expectedVersion: o.version } }, null, 2),
+            JSON.stringify(cancelPlan, null, 2),
+          {
+            meta: `⚙️ Generated · Remove listing for "${d.name}"`,
+            payload: { ...cancelPlan, endpoint: endpointBase() },
+            filename: `poa-domains-${safeSlug(d.name)}-cancelOffer.json`,
+            ready: true,
+            showPanel: true,
+          },
         );
       });
     }
   }
+  if (force || !managePromptState.ready) {
+    showManagePrompt("", { showPanel: true });
+  } else {
+    const panel = el("managePromptPanel");
+    if (panel) panel.hidden = false;
+  }
 }
 
 export function wireManagement() {
-  el("manageLookup")?.addEventListener("click", () => {
+  const onLookup = () => {
     ui.focusedManageDomain = null;
+    const raw = el("manageOwner")?.value.trim() ?? "";
+    if (!raw) {
+      ui.knownOwner = "";
+      ui.inferredCartOwner = "";
+      saveKnownOwner(globalThis.localStorage, "");
+    } else if (validPrincipal(raw)) {
+      ui.knownOwner = raw;
+      saveKnownOwner(globalThis.localStorage, raw);
+      if (isPoaAddress(raw)) syncEscrowPayerAddress(raw, { force: true });
+    }
     renderManagement({ force: true });
-  });
+  };
+  el("manageLookup")?.addEventListener("click", onLookup);
   el("manageOwner")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      ui.focusedManageDomain = null;
-      renderManagement({ force: true });
+      onLookup();
     }
   });
   el("copyManagePrompt")?.addEventListener("click", async () => {
-    const text = el("managePrompt")?.textContent?.trim();
-    if (!text) return;
+    const text = managePromptState.text || el("managePrompt")?.textContent?.trim();
+    if (!text || !managePromptState.ready) return;
     const res = await copyText(text, el("managePrompt"));
     const status = el("managePromptStatus");
     if (res.ok) {
@@ -491,5 +668,9 @@ export function wireManagement() {
     } else if (status) {
       status.textContent = "📋 Press Ctrl/Cmd+C to copy from the box.";
     }
+  });
+  el("downloadManageJSON")?.addEventListener("click", downloadManageJSON);
+  el("clearManagePrompt")?.addEventListener("click", () => {
+    showManagePrompt("", { showPanel: Boolean(el("manageNames")?.querySelector("article.card")) });
   });
 }

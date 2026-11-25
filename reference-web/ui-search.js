@@ -1,13 +1,13 @@
-import { copyText } from "./ui-copy.js?v=38947c454eb2";
-import { publicNameUnavailable } from "./shared.js?v=38947c454eb2";
-import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=38947c454eb2";
-import { ui } from "./ui-state.js?v=38947c454eb2";
-import { nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=38947c454eb2";
-import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=38947c454eb2";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=38947c454eb2";
-import { addToCart } from "./ui-cart.js?v=38947c454eb2";
-import { suggestNames } from "./ideas-generator.js?v=38947c454eb2";
-import { logSubmittedSearch } from "./ui-search-log.js?v=38947c454eb2";
+import { copyText } from "./ui-copy.js?v=7db21850d21a";
+import { publicNameUnavailable } from "./shared.js?v=7db21850d21a";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=7db21850d21a";
+import { ui } from "./ui-state.js?v=7db21850d21a";
+import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=7db21850d21a";
+import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=7db21850d21a";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=7db21850d21a";
+import { addToCart } from "./ui-cart.js?v=7db21850d21a";
+import { suggestNames } from "./ideas-generator.js?v=7db21850d21a";
+import { logSubmittedSearch } from "./ui-search-log.js?v=7db21850d21a";
 
 let activeSuggestionIdx = -1;
 let currentSuggestions = [];
@@ -266,12 +266,13 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
     const name = info.canonical;
     const card = add(container, "div", "", "card");
     const title = add(card, "h4", "");
-    nameLink(title, name);
+    domainHeader(title, name);
     const openPage = add(card, "button", "Open page", "secondary small");
     openPage.type = "button";
     openPage.addEventListener("click", () => navigateDomain(name));
     const kind=add(card,"p",info.isRoot?"Root":"Child of ");if(!info.isRoot)nameLink(kind,info.parent);kind.append(" · "+info.tier.toUpperCase());
-    if (info.isRoot && ui.reservedSet.has(name)) {
+    const entry = s.names[name];
+    if (info.isRoot && ui.reservedSet.has(name) && !(entry?.activeId && s.deeds?.[entry.activeId])) {
         add(card, "p", "🔒 Reserved — not for sale", "badge-warn");
         add(card, "p", `${ui.reservedSet.size}-name reservation catalog`);
         appendSuggestedAlternatives(card, name);
@@ -286,7 +287,6 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
         appendSuggestedAlternatives(card, name);
         return;
     }
-    const entry = s.names[name];
     const poa = poaOnlyMode(ui.cap);
     const poaAuction = poa ? findOpenPoaAuctionByName(ui.escrowMarket, name, ui.escrowMarketServerTime || Date.now()) : null;
     if (poaAuction) {

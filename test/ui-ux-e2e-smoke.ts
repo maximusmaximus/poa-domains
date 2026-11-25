@@ -132,6 +132,9 @@ async function assertResponsiveGeometry(
     if(tab&&await page.locator(`.section-tab[data-tab="${tab}"]`).count()){
       await page.locator(`.section-tab[data-tab="${tab}"]`).click();
       await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>r(true))));
+    } else if(tab==="handoff"&&await page.locator("#advancedLink").count()){
+      await page.locator("#advancedLink").click();
+      await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>r(true))));
     }
     const metric=await page.evaluate(id=>{
       const node=document.getElementById(id),rect=node?.getBoundingClientRect(),doc=document.documentElement;
@@ -461,7 +464,7 @@ async function runFullUiUxFlowsOnRegistryApp(
     expectedVersion: nexusDeed.version,
     records: [{ type: "service", url: "https://nexus.poa.domains/v2" }],
   };
-  await page.locator("#tabHandoff").click();
+  await page.locator("#advancedLink").click();
   await page.locator("#advancedHandoff").evaluate((n) => { (n as HTMLDetailsElement).open = true; });
     await page.locator("#signer").fill(carolPrincipal);
   await page.locator("#requestId").fill(`e2e-${browserName}-1`);

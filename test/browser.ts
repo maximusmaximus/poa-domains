@@ -60,7 +60,7 @@ export async function browserSmoke(
       expectedVersion: d.version,
       metadata: witness("alpha", d.rights, null, description),
     };
-    await page.locator("#tabHandoff").click();
+    await page.locator("#advancedLink").click();
     await page.locator("#advancedHandoff").evaluate((n) => { (n as HTMLDetailsElement).open = true; });
     for (const [id, value] of Object.entries({
       signer,

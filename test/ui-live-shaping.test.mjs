@@ -288,12 +288,14 @@ test("home HTML: skip link first, one-row tabs, ideas strip, footer links, no to
   assert.ok(!html.includes("resource-nav"));
   assert.ok(!html.includes("quick-pills"));
   assert.ok(html.includes('id="ideasStrip"'));
-  assert.equal((html.match(/class="section-tab[ "]/g) ?? []).length, 6);
+  assert.equal((html.match(/class="section-tab[ "]/g) ?? []).length, 5);
   assert.match(html, /data-tab="escrow"/);
   assert.match(html, /id="escrowSection" data-section="escrow"/);
   const footer = html.slice(html.indexOf('id="siteFooter"'));
   assert.ok(footer.includes("https://github.com/maximusmaximus/poa-domains"));
   assert.ok(footer.includes("https://maximusmaximus.github.io/poa-domains/"));
+  assert.ok(footer.includes('id="advancedLink"'));
+  assert.ok(footer.includes(">Advanced</a>"));
   assert.ok(footer.includes("Tesselate Army"));
   const header = html.slice(html.indexOf("<header>"), html.indexOf("</header>"));
   assert.ok(!header.includes("<a "), "no links in header");

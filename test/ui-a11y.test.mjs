@@ -10,8 +10,11 @@ test("every main and auction tab has a unique explicit panel, labelled panel and
   const tabs = [...html.matchAll(/<button[^>]*role="tab"[^>]*>/g)].map(
     (x) => x[0],
   );
-  assert.equal(tabs.length, 9);
+  assert.equal(tabs.length, 8);
   assert.equal(tabs.filter((x) => x.includes('tabindex="0"')).length, 2);
+  assert.ok(!html.includes('id="tabHandoff"'));
+  assert.ok(html.includes('id="advancedLink"'));
+  assert.ok(html.includes('id="handoffSection" data-section="handoff" aria-labelledby="handoffHeading"'));
   for (const tab of tabs) {
     const panel = /aria-controls="([^"]+)"/.exec(tab)?.[1],
       id = /\bid="([^"]+)"/.exec(tab)?.[1];

@@ -1,17 +1,17 @@
-import { installHelp } from "./ui-help.js?v=38947c454eb2";
-import { wireManagement } from "./ui-manage.js?v=38947c454eb2";
-import { bindTabKeys } from "./ui-a11y.js?v=38947c454eb2";
-import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=38947c454eb2";
-import { ui } from "./ui-state.js?v=38947c454eb2";
-import { canonical, digest, dismissNetworkBanner, instructions, isPoaAddress, loadBidderAddress, loadCart, loadTabSeen, makeBody, parsePublicJSON, recheckCartItem, saveBidderAddress, shouldHoldTransactions } from "./shared.js?v=38947c454eb2";
-import { navigateHome, openPoa, restoreViewFromURL, setSectionTab } from "./ui-router.js?v=38947c454eb2";
-import { el, endpointBase } from "./ui-core.js?v=38947c454eb2";
-import { clearHandoff, copyDomainListingPrompt, copySubnameListing, isTermsGateOpen, setFeedbackModalOpen, wireFeedbackModal, wireTermsGate } from "./ui-handoff.js?v=38947c454eb2";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=38947c454eb2";
-import { submitSearchQuery, wireSearchAutocomplete } from "./ui-search.js?v=38947c454eb2";
-import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=38947c454eb2";
-import { copyText, flashCopied, selectElementText } from "./ui-copy.js?v=38947c454eb2";
-import { cartCopyBlocked, downloadCartJSON, clearAllCart, persistCart, renderCart, renderCurrentCartHandoff, setFloatingCartOpen } from "./ui-cart.js?v=38947c454eb2";
+import { installHelp } from "./ui-help.js?v=7db21850d21a";
+import { wireManagement } from "./ui-manage.js?v=7db21850d21a";
+import { bindTabKeys } from "./ui-a11y.js?v=7db21850d21a";
+import { applySiteTitle, closeDetail, renderAuctions } from "./ui-render.js?v=7db21850d21a";
+import { ui } from "./ui-state.js?v=7db21850d21a";
+import { canonical, digest, dismissNetworkBanner, instructions, isPoaAddress, loadBidderAddress, loadCart, loadKnownOwner, loadTabSeen, makeBody, parsePublicJSON, recheckCartItem, saveBidderAddress, shouldHoldTransactions } from "./shared.js?v=7db21850d21a";
+import { navigateHome, openAdvanced, openPoa, restoreViewFromURL, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=7db21850d21a";
+import { el, endpointBase } from "./ui-core.js?v=7db21850d21a";
+import { clearHandoff, copyDomainListingPrompt, copySubnameListing, isTermsGateOpen, setFeedbackModalOpen, wireFeedbackModal, wireTermsGate } from "./ui-handoff.js?v=7db21850d21a";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=7db21850d21a";
+import { submitSearchQuery, wireSearchAutocomplete } from "./ui-search.js?v=7db21850d21a";
+import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=7db21850d21a";
+import { copyText, flashCopied, selectElementText } from "./ui-copy.js?v=7db21850d21a";
+import { cartCopyBlocked, downloadCartJSON, clearAllCart, persistCart, renderCart, renderCurrentCartHandoff, setFloatingCartOpen } from "./ui-cart.js?v=7db21850d21a";
 
 try {
     ui.statusPanelDismissed = false; // New page visits show status; closing lasts for this page only.
@@ -25,6 +25,7 @@ try {
     ui.cart = loadCart(globalThis.localStorage);
     ui.tabSeen = loadTabSeen(globalThis.localStorage);
     ui.bidderAddress = loadBidderAddress(globalThis.localStorage);
+    ui.knownOwner = loadKnownOwner(globalThis.localStorage);
     const bidderInput = el("auctionsBidderInput");
     if (bidderInput) {
         bidderInput.value = ui.bidderAddress;
@@ -32,6 +33,7 @@ try {
             const v = bidderInput.value.trim();
             ui.bidderAddress = isPoaAddress(v) ? v : "";
             saveBidderAddress(globalThis.localStorage, ui.bidderAddress);
+            if (ui.bidderAddress) syncEscrowPayerAddress(ui.bidderAddress);
             if (ui.latestState && ui.cap) {
                 ui.cart = ui.cart.map((item) =>
                     recheckCartItem(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now()),
@@ -72,7 +74,13 @@ try {
         event.preventDefault();
         navigateHome();
     });
-    el("poaSellBtn")?.addEventListener("click", () => openPoa(ui.currentDomainName));
+    el("advancedLink")?.addEventListener("click", (event) => {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        openAdvanced();
+    });
+    el("poaSellBtn")?.addEventListener("click", () => openPoa(ui.currentDomainName, { mode: "sell" }));
+    el("poaAuctionBtn")?.addEventListener("click", () => openPoa(ui.currentDomainName, { mode: "auction" }));
     el("poaSubnameBtn")?.addEventListener("click", copySubnameListing);
     el("copyListPromptBtn")?.addEventListener("click", () => copyDomainListingPrompt("list"));
     el("copyChangePromptBtn")?.addEventListener("click", () => copyDomainListingPrompt("change"));
@@ -118,6 +126,7 @@ try {
     el("floatingCartClose").addEventListener("click", () => setFloatingCartOpen(false));
     el("floatingCartBackdrop").addEventListener("click", () => setFloatingCartOpen(false));
     el("floatingCartClear").addEventListener("click", clearAllCart);
+    el("floatingDownloadCartJSON")?.addEventListener("click", downloadCartJSON);
     el("copyCheckoutBtn").addEventListener("click", async () => {
         if (shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level) || ui.networkStatus.hold) {
             el("floatingCartStatus").textContent = "Held ⏸️ until the PoA network is back";
@@ -128,12 +137,12 @@ try {
         const text = renderCurrentCartHandoff();
         if (!text) return;
         const fp = el("floatingCartPrompt"), res = await copyText(text);
+        if (fp) { fp.textContent = text; fp.hidden = false; }
         if (res.ok) {
-            if (fp) { fp.hidden = true; fp.textContent = ""; }
             flashCopied(el("copyCheckoutBtn"));
             el("floatingCartStatus").textContent = "✅ Request copied — nothing sent";
         } else {
-            if (fp) { fp.textContent = text; fp.hidden = false; selectElementText(fp); }
+            if (fp) selectElementText(fp);
             el("floatingCartStatus").textContent = "📋 Press Ctrl/Cmd+C to copy the selected request.";
         }
     });

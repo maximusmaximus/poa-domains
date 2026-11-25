@@ -63,7 +63,7 @@ try {
     "🧾 Agent Cart Handoff v2 · generated 0m ago",
   );
   await page.locator("#copyCartPrompt").click();
-  await page.locator("#tabHandoff").click();
+  await page.locator("#advancedLink").click();
   await page.locator("#floatingCartBtn").click();
   await page.locator("#copyCheckoutBtn").click();
   assert.deepEqual(await page.evaluate(() => window.__copied), [
@@ -167,7 +167,7 @@ try {
   await page.locator("#tabEscrow").click();
   await expect(page.locator("#escrowPayments h2")).toHaveText("🪙 My POA");
   assert.equal(await page.locator("#siteFooter").count(), 1);
-  assert.equal(await page.locator(".tab-dot").count(), 6);
+  assert.equal(await page.locator(".tab-dot").count(), 5);
   assert.deepEqual(errors, []);
   assert.deepEqual(h.writes, []);
   console.log(

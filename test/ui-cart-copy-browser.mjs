@@ -5,6 +5,8 @@ import { chromium, expect } from "@playwright/test";
 import { uiHarness } from "./fixtures/ui-harness.mjs";
 import { auditedEngine, get } from "./fixtures/audited-engine.mjs";
 import { nativePrincipal } from "../dist/src/auth.js";
+import { rightsHash as computeRightsHash } from "../dist/src/model.js";
+import { buildProfileWitness } from "../dist/src/profile.js";
 import { TERMS_DOMAIN, TERMS_HASH, TERMS_VERSION, signTermsAgreement } from "../dist/src/terms.js";
 
 const browser = await chromium.launch({ headless: true });
@@ -42,7 +44,7 @@ try {
   assert.equal(clipInline.replace(/\r\n/g, "\n"), expectedPrompt);
 
   // Open floating cart modal (visible off the Find tab), copy checkout prompt, verify clipboard, then click a link inside modal
-  await page.locator("#tabHandoff").click();
+  await page.locator("#advancedLink").click();
   await page.locator("#floatingCartBtn").click();
   await expect(page.locator("#floatingCartPanel")).toBeVisible();
   await expect(page.locator("#floatingCartExpectations")).toBeVisible();
@@ -56,17 +58,21 @@ try {
   await page.locator('#floatingCartList a[href="/d/freshpoaname"]').click();
   await expect(page.locator("#floatingCartPanel")).toBeHidden();
   assert.equal(await page.evaluate(() => document.getElementById("domainMain").inert), false);
-  await page.locator("#domainHomeLink").click();
-
-  // Clearing cart clears stale floatingCartStatus
-  await page.locator("#tabHandoff").click();
+  // Clicking the footer Advanced link from a domain page opens Advanced Handoff at /?tab=handoff
+  await page.locator("#advancedLink").click();
+  await expect(page.locator("#handoffSection")).toBeVisible();
+  await expect(page.locator("#domainMain")).toBeHidden();
+  await expect(page.locator("#advancedLink")).toHaveAttribute("aria-current", "page");
+  const advUrl = new URL(page.url());
+  assert.equal(advUrl.pathname, "/");
+  assert.equal(advUrl.searchParams.get("tab"), "handoff");
   await page.locator("#floatingCartBtn").click();
   await page.locator("#floatingCartClear").click();
   await expect(page.locator("#floatingCartStatus")).toHaveText("");
   await page.locator("#floatingCartClose").click();
 
   // Advanced handoff copy button gives visible feedback
-  await page.locator("#tabHandoff").click();
+  await page.locator("#advancedLink").click();
   await page.locator("#advancedHandoff > summary").click();
   await page.locator("#action").selectOption("transfer");
   await page.locator("#signer").fill("poa1" + "1".repeat(32));
@@ -111,7 +117,7 @@ try {
   const fallbackPrompt = await pageNoClip.locator("#cartPrompt").textContent();
   await pageNoClip.locator("#copyCartPrompt").click();
   await expect(pageNoClip.locator("#cartStatus")).toHaveText("✅ Copied");
-  await pageNoClip.locator("#tabHandoff").click();
+  await pageNoClip.locator("#advancedLink").click();
   await pageNoClip.locator("#floatingCartBtn").click();
   await pageNoClip.locator("#copyCheckoutBtn").click();
   await expect(pageNoClip.locator("#floatingCartStatus")).toHaveText("✅ Request copied — nothing sent");
@@ -143,7 +149,7 @@ try {
     (await pageManual.evaluate(() => window.getSelection().toString())).trim(),
     (await pageManual.locator("#cartPrompt").textContent()).trim(),
   );
-  await pageManual.locator("#tabHandoff").click();
+  await pageManual.locator("#advancedLink").click();
   await pageManual.locator("#floatingCartBtn").click();
   await pageManual.locator("#copyCheckoutBtn").click();
   await expect(pageManual.locator("#floatingCartPrompt")).toBeVisible();
@@ -180,7 +186,7 @@ try {
   await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("reconciliation hold");
   await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("public PoA network read timed out");
   await pageEscrow.locator("#addToCartBtn").click();
-  await pageEscrow.locator("#tabHandoff").click();
+  await pageEscrow.locator("#advancedLink").click();
   await pageEscrow.locator("#floatingCartBtn").click();
   await expect(pageEscrow.locator("#floatingCartEscrowStatus")).toBeVisible();
   await expect(pageEscrow.locator("#floatingCartEscrowStatus")).toContainText("stop at step 0");
@@ -302,11 +308,10 @@ try {
   const errorsUx = [];
   pageUx.on("pageerror", (e) => errorsUx.push(e.message));
   await pageUx.route("https://**", (r) => r.abort());
-  const samplePng = Buffer.from([
-    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-    0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
-    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-  ]);
+  const samplePng = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAECAIAAAA8r+mnAAAAIklEQVR4nGNg+M/A8J+BgYGBkYGBgYmBgYGBiYGBgQEAQhgBA9N0j98AAAAASUVORK5CYII=",
+    "base64",
+  );
   const mockAvatarCid = "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku";
   await pageUx.route("**/v1/media/upload", async (route) => {
     await route.fulfill({
@@ -351,25 +356,36 @@ try {
   await expect(pageUx.locator("#cartCount")).toHaveText("2");
 
   // Floating cart also uses clean price + type copy
-  await pageUx.locator("#tabHandoff").click();
+  await pageUx.locator("#advancedLink").click();
   await pageUx.locator("#floatingCartBtn").click();
   const floatCartText = await pageUx.locator("#floatingCartList").innerText();
   assert.ok(floatCartText.includes("🪙 100 POA · Standard root"), floatCartText);
   assert.equal(floatCartText.includes("Buy with POA"), false, floatCartText);
   await pageUx.locator("#floatingCartClose").click();
 
-  // (c) All cart items turn unavailable -> prefill Manage domains owner address
+  // (c) Settled cart items identify owner, prefill Manage domains, and drive the live
+  //     Manage domains inventory badge (increases on acquisition, decreases on sale/transfer).
+  await expect(pageUx.locator("#managedDomainsBadge")).toBeHidden();
   const buyerOwner = "poa1Buyer9mN3pQ7rS2tU5vW8xY4zA6bC1dE3fG5hJ7kL9mN";
+  const otherOwner = "poa1Other2aB4cD6eF8gH1jK3mN5pQ7rS9tU2vW4xY6zA8b";
   const agentDeedId = "d".repeat(64);
   const lunarDeedId = "e".repeat(64);
+  const solarDeedId = "9".repeat(64);
   const rightsHash = "f".repeat(64);
+  // Partial settlement first (1 of 2 cart items settled) -> badge lights up with 🌱1
   h.payload.state.names.agent = { name: "agent", generation: 1, activeId: agentDeedId, auctionId: null, version: 1 };
-  h.payload.state.names.lunar = { name: "lunar", generation: 1, activeId: lunarDeedId, auctionId: null, version: 1 };
   h.payload.state.deeds[agentDeedId] = {
     id: agentDeedId, name: "agent", parentId: null, generation: 1, owner: buyerOwner,
     version: 1, ownerVersion: 1, rights: { kind: "permanent" }, rightsHash, records: [],
     metadata: [{ cid: "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi" }],
   };
+  await pageUx.reload();
+  await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageUx.locator("#managedDomainsBadge")).toBeVisible();
+  await expect(pageUx.locator("#managedDomainsBadge")).toHaveText("🌱1");
+
+  // Full settlement (both cart items settled) -> badge ticks up to 🌱2 and shows all-registered banner
+  h.payload.state.names.lunar = { name: "lunar", generation: 1, activeId: lunarDeedId, auctionId: null, version: 1 };
   h.payload.state.deeds[lunarDeedId] = {
     id: lunarDeedId, name: "lunar", parentId: null, generation: 1, owner: buyerOwner,
     version: 1, ownerVersion: 1, rights: { kind: "permanent" }, rightsHash, records: [],
@@ -381,6 +397,40 @@ try {
   await expect(pageUx.locator("#cartOwnedNotice")).toBeVisible();
   await expect(pageUx.locator("#cartOwnedNotice")).toContainText("All names in your cart are now registered");
   assert.equal(await pageUx.locator("#manageOwner").inputValue(), buyerOwner);
+  await expect(pageUx.locator("#managedDomainsBadge")).toHaveText("🌱2");
+
+  // Acquiring a 3rd domain increases the badge to 🌱3; losing domains decreases it to 🌱1 and hides at 0
+  h.payload.state.names.solar = { name: "solar", generation: 1, activeId: solarDeedId, auctionId: null, version: 1 };
+  h.payload.state.deeds[solarDeedId] = {
+    id: solarDeedId, name: "solar", parentId: null, generation: 1, owner: buyerOwner,
+    version: 1, ownerVersion: 1, rights: { kind: "permanent" }, rightsHash, records: [],
+    metadata: [{ cid: "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi" }],
+  };
+  await pageUx.reload();
+  await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageUx.locator("#managedDomainsBadge")).toHaveText("🌱3");
+
+  // Transfer 2 domains away -> badge decreases to 🌱1
+  h.payload.state.deeds[solarDeedId].owner = otherOwner;
+  h.payload.state.deeds[lunarDeedId].owner = otherOwner;
+  await pageUx.reload();
+  await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageUx.locator("#managedDomainsBadge")).toHaveText("🌱1");
+
+  // Transfer final domain away -> badge hides (0 owned), then restore buyerOwner for remaining checks
+  h.payload.state.deeds[agentDeedId].owner = otherOwner;
+  await pageUx.reload();
+  await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageUx.locator("#managedDomainsBadge")).toBeHidden();
+
+  delete h.payload.state.names.solar;
+  delete h.payload.state.deeds[solarDeedId];
+  h.payload.state.deeds[agentDeedId].owner = buyerOwner;
+  h.payload.state.deeds[lunarDeedId].owner = buyerOwner;
+  await pageUx.reload();
+  await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageUx.locator("#tabFind").click();
+  await expect(pageUx.locator("#managedDomainsBadge")).toHaveText("🌱2");
 
   // (d) "Manage this domain" button on sold search result navigates to Manage domains & opens profile editor
   await pageUx.locator("#searchInput").fill("agent");
@@ -392,10 +442,19 @@ try {
   const agentCard = pageUx.locator('#manageNames article[data-domain-name="agent"]');
   await expect(agentCard).toBeVisible();
   await expect(agentCard.locator("details.profile-editor")).toHaveAttribute("open", "");
-  await expect(agentCard.locator(".profile-public-notice")).toContainText("publicly");
-  await expect(agentCard.locator(".profile-public-notice")).toContainText("IPFS");
+  await expect(agentCard.locator("details.profile-editor summary")).toHaveText("🪪 Public profile");
+  await expect(agentCard.locator(".profile-public-notice")).toContainText("public");
+  assert.equal(/(IPFS|R2)/.test(await agentCard.locator(".profile-public-notice").innerText()), false);
+  await expect(agentCard.locator(".profile-upload-row button")).toHaveText("📤 Upload");
 
-  // (e) Profile v1 editor: EIP-55 checksum fix, BTC mainnet, bio, image upload & agent prompt copy
+  // (e) Profile v1 editor: EIP-55 checksum fix, BTC mainnet, bio, image upload,
+  //     square header avatar live update, and live Agent prompt window with familiar buttons
+  await expect(pageUx.locator("#managePromptPanel")).toBeVisible();
+  const initialHeaderAvatarBox = await agentCard.locator("h3 .domain-header-avatar").boundingBox();
+  assert.ok(initialHeaderAvatarBox && Math.abs(initialHeaderAvatarBox.width - initialHeaderAvatarBox.height) < 1, "Manage header avatar must be square");
+  assert.equal(await pageUx.locator("#escrowPayer").inputValue(), buyerOwner);
+  await expect(agentCard.locator('button[aria-label="Sell for POA: agent"]')).toBeVisible();
+  await expect(agentCard.locator('button[aria-label="Auction for POA: agent"]')).toBeVisible();
   await agentCard.locator('input[data-profile-field="btc"]').fill("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
   await agentCard.locator('input[data-profile-field="eth"]').fill("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed");
   await expect(agentCard.locator(".profile-eth-fix")).toBeVisible();
@@ -405,13 +464,21 @@ try {
     "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
   );
   await agentCard.locator('textarea[data-profile-field="description"]').fill("Agent bio https://minepoa.com <script>alert(1)</script>");
+  // Live Agent Prompt window updates automatically from fields interacted with above (before clicking Copy!)
+  await expect(pageUx.locator("#managePrompt")).toContainText("0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed");
+  await expect(pageUx.locator("#managePrompt")).toContainText("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
+  await expect(pageUx.locator("#copyManagePrompt")).toBeEnabled();
+  await expect(pageUx.locator("#downloadManageJSON")).toBeEnabled();
+  await expect(pageUx.locator("#clearManagePrompt")).toBeEnabled();
   await agentCard.locator('input[type="file"]').setInputFiles({
     name: "avatar.png",
     mimeType: "image/png",
     buffer: samplePng,
   });
-  await expect(agentCard.locator(".profile-upload-row")).toContainText("Pinned to IPFS & backed up to R2");
+  await expect(agentCard.locator(".profile-upload-row")).toContainText("Image uploaded");
   assert.equal(await agentCard.locator('input[data-profile-field="image"]').inputValue(), `ipfs://${mockAvatarCid}`);
+  await expect(agentCard.locator("h3 .domain-header-avatar img")).toHaveAttribute("src", `/v1/media/${mockAvatarCid}`);
+  await expect(pageUx.locator("#managePrompt")).toContainText(`ipfs://${mockAvatarCid}`);
   await agentCard.getByRole("button", { name: /Copy profile prompt for my agent/ }).click();
   const profilePrompt = await pageUx.locator("#managePrompt").textContent();
   assert.match(profilePrompt, /poa-domains\.profile\.v1/);
@@ -419,6 +486,27 @@ try {
   assert.match(profilePrompt, /0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed/);
   assert.match(profilePrompt, /bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4/);
   assert.equal((await pageUx.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, "\n"), profilePrompt);
+
+  // Familiar Clear button clears the preview window & disables Copy/Download
+  await pageUx.locator("#clearManagePrompt").click();
+  await expect(pageUx.locator("#copyManagePrompt")).toBeDisabled();
+  await expect(pageUx.locator("#downloadManageJSON")).toBeDisabled();
+
+  // Clicking "Auction for POA" on an available held domain populates My POA with auto-filled POA address,
+  // domain name, active "open" auction command, and live updates when amount changes!
+  await pageUx.locator('#manageNames button[aria-label="Auction for POA: lunar"]').click();
+  assert.equal(await pageUx.locator("#escrowPayer").inputValue(), buyerOwner);
+  assert.equal(await pageUx.locator("#escrowName").inputValue(), "lunar");
+  await expect(pageUx.locator("#escrowPrompt")).toContainText('"action": "open"');
+  await expect(pageUx.locator("#escrowPrompt")).toContainText('"name": "lunar"');
+  await expect(pageUx.locator("#escrowPrompt")).toContainText("Sale & auction notice");
+  await expect(pageUx.locator("#downloadEscrowJSON")).toBeEnabled();
+  await expect(pageUx.locator("#clearEscrowPrompt")).toBeEnabled();
+  await pageUx.locator("#escrowAmount").fill("325");
+  await expect(pageUx.locator("#escrowPrompt")).toContainText('"reserve": "325.000000"');
+  await pageUx.locator("#clearEscrowPrompt").click();
+  await expect(pageUx.locator("#downloadEscrowJSON")).toBeDisabled();
+  await expect(pageUx.locator("#clearEscrowPrompt")).toBeDisabled();
 
   // (f) Reorganized Escrow Signed Request workflow with steps + ℹ️ popovers
   await expect(pageUx.locator('#escrowPayments .escrow-step[data-step="1"] h3')).toContainText("1. Pick an action");
@@ -445,6 +533,9 @@ try {
   await pageUx.goto(h.url + "/d/agent");
   await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
   await expect(pageUx.locator("#domainProfile")).toBeVisible();
+  await expect(pageUx.locator("#domainTitle .domain-header-avatar img")).toHaveAttribute("src", `/v1/media/${mockAvatarCid}`);
+  const domainHeaderAvatarBox = await pageUx.locator("#domainTitle .domain-header-avatar").boundingBox();
+  assert.ok(domainHeaderAvatarBox && Math.abs(domainHeaderAvatarBox.width - domainHeaderAvatarBox.height) < 1, "/d/<name> header avatar must be square");
   await expect(pageUx.locator("#domainProfile img.domain-avatar")).toHaveAttribute("src", `/v1/media/${mockAvatarCid}`);
   await expect(pageUx.locator("#domainProfile .domain-profile-bio")).toHaveText("Agent bio https://minepoa.com <script>alert(1)</script>");
   assert.equal(await pageUx.locator("#domainProfile script").count(), 0);
@@ -459,10 +550,47 @@ try {
   assert.deepEqual(errorsUx, []);
   await ctxUx.close();
 
-  // 7. Footer Domains Treasury balance + POAScan links + shortened address copy,
+  // 7. Footer Domains Treasury balance + direct wallet links + registered protocol domains
+  //    ("escrow" & "treasury") tiled buttons + management profile fields,
   //    and Bug/Feature popup form with prefilled POA address + CAPTCHA + PoW submission.
   const escrowWallet = "poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf";
   const treasuryWallet = "poa1GHppB8pYZ43gK8yBzR1RJhzfWjzrJn29q96ykwngUP7N";
+  const rootRights = computeRightsHash({ kind: "permanent" }, null);
+  const addProtocolDeed = (name, poa, description, deedId) => {
+    const meta = buildProfileWitness({ name, rightsHash: rootRights, poa, description });
+    h.payload.state.names[name] = { name, key: deedId, generation: 1, activeId: deedId, auctionId: null };
+    h.payload.state.deeds[deedId] = {
+      id: deedId,
+      name,
+      generation: 1,
+      owner: treasuryWallet,
+      ownerVersion: 1,
+      version: 1,
+      parentId: null,
+      rights: { kind: "permanent" },
+      rightsHash: rootRights,
+      expiry: null,
+      renewals: 0,
+      retired: false,
+      metadata: [meta],
+      records: [],
+      recordsVersion: 0,
+      lock: null,
+      encumbranceVersion: 0,
+    };
+  };
+  addProtocolDeed(
+    "treasury",
+    treasuryWallet,
+    "Official PoA Domains Treasury wallet. Holds protocol fee revenue and reserved PoA Domains owned by the registry treasury.",
+    "e1".repeat(32),
+  );
+  addProtocolDeed(
+    "escrow",
+    escrowWallet,
+    "Official PoA Domains Escrow wallet. Holds buyer deposits, active POA auction bids, and checkout payouts for PoA Domains.",
+    "e2".repeat(32),
+  );
   h.treasury = {
     total: "201.000000",
     escrow: { address: escrowWallet, balance: "201.000000", poascanUrl: `https://poascan.io/address/${escrowWallet}` },
@@ -522,17 +650,56 @@ try {
   await pageFooter.waitForFunction(() => document.body.dataset.registryStatus === "ready");
   await pageFooter.locator("#termsAgreeBtn").click();
   await expect(pageFooter.locator("#domainsServedFooter")).toContainText("Number of Domains Served:");
-  await expect(pageFooter.locator("#domainsServedCount")).toHaveText("0️⃣0️⃣0️⃣0️⃣0️⃣3️⃣");
-  await expect(pageFooter.locator("#domainsServedSr")).toHaveText("3");
+  await expect(pageFooter.locator("#domainsServedCount")).toHaveText("0️⃣0️⃣0️⃣0️⃣0️⃣5️⃣");
+  await expect(pageFooter.locator("#domainsServedSr")).toHaveText("5");
   await expect(pageFooter.locator("#treasuryTotal")).toHaveText("🪙 201 POA");
-  await expect(pageFooter.locator("#poascanHomeLink")).toHaveAttribute("href", "https://poascan.io/");
+  await expect(pageFooter.locator("#poascanHomeLink")).toHaveCount(0);
+  await expect(pageFooter.locator('#treasuryFooter a[href="https://poascan.io/"]')).toHaveCount(0);
   await expect(pageFooter.locator("#treasuryWallets")).toBeVisible();
+  const footerEscrowTile = pageFooter.locator('#treasuryWallets a.domain-tile.is-registered[href="/d/escrow"]');
+  const footerTreasuryTile = pageFooter.locator('#treasuryWallets a.domain-tile.is-registered[href="/d/treasury"]');
+  await expect(footerEscrowTile).toHaveText("escrow");
+  await expect(footerTreasuryTile).toHaveText("treasury");
   const escrowLink = pageFooter.locator(`#treasuryWallets a[href="https://poascan.io/address/${escrowWallet}"]`);
   const treasuryLink = pageFooter.locator(`#treasuryWallets a[href="https://poascan.io/address/${treasuryWallet}"]`);
   await expect(escrowLink).toHaveText("poa1...piRf");
   await expect(treasuryLink).toHaveText("poa1...UP7N");
   await pageFooter.locator("#treasuryWallets .poa-copy-btn").first().click();
   assert.equal(await pageFooter.evaluate(() => navigator.clipboard.readText()), escrowWallet);
+
+  // Registered domain tiled buttons & owned reserved protocol domain resolution:
+  // Unregistered available name is NOT styled as a registered tile; owned "escrow" IS a tile.
+  await pageFooter.locator("#searchInput").fill("freshavailableword");
+  await pageFooter.locator("#searchBtn").click();
+  await expect(pageFooter.locator('#searchResult a.domain-link[href="/d/freshavailableword"]')).toBeVisible();
+  await expect(pageFooter.locator('#searchResult a.domain-tile[href="/d/freshavailableword"]')).toHaveCount(0);
+  await pageFooter.locator("#clearCart").click();
+  await pageFooter.locator("#searchInput").fill("google");
+  await pageFooter.locator("#searchBtn").click();
+  await expect(pageFooter.locator("#searchResult")).toContainText("Reserved — not for sale");
+  await expect(pageFooter.locator('#searchResult a.domain-tile[href="/d/google"]')).toHaveCount(0);
+  await pageFooter.locator("#searchInput").fill("escrow");
+  await pageFooter.locator("#searchBtn").click();
+  await expect(pageFooter.locator("#searchResult")).toContainText("Owned (permanent)");
+  await expect(pageFooter.locator('#searchResult a.domain-tile.is-registered[href="/d/escrow"]')).toHaveText("escrow");
+
+  // Click the footer [escrow] tiled button -> /d/escrow shows treasury owner, escrow POA address, and description
+  await footerEscrowTile.click();
+  await expect(pageFooter.locator('#domainTitle a.domain-tile.is-registered[href="/d/escrow"]')).toHaveText("escrow");
+  await expect(pageFooter.locator("#domainOwner")).toContainText("poa1...UP7N");
+  await expect(pageFooter.locator("#domainProfile")).toContainText("Official PoA Domains Escrow wallet");
+  await expect(pageFooter.locator("#domainProfile")).toContainText("poa1...piRf");
+  await pageFooter.getByRole("button", { name: "Manage escrow" }).click();
+  await expect(pageFooter.locator("#manageOwner")).toHaveValue(treasuryWallet);
+  await expect(pageFooter.locator('#manageNames a.domain-tile.is-registered[href="/d/escrow"]')).toHaveText("escrow");
+  await expect(pageFooter.locator('#manageNames a.domain-tile.is-registered[href="/d/treasury"]')).toHaveText("treasury");
+  const escrowManageCard = pageFooter.locator('#manageNames article.card[data-domain-name="escrow"]');
+  await expect(escrowManageCard.locator('textarea[data-profile-field="description"]')).toHaveValue(/Official PoA Domains Escrow wallet/);
+  await expect(escrowManageCard.locator('input[data-profile-field="poa"]')).toHaveValue(escrowWallet);
+  const treasuryManageCard = pageFooter.locator('#manageNames article.card[data-domain-name="treasury"]');
+  await treasuryManageCard.locator("details.profile-editor summary").click();
+  await expect(treasuryManageCard.locator('textarea[data-profile-field="description"]')).toHaveValue(/Official PoA Domains Treasury wallet/);
+  await expect(treasuryManageCard.locator('input[data-profile-field="poa"]')).toHaveValue(treasuryWallet);
 
   // Set user's POA address in Manage domains, then open Bug/Feature modal -> prefilled automatically
   await pageFooter.locator("#tabEscrow").click();
@@ -814,7 +981,7 @@ try {
   await expect(pageFields.locator("#escrowBalanceNote")).toBeVisible();
   await expect(pageFields.locator("#escrowBalanceNote")).toContainText("available escrow balance");
   await expect(pageFields.locator("#escrowListingFieldWarning")).toBeVisible();
-  await expect(pageFields.locator("#escrowListingFieldWarning")).toContainText("paused while this domain is listed");
+  await expect(pageFields.locator("#escrowListingFieldWarning")).toContainText("paused while listed");
   await pageFields.locator("#escrowPayer").fill(prevOwner);
   await pageFields.locator("#escrowName").fill("agent");
   await pageFields.locator("#escrowAmount").fill("250.000000");
@@ -846,6 +1013,14 @@ try {
   await expect(pageFields.locator("#domainListing .sale-fields-warning")).toBeVisible();
   await expect(pageFields.locator("#domainProfile")).toContainText("paused while listed");
   assert.equal(await pageFields.locator("#domainProfile img.domain-avatar").count(), 0);
+  assert.equal(await pageFields.locator("#domainTitle .domain-header-avatar img").count(), 0);
+  await expect(pageFields.locator("#domainTitle .domain-header-avatar")).toBeVisible();
+  // While listed/in auction, "Auction for POA" is hidden in Manage domains for that domain
+  await pageFields.locator('#domainActions button[aria-label="Manage agent"]').click();
+  await expect(pageFields.locator('#manageNames button[aria-label="Auction for POA: agent"]')).toHaveCount(0);
+  await expect(pageFields.locator('#manageNames button[aria-label="Open in My POA: agent"]')).toBeVisible();
+  await pageFields.goto(`${h.url}/d/agent`);
+  await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");
   await expect(pageFields.locator("#domainPreviousFields")).toBeVisible();
   await expect(pageFields.locator('#domainPreviousFields article[data-record-status="paused"]')).toContainText("Paused while listed");
   await expect(pageFields.locator("#domainPreviousFields")).toContainText("https://agent.example/endpoint");

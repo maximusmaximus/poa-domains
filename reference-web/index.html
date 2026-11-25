@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=308982d129a2" />
+    <link rel="stylesheet" href="/style.css?v=5c893efb34a9" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
+    <div class="site-top">
     <header>
       <h1 id="siteTitle" class="site-title" aria-label="poadomains"><span class="title-fallback">poadomains</span></h1>
     </header>
@@ -22,6 +23,7 @@
         <p id="registryLoading" data-info-description role="status">⏳ Loading registry data… You can use the tabs and type a search now.</p>
         <p id="registryAge" data-info-description title="Registry data only. POA payments refresh separately.">Registry data not loaded yet · POA payments refresh separately.</p>
         <div id="registryError" role="alert" hidden><span id="registryErrorText"></span> <button id="registryRetry" type="button" class="secondary small">🔄 Refresh</button></div>
+    </div>
     </div>
 
     <div id="recentActions" class="ticker-shell">
@@ -47,10 +49,7 @@
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="explore" id="tabExplore" aria-controls="explorerSection" tabindex="-1">
         <span class="tab-icon" aria-hidden="true">🧭</span><span class="tab-label">Explore</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
-      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="escrow" id="tabEscrow" aria-controls="escrowSection" tabindex="-1"><span class="tab-icon" aria-hidden="true">🪙</span><span class="tab-label">Manage domains</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span></button>
-      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="handoff" id="tabHandoff" aria-controls="handoffSection" tabindex="-1">
-        <span class="tab-icon" aria-hidden="true">🧾</span><span class="tab-label">Handoff</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
-      </button>
+      <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="escrow" id="tabEscrow" aria-controls="escrowSection" tabindex="-1"><span class="tab-icon" aria-hidden="true">🪙</span><span id="managedDomainsBadge" class="tab-live-badge tab-managed-badge" hidden aria-hidden="true">0</span><span class="tab-label">Manage domains</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span><span id="managedDomainsSr" class="visually-hidden"></span></button>
     </nav>
     </div>
 
@@ -112,7 +111,7 @@
           <h4>Agent prompt</h4>
           <p id="cartRealityNote" data-info-description class="muted">🪙 Your agent pays in POA through POA checkout, only after your approval. Nothing is sent from this page.</p>
           <p id="cartHandoffMeta" data-info-description class="muted">🧾 Agent Cart Handoff v2 · not ready</p>
-          <pre id="cartPrompt" class="prompt-box">Add names from Find, Auctions, or For sale to build a prompt.</pre>
+          <pre id="cartPrompt" class="prompt-box" tabindex="0">Add names from Find, Auctions, or For sale to build a prompt.</pre>
           <div class="button-row">
             <button id="copyCartPrompt" type="button" disabled>Copy prompt</button>
             <button id="downloadCartJSON" type="button" class="secondary" disabled>📥 Download JSON</button>
@@ -196,8 +195,8 @@
       </section>
       </section>
 
-      <section id="handoffSection" data-section="handoff" role="tabpanel" aria-labelledby="tabHandoff" tabindex="0" hidden>
-        <h2>🧾 Handoff</h2>
+      <section id="handoffSection" data-section="handoff" aria-labelledby="handoffHeading" tabindex="0" hidden>
+        <h2 id="handoffHeading">⚙️ Advanced</h2>
         <p data-info-description class="howto">Give your agent a clear request — this page does not sign, pay or register a name.</p>
         <ol class="handoff-steps"><li>🔍 Find a name and add it to your planning cart.</li><li>🛒 Check each POA price, then copy the cart request or download its JSON.</li><li>🤖 Give it to your agent. Ask it to check prices and ownership again, preview the action, and ask for your approval before sending anything.</li></ol>
         <p data-info-description>Why? Your agent needs the exact name, POA price and current registry version. A copied request is not a payment or proof of ownership.</p>
@@ -235,9 +234,21 @@
           <p data-info-description>View a public owner address. This is not a wallet connection or proof that you own it. These are application-registry names, not verified native-chain ownership.</p>
           <label for="manageOwner">Public owner address — never a private key</label><div class="search-bar"><input id="manageOwner" autocomplete="off" placeholder="poa1… public owner address" /><button id="manageLookup" type="button">View names</button></div>
           <p id="manageOwnerNotice" class="muted" role="status" aria-live="polite" hidden></p>
-          <p data-info-description>Open a name to view it, edit its public profile fields (v1: POA/BTC/ETH addresses, bio, and avatar image backed up to R2 &amp; IPFS), or prepare a sale or subdomain request for its owner's agent. Retiring a subdomain needs both the child holder and parent owner. Nothing is sent from these controls.</p>
-          <div id="manageNames" class="cards"></div><pre id="managePrompt" class="prompt-box" role="status"></pre>
-          <div id="managePromptActions" class="button-row" hidden><button type="button" id="copyManagePrompt" class="secondary small">📋 Copy agent prompt</button><span id="managePromptStatus" class="muted" role="status" aria-live="polite"></span></div>
+          <p data-info-description>Open a name to view it, edit its public profile (addresses, bio, and avatar), or prepare a sale or subdomain request for its owner's agent. Retiring a subdomain needs both the child holder and parent owner. Nothing is sent from these controls.</p>
+          <div id="manageNames" class="cards"></div>
+          <div id="managePromptPanel" class="agent-prompt-panel" hidden>
+            <div class="agent-prompt-header">
+              <h3>🤖 Agent prompt</h3>
+              <button type="button" id="clearManagePrompt" class="secondary" disabled>Clear</button>
+            </div>
+            <p id="managePromptMeta" class="muted">Edit profile fields or choose an action above to preview the code for your agent.</p>
+            <pre id="managePrompt" class="prompt-box" role="status" tabindex="0"></pre>
+            <div id="managePromptActions" class="button-row">
+              <button type="button" id="copyManagePrompt" disabled>Copy prompt</button>
+              <button type="button" id="downloadManageJSON" class="secondary" disabled>📥 Download JSON</button>
+              <span id="managePromptStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
+            </div>
+          </div>
         </div>
         <div id="escrowPayments"></div>
       </section>
@@ -253,12 +264,12 @@
         <div id="domainListing" class="card" hidden></div>
         <div id="domainActions" class="button-row"></div>
         <div id="domainOwnerTools" class="owner-tools" hidden>
-          <div id="poaSellTools" hidden><h3>🏷️ Sell for POA</h3><p data-info-description class="howto">List or auction your name for POA in 🪙 My POA. Your agent signs; nothing submits here.</p><p class="sale-fields-warning" role="note">⚠️ <strong>Before you list or auction:</strong> Attached domain fields (tags, wallet/service/IPFS records, and public profile) will not work while listed, and will be dropped when ownership transfers to a new holder (archived as historical records on this page).</p><button type="button" id="poaSellBtn">🏷️ Sell for POA</button>
+          <div id="poaSellTools" hidden><h3>🏷️ Sell or auction for POA</h3><p data-info-description class="howto">List or auction your name for POA in 🪙 My POA. Your agent signs; nothing submits here.</p><p class="sale-fields-warning" role="note">⚠️ <strong>Before you list or auction:</strong> Profile fields and records pause while listed and will be dropped for the next owner (archived on this page).</p><div class="button-row"><button type="button" id="poaSellBtn">🏷️ Sell for POA</button><button type="button" id="poaAuctionBtn" class="secondary">🔨 Auction for POA</button></div>
           <div id="poaSubnameTools"><h3>🧩 Sell subnames</h3><p data-info-description class="howto">Set one POA price for new subnames like shop.yourname. Buyers pay with POA checkout and your share is paid out to you from escrow. Your agent signs; nothing submits here.</p><label>Subname price (POA) <input id="subnamePriceInput" inputmode="decimal" placeholder="10" aria-label="Subname price" /></label><button type="button" id="poaSubnameBtn">🧩 Copy agent request</button><pre id="subnamePromptBox" class="prompt-box" hidden></pre><p id="subnamePromptStatus" class="muted" role="status"></p></div></div>
           <div id="unitSellTools">
           <h3>💰 Sell</h3>
           <p data-info-description class="howto">Owners list, change price, or unlist. Copy a prompt for your agent — nothing submits here.</p>
-          <p class="sale-fields-warning" role="note">⚠️ <strong>Before you list:</strong> Attached domain fields (tags, wallet/service/IPFS records, and public profile) will not work while listed, and will be dropped when ownership transfers to a new holder (archived as historical records on this page).</p>
+          <p class="sale-fields-warning" role="note">⚠️ <strong>Before you list:</strong> Profile fields and records pause while listed and will be dropped for the next owner (archived on this page).</p>
           <label>
             Price
             <input id="listPriceInput" inputmode="numeric" placeholder="2500" aria-label="List price" />
@@ -300,7 +311,6 @@
         <div class="treasury-summary">
           <span class="treasury-label">🏦 Domains Treasury:</span>
           <strong id="treasuryTotal" class="treasury-total">—</strong>
-          <a id="poascanHomeLink" href="https://poascan.io/" target="_blank" rel="noopener noreferrer" class="treasury-scan-link">🔎 POAScan</a>
         </div>
         <div id="treasuryWallets" class="treasury-wallets" hidden></div>
       </div>
@@ -313,6 +323,7 @@
         <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer"><svg class="github-mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg> <span>poa-domains on GitHub</span></a>
         <a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer" title="Mirror Site — static read-only landing page"><svg class="github-mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg> <span>Mirror Site</span></a>
         <a href="/terms" target="_blank" rel="noopener noreferrer">📜 Terms</a>
+        <a href="/?tab=handoff" id="advancedLink" title="Advanced agent handoff and unsigned action builder">Advanced</a>
         <button type="button" id="openFeedbackBtn" class="footer-action-btn" aria-haspopup="dialog" aria-controls="feedbackModal">💬 Bug / Feature</button>
       </nav>
       <p class="footer-credit">made with ❤️ in SF by Tesselate Army | <a href="https://maxi.grok.me" rel="noreferrer">maxi.grok.me</a></p>
@@ -355,11 +366,12 @@
           <li>Verify on <code>/d/&lt;name&gt;</code> or <strong>Manage domains</strong>. Unused POA refunds only to your original address.</li>
         </ol>
       </div>
+      <pre id="floatingCartPrompt" class="prompt-box" tabindex="0" hidden></pre>
       <div class="button-row">
         <button type="button" id="floatingCartClear" class="secondary" disabled>Clear</button>
+        <button type="button" id="floatingDownloadCartJSON" class="secondary" disabled>📥 Download JSON</button>
         <button type="button" id="copyCheckoutBtn" disabled>Copy checkout for agent</button>
       </div>
-      <pre id="floatingCartPrompt" class="prompt-box" hidden></pre>
       <p id="floatingCartStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
 
@@ -457,6 +469,6 @@
       </details>
     </div>
 
-    <script type="module" src="/app.js?v=38947c454eb2"></script>
+    <script type="module" src="/app.js?v=7db21850d21a"></script>
   </body>
 </html>

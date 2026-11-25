@@ -79,6 +79,7 @@ export function escrowPacketBlocked(escrowState: State, engine: Engine, packet: 
 
   switch (b.action) {
     case "announceAuction":
+    case "issueReserved":
     case "sellFixed":
     case "transfer":
     case "setRecords":
