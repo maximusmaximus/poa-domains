@@ -1,5 +1,5 @@
-import { el, endpointBase } from "./ui-core.js?v=47cf48dc0435";
-import { ui } from "./ui-state.js?v=47cf48dc0435";
+import { el, endpointBase } from "./ui-core.js?v=69895dc026c0";
+import { ui } from "./ui-state.js?v=69895dc026c0";
 let lastQuery="",lastAt=0,queue=Promise.resolve();
 // Only explicit Check/Enter/idea selections call this. Typing, URL restoration and polls do not.
 export function logSubmittedSearch(raw){const query=String(raw??"").trim();if(!query)return;const now=Date.now();if(query===lastQuery&&now-lastAt<1000)return;lastQuery=query;lastAt=now;
