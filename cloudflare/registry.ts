@@ -1,6 +1,6 @@
 import { AUDITED_REGISTRY, publicRegistryRoute } from "./public-registry-view.js";
 import { registryRoute, type RegistryCall, type RegistryReply } from "../src/registry-routes.js";
-import { marketView, publicCommand, subnameView } from "./escrow-public.js";
+import { marketPage, marketView, publicCommand, subnameView } from "./escrow-public.js";
 import { escrowPacketBlocked, registryTitles } from "./escrow-titles.js";
 import { backupCommittedProfile } from "./profiles-storage.js";
 import { validPoaAddr } from "./treasury.js";
@@ -426,7 +426,8 @@ export class PoaRegistry extends DurableObject<Env> {
         address:escrow.policy.wallet,limits:{perTransaction:escrow.policy.perTx,daily:escrow.policy.daily},newNameCheckout:newNameCheckout(this.env),subnameSales:subnameSales(this.env),freshness,serverTime:Date.now(),registryId:this.engine.registryId};
     }
     if(path==="intent")return escrow.depositView(query.id!,query.txid);
-    if(path==="market"||path==="domain")return {items:marketView(escrow.state(),path==="domain"?query.name:undefined),serverTime:Date.now()};
+    if(path==="market")return marketPage(escrow.state(),query,Date.now());
+    if(path==="domain")return {items:marketView(escrow.state(),query.name),serverTime:Date.now()};
     if(path==="subnames")return {items:subnameView(escrow.state(),query.parent),serverTime:Date.now()};
     need(false,"ESCROW_ROUTE");
   }

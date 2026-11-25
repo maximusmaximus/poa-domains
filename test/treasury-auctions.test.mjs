@@ -10,7 +10,8 @@ import { BootableSystemClock } from "../dist/src/seed.js";
 import { cidFor } from "../dist/src/metadata.js";
 import { rightsHash } from "../dist/src/model.js";
 import { base58 } from "../dist/src/native-crypto.js";
-import { canonical } from "../dist/src/core.js";
+import { canonical, Fault } from "../dist/src/core.js";
+import { ERROR_CATALOGUE, errorEnvelope } from "../dist/src/errors.js";
 import {
   TREASURY_AI_AUCTION_NAMES,
   TREASURY_CRYPTO_AUCTION_NAMES,
@@ -177,6 +178,7 @@ test("Escrow seedInventoryAuctions + MCP POA auction tools: atomic 100-auction o
     creditFinalDeposit,
     advanceMs,
     marketView,
+    marketPage,
     publicCommand,
   } = await fixtureMod.createTreasuryAuctionFixture();
 
@@ -214,7 +216,12 @@ test("Escrow seedInventoryAuctions + MCP POA auction tools: atomic 100-auction o
         };
       }
       if (path === "/v1/escrow/market" && method === "GET") {
-        return { items: marketView(escrow.state()), serverTime: clock.now() * 1000 };
+        try {
+          return marketPage(escrow.state(), query, clock.now() * 1000);
+        } catch (err) {
+          const code = err instanceof Fault ? err.code : err instanceof Error && Object.hasOwn(ERROR_CATALOGUE, err.message) ? err.message : "ESCROW_UNAVAILABLE";
+          throw Object.assign(new Fault(code), { detail: errorEnvelope(code, "mcp-treasury-test") });
+        }
       }
       if (path === "/v1/escrow/domain" && method === "GET") {
         return { items: marketView(escrow.state(), query.name), serverTime: clock.now() * 1000 };
@@ -257,11 +264,20 @@ test("Escrow seedInventoryAuctions + MCP POA auction tools: atomic 100-auction o
   assert.equal(cap.enabled, true);
   assert.equal(cap.held, false);
 
-  // MCP list_poa_auctions: 100 queued, 0 live
+  // MCP list_poa_auctions: 100 queued, 0 live (default limit=50 returns first page + cursor + sequence)
   const queuedList = await callTool(4, "list_poa_auctions", { phase: "queued" });
   assert.equal(queuedList.total, 100);
+  assert.equal(queuedList.items.length, 50);
+  assert.equal(queuedList.hasMore, true);
+  assert.ok(typeof queuedList.nextCursor === "string" && queuedList.nextCursor.length >= 16);
+  assert.equal(queuedList.sequence, escrow.state().sequence);
   assert.equal(queuedList.counts.queued, 100);
   assert.equal(queuedList.counts.live, 0);
+  const queuedPage2 = await callTool(41, "list_poa_auctions", { phase: "queued", cursor: queuedList.nextCursor });
+  assert.equal(queuedPage2.items.length, 50);
+  assert.equal(queuedPage2.hasMore, false);
+  assert.equal(queuedPage2.nextCursor, null);
+  assert.equal(new Set([...queuedList.items, ...queuedPage2.items].map((x) => x.id)).size, 100);
 
   // MCP list_poa_auctions filtered by premium name="ai" (1000 POA reserve) and standard name="defi" (100 POA reserve)
   const aiLookup = await callTool(5, "list_poa_auctions", { name: "ai" });
@@ -439,6 +455,156 @@ test("Escrow seedInventoryAuctions + MCP POA auction tools: atomic 100-auction o
     nowMs: clock.now() * 1000,
   });
   assert.equal(nonTreasuryOwned, null);
+});
+
+test("MCP list_poa_auctions supports sorting, filtering, >100 cursor paging, since deltas, and structured bad-input errors", async () => {
+  const fixtureMod = await import("./fixtures/escrow-mcp-helper.mjs");
+  const {
+    escrow,
+    engine,
+    clock,
+    treasury,
+    bidder1,
+    signEscrowCommand,
+    creditFinalDeposit,
+    advanceMs,
+    marketPage,
+    publicCommand,
+  } = await fixtureMod.createTreasuryAuctionFixture();
+
+  // Mint 100 Treasury words + 4 extra standard words + 1 single-emoji premium domain ("🚀") = 105 auctions
+  provisionTreasuryAuctionDomains(engine, clock, treasury.key);
+  clock.overrideTime = Math.max(clock.now(), engine.snapshot().time);
+  const extraNames = ["alphaextra", "betaextra", "gammaextra", "deltaextra", "🚀"];
+  const rootRights = rightsHash({ kind: "permanent" }, null);
+  for (const name of extraNames) {
+    const doc = { schema: "poa-domains.metadata.v1", name, rightsHash: rootRights, description: `Extra ${name}` };
+    const pkt = makeSignedPacket(
+      engine,
+      treasury.key,
+      treasury.addr,
+      "issueTreasuryInventory",
+      { name, expectedVersion: 0, expectedDeedId: null, metadata: { cid: cidFor(doc), document: doc } },
+      { time: clock.now() },
+    );
+    assert.equal(engine.submit(pkt).status, "succeeded");
+  }
+  const allSpecs = [
+    ...TREASURY_CRYPTO_AI_AUCTION_NAMES.map((name) => ({ name, reserve: treasuryAuctionReservePoa(name) })),
+    { name: "alphaextra", reserve: "50.000000" },
+    { name: "betaextra", reserve: "150.000000" },
+    { name: "gammaextra", reserve: "250.000000" },
+    { name: "deltaextra", reserve: "350.000000" },
+    { name: "🚀", reserve: "1000.000000" },
+  ];
+  assert.equal(escrow.seedInventoryAuctions(treasury.addr, allSpecs, "mcp-paging-v1").length, 105);
+
+  const mcp = new McpCore(
+    registryMcpProfile(async (method, path, query = {}, body) => {
+      if (path === "/v1/escrow/market" && method === "GET") {
+        try {
+          return marketPage(escrow.state(), query, clock.now() * 1000);
+        } catch (err) {
+          const code = err instanceof Fault ? err.code : err instanceof Error && Object.hasOwn(ERROR_CATALOGUE, err.message) ? err.message : "ESCROW_UNAVAILABLE";
+          throw Object.assign(new Fault(code), { detail: errorEnvelope(code, "mcp-paging-test") });
+        }
+      }
+      if (path === "/v1/escrow/command" && method === "POST") {
+        return publicCommand(() => escrow, JSON.stringify(body), engine.registryId, "command", clock.now() * 1000, true);
+      }
+      throw Error(`Unexpected call ${method} ${path}`);
+    }),
+    true,
+  );
+  const rawCall = (id, name, args = {}) =>
+    mcp.handle(JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } }));
+  const okCall = async (id, args = {}) => {
+    const res = await rawCall(id, "list_poa_auctions", args);
+    assert.ok(!res.error, JSON.stringify(res));
+    assert.equal(res.result.isError, false, JSON.stringify(res));
+    return res.result.structuredContent;
+  };
+
+  // Start 2 auctions with first bids: standard "alphaextra" (1h/1h) and premium "🚀" (24h/24h)
+  const seqBeforeBids = (await okCall(1, { limit: 1 })).sequence;
+  const dep = await rawCall(2, "submit_escrow_command", signEscrowCommand(bidder1, "mcp_p_dep", "intent", { amount: "2000.000000" }));
+  await creditFinalDeposit(bidder1, dep.result.structuredContent.result.intent, "2000.000000");
+
+  const alphaAuc = (await okCall(3, { name: "alphaextra" })).items[0];
+  const rocketAuc = (await okCall(4, { name: "🚀" })).items[0];
+  advanceMs(5000);
+  await rawCall(5, "submit_escrow_command", signEscrowCommand(bidder1, "mcp_bid_alpha", "bid", { auction: alphaAuc.id, amount: "60.000000" }));
+  advanceMs(5000);
+  await rawCall(6, "submit_escrow_command", signEscrowCommand(bidder1, "mcp_bid_rocket", "bid", { auction: rocketAuc.id, amount: "1200.000000" }));
+
+  // Tier filter: premium returns only single-emoji "🚀" (24h/24h); standard returns 104
+  const prem = await okCall(7, { tier: "premium" });
+  assert.deepEqual(prem.items.map((x) => x.name), ["🚀"]);
+  assert.equal(prem.items[0].window, 86400000);
+  assert.equal(prem.items[0].quiet, 86400000);
+  assert.equal((await okCall(8, { tier: "standard", limit: 1 })).total, 104);
+
+  // Price filter against current high bid (alphaextra=60, rocket=1200) and reserve (betaextra=150, gammaextra=250, deltaextra=350)
+  const midPrice = await okCall(9, { minPrice: "150", maxPrice: "350.000000", sort: "price", order: "asc" });
+  assert.deepEqual(midPrice.items.map((x) => x.name), ["betaextra", "gammaextra", "deltaextra"]);
+  const highPrice = await okCall(10, { minPrice: "1100", sort: "price", order: "desc" });
+  assert.deepEqual(highPrice.items.map((x) => x.name), ["🚀"]);
+
+  // closesBefore (unix seconds): only live auctions closing strictly before cutoff (alphaextra closes ~1h, rocket closes ~24h)
+  const liveAfterBids = await okCall(11, { phase: "live", sort: "closes", order: "asc" });
+  assert.deepEqual(liveAfterBids.items.map((x) => x.name), ["alphaextra", "🚀"]);
+  const cutoffSec = Math.floor((liveAfterBids.items[0].closes + 60000) / 1000);
+  const closingSoon = await okCall(12, { closesBefore: cutoffSec });
+  assert.deepEqual(closingSoon.items.map((x) => x.name), ["alphaextra"]);
+
+  // sort=closes desc still keeps queued (closes=0) auctions LAST
+  const closesDesc = await okCall(13, { sort: "closes", order: "desc", limit: 5 });
+  assert.deepEqual(closesDesc.items.slice(0, 2).map((x) => x.name), ["🚀", "alphaextra"]);
+  assert.ok(closesDesc.items.slice(2).every((x) => x.closes === 0));
+
+  // Page through all 105 auctions via MCP with limit=30 -> 4 pages (30+30+30+15), 0 duplicates, 0 gaps
+  const seen = [];
+  let cursor = null;
+  let pages = 0;
+  do {
+    const p = await okCall(20 + pages, { sort: "price", order: "asc", limit: 30, ...(cursor ? { cursor } : {}) });
+    seen.push(...p.items.map((x) => x.id));
+    assert.equal(p.hasMore, p.nextCursor !== null);
+    cursor = p.nextCursor;
+    pages++;
+  } while (cursor);
+  assert.equal(pages, 4);
+  assert.equal(seen.length, 105);
+  assert.equal(new Set(seen).size, 105);
+
+  // Delta polling with `since`
+  const delta = await okCall(30, { since: seqBeforeBids, sort: "price", order: "asc" });
+  assert.deepEqual(delta.items.map((x) => x.name), ["alphaextra", "🚀"]);
+  const noNewChanges = await okCall(31, { since: delta.sequence });
+  assert.deepEqual(noNewChanges.items, []);
+
+  // Bad inputs: schema errors return JSON-RPC -32602 MCP_BAD_PARAMS; semantic errors return isError:true ErrorEnvelope
+  for (const badArgs of [
+    { limit: 0 },
+    { limit: 101 },
+    { sort: "unknown" },
+    { order: "sideways" },
+    { tier: "gold" },
+    { minPrice: "-5" },
+    { closesBefore: -1 },
+    { since: -1 },
+    { bogus: "x" },
+  ]) {
+    const errRes = await rawCall(40, "list_poa_auctions", badArgs);
+    assert.equal(errRes.error?.code, -32602, JSON.stringify(badArgs));
+    assert.equal(errRes.error?.data?.code, "MCP_BAD_PARAMS");
+  }
+  const badCursorRes = await rawCall(41, "list_poa_auctions", { cursor: "not-a-valid-cursor" });
+  assert.equal(badCursorRes.result?.isError, true);
+  assert.equal(badCursorRes.result?.structuredContent?.code, "PAGE_CURSOR");
+  const badRangeRes = await rawCall(42, "list_poa_auctions", { minPrice: "500", maxPrice: "100" });
+  assert.equal(badRangeRes.result?.isError, true);
+  assert.equal(badRangeRes.result?.structuredContent?.code, "ESCROW_AMOUNT");
 });
 
 test("publicRegistryRoute exposes all 100 Treasury Crypto+AI auction domains while withholding legacy hidden records", () => {

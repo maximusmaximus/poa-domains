@@ -66,7 +66,7 @@ export interface Payment {
   day: string | null; body: Transfer | null; txid: string | null;
 }
 interface Deposit { payer: string; amount: string; tx: string | null; createdAt?: number; auto?: boolean; }
-interface Auction {
+export interface Auction {
   id: string; name: string; seller: string; reserve: string; closes: number; quiet: number; kind?: "auction" | "fixed"; createdAt?: number;
   /** Auction duration (ms) started when the first bid lands (closes === 0 until first bid). */
   window?: number;
@@ -74,6 +74,8 @@ interface Auction {
   startedAt?: number | null;
   /** Extended handover deadline (ms) granted when another auction by the same seller finishes SETTLING. */
   handoverUntil?: number;
+  /** Escrow ledger sequence number when this auction or its settlement last changed. */
+  updatedSequence?: number;
   history?: {event:string;at:number;amount?:string;payer?:string}[];
   high: { payer: string; amount: string } | null; status: "OPEN" | "CANCELLED" | "SETTLING" | "COMPLETE";
 }
@@ -132,11 +134,27 @@ export function recoveryReserve(s: State, policy: Policy): bigint {
 }
 const DRAIN_EVENTS=new Set(["deposit","withdraw","cancel","expire","auto-expire","settle","repair-title",
   "outgoing-intent","outgoing-unknown","payment-final","title-pending","title-complete"]);
+function auctionChanged(prevA: Auction | undefined, nextA: Auction, prevSt: Settlement | undefined, nextSt: Settlement | undefined): boolean {
+  if (!prevA) return true;
+  if (prevA.status !== nextA.status || prevA.closes !== nextA.closes || prevA.startedAt !== nextA.startedAt || prevA.handoverUntil !== nextA.handoverUntil) return true;
+  if ((prevA.high?.payer ?? null) !== (nextA.high?.payer ?? null) || (prevA.high?.amount ?? null) !== (nextA.high?.amount ?? null)) return true;
+  if ((prevSt?.status ?? null) !== (nextSt?.status ?? null)) return true;
+  const ph = prevA.history ?? [], nh = nextA.history ?? [];
+  if (ph.length !== nh.length) return true;
+  const pl = ph[ph.length - 1], nl = nh[nh.length - 1];
+  return (pl?.event ?? null) !== (nl?.event ?? null) || (pl?.at ?? null) !== (nl?.at ?? null) || (pl?.amount ?? null) !== (nl?.amount ?? null) || (pl?.payer ?? null) !== (nl?.payer ?? null);
+}
 export function nextEntry(s: State, previous: string, event: string, payload: unknown, change: (s: State)=>void, policy: Policy): Entry {
   const emergency=event==="pause"||event==="halt"||event==="reconciliation-quarantine"||event==="restore-paused";
   // Emergency controls must remain available after a legacy drain crosses the
   // old cap; they never admit financial obligations. Repeated controls dedupe.
-  const next = structuredClone(s); change(next); next.sequence++; invariant(next);
+  const next = structuredClone(s); change(next); next.sequence++;
+  for (const [id, a] of Object.entries(next.auctions)) {
+    if (auctionChanged(s.auctions[id], a, s.settlements[id], next.settlements[id])) {
+      a.updatedSequence = next.sequence;
+    }
+  }
+  invariant(next);
   if(!emergency){
     const remaining=recoveryReserve(next,policy);
     // New work must reserve its entire drain budget atomically. Legacy journals

@@ -1,5 +1,7 @@
 /** HTTP boundary for signed public escrow calls. Admin HTTP remains separate. */
 import { need, parseJSON, exact, Fault } from "../src/core.js";
+import { MARKET_QUERY_KEYS, parseMarketQuery } from "./escrow-public.js";
+const READ_ERRORS = new Set(["PAGE_CURSOR", "PAGE_LIMIT", "INVALID_REQUEST", "INTEGER", "QUERY_NOT_ALLOWED", "DUPLICATE_QUERY"]);
 interface PublicEnv { POA_ESCROW_ENABLED?:string;POA_ESCROW_PER_TX?:string;POA_ESCROW_DAILY?:string;PUBLIC_EXPLORER_URL:string; }
 export interface PublicRpc { escrowRead(path:string,query:Record<string,string>):Promise<unknown>;escrowCommand(packet:string,endpoint:string):Promise<unknown>; }
 const headers={"cache-control":"no-store","content-type":"application/json; charset=utf-8","x-content-type-options":"nosniff","referrer-policy":"no-referrer"};
@@ -13,9 +15,11 @@ export async function escrowHttp(request:Request,env:PublicEnv,rpc:()=>PublicRpc
     if(env.POA_ESCROW_ENABLED!=="true")return part==="capabilities"&&request.method==="GET"?reply(200,{enabled:false,paused:true,held:true,holdReason:"POA payments not open",address:null,limits:{perTransaction:env.POA_ESCROW_PER_TX??"250000.000000",daily:env.POA_ESCROW_DAILY??"1000000.000000"}}):reply(404,{code:"NOT_FOUND"});
     if(request.method==="GET"){
       need(["capabilities","market","domain","subnames","intent"].includes(part),"METHOD_NOT_ALLOWED");
-      const allowed=part==="domain"?["name"]:part==="subnames"?["parent"]:part==="intent"?["id","txid"]:[];
+      const allowed: readonly string[]=part==="domain"?["name"]:part==="subnames"?["parent"]:part==="intent"?["id","txid"]:part==="market"?MARKET_QUERY_KEYS:[];
       need(keys.every(k=>allowed.includes(k)),"QUERY_NOT_ALLOWED");
-      const query=Object.fromEntries(u.searchParams);if(part==="domain")need(typeof query.name==="string"&&query.name.length>0&&query.name.length<=256,"ESCROW_NAME");
+      const query=Object.fromEntries(u.searchParams);
+      if(part==="market")parseMarketQuery(query);
+      if(part==="domain")need(typeof query.name==="string"&&query.name.length>0&&query.name.length<=256,"ESCROW_NAME");
       if(part==="subnames"&&query.parent!==undefined)need(query.parent.length>0&&query.parent.length<=256,"ESCROW_NAME");
       if(part==="intent"){need(/^[0-9a-f]{64}$/.test(query.id??""),"ESCROW_DEPOSIT_INTENT");if(query.txid)need(/^[0-9a-f]{64}$/.test(query.txid),"ESCROW_TXID");}
       return reply(200,await rpc().escrowRead(part,query));
@@ -31,7 +35,7 @@ export async function escrowHttp(request:Request,env:PublicEnv,rpc:()=>PublicRpc
     const bytes=new Uint8Array(size);let offset=0;for(const c of chunks){bytes.set(c,offset);offset+=c.length;}
     const text=new TextDecoder("utf-8",{fatal:true}).decode(bytes);exact(parseJSON(text),["command","signature"]);
     dispatched=true;return reply(200,await rpc().escrowCommand(text,part));
-  }catch(e){const code=e instanceof Fault?e.code:e instanceof Error&&/^ESCROW_[A-Z_]+$/.test(e.message)?e.message:"ESCROW_HELD";
+  }catch(e){const code=e instanceof Fault?e.code:e instanceof Error&&(/^ESCROW_[A-Z_]+$/.test(e.message)||READ_ERRORS.has(e.message))?e.message:"ESCROW_HELD";
     const unknown=dispatched&&(code==="ESCROW_UNAVAILABLE"||code==="ESCROW_HELD"||!(e instanceof Fault)&&!(e instanceof Error&&/^ESCROW_[A-Z_]+$/.test(e.message)));
     return reply(unknown?503:code==="BODY_TOO_LARGE"?413:409,{code,accepted:unknown?"unknown":false,...(unknown?{message:"Keep the exact signed request. Query your signed account; do not create a new request key or payment."}:{})});}
 }
