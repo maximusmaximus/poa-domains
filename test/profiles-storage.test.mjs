@@ -6,6 +6,8 @@ import { nativeAddress } from "../dist/src/native-crypto.js";
 import {
   handleMediaUpload,
   handleMediaGet,
+  handleDomainAvatarGet,
+  validateSafePublicImageUrl,
   backupCommittedProfile,
   pinBytesToPinata,
   checkHourlyUploadCaps,
@@ -352,4 +354,139 @@ test("hourly caps: per client and global, with Retry-After to the next hour and 
   const down = await handleMediaUpload(uploadReq(), { ...env, PROFILES: failing }, undefined, () => now);
   assert.equal(down.status, 503);
   assert.equal((await down.json()).code, "MEDIA_RATE_UNAVAILABLE");
+});
+
+test("validateSafePublicImageUrl allows public https image URLs and rejects SSRF / non-public targets", () => {
+  assert.equal(
+    validateSafePublicImageUrl("https://pub-fc606df28da84dbabc0f8782d8ab944e.r2.dev/poa-domains/moon.png")?.href,
+    "https://pub-fc606df28da84dbabc0f8782d8ab944e.r2.dev/poa-domains/moon.png",
+  );
+  assert.equal(validateSafePublicImageUrl("https://cdn.example.com:443/a.png")?.hostname, "cdn.example.com");
+  for (const bad of [
+    "",
+    "not-a-url",
+    "http://cdn.example.com/a.png",
+    "https://user:pass@cdn.example.com/a.png",
+    "https://cdn.example.com:8443/a.png",
+    "https://localhost/a.png",
+    "https://sub.localhost/a.png",
+    "https://service.local/a.png",
+    "https://metadata.google.internal/computeMetadata/v1/",
+    "https://127.0.0.1/a.png",
+    "https://169.254.169.254/latest/meta-data/",
+    "https://10.0.0.1/a.png",
+    "https://[::1]/a.png",
+    "https://intranet/a.png",
+    "https://1.0.0.127.in-addr.arpa/a.png",
+    "https://cdn.example.com/" + "a".repeat(2050),
+  ]) {
+    assert.equal(validateSafePublicImageUrl(bad), null, bad);
+  }
+});
+
+test("handleDomainAvatarGet serves committed https:// and ipfs:// avatars same-origin with R2 caching and strict guards", async () => {
+  const r2 = mockR2();
+  const owner = nativeAddress(randomBytes(32));
+  const env = {
+    PROFILES: r2,
+    BACKEND_HOST: "poadomains.grok.me",
+    PUBLIC_EXPLORER_URL: "https://poadomains.grok.me",
+    MEDIA_UPLOAD_LIMITER: { limit: async () => ({ success: true }) },
+  };
+  const makeDeed = (name, image, extra = {}) => {
+    const meta = buildProfileWitness({
+      name,
+      rightsHash: "a".repeat(64),
+      poa: owner,
+      description: `${name} profile`,
+      image,
+    });
+    return { id: "d".repeat(64), name, owner, rightsHash: "a".repeat(64), retired: false, metadata: [meta], ...extra };
+  };
+
+  // 1. Committed https:// avatar -> fetches once, magic-byte sniffs, caches in R2, serves subsequent GET/HEAD from cache
+  const extUrl = "https://pub-fc606df28da84dbabc0f8782d8ab944e.r2.dev/poa-domains/moon.png";
+  const moonDeed = makeDeed("moon", extUrl);
+  let fetchCalls = 0;
+  const okFetch = async (url, init) => {
+    fetchCalls++;
+    assert.equal(url, extUrl);
+    assert.equal(init.redirect, "manual");
+    return new Response(SAMPLE_PNG, { status: 200, headers: { "content-type": "image/png" } });
+  };
+  const lookupMoon = async () => ({ status: 200, deed: moonDeed });
+
+  const firstGet = await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/moon"), env, "moon", lookupMoon, okFetch);
+  assert.equal(firstGet.status, 200);
+  assert.equal(firstGet.headers.get("content-type"), "image/png");
+  assert.equal(firstGet.headers.get("content-disposition"), "inline");
+  assert.deepEqual(new Uint8Array(await firstGet.arrayBuffer()), SAMPLE_PNG);
+  assert.equal(fetchCalls, 1);
+
+  // Cached GET & HEAD hit R2 without calling fetch again
+  const cachedGet = await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/moon"), env, "moon", lookupMoon, okFetch);
+  assert.equal(cachedGet.status, 200);
+  assert.deepEqual(new Uint8Array(await cachedGet.arrayBuffer()), SAMPLE_PNG);
+  assert.equal(fetchCalls, 1);
+
+  const cachedHead = await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/moon", { method: "HEAD" }), env, "moon", lookupMoon, okFetch);
+  assert.equal(cachedHead.status, 200);
+  assert.equal(cachedHead.headers.get("content-length"), String(SAMPLE_PNG.byteLength));
+  assert.equal(fetchCalls, 1);
+
+  // HEAD on cold cache (no PROFILES) still validates & returns empty body
+  const coldHead = await handleDomainAvatarGet(
+    new Request("https://poadomains.grok.me/v1/media/domain/moon", { method: "HEAD" }),
+    { BACKEND_HOST: "poadomains.grok.me" },
+    "moon",
+    lookupMoon,
+    okFetch,
+  );
+  assert.equal(coldHead.status, 200);
+  assert.equal(await coldHead.text(), "");
+  assert.equal(fetchCalls, 2);
+
+  // 2. Committed ipfs:// avatar -> served directly via handleMediaGet with zero external fetches
+  const upRes = await handleMediaUpload(
+    new Request("https://poadomains.grok.me/v1/media/upload", {
+      method: "POST",
+      headers: { "content-type": "image/png" },
+      body: SAMPLE_PNG,
+    }),
+    env,
+  );
+  const { uri } = await upRes.json();
+  const ipfsDeed = makeDeed("nova", uri);
+  const ipfsRes = await handleDomainAvatarGet(
+    new Request("https://poadomains.grok.me/v1/media/domain/nova"),
+    env,
+    "nova",
+    async () => ({ status: 200, deed: ipfsDeed }),
+    async () => assert.fail("ipfs:// must never fetch externally"),
+  );
+  assert.equal(ipfsRes.status, 200);
+  assert.equal(ipfsRes.headers.get("content-type"), "image/png");
+  assert.deepEqual(new Uint8Array(await ipfsRes.arrayBuffer()), SAMPLE_PNG);
+
+  // 3. Guards: method, path, withheld/404, retired, reset/empty image, self-host, SSRF, redirects, bad format, oversized
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/moon", { method: "POST" }), env, "moon", lookupMoon)).status, 405);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/a/b"), env, "a/b", lookupMoon)).status, 400);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/hidden"), env, "hidden", async () => ({ status: 409, code: "PUBLIC_RECORD_WITHHELD" }))).status, 409);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/missing"), env, "missing", async () => ({ status: 404, code: "NOT_FOUND" }))).status, 404);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/old"), env, "old", async () => ({ status: 200, deed: { ...moonDeed, retired: true } }))).status, 404);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/reset"), env, "reset", async () => ({ status: 200, deed: { ...moonDeed, profileResetAt: 1 } }))).status, 404);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/noimg"), env, "noimg", async () => ({ status: 200, deed: makeDeed("noimg", null) }))).status, 404);
+
+  const selfDeed = makeDeed("loop", "https://poadomains.grok.me/v1/media/domain/loop");
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/loop"), env, "loop", async () => ({ status: 200, deed: selfDeed }), async () => assert.fail("self-host must not fetch"))).status, 404);
+
+  const ssrfDeed = makeDeed("meta", "https://169.254.169.254/latest/meta-data/");
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/meta"), env, "meta", async () => ({ status: 200, deed: ssrfDeed }), async () => assert.fail("SSRF IP must not fetch"))).status, 404);
+
+  const uncachedDeed = makeDeed("other", "https://cdn.example.com/other.png");
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/other"), env, "other", async () => ({ status: 200, deed: uncachedDeed }), async () => new Response(null, { status: 302, headers: { location: "https://127.0.0.1/" } }))).status, 404);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/other"), env, "other", async () => ({ status: 200, deed: uncachedDeed }), async () => { throw Error("network down"); })).status, 404);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/other"), env, "other", async () => ({ status: 200, deed: uncachedDeed }), async () => new Response("<svg xmlns='http://www.w3.org/2000/svg'/>", { status: 200, headers: { "content-type": "image/png" } }))).status, 400);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/other"), env, "other", async () => ({ status: 200, deed: uncachedDeed }), async () => new Response(SAMPLE_PNG, { status: 200, headers: { "content-length": String(6 * 1024 * 1024) } }))).status, 413);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/other"), env, "other", async () => ({ status: 200, deed: uncachedDeed }), async () => new Response(new Uint8Array(5 * 1024 * 1024 + 10), { status: 200 }))).status, 413);
 });

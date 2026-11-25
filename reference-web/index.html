@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=800fd61cfb8e" />
+    <link rel="stylesheet" href="/style.css?v=62bae1998909" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -123,7 +123,7 @@
             <ol id="cartExpectList" class="cart-expect-steps">
               <li><strong>Finality first:</strong> Your agent creates an escrow intent and sends the exact POA total with the unique memo. PoA network finality (<code>K=5</code> attestations or checkpoint) is required — <em>seen</em> is not credited yet.</li>
               <li><strong>Instant permanent mint:</strong> Once final, escrow credits your balance and your agent submits <code>issue</code> for each name. Each domain is minted permanently to your address immediately in that step — no auction or wait for treasury payout.</li>
-              <li><strong>Verify ownership right away:</strong> Open each name’s <code>/d/&lt;name&gt;</code> page or the <strong>Manage domains</strong> tab with your public <code>poa1…</code> address to see <strong>Owned (permanent)</strong>.</li>
+              <li><strong>Verify ownership right away:</strong> Open each name’s <code>/d/&lt;name&gt;</code> page or <strong>Manage domains</strong> with your public <code>poa1…</code> address to see your name.</li>
               <li><strong>Safety &amp; unused POA:</strong> If a name is taken first or checkout is held, nothing is minted for it. Any unused POA credit stays in your escrow balance and can be withdrawn back only to your original sending address.</li>
             </ol>
           </div>
@@ -133,10 +133,10 @@
       <section id="auctionsSection" data-section="auctions" role="tabpanel" aria-labelledby="tabAuctions" tabindex="0" hidden>
         <h2>🏷️ Auctions</h2>
         <p data-info-description class="howto">Past · Current · Upcoming. Queued inventory auctions start their timer when the first bid is placed. Tap a name for history.</p>
-        <p id="auctionsStartNote" class="escrow-balance-note" role="note">⏱️ <strong>Note:</strong> An auction starts with the first bid — placing the opening bid begins the countdown timer.</p>
+        <p id="auctionsStartNote" class="escrow-balance-note" role="note">⏱️ An auction starts with the first bid.</p>
         <div id="auctionsBidderBar" class="auctions-bidder-bar" hidden>
-          <label for="auctionsBidderInput">👤 Track your bids (optional public <code>poa1…</code> address — never a private key)</label>
-          <input id="auctionsBidderInput" type="text" autocomplete="off" placeholder="poa1… to highlight leading &amp; outbid auctions" maxlength="80" />
+          <label for="auctionsBidderInput">👤 Track your bids</label>
+          <input id="auctionsBidderInput" type="text" autocomplete="off" placeholder="poa1… public address" maxlength="80" />
         </div>
         <div class="auction-tabs" role="tablist" aria-label="Auction filters">
           <button type="button" class="auction-tab is-active" role="tab" aria-selected="true" data-auction-tab="current" id="auctionTabCurrent" aria-controls="auctions" tabindex="0">Current</button>
@@ -470,6 +470,6 @@
       </details>
     </div>
 
-    <script type="module" src="/app.js?v=e24f44d20e2d"></script>
+    <script type="module" src="/app.js?v=47cf48dc0435"></script>
   </body>
 </html>

@@ -66,7 +66,7 @@ test('all UI modules load without booting a browser, and shared copy guards rema
   assert.equal(cart.cartCopyBlocked(),false);
   for(const item of [{validationError:'invalid'},{needsReview:true}]){ui.cart=[item];assert.equal(cart.cartCopyBlocked(),true);}
   ui.cart=[];ui.networkStatus.hold=true;assert.equal(cart.cartCopyBlocked(),true);
-  assert.match(core.statusLabel('available'),/🟢/);assert.equal(core.statusLabel('custom'),'custom');
+  assert.match(core.statusLabel('available'),/🟢/);assert.equal(core.statusLabel('owned'),'Owned');assert.equal(core.statusLabel('custom'),'custom');
   ui.details={roles:{buyer:'fixture-public-id'}};assert.equal(core.person('fixture-public-id'),'Demo buyer');assert.match(core.person('other-public-identity'),/…$/);
   const samplePoa='poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf';
   assert.equal(isPoaAddress(samplePoa),true);
@@ -273,11 +273,13 @@ test('router domain avatars, escrow payer autofill, management plans, and addres
 
   const deedId = 'a'.repeat(64);
   const childId = 'b'.repeat(64);
+  const extDeedId = 'c'.repeat(64);
   ui.latestState = {
    time: 1000,
    names: {
     agent: { name: 'agent', activeId: deedId },
     'sub.agent': { name: 'sub.agent', activeId: childId },
+    moon: { name: 'moon', activeId: extDeedId },
    },
    deeds: {
     [deedId]: {
@@ -289,6 +291,11 @@ test('router domain avatars, escrow payer autofill, management plans, and addres
      id: childId, name: 'sub.agent', parentId: deedId, owner: ownerB, version: 1, ownerVersion: 1, retired: false,
      rights: { kind: 'permanent' }, rightsHash: 'e'.repeat(64), records: [], metadata: [],
     },
+    [extDeedId]: {
+     id: extDeedId, name: 'moon', parentId: null, owner: ownerB, version: 2, ownerVersion: 1, retired: false,
+     rights: { kind: 'permanent' }, rightsHash: 'd'.repeat(64), records: [],
+     metadata: [{ cid: avatarCid, document: { schema: 'poa-domains.profile.v1', version: 1, name: 'moon', rightsHash: 'd'.repeat(64), poa: ownerB, btc: null, eth: null, description: 'moon', image: 'https://pub.r2.dev/moon.png' } }],
+    },
    },
    offers: {},
    auctions: {},
@@ -297,6 +304,7 @@ test('router domain avatars, escrow payer autofill, management plans, and addres
   assert.equal(routerMod.isRegisteredDomain('agent'), true);
   assert.equal(routerMod.isRegisteredDomain('unregistered'), false);
   assert.equal(routerMod.domainAvatarMediaPath('agent'), `/v1/media/${avatarCid}`);
+  assert.equal(routerMod.domainAvatarMediaPath('moon'), '/v1/media/domain/moon');
   assert.equal(routerMod.domainAvatarMediaPath('sub.agent'), null);
   assert.equal(routerMod.domainAvatarMediaPath('unregistered'), null);
 

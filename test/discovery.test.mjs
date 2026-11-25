@@ -91,6 +91,8 @@ test("all actual registry, gateway and discovery API methods appear exactly once
     ["POST", "/mcp"],
     ["POST", "/v1/search-log"],
     ["POST", "/v1/media/upload"],
+    ["GET", "/v1/media/domain/:name"],
+    ["HEAD", "/v1/media/domain/:name"],
     ["GET", "/v1/media/:cid"],
     ["HEAD", "/v1/media/:cid"],
     ["GET", "/v1/network-status"],

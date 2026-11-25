@@ -15,17 +15,16 @@ import {
   poaOnlyMode,
   poaShort,
   poaToMicros,
-  profileImageMediaPath,
   publicNameUnavailable,
   registryUnit,
   resolveDomainView,
   unavailableKey,
-} from "./shared.js?v=e24f44d20e2d";
-import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=e24f44d20e2d";
-import { ui } from "./ui-state.js?v=e24f44d20e2d";
-import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=e24f44d20e2d";
-import { domainHeader, nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=e24f44d20e2d";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=e24f44d20e2d";
+} from "./shared.js?v=47cf48dc0435";
+import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=47cf48dc0435";
+import { ui } from "./ui-state.js?v=47cf48dc0435";
+import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=47cf48dc0435";
+import { domainHeader, nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=47cf48dc0435";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=47cf48dc0435";
 
 function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) {
   const wrap = document.createElement("span");
@@ -89,11 +88,7 @@ function renderDomainProfileCard(deed, { listedForSale = false } = {}) {
     box.hidden = false;
     box.classList.add("domain-fields-paused");
     add(box, "h3", "⏸️ Domain fields paused while listed");
-    add(
-      box,
-      "p",
-      "This domain is listed for sale or in an auction. Attached profile fields and records are paused while listed and will be dropped when ownership transfers (archived under Previous fields & records below).",
-    );
+    add(box, "p", "Profile fields are paused while listed and reset on transfer.");
     return;
   }
 
@@ -103,7 +98,7 @@ function renderDomainProfileCard(deed, { listedForSale = false } = {}) {
       add(
         box,
         "p",
-        "✨ Clean slate for current holder — previous holder's attached fields and profile were dropped on ownership transfer and archived as historical records below.",
+        "✨ Clean slate for current holder — previous fields are archived below.",
         "domain-clean-slate",
       );
       return;
@@ -113,39 +108,13 @@ function renderDomainProfileCard(deed, { listedForSale = false } = {}) {
   }
 
   box.hidden = false;
+  let imageUri = null;
+  let contentCid = null;
   if (hasActiveProfile) {
     const p = extracted.profile;
-    const mediaPath = profileImageMediaPath(p.image);
-    if (mediaPath || p.description || p.image) {
-      const head = add(box, "div", "", "domain-profile-head");
-      if (mediaPath) {
-        const img = document.createElement("img");
-        img.className = "domain-avatar";
-        img.src = mediaPath;
-        img.alt = `Avatar for ${deed.name}`;
-        img.addEventListener("error", () => {
-          img.hidden = true;
-        });
-        head.append(img);
-      }
-      if (p.description || (p.image && !mediaPath)) {
-        const meta = add(head, "div", "", "domain-profile-meta");
-        if (p.description) add(meta, "p", p.description, "domain-profile-bio");
-        if (p.image && !mediaPath) {
-          const linkLine = add(meta, "p", "🖼️ Avatar: ", "muted");
-          if (p.image.startsWith("https://")) {
-            const a = document.createElement("a");
-            a.href = p.image;
-            a.target = "_blank";
-            a.rel = "noopener noreferrer";
-            a.textContent = p.image;
-            linkLine.append(a);
-          } else {
-            add(linkLine, "code", p.image);
-          }
-        }
-      }
-    }
+    imageUri = p.image || null;
+    contentCid = extracted.cid || null;
+    if (p.description) add(box, "p", p.description, "domain-profile-bio");
     const fields = add(box, "div", "", "domain-profile-fields");
     const poaRow = add(fields, "p", "POA: ", "record");
     appendPoaAddress(poaRow, p.poa, { code: true });
@@ -157,15 +126,34 @@ function renderDomainProfileCard(deed, { listedForSale = false } = {}) {
       const ethRow = add(fields, "p", "ETH / Base: ", "record");
       appendCopyableValue(ethRow, p.eth, `Copy ETH address for ${deed.name}`);
     }
-    if (extracted.cid) {
-      const cidRow = add(box, "p", "Content ID: ", "muted");
-      add(cidRow, "code", extracted.cid);
-    }
   }
-  if (activeRecords.length) {
-    const recBox = add(box, "div", "", hasActiveProfile ? "domain-records-list" : "");
-    add(recBox, "h3", "🏷️ Attached domain records");
-    for (const rec of activeRecords) appendRecordRow(recBox, rec, deed.name);
+  if (imageUri || contentCid || activeRecords.length) {
+    const more = document.createElement("details");
+    more.className = "domain-more";
+    add(more, "summary", "More");
+    if (imageUri) {
+      const linkLine = add(more, "p", "Avatar: ", "muted");
+      if (imageUri.startsWith("https://")) {
+        const a = document.createElement("a");
+        a.href = imageUri;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = imageUri;
+        linkLine.append(a);
+      } else {
+        add(linkLine, "code", imageUri);
+      }
+    }
+    if (contentCid) {
+      const cidRow = add(more, "p", "Content ID: ", "muted");
+      add(cidRow, "code", contentCid);
+    }
+    if (activeRecords.length) {
+      const recBox = add(more, "div", "", "domain-records-list");
+      add(recBox, "h4", "Attached domain records");
+      for (const rec of activeRecords) appendRecordRow(recBox, rec, deed.name);
+    }
+    box.append(more);
   }
 }
 
@@ -180,12 +168,7 @@ function renderDomainPreviousFields(deed, { listedForSale = false } = {}) {
   }
   box.hidden = false;
   add(box, "h3", `📚 Previous fields & records (${entries.length})`);
-  add(
-    box,
-    "p",
-    "Historical profile fields, paused tags while listed, and records dropped on ownership transfer are preserved here as read-only records and are not active on this domain.",
-    "muted",
-  );
+  add(box, "p", "Read-only archive of inactive fields and records.", "muted");
   for (const entry of entries) {
     const item = add(box, "article", "", "domain-prev-entry");
     item.dataset.recordStatus = entry.status;
@@ -277,13 +260,13 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
     const outbidInfo = poaAuctionOutbidStatus(a, { bidderAddress: ui.bidderAddress, cartItem });
 
     if (a.status === "SETTLING") {
-      add(item, "p", "⏳ POA Auction · Settling handover", "badge");
+      add(item, "p", "⏳ Settling", "badge");
     } else if (awaiting) {
-      add(item, "p", "⏳ POA Auction queued — timer starts on first bid", "badge");
+      add(item, "p", "⏳ Starts on first bid", "badge");
     } else if (closed) {
-      add(item, "p", "⏰ POA Auction closed · awaiting seller handover", "badge");
+      add(item, "p", "⏰ Awaiting handover", "badge");
     } else {
-      add(item, "p", `🔥 Live POA Auction · High bid ${poaShort(a.high?.amount ?? a.price)} POA`, "badge-ok");
+      add(item, "p", `🔥 Live auction · High bid ${poaShort(a.high?.amount ?? a.price)} POA`, "badge-ok");
     }
 
     if (outbidInfo.status === "leading") add(item, "p", outbidInfo.message, "auction-leading-badge");
@@ -301,9 +284,8 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
     appendPrincipal(sellerLine, a.seller);
 
     const windowSec = Math.round((a.window ?? a.quiet ?? 3600000) / 1000);
-    const quietSec = Math.round((a.quiet ?? 3600000) / 1000);
     if (awaiting) {
-      add(item, "p", `⏱️ Timer (${formatDuration(windowSec)} + ${formatDuration(quietSec)} quiet) starts when the first bid is placed.`, "muted");
+      add(item, "p", `⏱️ ${formatDuration(windowSec)} timer · starts on first bid`, "muted");
     } else if (a.closes > 0) {
       const closeRow = add(item, "p", "");
       if (a.status === "OPEN" && !closed) {
@@ -311,7 +293,7 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
         cd.dataset.closesMs = String(a.closes);
         closeRow.append(" · ");
       }
-      closeRow.append(`Closes ${formatClock(Math.floor(a.closes / 1000))} (+${formatDuration(quietSec)} anti-snipe quiet)`);
+      closeRow.append(`Closes ${formatClock(Math.floor(a.closes / 1000))}`);
     }
 
     if (a.status === "OPEN" && (awaiting || !closed)) {
@@ -358,10 +340,10 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
       item,
       "p",
       s.status === "SETTLING"
-        ? "⏳ POA Sale · Settling handover"
+        ? "⏳ Settling"
         : s.high
-          ? "⏳ POA Sale reserved — awaiting seller handover"
-          : `💰 For sale · ${poaShort(s.price)} POA (Fixed price)`,
+          ? "⏳ Awaiting handover"
+          : `💰 For sale · ${poaShort(s.price)} POA`,
       s.high || s.status === "SETTLING" ? "badge" : "badge-ok",
     );
     const sellerLine = add(item, "p", "Seller: ", "muted");
@@ -450,8 +432,9 @@ export function renderDomainPage(name) {
   if (publicNameUnavailable(name, ui.cap)) {
     syncDomainCopyLink(name, false);
     el("domainTitle").classList.remove("domain-heading");
-    el("domainTitle").textContent = "Name unavailable";
-    el("domainStatus").textContent = "🔒 Stored record withheld — not free to register";
+    el("domainTitle").textContent = "Unavailable";
+    el("domainStatus").hidden = false;
+    el("domainStatus").textContent = "🔴 Unavailable";
     el("domainOwner").textContent = "No public ownership record.";
     for (const id of ["domainProfile", "domainListing", "domainPreviousFields"]) {
       const node = el(id);
@@ -480,15 +463,22 @@ export function renderDomainPage(name) {
 
   el("domainTitle").replaceChildren();
   domainHeader(el("domainTitle"), name, { size: "lg" });
+  const statusEl = el("domainStatus");
   if (salesInfo.activePoaAuctions.length) {
     const first = salesInfo.activePoaAuctions[0];
-    el("domainStatus").textContent = isPoaAuctionAwaitingFirstBid(first)
-      ? "⏳ POA auction queued (starts on first bid)"
-      : "🔥 In live POA auction";
+    statusEl.hidden = false;
+    statusEl.textContent = isPoaAuctionAwaitingFirstBid(first)
+      ? "⏳ Starts on first bid"
+      : "🔥 Live auction";
   } else if (salesInfo.activePoaSales.length) {
-    el("domainStatus").textContent = "💰 For sale (POA)";
+    statusEl.hidden = false;
+    statusEl.textContent = "💰 For sale";
+  } else if (view.status === "owned") {
+    statusEl.hidden = true;
+    statusEl.textContent = "";
   } else {
-    el("domainStatus").textContent = statusLabel(view.status);
+    statusEl.hidden = false;
+    statusEl.textContent = statusLabel(view.status);
   }
 
   const ownerNode = el("domainOwner");
@@ -499,7 +489,6 @@ export function renderDomainPage(name) {
   } else if (view.variantOf) {
     ownerNode.append("🔒 Same emoji as ");
     nameLink(ownerNode, view.variantOf);
-    ownerNode.append(" · one owner per emoji");
   } else {
     ownerNode.textContent = "No owner yet";
   }
@@ -604,7 +593,7 @@ export function renderOwnerPage(ownerId) {
     const card = add(namesBox, "article", "", "card");
     const h = add(card, "h4", "");
     domainHeader(h, n.name);
-    add(card, "p", d.rights.kind, "badge");
+    if (d.rights.kind === "lease") add(card, "p", "📜 Legacy lease", "badge");
     const manageBtn = add(card, "button", "⚙️ Manage this domain", "secondary small");
     manageBtn.type = "button";
     manageBtn.setAttribute("aria-label", `Manage ${n.name}`);

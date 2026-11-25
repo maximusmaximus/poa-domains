@@ -1,9 +1,9 @@
-import { ui } from "./ui-state.js?v=e24f44d20e2d";
-import { add, el, endpointBase } from "./ui-core.js?v=e24f44d20e2d";
-import { createDomainAvatar, domainHeader, nameLink, openPoa, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=e24f44d20e2d";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=e24f44d20e2d";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=e24f44d20e2d";
-import { createInlineInfo } from "./ui-help.js?v=e24f44d20e2d";
+import { ui } from "./ui-state.js?v=47cf48dc0435";
+import { add, el, endpointBase } from "./ui-core.js?v=47cf48dc0435";
+import { createDomainAvatar, domainHeader, nameLink, openPoa, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=47cf48dc0435";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=47cf48dc0435";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=47cf48dc0435";
+import { createInlineInfo } from "./ui-help.js?v=47cf48dc0435";
 import {
   buildProfileUpdatePrompt,
   checkBtcAddress,
@@ -21,7 +21,7 @@ import {
   SALE_FIELDS_WARNING,
   saveKnownOwner,
   validPrincipal,
-} from "./shared.js?v=e24f44d20e2d";
+} from "./shared.js?v=47cf48dc0435";
 
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const IDLE_MANAGE_PROMPT = "Edit profile fields or choose an action above to preview the code for your agent.";
@@ -327,7 +327,7 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
   const previewBox = add(form, "div", "", "profile-avatar-preview");
   const renderAvatarPreview = (uri) => {
     previewBox.replaceChildren();
-    const mediaPath = profileImageMediaPath(uri);
+    const mediaPath = profileImageMediaPath(uri, uri && uri === current.image ? deed.name : null);
     previewBox.hidden = false;
     previewBox.append(createDomainAvatar(deed.name, { size: "lg", mediaPath }));
     if (headerAvatar && !listedForSale) {

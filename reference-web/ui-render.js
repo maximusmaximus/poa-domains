@@ -1,13 +1,13 @@
-import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, validPrincipal } from "./shared.js?v=e24f44d20e2d";
-import { drawTicker } from "./ui-ticker.js?v=e24f44d20e2d";
-import { actionLabel } from "./ui-copy.js?v=e24f44d20e2d";
-import { returnFocus } from "./ui-a11y.js?v=e24f44d20e2d";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=e24f44d20e2d";
-import { ui } from "./ui-state.js?v=e24f44d20e2d";
-import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=e24f44d20e2d";
-import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=e24f44d20e2d";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=e24f44d20e2d";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=e24f44d20e2d";
+import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, validPrincipal } from "./shared.js?v=47cf48dc0435";
+import { drawTicker } from "./ui-ticker.js?v=47cf48dc0435";
+import { actionLabel } from "./ui-copy.js?v=47cf48dc0435";
+import { returnFocus } from "./ui-a11y.js?v=47cf48dc0435";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=47cf48dc0435";
+import { ui } from "./ui-state.js?v=47cf48dc0435";
+import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=47cf48dc0435";
+import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=47cf48dc0435";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=47cf48dc0435";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=47cf48dc0435";
 
 export function updateLiveAuctionsBadge(state = ui.latestState) {
     const badge = el("liveAuctionsBadge");
@@ -185,7 +185,7 @@ function renderPoaAuctions(box) {
     const list = groups[ui.auctionTab] ?? [];
     if (!list.length) {
         if (ui.auctionTab === "current" && groups.upcoming.length > 0) {
-            add(box, "p", `No live auctions running yet. ${groups.upcoming.length} ${groups.upcoming.length === 1 ? "domain is" : "domains are"} queued in Upcoming — placing the first bid starts the auction timer.`, "muted");
+            add(box, "p", `No live auctions yet. ${groups.upcoming.length} queued in Upcoming — first bid starts the timer.`, "muted");
             const jump = add(box, "button", `⏳ View Upcoming (${groups.upcoming.length})`, "secondary small");
             jump.type = "button";
             jump.addEventListener("click", () => el("auctionTabUpcoming")?.click());
@@ -209,13 +209,13 @@ function renderPoaAuctions(box) {
         const ah = add(card, "h4", "");
         domainHeader(ah, a.name);
         if (a.status !== "OPEN") {
-            add(card, "p", a.status === "COMPLETE" ? "✅ Complete" : a.status === "SETTLING" ? "⏳ Settling handover" : "✖️ Cancelled", a.status === "COMPLETE" ? "badge-ok" : "badge");
+            add(card, "p", a.status === "COMPLETE" ? "✅ Complete" : a.status === "SETTLING" ? "⏳ Settling" : "✖️ Cancelled", a.status === "COMPLETE" ? "badge-ok" : "badge");
         } else if (awaiting) {
             add(card, "p", "⏳ Starts on first bid", "badge");
         } else if (closed) {
-            add(card, "p", "⏰ Bidding closed · awaiting seller handover", "badge");
+            add(card, "p", "⏰ Awaiting handover", "badge");
         } else {
-            add(card, "p", "🔥 Live POA auction", "badge-ok");
+            add(card, "p", "🔥 Live auction", "badge-ok");
         }
         if (outbidInfo.status === "leading") {
             add(card, "p", outbidInfo.message, "auction-leading-badge");
@@ -230,9 +230,8 @@ function renderPoaAuctions(box) {
             bidLine.append("No bids yet.");
         }
         const windowSec = Math.round((a.window ?? a.quiet ?? 3600000) / 1000);
-        const quietSec = Math.round((a.quiet ?? 3600000) / 1000);
         if (awaiting) {
-            add(card, "p", `⏱️ Timer (${formatDuration(windowSec)} + ${formatDuration(quietSec)} quiet) starts when the first bid is placed.`, "muted");
+            add(card, "p", `⏱️ ${formatDuration(windowSec)} timer · starts on first bid`, "muted");
         } else if (a.closes > 0) {
             const closeRow = add(card, "p", "");
             if (a.status === "OPEN" && !closed) {
@@ -240,7 +239,7 @@ function renderPoaAuctions(box) {
                 cd.dataset.closesMs = String(a.closes);
                 closeRow.append(" · ");
             }
-            closeRow.append(`Closes ${formatClock(Math.floor(a.closes / 1000))} (+${formatDuration(quietSec)} anti-snipe quiet)`);
+            closeRow.append(`Closes ${formatClock(Math.floor(a.closes / 1000))}`);
         }
         if (a.status === "OPEN" && (awaiting || !closed)) {
             add(card, "p", `Minimum ${awaiting ? "opening" : "next"} bid: ${poaShort(minNext)} POA`, "badge-ok");
@@ -394,7 +393,7 @@ export function renderMarketplace(s) {
             const card = add(box, "article", "", "card");
             const h = add(card, "h4", "");
             domainHeader(h, item.name);
-            add(card, "p", `🪙 ${poaShort(item.price)} POA · Fixed price`, "badge-ok");
+            add(card, "p", `🪙 ${poaShort(item.price)} POA`, "badge-ok");
             const sellerLine = add(card, "p", "Seller: ");
             appendPrincipal(sellerLine, item.seller);
             if (item.closes > 0)
@@ -486,7 +485,7 @@ export function render(payload) {
             `${bids.length} / ${receipts.length}`,
             "recorded bids / committed receipts",
         ],
-        ...(poaOnlyMode(ui.cap) ? [] : [[settledVolume.toString(), "Registry bids + filled offers (local registry units, not on-chain volume)"]]),
+        ...(poaOnlyMode(ui.cap) ? [] : [[settledVolume.toString(), "registry volume"]]),
         [
             `${ui.cap.emojiAliases ?? "unknown"} / ${ui.reservedSet.size || (ui.cap.reservedCount ?? "unknown")}`,
             "emoji sequences / reserved roots",
@@ -501,15 +500,12 @@ export function render(payload) {
         const d = s.deeds[n.activeId], card = add(el("names"), "article", "", "card");
         const nh = add(card, "h4", "");
         domainHeader(nh, n.name);
-        const ownerLine = add(card, "p", "", "badge");
-        ownerLine.append((ui.demo ? "Synthetic " : "") + d.rights.kind + " deed · ");
+        const ownerLine = add(card, "p", ui.demo ? "Synthetic · Owner: " : "Owner: ", "muted");
         ownerLink(ownerLine, d.owner, person(d.owner));
-        add(card, "p", `Generation ${d.generation} · owner version ${d.ownerVersion} · deed version ${d.version}`);
         if (d.parentId)
             namedText(add(card,"p",""),"Protected child of "+s.deeds[d.parentId].name+"; parent transfer does not remove these registry rights.");
-        add(card, "p", d.rights.kind === "lease"
-            ? "📜 Legacy lease record · renewals are off"
-            : "♾️ Owned forever · resale or transfer only", "badge-ok");
+        if (d.rights.kind === "lease")
+            add(card, "p", "📜 Legacy lease", "badge");
         for (const r of d.records) {
             const value = r.url ?? r.address ?? r.cid;
             const recLine = add(card, "p", r.type + ": ", "record");
@@ -519,8 +515,15 @@ export function render(payload) {
                 recLine.append(String(value ?? ""));
         }
         const lastCid = d.metadata?.[d.metadata.length - 1]?.cid;
-        if (lastCid)
-            add(card, "code", lastCid);
+        const more = document.createElement("details");
+        more.className = "domain-more";
+        add(more, "summary", "More");
+        add(more, "p", `Gen ${d.generation} · owner v${d.ownerVersion} · deed v${d.version}`, "muted");
+        if (lastCid) {
+            const cidRow = add(more, "p", "Content ID: ", "muted");
+            add(cidRow, "code", lastCid);
+        }
+        card.append(more);
         const manageBtn = add(card, "button", "⚙️ Manage this domain", "secondary small");
         manageBtn.type = "button";
         manageBtn.setAttribute("aria-label", `Manage ${n.name}`);

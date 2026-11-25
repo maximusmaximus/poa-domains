@@ -143,6 +143,9 @@ test("Profile description, image URI, and magic-byte sniffing enforce bounds and
   assert.equal(profileImageMediaPath(`ipfs://${sampleCid}`), `/v1/media/${sampleCid}`);
   assert.equal(validProfileImage("https://example.com/avatar.png"), "https://example.com/avatar.png");
   assert.equal(profileImageMediaPath("https://example.com/avatar.png"), null);
+  assert.equal(profileImageMediaPath("https://example.com/avatar.png", "moon"), "/v1/media/domain/moon");
+  assert.equal(profileImageMediaPath("https://pub.r2.dev/pizza.png", "🍕"), "/v1/media/domain/%F0%9F%8D%95");
+  assert.equal(profileImageMediaPath(`ipfs://${sampleCid}`, "moon"), `/v1/media/${sampleCid}`);
   for (const badUri of ["javascript:alert(1)", "data:image/png;base64,AAAA", "http://insecure.example/a.png", "ipfs://bad cid"]) {
     assert.throws(() => validProfileImage(badUri), /INVALID_PROFILE_IMAGE/, badUri);
     assert.equal(checkProfileImage(badUri).ok, false, badUri);

@@ -1,13 +1,13 @@
-import { publicNameUnavailable } from "./shared.js?v=e24f44d20e2d";
-import { registryUnit } from "./shared.js?v=e24f44d20e2d";
-import { actionLabel } from "./ui-copy.js?v=e24f44d20e2d";
-import { createInlineInfo } from "./ui-help.js?v=e24f44d20e2d";
-import { trapDialog } from "./ui-a11y.js?v=e24f44d20e2d";
-import { ui } from "./ui-state.js?v=e24f44d20e2d";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=e24f44d20e2d";
-import { add, el, endpointBase } from "./ui-core.js?v=e24f44d20e2d";
-import { domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=e24f44d20e2d";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=e24f44d20e2d";
+import { publicNameUnavailable } from "./shared.js?v=47cf48dc0435";
+import { registryUnit } from "./shared.js?v=47cf48dc0435";
+import { actionLabel } from "./ui-copy.js?v=47cf48dc0435";
+import { createInlineInfo } from "./ui-help.js?v=47cf48dc0435";
+import { trapDialog } from "./ui-a11y.js?v=47cf48dc0435";
+import { ui } from "./ui-state.js?v=47cf48dc0435";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=47cf48dc0435";
+import { add, el, endpointBase } from "./ui-core.js?v=47cf48dc0435";
+import { domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=47cf48dc0435";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=47cf48dc0435";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
@@ -237,7 +237,7 @@ export function renderCartEscrowStatus() {
             hint.textContent = "Plan your cart now — wait to send POA until checkout reopens.";
             node.append(title, detail, hint);
         } else {
-            node.textContent = "🟢 POA checkout open — ready when you approve your agent.";
+            node.textContent = "🟢 POA checkout open";
         }
     }
 }
@@ -296,7 +296,7 @@ export function renderCartExpectations() {
                     : [
                         ["Finality first: ", "Your agent creates an escrow intent and sends the exact POA total with the unique memo. PoA network finality (K=5 attestations or checkpoint) is required — seen is not credited yet."],
                         ["Instant permanent mint: ", "Once final, escrow credits your balance and your agent submits issue for each name. Each domain is minted permanently to your address immediately in that step — no auction or wait for treasury payout."],
-                        ["Verify ownership right away: ", "Open each name’s /d/<name> page or the Manage domains tab with your public poa1… address to see Owned (permanent)."],
+                        ["Verify ownership right away: ", "Open each name’s /d/<name> page or Manage domains with your public poa1… address to see your name."],
                         ["Safety & unused POA: ", "If a name is taken first or checkout is held, nothing is minted for it. Any unused POA credit stays in your escrow balance and can be withdrawn back only to your original sending address."],
                     ];
                 for (const [strongText, bodyText] of steps) {
@@ -529,7 +529,7 @@ export function renderCart() {
             const nowMs = ui.escrowMarketServerTime || Date.now();
             const review = cartReview(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, nowMs);
             const liveMin = review.minimum ?? item.latestMinimum ?? item.minimumAmount ?? item.amount;
-            add(card, "p", `🔨 For Auction (${p.awaitingFirstBid ? "starts on 1st bid" : "live"}) · Min ${poaShort(liveMin)} POA`, "badge-ok");
+            add(card, "p", `${p.awaitingFirstBid ? "⏳ Starts on 1st bid" : "🔥 Live auction"} · Min ${poaShort(liveMin)} POA`, "badge-ok");
             if (item.needsReview || item.outbid)
                 add(card, "p", "⚠️ " + (item.reviewMessage || "Auction changed — review your highest bid."), item.outbid ? "auction-outbid-badge" : "badge-warn");
             const actionBtns = add(card, "div", "", "button-row");

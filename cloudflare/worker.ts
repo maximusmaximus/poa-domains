@@ -1,5 +1,5 @@
 import { searchLog } from "./search-log.js";
-import { backupCommittedProfile, handleMediaGet, handleMediaUpload } from "./profiles-storage.js";
+import { backupCommittedProfile, handleDomainAvatarGet, handleMediaGet, handleMediaUpload } from "./profiles-storage.js";
 import { handleTreasuryRequest } from "./treasury.js";
 import { handleFeedbackCaptcha, handleFeedbackChallenge, handleFeedbackSubmit } from "./feedback.js";
 import { handleTermsAgree, handleTermsInfo, handleTermsStatus } from "./terms.js";
@@ -142,6 +142,16 @@ const gateway = {
       if(discovery){if(request.method!=="GET"&&request.method!=="HEAD")return fail(405,{code:"METHOD_NOT_ALLOWED"});return new Response(request.method==="HEAD"?null:discovery.text,{headers:{...SECURITY,"content-type":discovery.type,"access-control-allow-origin":"*"}});}
       if(u.pathname === "/v1/search-log") return searchLog(request,env);
       if(u.pathname === "/v1/media/upload") return handleMediaUpload(request,env);
+      // GET/HEAD /v1/media/domain/:name
+      if(u.pathname.startsWith("/v1/media/domain/")) {
+        const rawName = u.pathname.slice("/v1/media/domain/".length);
+        const stub = env.REGISTRY.getByName(SINGLETON);
+        return handleDomainAvatarGet(request, env, rawName, async (nameSeg, reqId) => {
+          const reply = await stub.handle({ method: "GET", path: "/v1/names/" + nameSeg, query: {}, requestId: reqId });
+          const parsed = JSON.parse(reply.jsonText);
+          return reply.status >= 400 ? { status: reply.status, code: parsed?.code } : { status: 200, deed: parsed?.deed };
+        });
+      }
       // GET/HEAD /v1/media/:cid
       if(u.pathname.startsWith("/v1/media/")) return handleMediaGet(request,env,u.pathname.slice("/v1/media/".length));
       if(u.pathname === "/v1/treasury") {
