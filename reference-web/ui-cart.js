@@ -1,13 +1,13 @@
-import { publicNameUnavailable } from "./shared.js?v=47cf48dc0435";
-import { registryUnit } from "./shared.js?v=47cf48dc0435";
-import { actionLabel } from "./ui-copy.js?v=47cf48dc0435";
-import { createInlineInfo } from "./ui-help.js?v=47cf48dc0435";
-import { trapDialog } from "./ui-a11y.js?v=47cf48dc0435";
-import { ui } from "./ui-state.js?v=47cf48dc0435";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=47cf48dc0435";
-import { add, el, endpointBase } from "./ui-core.js?v=47cf48dc0435";
-import { domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=47cf48dc0435";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=47cf48dc0435";
+import { publicNameUnavailable } from "./shared.js?v=69895dc026c0";
+import { registryUnit } from "./shared.js?v=69895dc026c0";
+import { actionLabel } from "./ui-copy.js?v=69895dc026c0";
+import { createInlineInfo } from "./ui-help.js?v=69895dc026c0";
+import { trapDialog } from "./ui-a11y.js?v=69895dc026c0";
+import { ui } from "./ui-state.js?v=69895dc026c0";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=69895dc026c0";
+import { add, el, endpointBase } from "./ui-core.js?v=69895dc026c0";
+import { domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=69895dc026c0";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=69895dc026c0";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
@@ -212,7 +212,8 @@ function formatEscrowHoldReason(caps) {
 }
 
 export function renderCartEscrowStatus() {
-    const show = Boolean(ui.cap && poaOnlyMode(ui.cap) && ui.escrowCaps?.enabled);
+    const escrowKnown = Boolean(ui.escrowCaps);
+    const show = Boolean(ui.cap && poaOnlyMode(ui.cap) && (escrowKnown ? ui.escrowCaps.enabled : ui.cap.escrow?.enabled));
     const caps = ui.escrowCaps;
     const isHeld = Boolean(caps && (caps.held || caps.paused || caps.freshness?.held));
     const reason = show && isHeld ? formatEscrowHoldReason(caps) : "";
@@ -221,23 +222,35 @@ export function renderCartEscrowStatus() {
         if (!node)
             continue;
         node.hidden = !show;
-        node.className = "cart-escrow-status " + (isHeld ? "is-held badge-warn" : "badge-ok");
+        node.className = "cart-escrow-status " + (!escrowKnown ? "badge" : isHeld ? "is-held badge-warn" : "badge-ok");
         node.replaceChildren();
         if (!show)
             continue;
-        if (isHeld) {
-            const title = document.createElement("strong");
-            title.className = "cart-escrow-title";
+        const title = document.createElement("strong");
+        title.className = "cart-escrow-title";
+        title.setAttribute("role", "status");
+        title.setAttribute("aria-live", "polite");
+        if (!escrowKnown) {
+            title.textContent = "⚪ Checking POA checkout…";
+            node.append(title);
+        } else if (isHeld) {
             title.textContent = "⏸️ POA checkout paused";
-            const detail = document.createElement("span");
-            detail.className = "cart-escrow-reason";
-            detail.textContent = reason;
-            const hint = document.createElement("span");
-            hint.className = "cart-escrow-hint";
-            hint.textContent = "Plan your cart now — wait to send POA until checkout reopens.";
-            node.append(title, detail, hint);
+            const info = createInlineInfo(id + "-info", "Why POA checkout is paused", "");
+            const firstP = info.querySelector(".info-popover p");
+            if (firstP) {
+                firstP.replaceChildren();
+                const detail = document.createElement("span");
+                detail.className = "cart-escrow-reason";
+                detail.textContent = reason;
+                const hint = document.createElement("span");
+                hint.className = "cart-escrow-hint";
+                hint.textContent = "Plan your cart now — wait to send POA until checkout reopens.";
+                firstP.append(detail, hint);
+            }
+            node.append(title, info);
         } else {
-            node.textContent = "🟢 POA checkout open";
+            title.textContent = "🟢 POA checkout open";
+            node.append(title);
         }
     }
 }

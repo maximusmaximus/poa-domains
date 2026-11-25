@@ -1,18 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=47cf48dc0435";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=47cf48dc0435";
-import { renderManagement } from "./ui-manage.js?v=47cf48dc0435";
-import { actionLabel } from "./ui-copy.js?v=47cf48dc0435";
-import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=47cf48dc0435";
-import { ui } from "./ui-state.js?v=47cf48dc0435";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=47cf48dc0435";
-import { createPoaCopyButton } from "./ui-copy.js?v=47cf48dc0435";
-import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=47cf48dc0435";
-import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=47cf48dc0435";
-import { renderDomainPage } from "./ui-domain.js?v=47cf48dc0435";
-import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=47cf48dc0435";
-import { renderIdeas } from "./ui-ideas.js?v=47cf48dc0435";
-import { mountEscrow } from "./escrow.js?v=47cf48dc0435";
-import { applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=47cf48dc0435";
+import { publicNameUnavailable } from "./shared.js?v=69895dc026c0";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=69895dc026c0";
+import { renderManagement } from "./ui-manage.js?v=69895dc026c0";
+import { actionLabel } from "./ui-copy.js?v=69895dc026c0";
+import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=69895dc026c0";
+import { ui } from "./ui-state.js?v=69895dc026c0";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=69895dc026c0";
+import { createPoaCopyButton } from "./ui-copy.js?v=69895dc026c0";
+import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=69895dc026c0";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=69895dc026c0";
+import { renderDomainPage } from "./ui-domain.js?v=69895dc026c0";
+import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=69895dc026c0";
+import { renderIdeas } from "./ui-ideas.js?v=69895dc026c0";
+import { mountEscrow } from "./escrow.js?v=69895dc026c0";
+import { applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=69895dc026c0";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -370,6 +370,8 @@ function observeEscrowAddresses(root) {
         return;
     root.dataset.poaAddrObserved = "1";
     let busy = false;
+    let lastDomain = "";
+    let steadyHeight = 0;
     const onCopy = (res) => {
         const msg = el("escrowMessage");
         if (msg)
@@ -381,6 +383,39 @@ function observeEscrowAddresses(root) {
         busy = true;
         try {
             enhancePoaAddressesIn(root, { onCopy });
+            const heldBadge = root.querySelector("#escrowHeld");
+            if (heldBadge) {
+                const txt = heldBadge.textContent?.trim() ?? "";
+                if (txt && heldBadge.title !== txt) heldBadge.title = txt;
+            }
+            if (root.id === "escrowDomain") {
+                const cur = ui.currentDomainName || "";
+                if (cur !== lastDomain) {
+                    lastDomain = cur;
+                    steadyHeight = 0;
+                    root.style.minHeight = "";
+                }
+                const paras = [...root.querySelectorAll(":scope > p:not(.escrow-mock)")];
+                if (paras[0]) {
+                    const txt = paras[0].textContent?.trim() ?? "";
+                    if (txt && paras[0].title !== txt) paras[0].title = txt;
+                }
+                const settled = Boolean(
+                    root.querySelector(":scope > article.card") ||
+                    paras.length >= 2 ||
+                    paras.some((p) => p.textContent?.trim() === "POA payments not open")
+                );
+                if (settled) {
+                    root.style.minHeight = "";
+                    const h = root.offsetHeight;
+                    if (h > 0) {
+                        steadyHeight = h;
+                        root.style.minHeight = h + "px";
+                    }
+                } else if (steadyHeight > 0) {
+                    root.style.minHeight = steadyHeight + "px";
+                }
+            }
             const domainHeaders = root.id === "escrowDomain"
                 ? root.querySelectorAll("article.card > h3")
                 : root.querySelectorAll("#escrowMarket article.card > h3");
@@ -404,7 +439,9 @@ function observeEscrowAddresses(root) {
 
 export function pageStatus(error = "", loading = false) {
     el("registryError").hidden = !error;
-    el("registryErrorText").textContent = error;
+    const errText = el("registryErrorText");
+    errText.textContent = error;
+    errText.title = error;
     el("registryLoading").hidden = !loading || !!ui.latestState;
     document.body.dataset.registryStatus = error ? "error" : loading ? "loading" : "ready";
     updateTabDots(ui.latestState);
@@ -471,6 +508,7 @@ export async function refreshRegistry() {
         const [payload] = await Promise.all([ui.readState(), fetchEscrowMarketData()]);
         const viewState = registryViewState(payload);
         ui.registryReadFailed = false;
+        ui.refreshing = false;
         ui.lastLoadedAt = Date.now();
         preserveInputs(() => {
             ui.cart = ui.cart.map(item => recheckCartItem(item, ui.cap, viewState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now()));
@@ -491,6 +529,7 @@ export async function refreshRegistry() {
     }
     catch {
         ui.registryReadFailed = true;
+        ui.refreshing = false;
         pageStatus("⚠️ Could not update registry data. Your last view is kept. Tap Refresh to try again; cart copying is paused.");
         updatePromptText();
     }
@@ -499,7 +538,6 @@ export async function refreshRegistry() {
         el("refresh").disabled = false;
         el("registryRetry").disabled = false;
         updateCartCopyState();
-        updatePromptText();
     }
 }
 
@@ -710,8 +748,10 @@ export function renderNetworkStatus() {
         icon.textContent = "";
     const lastKnown = ui.networkStatus.lastKnown === true, stale = lastKnown && ui.networkStatus.stale === true;
     bar.dataset.stale = stale ? "true" : "false";
-    if (label)
+    if (label) {
         label.textContent = shortNetworkLine(level) + (stale ? " · 🕰️" : "");
+        label.title = label.textContent;
+    }
     const detail = el("networkStatusDetail");
     if (detail)
         detail.textContent = text + (stale ? ` Last checked ${Math.max(1, Math.round((ui.networkStatus.ageMs || 0) / 60000))} min ago; rechecking now.` : "");
@@ -755,22 +795,17 @@ export function applyNetworkHold() {
     updateCartCopyState();
     // A down-state refresh clears the unsigned handoff. Rebuild it after recovery, not only on the next poll.
     if(!hold&&ui.cart.length&&!ui.handoffData&&!ui.handoffPending&&!ui.refreshing&&!ui.registryReadFailed)void updatePromptText();
-    let note = el("networkHoldNote");
-    if (hold) {
-        if (!note) {
-            note = document.createElement("p");
-            note.id = "networkHoldNote";
-            note.className = "hold-note";
-            note.setAttribute("role", "status");
-            const panel = el("floatingCartPanel");
-            if (panel)
-                panel.appendChild(note);
+    const fStatus = el("floatingCartStatus");
+    if (fStatus) {
+        if (hold) {
+            fStatus.textContent = "⏸️ Held until the PoA network is back. Reads still work.";
+            fStatus.title = fStatus.textContent;
+            fStatus.dataset.holdNote = "1";
+        } else if (fStatus.dataset.holdNote === "1") {
+            fStatus.textContent = "";
+            fStatus.removeAttribute("title");
+            delete fStatus.dataset.holdNote;
         }
-        note.textContent = "⏸️ Held until the PoA network is back. Reads still work.";
-        note.hidden = false;
-    }
-    else if (note) {
-        note.hidden = true;
     }
     document.querySelectorAll("[data-requires-network]").forEach((node) => {
         if (hold) {

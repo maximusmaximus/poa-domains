@@ -184,16 +184,182 @@ try {
   await pageEscrow.waitForFunction(() => document.body.dataset.registryStatus === "ready");
   await pageEscrow.locator("#termsAgreeBtn").click();
   await expect(pageEscrow.locator("#cartEscrowStatus")).toBeVisible();
-  await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("POA checkout paused");
+  await expect(pageEscrow.locator("#cartEscrowStatus .cart-escrow-title")).toHaveText("⏸️ POA checkout paused");
   await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("Reconciliation hold awaiting operator review");
   await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("Public PoA network read timed out");
   await expect(pageEscrow.locator("#cartEscrowStatus")).not.toContainText("Network freshness or verification is held");
+  await pageEscrow.locator("#help-cartEscrowStatus-info").click();
+  await expect(pageEscrow.locator("#info-cartEscrowStatus-info")).toBeVisible();
+  await expect(pageEscrow.locator("#info-cartEscrowStatus-info")).toContainText("Reconciliation hold awaiting operator review");
+  await pageEscrow.keyboard.press("Escape");
+
+  // Layout stability: network & escrow status transitions (including registryError) cause 0px vertical bounce
+  const snapRects = () => pageEscrow.evaluate(() => {
+    window.scrollTo(0, 0);
+    const pick = (sel) => {
+      const r = document.querySelector(sel).getBoundingClientRect();
+      return { top: Math.round(r.top * 10) / 10, height: Math.round(r.height * 10) / 10 };
+    };
+    return {
+      bar: pick("#networkStatusBar"),
+      ticker: pick("#recentActions"),
+      tabs: pick("#sectionTabs"),
+      search: pick("#searchInput"),
+      cart: pick("#cartAnchor"),
+      escrow: pick("#cartEscrowStatus"),
+      footer: pick("#siteFooter"),
+    };
+  });
+  const assertNoBounce = (base, next, label) => {
+    for (const k of Object.keys(base)) {
+      assert.ok(
+        Math.abs(next[k].top - base[k].top) < 1 && Math.abs(next[k].height - base[k].height) < 1,
+        `Vertical layout shift on ${k} during ${label}: base=${JSON.stringify(base[k])} next=${JSON.stringify(next[k])}`,
+      );
+    }
+  };
+  const baseRects = await snapRects();
+  for (const [label, netState] of [
+    ["degraded", { level: "degraded", hold: false, message: "🟡 PoA network Slow", livePoA: false }],
+    ["down", { level: "down", hold: true, message: "🔴 PoA network Down — actions held", livePoA: false }],
+    ["down-stale", { level: "down", hold: false, lastKnown: true, stale: true, ageMs: 420000, message: "🔴 PoA network Down — stale", livePoA: false }],
+    ["checking", { level: "checking", hold: false, message: "⚪ Checking PoA network…", livePoA: false }],
+    ["online", { level: "online", hold: false, message: "🟢 PoA network Online", livePoA: false }],
+  ]) {
+    h.networkStatus = netState;
+    await pageEscrow.evaluate(async () => {
+      const q = new URL(document.querySelector('script[src*="app.js"]').src).search;
+      await (await import("/ui-poll.js" + q)).refreshNetworkStatus();
+    });
+    assertNoBounce(baseRects, await snapRects(), `network:${label}`);
+  }
+  // Transient registry poll error floats cleanly without pushing the page down
+  h.stateStatus = 500;
+  await pageEscrow.evaluate(async () => {
+    const q = new URL(document.querySelector('script[src*="app.js"]').src).search;
+    await (await import("/ui-poll.js" + q)).refreshRegistry();
+  });
+  await expect(pageEscrow.locator("#registryError")).toBeVisible();
+  assertNoBounce(baseRects, await snapRects(), "registryError");
+  h.stateStatus = 200;
+  await pageEscrow.locator("#registryRetry").click();
+  await expect(pageEscrow.locator("#registryError")).toBeHidden();
+  assertNoBounce(baseRects, await snapRects(), "registryRecover");
+
+  // Switching escrow status between paused and open causes 0px vertical bounce
+  h.escrowCap = { ...h.escrowCap, held: false, holdReason: null, freshness: { held: false, code: null, reason: null } };
+  await pageEscrow.evaluate(async () => {
+    const q = new URL(document.querySelector('script[src*="app.js"]').src).search;
+    await (await import("/ui-poll.js" + q)).refreshEscrowCaps();
+  });
+  await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("🟢 POA checkout open");
+  assertNoBounce(baseRects, await snapRects(), "escrow:open");
+  h.escrowCap = {
+    ...h.escrowCap,
+    held: true,
+    holdReason: "ASSET_LIABILITY_MISMATCH",
+    freshness: { held: true, code: "ESCROW_NODE_TIMEOUT", reason: "The public network read timed out." },
+  };
+  await pageEscrow.evaluate(async () => {
+    const q = new URL(document.querySelector('script[src*="app.js"]').src).search;
+    await (await import("/ui-poll.js" + q)).refreshEscrowCaps();
+  });
+  assertNoBounce(baseRects, await snapRects(), "escrow:held-again");
+  h.networkStatus = undefined;
+
   await pageEscrow.locator("#addToCartBtn").click();
   await pageEscrow.locator("#advancedLink").click();
   await pageEscrow.locator("#floatingCartBtn").click();
   await expect(pageEscrow.locator("#floatingCartEscrowStatus")).toBeVisible();
   await expect(pageEscrow.locator("#floatingCartEscrowStatus")).toContainText("wait to send POA until checkout reopens");
+  // Floating cart panel also stays vertically stationary across network & escrow transitions
+  const snapFloat = () => pageEscrow.evaluate(() => {
+    const pick = (sel) => {
+      const r = document.querySelector(sel).getBoundingClientRect();
+      return { top: Math.round(r.top * 10) / 10, height: Math.round(r.height * 10) / 10 };
+    };
+    return {
+      panel: pick("#floatingCartPanel"),
+      escrow: pick("#floatingCartEscrowStatus"),
+      meta: pick("#floatingHandoffMeta"),
+      prompt: pick("#floatingCartPrompt"),
+      status: pick("#floatingCartStatus"),
+    };
+  });
+  const baseFloat = await snapFloat();
+  h.networkStatus = { level: "down", hold: true, message: "🔴 PoA network Down — actions held", livePoA: false };
+  await pageEscrow.evaluate(async () => {
+    const q = new URL(document.querySelector('script[src*="app.js"]').src).search;
+    await (await import("/ui-poll.js" + q)).refreshNetworkStatus();
+  });
+  await expect(pageEscrow.locator("#floatingCartStatus")).toContainText("Held until the PoA network is back");
+  assertNoBounce(baseFloat, await snapFloat(), "floating:network-down");
+  h.networkStatus = { level: "online", hold: false, message: "🟢 PoA network Online", livePoA: false };
+  await pageEscrow.evaluate(async () => {
+    const q = new URL(document.querySelector('script[src*="app.js"]').src).search;
+    await (await import("/ui-poll.js" + q)).refreshNetworkStatus();
+  });
+  await expect(pageEscrow.locator("#floatingCartStatus")).toHaveText("");
+  assertNoBounce(baseFloat, await snapFloat(), "floating:network-online");
+  h.networkStatus = undefined;
   await pageEscrow.locator("#floatingCartClose").click();
+
+  // Manage domains (#escrowHeld) and /d/<name> (#escrowDomain) stay stationary across escrow hold toggles
+  await pageEscrow.locator("#tabEscrow").click();
+  await expect(pageEscrow.locator("#escrowHeld")).toBeVisible();
+  const snapEscrowTab = () => pageEscrow.evaluate(() => {
+    window.scrollTo(0, 0);
+    const pick = (sel) => {
+      const r = document.querySelector(sel).getBoundingClientRect();
+      return { top: Math.round(r.top * 10) / 10, height: Math.round(r.height * 10) / 10 };
+    };
+    return { held: pick("#escrowHeld"), footer: pick("#siteFooter") };
+  });
+  const baseEscrowTab = await snapEscrowTab();
+  h.escrowCap = { ...h.escrowCap, held: false, holdReason: null, freshness: { held: false, code: null, reason: null } };
+  await pageEscrow.evaluate(async () => {
+    const q = new URL(document.querySelector('script[src*="app.js"]').src).search;
+    const { ui } = await import("/ui-state.js" + q);
+    await ui.escrowUI?.refresh?.();
+  });
+  await expect(pageEscrow.locator("#escrowHeld")).toContainText("🟢 POA payments open");
+  assertNoBounce(baseEscrowTab, await snapEscrowTab(), "escrowTab:open");
+  h.escrowCap = {
+    ...h.escrowCap,
+    held: true,
+    holdReason: "Network freshness or verification is held. The public network read timed out. Payments stay held.",
+    freshness: { held: true, code: "ESCROW_NODE_TIMEOUT", reason: "The public network read timed out." },
+  };
+  await pageEscrow.evaluate(async () => {
+    const q = new URL(document.querySelector('script[src*="app.js"]').src).search;
+    const { ui } = await import("/ui-state.js" + q);
+    await ui.escrowUI?.refresh?.();
+  });
+  await expect(pageEscrow.locator("#escrowHeld")).toContainText("⏸️");
+  assertNoBounce(baseEscrowTab, await snapEscrowTab(), "escrowTab:held");
+
+  await pageEscrow.goto(`${h.url}/d/alpha`);
+  await pageEscrow.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageEscrow.locator("#escrowDomain")).toContainText(/not listed for POA payments|POA payments held/);
+  const snapDomain = () => pageEscrow.evaluate(() => {
+    window.scrollTo(0, 0);
+    const pick = (sel) => {
+      const r = document.querySelector(sel).getBoundingClientRect();
+      return { top: Math.round(r.top * 10) / 10, height: Math.round(r.height * 10) / 10 };
+    };
+    return { domainEscrow: pick("#escrowDomain"), footer: pick("#siteFooter") };
+  });
+  const baseDomain = await snapDomain();
+  h.escrowCap = { ...h.escrowCap, held: false, holdReason: null, freshness: { held: false, code: null, reason: null } };
+  await pageEscrow.evaluate(async () => {
+    const q = new URL(document.querySelector('script[src*="app.js"]').src).search;
+    const { ui } = await import("/ui-state.js" + q);
+    await ui.escrowUI?.refresh?.();
+  });
+  await expect(pageEscrow.locator("#escrowDomain")).toContainText("Custodial payments");
+  assertNoBounce(baseDomain, await snapDomain(), "domain:escrow-open");
+  await pageEscrow.goto(h.url);
+  await pageEscrow.waitForFunction(() => document.body.dataset.registryStatus === "ready");
 
   // Verbose freshness hold boilerplate is collapsed to one crisp reason with no duplication
   h.escrowCap = {
