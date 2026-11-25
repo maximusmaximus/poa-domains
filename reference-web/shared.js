@@ -311,6 +311,14 @@ export function partitionPoaAuctions(items, nowMs = Date.now()) {
   groups.past.sort((x, y) => (y.closes || y.createdAt || 0) - (x.closes || x.createdAt || 0) || String(x.name).localeCompare(String(y.name)));
   return groups;
 }
+export function resolveDefaultAuctionTab(groups, { currentTab = "current", userSelected = false, keepActiveTab = false } = {}) {
+  if (userSelected) return currentTab;
+  const currentCount = Array.isArray(groups?.current) ? groups.current.length : 0;
+  const upcomingCount = Array.isArray(groups?.upcoming) ? groups.upcoming.length : 0;
+  if (currentCount === 0 && upcomingCount > 0) return "upcoming";
+  if (currentCount > 0 && (!keepActiveTab || currentTab === "current")) return "current";
+  return currentTab;
+}
 export function activePoaFixedListings(items, nowMs = Date.now()) {
   return (Array.isArray(items) ? items : [])
     .filter((a) => a && a.kind === "fixed" && a.status === "OPEN" && !a.high && (!a.closes || nowMs < a.closes))
@@ -486,7 +494,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=c83b04d179c4";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=e24f44d20e2d";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {

@@ -933,6 +933,9 @@ try {
 
   // Auctions tab: Current shows live "comet" with countdown timer, Upcoming shows queued "vault" ("Starts on first bid")
   await pageAuc.locator("#tabAuctions").click();
+  await expect(pageAuc.locator("#auctionsStartNote")).toBeVisible();
+  await expect(pageAuc.locator("#auctionsStartNote")).toContainText("An auction starts with the first bid");
+  await expect(pageAuc.locator("#auctionTabCurrent")).toHaveAttribute("aria-selected", "true");
   await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"]`)).toBeVisible();
   await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"]`)).toContainText("Live POA auction");
   await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"] .auction-countdown`)).toContainText("left");
@@ -1096,6 +1099,41 @@ try {
   await expect(pageAuc.locator("#domainTitle")).toContainText("google");
   await expect(pageAuc.locator("#domainStatus")).toContainText("Reserved");
   await expect(pageAuc.locator("#cartCount")).toHaveText("1");
+
+  // 9c. When there are 0 current (live) auctions and >=1 upcoming auction, Auctions defaults to Upcoming
+  //     and shows a clear note that an auction starts with the first bid; manual tab click is respected.
+  h.escrowMarket = {
+    serverTime: nowAuctionMs + 15000,
+    items: [
+      {
+        id: aucAgenticId, name: "agentic", seller: sellerAddr, kind: "auction",
+        price: "100.000000", minimumNextBid: "100.000000", status: "OPEN",
+        closes: 0, window: 3600000, quiet: 3600000, createdAt: nowAuctionMs - 60000,
+        startedAt: null, awaitingFirstBid: true, high: null, bidders: [], settlement: null,
+        history: [{ event: "Auction queued; timer starts on first bid", at: nowAuctionMs - 60000 }],
+      },
+    ],
+  };
+  await pageAuc.goto(`${h.url}/?tab=auctions`);
+  await pageAuc.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageAuc.locator("#auctionsSection")).toBeVisible();
+  await expect(pageAuc.locator("#auctionTabUpcoming")).toHaveAttribute("aria-selected", "true");
+  await expect(pageAuc.locator("#auctionTabCurrent")).toHaveAttribute("aria-selected", "false");
+  await expect(pageAuc.locator("#auctions")).toHaveAttribute("aria-labelledby", "auctionTabUpcoming");
+  await expect(pageAuc.locator("#auctionsStartNote")).toBeVisible();
+  await expect(pageAuc.locator("#auctionsStartNote")).toContainText("An auction starts with the first bid");
+  await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucAgenticId}"]`)).toBeVisible();
+  // Manual click on Current stays on Current across refreshes (does not snap back to Upcoming)
+  await pageAuc.locator("#auctionTabCurrent").click();
+  await expect(pageAuc.locator("#auctionTabCurrent")).toHaveAttribute("aria-selected", "true");
+  await expect(pageAuc.locator("#auctions")).toContainText("No live auctions running yet");
+  await pageAuc.evaluate(async () => {
+    const q = new URL(document.querySelector('script[src*="app.js"]').src).search;
+    const { refreshEscrowMarket } = await import("/ui-poll.js" + q);
+    await refreshEscrowMarket();
+  });
+  await expect(pageAuc.locator("#auctionTabCurrent")).toHaveAttribute("aria-selected", "true");
+  await expect(pageAuc.locator("#auctions")).toHaveAttribute("aria-labelledby", "auctionTabCurrent");
 
   assert.deepEqual(errorsAuc, []);
   await ctxAuc.close();
