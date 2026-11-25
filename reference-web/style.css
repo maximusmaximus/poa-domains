@@ -1518,86 +1518,17 @@ main#homeMain, main#homeMain > section, .ideas { min-width: 0; max-width: 100%; 
   border-color: #65cfa8;
   background: #194555;
 }
-.escrow-step {
-  margin: 0.75rem 0;
-  padding: 0.85rem;
-  background: #10212c;
-  border: 1px solid #31535c;
-  border-radius: 0.6rem;
-  box-sizing: border-box;
-  max-width: 100%;
-  min-width: 0;
-}
-.escrow-step-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin: 0 0 0.45rem;
-}
-.escrow-step-head h3 {
-  margin: 0;
-  font-size: 1rem;
-}
-.escrow-step-lead {
-  margin: 0 0 0.5rem;
-  font-size: 0.86rem;
-}
-.escrow-field-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 0.25rem;
-  font-size: 0.84rem;
-}
-.treasury-footer {
-  margin: 0 auto 0.85rem;
-  padding: 0.65rem 0.9rem;
-  max-width: 100%;
-  background: #10212c;
-  border: 1px solid #31535c;
-  border-radius: 0.6rem;
-  box-sizing: border-box;
-  color: #dfecf5;
-}
-.treasury-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-}
-.treasury-total {
-  color: #75e0b5;
-}
-.treasury-wallets {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.55rem 1rem;
-  margin-top: 0.45rem;
-  font-size: 0.82rem;
-}
-.treasury-item {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-}
-.domains-served-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  margin: 0 auto 0.85rem;
-  font-size: 0.9rem;
-  color: #dfecf5;
-}
+.escrow-step { margin: 0.75rem 0; padding: 0.85rem; background: #10212c; border: 1px solid #31535c; border-radius: 0.6rem; box-sizing: border-box; max-width: 100%; min-width: 0; }
+.escrow-step-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin: 0 0 0.45rem; }
+.escrow-step-head h3 { margin: 0; font-size: 1rem; }
+.escrow-step-lead { margin: 0 0 0.5rem; font-size: 0.86rem; }
+.escrow-field-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.25rem; font-size: 0.84rem; }
+.treasury-footer { margin: 0 auto 0.85rem; padding: 0.65rem 0.9rem; max-width: 100%; background: #10212c; border: 1px solid #31535c; border-radius: 0.6rem; box-sizing: border-box; color: #dfecf5; }
+.treasury-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.9rem; }
+.treasury-total { color: #75e0b5; }
+.treasury-wallets { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.55rem 1rem; margin-top: 0.45rem; font-size: 0.82rem; }
+.treasury-item { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.domains-served-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.45rem; margin: 0 auto 0.85rem; font-size: 0.9rem; color: #dfecf5; }
 .domains-served-label {
   font-weight: 600;
   color: #b7d2e2;
