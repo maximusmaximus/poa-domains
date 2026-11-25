@@ -1,9 +1,9 @@
-import { ui } from "./ui-state.js?v=cd984d051d71";
-import { add, el, endpointBase } from "./ui-core.js?v=cd984d051d71";
-import { createDomainAvatar, domainHeader, nameLink, openPoa, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=cd984d051d71";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=cd984d051d71";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=cd984d051d71";
-import { createInlineInfo } from "./ui-help.js?v=cd984d051d71";
+import { ui } from "./ui-state.js?v=a4c45bbc5a95";
+import { add, el, endpointBase } from "./ui-core.js?v=a4c45bbc5a95";
+import { createDomainAvatar, domainHeader, nameLink, openPoa, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=a4c45bbc5a95";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=a4c45bbc5a95";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=a4c45bbc5a95";
+import { createInlineInfo } from "./ui-help.js?v=a4c45bbc5a95";
 import {
   buildProfileUpdatePrompt,
   checkBtcAddress,
@@ -21,7 +21,7 @@ import {
   SALE_FIELDS_WARNING,
   saveKnownOwner,
   validPrincipal,
-} from "./shared.js?v=cd984d051d71";
+} from "./shared.js?v=a4c45bbc5a95";
 
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const IDLE_MANAGE_PROMPT = "Edit profile fields or choose an action above to preview the code for your agent.";
@@ -128,6 +128,16 @@ function downloadManageJSON() {
   if (status) status.textContent = "📥 JSON downloaded — unsigned, nothing submitted.";
 }
 
+function addFieldWithInfo(parent, { id, label, infoId, infoLabel, infoText, tag = "input" }) {
+  const row = add(parent, "div", "", "field-label-row");
+  const labelEl = add(row, "label", label);
+  labelEl.setAttribute("for", id);
+  row.append(createInlineInfo(infoId, infoLabel, infoText));
+  const input = add(parent, tag, "");
+  input.id = id;
+  return { row, label: labelEl, input };
+}
+
 function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = false, headerAvatar = null } = {}) {
   const extracted = extractDomainProfile(deed);
   const current = extracted?.profile ?? {
@@ -137,14 +147,15 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
     description: "",
     image: null,
   };
+  const slug = deed.id.slice(0, 12);
   const details = document.createElement("details");
   details.className = "profile-editor";
   if (startOpen) details.open = true;
   const summary = document.createElement("summary");
   summary.textContent = listedForSale
-    ? "⏸️ Public profile (paused while listed)"
+    ? "⏸️ Public profile · Paused"
     : extracted && !extracted.isDefault
-      ? `🪪 Public profile (#${extracted.metadataVersion})`
+      ? `🪪 Public profile · v${extracted.metadataVersion}`
       : "🪪 Public profile";
   details.append(summary);
 
@@ -158,17 +169,13 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
     );
     pausedNote.setAttribute("role", "note");
   }
-  const noticeRow = add(form, "div", "", "profile-public-notice");
-  add(
-    noticeRow,
-    "span",
-    "🌐 Public info: Everything you save here is public and visible to everyone once published.",
-  );
+  const noticeRow = add(form, "div", "", "profile-public-notice has-info");
+  add(noticeRow, "span", "🌐 Saved profile fields are public.");
   noticeRow.append(
     createInlineInfo(
-      `profile-v1-${deed.id.slice(0, 12)}`,
+      `profile-v1-${slug}`,
       `About public profile for ${deed.name}`,
-      "Optional public fields for your domain: POA, BTC, and ETH/EVM addresses, a short plain-text bio (up to 280 characters), and a square avatar image (PNG, JPG, WebP, or GIF up to 5 MB). Saved profiles are public and readable by apps and agents.",
+      "Everything you save here is public and visible to everyone once published. Optional fields: POA, BTC, and ETH/EVM addresses, a short plain-text bio up to 280 characters, and a square avatar image up to 5 MB.",
     ),
   );
 
@@ -185,9 +192,14 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
     }, 90);
   };
 
-  // 1. POA address (defaults to owner wallet)
-  const poaLabel = add(form, "label", "POA address (defaults to owner wallet)");
-  const poaInput = add(poaLabel, "input", "");
+  // 1. POA address
+  const { input: poaInput } = addFieldWithInfo(form, {
+    id: `prof-poa-${slug}`,
+    label: "POA address",
+    infoId: `prof-poa-info-${slug}`,
+    infoLabel: `About POA address for ${deed.name}`,
+    infoText: "Defaults to the owner wallet. Where POA payments sent to this name go.",
+  });
   poaInput.type = "text";
   poaInput.autocomplete = "off";
   poaInput.placeholder = deed.owner;
@@ -197,11 +209,15 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
     markDirty();
     scheduleLivePreview();
   });
-  add(form, "small", "Where POA payments sent to this name go.", "muted profile-hint");
 
   // 2. BTC address
-  const btcLabel = add(form, "label", "BTC address (optional — mainnet bc1… or legacy 1…/3…)");
-  const btcInput = add(btcLabel, "input", "");
+  const { input: btcInput } = addFieldWithInfo(form, {
+    id: `prof-btc-${slug}`,
+    label: "BTC address",
+    infoId: `prof-btc-info-${slug}`,
+    infoLabel: `About BTC address for ${deed.name}`,
+    infoText: "Optional — mainnet Bitcoin address: bc1… SegWit/Taproot or legacy 1… / 3….",
+  });
   btcInput.type = "text";
   btcInput.autocomplete = "off";
   btcInput.placeholder = "bc1q… or 1… / 3…";
@@ -213,11 +229,16 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
   });
 
   // 3. ETH address (with EIP-55 checksum assist)
-  const ethLabel = add(form, "label", "ETH address (optional — 0x… with EIP-55 checksum; also works on Base/EVM)");
-  const ethInput = add(ethLabel, "input", "");
+  const { input: ethInput } = addFieldWithInfo(form, {
+    id: `prof-eth-${slug}`,
+    label: "ETH address",
+    infoId: `prof-eth-info-${slug}`,
+    infoLabel: `About ETH address for ${deed.name}`,
+    infoText: "Optional — 0x… address with EIP-55 checksum. Also works on Base and other EVM chains.",
+  });
   ethInput.type = "text";
   ethInput.autocomplete = "off";
-  ethInput.placeholder = "0x… (EIP-55 checksummed)";
+  ethInput.placeholder = "0x…";
   ethInput.value = current.eth ?? "";
   ethInput.dataset.profileField = "eth";
   const ethFixRow = add(form, "div", "", "profile-eth-fix");
@@ -251,9 +272,15 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
     }
   });
 
-  // 4. Description (plain text bio <= 280 chars)
-  const descLabel = add(form, "label", "Description (plain-text bio, max 280 chars — links cannot run as code)");
-  const descInput = add(descLabel, "textarea", "");
+  // 4. Description
+  const { input: descInput } = addFieldWithInfo(form, {
+    id: `prof-desc-${slug}`,
+    label: "Description",
+    infoId: `prof-desc-info-${slug}`,
+    infoLabel: `About description for ${deed.name}`,
+    infoText: "Optional plain-text bio, max 280 characters. Links are stored as plain text and cannot run as code.",
+    tag: "textarea",
+  });
   descInput.rows = 3;
   descInput.maxLength = MAX_PROFILE_DESCRIPTION_CHARS;
   descInput.placeholder = "Short plain-text bio…";
@@ -266,9 +293,14 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
     scheduleLivePreview();
   });
 
-  // 5. Image / Avatar (square image — URL or upload PNG/JPG/WebP/GIF <= 5 MB)
-  const imgLabel = add(form, "label", "Avatar image (square · link or upload PNG, JPG, WebP, or GIF up to 5 MB)");
-  const imgInput = add(imgLabel, "input", "");
+  // 5. Image / Avatar
+  const { input: imgInput } = addFieldWithInfo(form, {
+    id: `prof-img-${slug}`,
+    label: "Avatar image",
+    infoId: `prof-img-info-${slug}`,
+    infoLabel: `About avatar image for ${deed.name}`,
+    infoText: "Square image — paste an https:// or ipfs:// link, or upload PNG, JPG, WebP, or GIF up to 5 MB.",
+  });
   imgInput.type = "text";
   imgInput.autocomplete = "off";
   imgInput.placeholder = "https://… or ipfs://…";
@@ -411,7 +443,7 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
       };
       errNode.textContent = "";
       showManagePrompt(promptText, {
-        meta: `🪪 Live preview · Public profile for "${fresh.name}" (setMetadata)`,
+        meta: `🪪 Live preview · Public profile for "${fresh.name}"`,
         payload,
         filename: `poa-domains-${safeSlug(fresh.name)}-profile.json`,
         ready: true,
@@ -494,12 +526,7 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
     card.dataset.domainName = d.name;
     const h = add(card, "h3", "");
     const { avatar: headerAvatar } = domainHeader(h, d.name);
-    add(
-      card,
-      "p",
-      d.parentId ? "Subdomain · application-registry record" : "Root domain · application-registry record",
-      "badge",
-    );
+    add(card, "p", d.parentId ? "Subdomain" : "Root domain", "badge");
     if (d.parentId) {
       const p = add(card, "p", "Child of ");
       nameLink(p, ui.latestState.deeds[d.parentId]?.name ?? "");
@@ -527,13 +554,16 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
     });
     const poa = ui.cap?.poaOnly?.status === "on";
     if (availableToList) {
-      const sellWarn = add(
-        card,
-        "p",
-        "⚠️ Listing or auctioning pauses your profile fields and drops them for the next owner (archived on the domain page).",
-        "sale-fields-warning",
-      );
+      const sellWarn = add(card, "div", "", "sale-fields-warning has-info");
       sellWarn.setAttribute("role", "note");
+      add(sellWarn, "span", "⚠️ Listing or auctioning pauses profile fields and drops them on transfer.");
+      sellWarn.append(
+        createInlineInfo(
+          `manage-sale-warn-${d.id.slice(0, 12)}`,
+          `About profile fields when selling or auctioning ${d.name}`,
+          "While listed or in auction, active profile fields are paused. When ownership transfers, they are dropped for the next owner and archived as read-only history on the domain page.",
+        ),
+      );
     }
     if (poa) {
       const poaRow = add(card, "div", "", "button-row manage-poa-actions");
@@ -553,12 +583,18 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
         viewPoa.addEventListener("click", () => openPoa("", { owner }));
       }
     }
-    const label = add(card, "label", "Listing / subdomain price (registry units)"),
-      price = add(label, "input", "");
+    const priceWrap = add(card, "div", "", "manage-unit-price");
+    priceWrap.hidden = poa;
+    const { input: price } = addFieldWithInfo(priceWrap, {
+      id: `manage-price-${d.id.slice(0, 12)}`,
+      label: "Listing / subdomain price",
+      infoId: `manage-price-info-${d.id.slice(0, 12)}`,
+      infoLabel: `About listing price for ${d.name}`,
+      infoText: "Whole-number price in registry units.",
+    });
     price.value = "100";
     price.inputMode = "numeric";
     price.setAttribute("aria-label", "Registry-unit listing price for " + d.name);
-    label.hidden = poa;
     const controls = add(card, "div", "", "button-row");
     let activeCardAction = null;
     const buildActionPrompt = (action) => {
@@ -636,6 +672,16 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
 }
 
 export function wireManagement() {
+  const ownerRow = el("manageOwnerLabelRow");
+  if (ownerRow && !ownerRow.querySelector("#help-manage-owner-field")) {
+    ownerRow.append(
+      createInlineInfo(
+        "manage-owner-field",
+        "About public owner address",
+        "Enter a public poa1… owner address only — never paste a private key. Viewing an address does not connect a wallet.",
+      ),
+    );
+  }
   const onLookup = () => {
     ui.focusedManageDomain = null;
     const raw = el("manageOwner")?.value.trim() ?? "";

@@ -1,12 +1,12 @@
-import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, profileImageMediaPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=cd984d051d71";
-import { ui } from "./ui-state.js?v=cd984d051d71";
-import { createPoaCopyButton } from "./ui-copy.js?v=cd984d051d71";
-import { add, el } from "./ui-core.js?v=cd984d051d71";
-import { runSearch } from "./ui-search.js?v=cd984d051d71";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=cd984d051d71";
-import { updateTabDots } from "./ui-render.js?v=cd984d051d71";
-import { syncCartShortcutNow } from "./ui-cart.js?v=cd984d051d71";
-import { renderManagement } from "./ui-manage.js?v=cd984d051d71";
+import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, profileImageMediaPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=a4c45bbc5a95";
+import { ui } from "./ui-state.js?v=a4c45bbc5a95";
+import { createPoaCopyButton } from "./ui-copy.js?v=a4c45bbc5a95";
+import { add, el } from "./ui-core.js?v=a4c45bbc5a95";
+import { runSearch } from "./ui-search.js?v=a4c45bbc5a95";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=a4c45bbc5a95";
+import { updateTabDots } from "./ui-render.js?v=a4c45bbc5a95";
+import { syncCartShortcutNow } from "./ui-cart.js?v=a4c45bbc5a95";
+import { renderManagement } from "./ui-manage.js?v=a4c45bbc5a95";
 
 const LAST_POA_KEY = "poadomains.lastPoaAddress.v1";
 
@@ -93,8 +93,8 @@ export function openPoa(name, opts = {}) {
             targetBtn.click();
             if (message) {
                 message.textContent = mode === "auction"
-                    ? `🔨 Auction ready for ${name} — adjust the reserve POA amount if needed (code updates live), then copy for your agent. ⚠️ Profile fields pause while listed and drop on transfer.`
-                    : `🏷️ Sale listing ready for ${name} — adjust the POA price if needed (code updates live), then copy for your agent. ⚠️ Profile fields pause while listed and drop on transfer.`;
+                    ? `🔨 Auction ready for ${name} — adjust the reserve POA amount if needed; code updates live below. ⚠️ Profile fields pause while listed and drop on transfer.`
+                    : `🏷️ Sale listing ready for ${name} — adjust the POA price if needed; code updates live below. ⚠️ Profile fields pause while listed and drop on transfer.`;
             }
         } else if (message) {
             message.textContent = mode === "auction"

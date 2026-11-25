@@ -527,11 +527,36 @@ try {
   await expect(pageUx.locator("#downloadEscrowJSON")).toBeDisabled();
   await expect(pageUx.locator("#clearEscrowPrompt")).toBeDisabled();
 
-  // (f) Reorganized Escrow Signed Request workflow with steps + ℹ️ popovers
+  // (f) Reorganized Escrow Signed Request workflow with steps + ℹ️ popovers & clean Manage domains (no inline parentheses)
   await expect(pageUx.locator('#escrowPayments .escrow-step[data-step="1"] h3')).toContainText("1. Pick an action");
   await expect(pageUx.locator('#escrowPayments .escrow-step[data-step="2"] h3')).toContainText("2. Copy the prompt to your agent");
   await expect(pageUx.locator('#escrowPayments .escrow-step[data-step="3"] h3')).toContainText("3. Paste & submit");
   assert.equal((await pageUx.locator("#escrowPayments").innerText()).includes("Signed request — public command and signature only"), false);
+  for (const sel of [
+    "#manageOwnerLabelRow label",
+    "#manageOwnerNotice > span:first-child",
+    '#manageNames article[data-domain-name="agent"] .profile-form label',
+    '#manageNames article[data-domain-name="agent"] .sale-fields-warning > span:first-child',
+    "#escrowPayments .escrow-grid label",
+    "#escrowBalanceNote > span:first-child",
+    "#escrowListingFieldWarning > span:first-child",
+  ]) {
+    const texts = await pageUx.locator(sel).allInnerTexts();
+    assert.ok(texts.length > 0, `Expected visible elements for ${sel}`);
+    for (const t of texts) {
+      assert.equal(/[()]/.test(t), false, `Parenthetical text should live in ℹ️ popover, not ${sel}: ${t}`);
+    }
+  }
+  await pageUx.locator("#help-manage-owner-field").click();
+  await expect(pageUx.locator("#info-manage-owner-field")).toBeVisible();
+  await pageUx.keyboard.press("Escape");
+  await pageUx.locator("#help-escrow-name-field").click();
+  await expect(pageUx.locator("#info-escrow-name-field")).toBeVisible();
+  await expect(pageUx.locator("#info-escrow-name-field")).toContainText("POA listing");
+  await pageUx.keyboard.press("Escape");
+  await pageUx.locator("#help-escrow-balance-info").click();
+  await expect(pageUx.locator("#info-escrow-balance-info")).toBeVisible();
+  await pageUx.keyboard.press("Escape");
   await pageUx.locator("#help-escrow-step-3").click();
   await expect(pageUx.locator("#info-escrow-step-3")).toBeVisible();
   await pageUx.keyboard.press("Escape");
