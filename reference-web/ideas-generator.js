@@ -1,4 +1,4 @@
-import { IDEA_WORDS, IDEA_EMOJI, inspectName } from "./shared.js?v=38947c454eb2";
+import { IDEA_WORDS, IDEA_EMOJI, inspectName } from "./shared.js?v=c25888b92fd9";
 
 // Massive curated list of obvious everyday, tech, AI, crypto, finance, nature, creative & short root words.
 const CURATED_WORD_BANK = (
@@ -107,6 +107,7 @@ const topics = [
  {keys:["cat","dog","fox","panda","animal","🦊","🐼"],words:["panda","otter","koala","falcon","tiger","llama","zebra","whale"],emoji:["🦊","🐼","🐨","🐯","🦦"]},
  {keys:["ai","bot","agent","code","dev","tech","🤖","⚡"],words:["agent","neural","model","prompt","synth","quantum","vector","nexus","logic"],emoji:["🤖","⚡","🧠","💻","🚀"]},
  {keys:["pay","cash","coin","bank","money","gold","🪙","💎"],words:["vault","wallet","pay","ledger","mint","gold","diamond","treasury","trade"],emoji:["🪙","💎","💰","🏦","⚡"]},
+ {keys:["crypto","hodl","rekt","wagmi","ngmi","degen","lambo","fomo","fud","copium","hopium","rugpull","btc","eth","poa","defi","meme","wen","ser","fren","wojak","safu","buidl"],words:["hodl","rekt","wagmi","degen","copium","hopium","lambo","rugpull","bagholder","paperhands","safu","buidl","nocoiner","moonboy","wojak","shill","diamondhands","flippening"],emoji:["🪙","🚀","💎","🐸","🐋","🔥"]},
 ];
 
 export function ideaPools(query, manifest) {

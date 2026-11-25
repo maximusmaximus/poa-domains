@@ -24,24 +24,33 @@ for(const [name,launcher]of [['chromium',chromium],['firefox',firefox],['webkit'
  assert.equal(await page.locator('#siteTitle').textContent(),'🅿️🅾️🅰️D🅾️Ⓜ️🅰️INS');
  const measure=()=>page.evaluate(()=>{
   const rect=n=>{const r=n.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width};};
-  const tabs=document.querySelector('#sectionTabs'),row=document.querySelector('.ideas-masonry'),help=document.querySelector('#ideasHeading > .module-info');
+  const tabs=document.querySelector('#sectionTabs'),section=document.querySelector('#searchSection'),strip=document.querySelector('#ideasStrip'),row=document.querySelector('.ideas-masonry'),help=document.querySelector('#ideasHeading > .module-info');
   const visible=[...row.querySelectorAll('.idea')].filter(n=>getComputedStyle(n).visibility==='visible').map(rect);
+  const stripStyle=getComputedStyle(strip),rowStyle=getComputedStyle(row);
+  const mask=stripStyle.maskImage&&stripStyle.maskImage!=='none'?stripStyle.maskImage:stripStyle.webkitMaskImage;
   const color=getComputedStyle(document.querySelector('#tabFind .tab-age')).color;
   const rgb=color.match(/[\d.]+/g).slice(0,3).map(Number),lum=rgb=>rgb.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((a,v,i)=>a+v*[.2126,.7152,.0722][i],0);
-  return{width:innerWidth,tabs:rect(tabs),tabOverflow:tabs.scrollWidth>tabs.clientWidth+1,buttons:[...tabs.querySelectorAll('.section-tab')].map(rect),row:rect(row),help:rect(help),visible,ticker:rect(document.querySelector('#recentActions')),header:rect(document.querySelector('header')),empty:rect(document.querySelector('.ticker-empty')),tickerHelp:rect(document.querySelector('#recentActions > .module-info')),contrast:(lum([79,191,149])+.05)/(lum(rgb)+.05)};
+  return{width:innerWidth,tabs:rect(tabs),tabOverflow:tabs.scrollWidth>tabs.clientWidth+1,buttons:[...tabs.querySelectorAll('.section-tab')].map(rect),section:rect(section),strip:rect(strip),row:rect(row),rowScrollWidth:row.scrollWidth,rowClientWidth:row.clientWidth,overflowX:rowStyle.overflowX,touchAction:rowStyle.touchAction,mask,clipped:row.querySelectorAll('.idea.is-clipped').length,help:rect(help),visible,ticker:rect(document.querySelector('#recentActions')),header:rect(document.querySelector('header')),empty:rect(document.querySelector('.ticker-empty')),tickerHelp:rect(document.querySelector('#recentActions > .module-info')),contrast:(lum([79,191,149])+.05)/(lum(rgb)+.05)};
  });
- await expect.poll(async()=>{const m=await measure();return m.visible.length>0&&m.visible.every(r=>r.left>=m.row.left-.5&&r.right<=m.row.right+.5);}).toBe(true);
  const m=await measure();assert.ok(!m.tabOverflow&&m.buttons.every(r=>r.left>=m.tabs.left-.5&&r.right<=m.tabs.right+.5),JSON.stringify(m));
+ assert.ok(m.visible.length>0&&m.clipped===0&&m.rowScrollWidth>m.rowClientWidth,JSON.stringify(m));
+ assert.ok(Math.abs(m.strip.left-m.section.left)<=1&&Math.abs(m.strip.right-m.section.right)<=1,'Ideas strip bleeds seamlessly to #searchSection edges '+JSON.stringify({strip:m.strip,section:m.section}));
+ assert.ok(/linear-gradient\(.+(transparent|rgba\(0,\s*0,\s*0,\s*0\)).+(transparent|rgba\(0,\s*0,\s*0,\s*0\))/i.test(m.mask||''),'Ideas strip must fade on both ends: '+m.mask);
+ assert.equal(m.overflowX,'auto');
  assert.ok(m.row.left>=0&&m.row.right<=width+.5&&m.visible.every(r=>r.top>=m.help.bottom+3),JSON.stringify(m));
  assert.ok(m.ticker.left>=m.header.left-.5&&m.ticker.right<=m.header.right+.5&&m.empty.left>=m.ticker.left&&m.empty.right<=m.tickerHelp.left,JSON.stringify(m));
  assert.ok(m.tickerHelp.left-m.empty.right<=12,'Empty ticker help stays beside its label, not alone at the far right');
  assert.ok(m.contrast>=4.5,'Active Find freshness text contrast '+m.contrast);
- // The whole-chip boundary rule must hold during motion, not just at initial scrollLeft=0.
+ // Slow continuous scroll with seamless faded edges and non-fighting horizontal manual scroll.
  await page.emulateMedia({reducedMotion:'no-preference'});await page.mouse.move(0,0);
  await expect(page.locator('.ideas-masonry')).toHaveAttribute('data-motion','running');
  const before=await page.locator('.ideas-masonry').evaluate(n=>n.scrollLeft);
  await page.waitForFunction(x=>document.querySelector('.ideas-masonry').scrollLeft>x+6,before);
- await expect.poll(async()=>{const m=await measure();return m.visible.length>0&&m.visible.every(r=>r.left>=m.row.left-.5&&r.right<=m.row.right+.5);}).toBe(true);
+ const afterAuto=await measure();assert.ok(afterAuto.clipped===0&&afterAuto.visible.every(r=>r.top>=afterAuto.help.bottom+3));
+ const manualPos=await page.locator('.ideas-masonry').evaluate(n=>{n.scrollLeft=Math.min(260,n.scrollWidth-n.clientWidth);return n.scrollLeft;});
+ assert.ok(manualPos>=120,'User can scroll suggestions horizontally: '+manualPos);
+ await expect(page.locator('.ideas-masonry')).toHaveAttribute('data-motion','paused');
+ assert.ok(await page.locator('.ideas-masonry a.idea').count()<=36);
  await page.emulateMedia({reducedMotion:'reduce'});
 
  await page.locator('#cartAnchor').scrollIntoViewIfNeeded();await expect(page.locator('#floatingCartBtn')).toBeHidden();

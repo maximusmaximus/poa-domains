@@ -465,7 +465,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=38947c454eb2";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=c25888b92fd9";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -703,7 +703,16 @@ export function titleCodePointsOk(title) {
 }
 
 /* ---------- Name ideas under the Check button ---------- */
-export const IDEA_WORDS = [
+export const CRYPTO_IDEA_WORDS = [
+  "hodl", "rekt", "wagmi", "ngmi", "degen", "copium", "hopium", "lambo",
+  "rugpull", "fomo", "safu", "bagholder", "paperhands", "buidl", "nocoiner",
+  "moonboy", "shill", "wojak", "normie", "maxi", "fren", "ser", "wen", "jeet",
+  "fud", "depeg", "vaporware", "unbanked", "liquidated", "flippening",
+  "diamondhands", "pleb", "pamp", "slashed", "goblin", "chad", "gwei",
+  "satoshi", "mempool", "gasless", "airdrop", "bullish", "bearish", "dyor",
+  "nfa", "btfd", "snipe", "faucet", "gm", "gn",
+];
+const CLASSIC_IDEA_WORDS = [
   "moon", "rocket", "pixel", "sunny", "cosmic", "lucky", "mango", "ninja", "river",
   "spark", "cloud", "nova", "maple", "echo", "comet", "tiger", "lemon", "bolt",
   "jazz", "zen", "koala", "waffle", "disco", "astro", "coral", "frost", "honey",
@@ -713,6 +722,14 @@ export const IDEA_WORDS = [
   "quest", "rainbow", "sushi", "taco", "unicorn", "vibe", "whale", "zebra",
   "happy", "golden", "tiny", "mega", "super", "chill", "brave", "swift", "wild",
 ];
+export const IDEA_WORDS = (() => {
+  const mixed = [], len = Math.max(CRYPTO_IDEA_WORDS.length, CLASSIC_IDEA_WORDS.length);
+  for (let i = 0; i < len; i++) {
+    if (i < CRYPTO_IDEA_WORDS.length) mixed.push(CRYPTO_IDEA_WORDS[i]);
+    if (i < CLASSIC_IDEA_WORDS.length) mixed.push(CLASSIC_IDEA_WORDS[i]);
+  }
+  return [...new Set(mixed)];
+})();
 export const IDEA_EMOJI = [
   "\u{1F680}", "\u{1F319}", "\u{1F355}", "\u{1F525}", "\u{1F30A}", "\u{1F419}",
   "\u{1F98A}", "\u{1F340}", "\u{1F48E}", "\u26A1", "\u{1F388}", "\u{1F335}",

@@ -1,18 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=38947c454eb2";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=38947c454eb2";
-import { renderManagement } from "./ui-manage.js?v=38947c454eb2";
-import { actionLabel } from "./ui-copy.js?v=38947c454eb2";
-import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=38947c454eb2";
-import { ui } from "./ui-state.js?v=38947c454eb2";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=38947c454eb2";
-import { createPoaCopyButton } from "./ui-copy.js?v=38947c454eb2";
-import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=38947c454eb2";
-import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=38947c454eb2";
-import { renderDomainPage } from "./ui-domain.js?v=38947c454eb2";
-import { runSearch } from "./ui-search.js?v=38947c454eb2";
-import { renderIdeas } from "./ui-ideas.js?v=38947c454eb2";
-import { mountEscrow } from "./escrow.js?v=38947c454eb2";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=38947c454eb2";
+import { publicNameUnavailable } from "./shared.js?v=c25888b92fd9";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=c25888b92fd9";
+import { renderManagement } from "./ui-manage.js?v=c25888b92fd9";
+import { actionLabel } from "./ui-copy.js?v=c25888b92fd9";
+import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=c25888b92fd9";
+import { ui } from "./ui-state.js?v=c25888b92fd9";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=c25888b92fd9";
+import { createPoaCopyButton } from "./ui-copy.js?v=c25888b92fd9";
+import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=c25888b92fd9";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=c25888b92fd9";
+import { renderDomainPage } from "./ui-domain.js?v=c25888b92fd9";
+import { runSearch } from "./ui-search.js?v=c25888b92fd9";
+import { renderIdeas } from "./ui-ideas.js?v=c25888b92fd9";
+import { mountEscrow } from "./escrow.js?v=c25888b92fd9";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=c25888b92fd9";
 
 export function updateFreshness() {
     updateHandoffAge();

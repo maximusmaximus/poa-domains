@@ -5,10 +5,19 @@ import {createIdeaGenerator,ideaPools} from "../reference-web/ideas-generator.js
 import {recentActions} from "../reference-web/ui-ticker.js";
 import {actionLabel,buttonIcon,decorateEmojiButton} from "../reference-web/ui-copy.js";
 import {managedNames,managementPlan} from "../reference-web/ui-manage.js";
-import {inspectName} from "../reference-web/shared.js";
+import {CRYPTO_IDEA_WORDS,IDEA_WORDS,inspectName} from "../reference-web/shared.js";
 import {profileEngine} from "./fixtures/ui-harness.mjs";
 import {capabilities} from "../dist/src/interface.js";
 const cap=capabilities(profileEngine('mainnet'));
+test('funny single crypto words are valid root names and appear in default & crypto suggestion pools',()=>{
+ assert.ok(CRYPTO_IDEA_WORDS.length>=30);
+ for(const w of CRYPTO_IDEA_WORDS){assert.match(w,/^[a-z]+$/);const n=inspectName(w,cap.emojiManifest);assert.ok(n.isRoot&&n.emojiCount===0,w);}
+ const defWords=ideaPools('',cap.emojiManifest).words;
+ assert.ok(defWords.slice(0,12).filter(w=>CRYPTO_IDEA_WORDS.includes(w)).length>=4,'Funny crypto words should appear immediately in the suggested window');
+ for(const w of ['hodl','rekt','wagmi','degen','copium','lambo'])assert.ok(IDEA_WORDS.includes(w),w);
+ const cryptoPool=ideaPools('crypto',cap.emojiManifest);
+ assert.ok(cryptoPool.related&&cryptoPool.words.includes('hodl')&&cryptoPool.words.includes('copium'));
+});
 test('separate single words / double emoji / single emoji keep generating with bounded recent exclusions',()=>{
  const g=createIdeaGenerator({query:'moon',manifest:cap.emojiManifest});for(const lane of ['words','double','single']){const out=[];for(let i=0;i<250;i++){const q=g.next(lane);assert.ok(q,lane+' exhausted');const n=inspectName(q,cap.emojiManifest);assert.ok(n.isRoot);assert.equal(n.emojiCount,lane==='words'?0:lane==='double'?2:1);if(lane==='words')assert.match(q,/^[a-z]+$/);out.push(q);}assert.ok(new Set(out).size>20);}
  assert.ok(ideaPools('robot',cap.emojiManifest).words.includes('robothub'));assert.ok(ideaPools('robot',cap.emojiManifest).related);const pools=ideaPools('moon',cap.emojiManifest);assert.ok(pools.related);assert.equal(pools.words[0],'moonbeam');assert.equal(createIdeaGenerator({manifest:cap.emojiManifest,accept:()=>false}).next('single'),null);
