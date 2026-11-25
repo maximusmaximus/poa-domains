@@ -494,7 +494,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=e24f44d20e2d";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=47cf48dc0435";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -2033,10 +2033,16 @@ export function collectPreviousDomainFields(deed, { listedForSale = false } = {}
 
   return out;
 }
-export function profileImageMediaPath(image) {
-  if (typeof image !== "string" || !image.startsWith("ipfs://")) return null;
-  const cid = image.slice(7);
-  return /^bafkrei[a-z2-7]{52}$/.test(cid) ? `/v1/media/${cid}` : null;
+export function profileImageMediaPath(image, domainName = null) {
+  if (typeof image !== "string") return null;
+  if (image.startsWith("ipfs://")) {
+    const cid = image.slice(7);
+    return /^bafkrei[a-z2-7]{52}$/.test(cid) ? `/v1/media/${cid}` : null;
+  }
+  if (image.startsWith("https://") && typeof domainName === "string" && domainName.trim()) {
+    return `/v1/media/domain/${encodeURIComponent(domainName.trim())}`;
+  }
+  return null;
 }
 export function buildProfileUpdatePrompt({ name, deed, metadata, endpointUrl }) {
   const endpoint = endpointUrl || "https://poadomains.grok.me";

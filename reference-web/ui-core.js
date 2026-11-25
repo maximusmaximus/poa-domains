@@ -1,6 +1,6 @@
-import { createPoaCopyButton, decorateEmojiButton } from "./ui-copy.js?v=e24f44d20e2d";
-import { buildOwnershipIndex, isPoaAddress, ownershipConflict, safeObject, shortenPoaAddress } from "./shared.js?v=e24f44d20e2d";
-import { ui } from "./ui-state.js?v=e24f44d20e2d";
+import { createPoaCopyButton, decorateEmojiButton } from "./ui-copy.js?v=47cf48dc0435";
+import { buildOwnershipIndex, isPoaAddress, ownershipConflict, safeObject, shortenPoaAddress } from "./shared.js?v=47cf48dc0435";
+import { ui } from "./ui-state.js?v=47cf48dc0435";
 
 export const el = (id) => document.getElementById(id);
 
@@ -150,20 +150,20 @@ export function variantOwner(name) {
 export function statusLabel(status) {
     const map = {
         available: "🟢 Available",
-        reserved: "🔒 Reserved",
-        owned: "♾️ Owned forever",
-        listed: "💰 For sale (resale)",
+        reserved: "🔴 Reserved",
+        owned: "Owned",
+        listed: "💰 For sale",
         // Legacy lease records only; new leases and renewals are off.
-        leased: "📜 Legacy lease record",
-        "listed-lease": "📜 Legacy lease record",
-        "lease-grace": "📜 Legacy lease record",
-        "lease-expired": "📜 Legacy lease record",
-        "variant-taken": "🔒 Taken (same emoji)",
-        "auction-current": "🏷️ Auction open",
-        "auction-upcoming": "🗓️ Auction upcoming",
+        leased: "📜 Legacy lease",
+        "listed-lease": "📜 Legacy lease",
+        "lease-grace": "📜 Legacy lease",
+        "lease-expired": "📜 Legacy lease",
+        "variant-taken": "🔴 Unavailable",
+        "auction-current": "🔥 Live auction",
+        "auction-upcoming": "⏳ Upcoming auction",
         "auction-past": "📜 Auction ended",
-        "child-offer": "🟢 Child offer open",
-        "unminted-child": "⚪ Child not minted",
+        "child-offer": "🟢 Available",
+        "unminted-child": "🔴 Unavailable",
         unknown: "❓ Unknown",
     };
     return map[status] || status;

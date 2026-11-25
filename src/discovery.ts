@@ -26,6 +26,8 @@ export const GATEWAY_ROUTES = Object.freeze([
   ["POST", "/mcp"],
   ["POST", "/v1/search-log"],
   ["POST", "/v1/media/upload"],
+  ["GET", "/v1/media/domain/:name"],
+  ["HEAD", "/v1/media/domain/:name"],
   ["GET", "/v1/media/:cid"],
   ["HEAD", "/v1/media/:cid"],
   ["GET", "/v1/network-status"],
@@ -293,6 +295,13 @@ export function openApiDocument(): any {
           required: ["cid", "uri", "mediaUrl", "contentType", "bytes", "r2Stored", "ipfsPinned"],
         }),
         default: response("Rejected or temporarily unavailable", ref("Error")),
+      };
+    }
+    if (path === "/v1/media/domain/:name") {
+      operation.description = "Read a domain's committed public profile avatar image same-origin (serves R2 CIDs directly or fetches, magic-byte verifies, and R2-caches committed https:// PNG/JPG/WebP/GIF images).";
+      operation.responses = {
+        "200": { description: "Validated avatar image bytes (image/png, image/jpeg, image/webp, or image/gif)" },
+        default: response("Domain or avatar not found, withheld, or invalid image", ref("Error")),
       };
     }
     if (path === "/v1/media/:cid") {
@@ -591,15 +600,34 @@ export function openApiDocument(): any {
     },
     "x-surface": API_SURFACE,
     "x-limits": API_LIMITS,
-    "x-mcp-tools": toolDefinitions().map((t: any) => ({
-      name: t.name,
-      inputSchema: ["simulate_intent", "submit_intent"].includes(t.name)
-        ? ref("SignedPacket")
-        : t.name === "submit_escrow_command"
-          ? ref("EscrowSignedCommand")
-          : t.inputSchema,
-      outputSchema: t.outputSchema,
-    })),
+    "x-mcp-tools": toolDefinitions().map((t: any) => {
+      const replaceError = (node: any): any => {
+        if (!node || typeof node !== "object") return node;
+        if (Array.isArray(node)) return node.map(replaceError);
+        if (
+          node.type === "object" &&
+          Array.isArray(node.required) &&
+          node.required.length === ERROR_SCHEMA.required.length &&
+          node.required.every((k: string, i: number) => k === ERROR_SCHEMA.required[i]) &&
+          node.properties &&
+          Object.keys(node.properties).length === Object.keys(ERROR_SCHEMA.properties).length
+        ) {
+          return ref("Error");
+        }
+        const out: Record<string, any> = {};
+        for (const [k, v] of Object.entries(node)) out[k] = replaceError(v);
+        return out;
+      };
+      return {
+        name: t.name,
+        inputSchema: ["simulate_intent", "submit_intent"].includes(t.name)
+          ? ref("SignedPacket")
+          : t.name === "submit_escrow_command"
+            ? ref("EscrowSignedCommand")
+            : t.inputSchema,
+        outputSchema: replaceError(t.outputSchema),
+      };
+    }),
   };
 }
 export function agentCard(): any {

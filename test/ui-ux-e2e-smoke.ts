@@ -376,11 +376,11 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#searchBtn").click();
   assert.match(
     await searchDetails(page),
-    /OWNED \(PERMANENT DEED\)/,
+    /Unavailable/,
   );
   assert.match(
     await searchDetails(page),
-    /Active fixed-price resale listing: 2500 registry units/,
+    /For sale · 2500 registry units/,
   );
 
   // 4. Add items to cart directly from #auctions and #offers cards
@@ -617,13 +617,13 @@ async function runAgentRoundtripVerification(
   // Verify #names now includes builder.nexus
   assert.match(await page.locator("#names").innerText(), /builder\.nexus/);
 
-  // Verify searching builder.nexus now reports OWNED (PERMANENT DEED)
+  // Verify searching builder.nexus now reports simple Unavailable
   await page.locator("#tabFind").click();
   await page.locator("#searchInput").fill("builder.nexus");
   await page.locator("#searchBtn").click();
   assert.match(
     await searchDetails(page),
-    /OWNED \(PERMANENT DEED\)/,
+    /Unavailable/,
   );
 
   await page.locator("#tabAuctions").click();

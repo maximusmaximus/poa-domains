@@ -1,13 +1,13 @@
-import { copyText } from "./ui-copy.js?v=e24f44d20e2d";
-import { publicNameUnavailable } from "./shared.js?v=e24f44d20e2d";
-import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, activePoaFixedListings, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=e24f44d20e2d";
-import { ui } from "./ui-state.js?v=e24f44d20e2d";
-import { domainHeader, nameLink, navigateDomain, openManageDomain, openPoa, ownerLink, writeViewURL } from "./ui-router.js?v=e24f44d20e2d";
-import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=e24f44d20e2d";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=e24f44d20e2d";
-import { addToCart } from "./ui-cart.js?v=e24f44d20e2d";
-import { suggestNames } from "./ideas-generator.js?v=e24f44d20e2d";
-import { logSubmittedSearch } from "./ui-search-log.js?v=e24f44d20e2d";
+import { copyText } from "./ui-copy.js?v=47cf48dc0435";
+import { publicNameUnavailable } from "./shared.js?v=47cf48dc0435";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, activePoaFixedListings, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=47cf48dc0435";
+import { ui } from "./ui-state.js?v=47cf48dc0435";
+import { domainHeader, nameLink, navigateDomain, openManageDomain, openPoa, ownerLink, writeViewURL } from "./ui-router.js?v=47cf48dc0435";
+import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=47cf48dc0435";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=47cf48dc0435";
+import { addToCart } from "./ui-cart.js?v=47cf48dc0435";
+import { suggestNames } from "./ideas-generator.js?v=47cf48dc0435";
+import { logSubmittedSearch } from "./ui-search-log.js?v=47cf48dc0435";
 
 let activeSuggestionIdx = -1;
 let currentSuggestions = [];
@@ -125,13 +125,13 @@ function classifySearchName(rawQuery) {
     const poa = poaOnlyMode(ui.cap);
     const nowMs = ui.escrowMarketServerTime || Date.now();
     if (publicNameUnavailable(name, ui.cap)) {
-        return { name, info, status: "unavailable", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Not available · View" };
+        return { name, info, status: "unavailable", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Unavailable" };
     }
     if (info.isRoot && ui.reservedSet.has(name) && !(entry?.activeId && s.deeds?.[entry.activeId])) {
-        return { name, info, status: "reserved", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Reserved · Not available" };
+        return { name, info, status: "reserved", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Reserved" };
     }
     if (variantOwner(name)) {
-        return { name, info, status: "unavailable", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Not available · View" };
+        return { name, info, status: "unavailable", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Unavailable" };
     }
     const poaAuction = poa ? findOpenPoaAuctionByName(ui.escrowMarket, name, nowMs) : null;
     if (poaAuction) {
@@ -156,7 +156,7 @@ function classifySearchName(rawQuery) {
             tone: "auction",
             canAddToCart: false,
             goToPage: true,
-            meta: `🏷️ For sale · ${poaShort(poaFixed.price)} POA · View`,
+            meta: `🏷️ For sale · ${poaShort(poaFixed.price)} POA`,
         };
     }
     const liveAuction = entry?.auctionId && s.auctions?.[entry.auctionId]?.status === "live"
@@ -164,7 +164,7 @@ function classifySearchName(rawQuery) {
         : Object.values(s.auctions ?? {}).find((a) => a.name === name && a.status === "live");
     if (liveAuction) {
         if (poa) {
-            return { name, info, status: "unavailable", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Not available · View" };
+            return { name, info, status: "unavailable", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Unavailable" };
         }
         const minBid = liveAuction.high ? minimumNextBid(liveAuction.high.amount, ui.cap.increment) : liveAuction.reserve;
         return {
@@ -197,7 +197,7 @@ function classifySearchName(rawQuery) {
                 meta: `💰 For sale · ${compactAmount(resaleOffer.price)} units · + Cart`,
             };
         }
-        return { name, info, status: "taken", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Not available · View" };
+        return { name, info, status: "taken", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Unavailable" };
     }
     if (!info.isRoot) {
         const parentEntry = s.names?.[info.parent];
@@ -210,7 +210,7 @@ function classifySearchName(rawQuery) {
                 tone: parentDeed ? "neutral" : "unavailable",
                 canAddToCart: false,
                 goToPage: true,
-                meta: parentDeed ? "⚪ Subname · View" : "🔴 Not available",
+                meta: parentDeed ? "⚪ Subname" : "🔴 Unavailable",
             };
         }
         const childOffer = parentDeed
@@ -232,7 +232,7 @@ function classifySearchName(rawQuery) {
                 meta: `🟢 ${compactAmount(childOffer.price)} units · + Cart`,
             };
         }
-        return { name, info, status: "unavailable", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Not available" };
+        return { name, info, status: "unavailable", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Unavailable" };
     }
     const price = suggestionPriceLabel(info);
     return {
@@ -474,7 +474,8 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
         const openPage = add(card, "button", "Open page", "secondary small");
         openPage.type = "button";
         openPage.addEventListener("click", () => navigateDomain(info.canonical));
-        add(card, "p", "🔴 Name unavailable — Stored records are withheld from public view; this name is not free to register.", "badge-warn");
+        add(card, "p", "🔴 Unavailable", "badge-warn");
+        add(card, "p", "Stored records are withheld from public view; this name is not free to register.").setAttribute("data-info-description", "");
         return;
     }
     const s = ui.latestState;
@@ -488,15 +489,15 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
     const kind=add(card,"p",info.isRoot?"Root":"Child of ");if(!info.isRoot)nameLink(kind,info.parent);kind.append(" · "+info.tier.toUpperCase());
     const entry = s.names[name];
     if (info.isRoot && ui.reservedSet.has(name) && !(entry?.activeId && s.deeds?.[entry.activeId])) {
-        add(card, "p", "🔴 Reserved — not for sale (Not available)", "badge-warn");
-        add(card, "p", `${ui.reservedSet.size}-name reservation catalog`);
+        add(card, "p", "🔴 Reserved", "badge-warn");
+        add(card, "p", `Reserved name (${ui.reservedSet.size}-name reservation catalog) — not available for registration.`).setAttribute("data-info-description", "");
         appendSuggestedAlternatives(card, name);
         return;
     }
     const sameEmoji = variantOwner(name);
     if (sameEmoji) {
-        add(card, "p", "🔴 Not available — same emoji as another name", "badge-warn");
-        const p = add(card, "p", "Owned or in auction as ");
+        add(card, "p", "🔴 Unavailable", "badge-warn");
+        const p = add(card, "p", "Same emoji as ");
         nameLink(p, sameEmoji);
         add(card, "p", "One owner per emoji, whatever the skin tone or style.").setAttribute("data-info-description", "");
         appendSuggestedAlternatives(card, name);
@@ -520,15 +521,15 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
         }
         const cartItem = ui.cart.find((x) => x.action === "poaBid" && x.params?.auctionId === poaAuction.id) ?? null;
         const outbidInfo = poaAuctionOutbidStatus(poaAuction, { bidderAddress: ui.bidderAddress, cartItem });
-        add(card, "p", awaiting ? "🔨 For Auction — queued (timer starts on first bid)" : "🔥 For Auction — live POA auction", awaiting ? "badge" : "badge-ok");
+        add(card, "p", awaiting ? "🔨 For Auction · Starts on first bid" : "🔥 Live Auction", awaiting ? "badge" : "badge-ok");
         add(
             card,
             "p",
             autoAdded
-                ? `🔨 Added to your cart as a POA auction bid at the ${awaiting ? "opening minimum" : "current minimum"} (${poaShort(minNext)} POA). This domain is for auction, not a fixed-price buy — adjust your highest bid below or in your cart. Tap ℹ️ for how auctions work.`
+                ? `Added to cart as an auction bid (${poaShort(minNext)} POA minimum).`
                 : cartItem
-                    ? `🔨 In your cart as a POA auction bid (cap ${poaShort(cartItem.amount)} POA). This domain is for auction, not a fixed-price buy — adjust your highest bid below or in your cart. Tap ℹ️ for how auctions work.`
-                    : `🔨 This domain is for POA auction, not a fixed-price buy — enter your highest bid (at least ${poaShort(minNext)} POA) and add it to your cart. Tap ℹ️ for how auctions work.`,
+                    ? `In cart as an auction bid (cap ${poaShort(cartItem.amount)} POA).`
+                    : `Auction (not fixed price) — enter your highest bid below.`,
             "muted poa-search-expect",
         );
         const windowSec = Math.round((poaAuction.window ?? poaAuction.quiet ?? 3600000) / 1000);
@@ -600,7 +601,7 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
         ? s.auctions[entry.auctionId]
         : Object.values(s.auctions).find((a) => a.name === name && a.status === "live");
     if (liveAuction && poa) {
-        add(card, "p", "⏳ Not available right now", "badge");
+        add(card, "p", "🔴 Unavailable", "badge-warn");
         return;
     }
     if (liveAuction) {
@@ -650,16 +651,16 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
         const d = s.deeds[entry.activeId];
         const poaFixed = poa ? activePoaFixedListings(ui.escrowMarket, ui.escrowMarketServerTime || Date.now()).find((x) => x.name === name) ?? null : null;
         if (poaFixed) {
-            add(card, "p", `🏷️ For sale — ${poaShort(poaFixed.price)} POA (Fixed price)`, "badge-ok");
+            add(card, "p", `🏷️ For sale · ${poaShort(poaFixed.price)} POA`, "badge-ok");
             const buyBtn = add(card, "button", "🪙 Open My POA to buy", "small");
             buyBtn.type = "button";
             buyBtn.addEventListener("click", () => openPoa(name));
         } else {
-            add(card, "p", `🔴 Not available — Owned (${d.rights.kind}) — OWNED (${d.rights.kind.toUpperCase()} DEED)`, "badge-warn");
+            add(card, "p", "🔴 Unavailable", "badge-warn");
         }
         const ownerInfo = add(card, "p", "Owner: ");
         ownerLink(ownerInfo, d.owner, person(d.owner));
-        ownerInfo.append(` · Generation ${d.generation} · Owner version ${d.ownerVersion} · Deed version ${d.version}`);
+        add(card, "p", `Deed: ${d.rights.kind} · Generation ${d.generation} · Owner v${d.ownerVersion} · Deed v${d.version}`).setAttribute("data-info-description", "");
         const manageBtn = add(card, "button", "⚙️ Manage this domain", "secondary small");
         manageBtn.type = "button";
         manageBtn.setAttribute("aria-label", `Manage ${name}`);
@@ -670,7 +671,8 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
             o.uses < o.maxUses &&
             s.time < o.validUntil);
         if (resaleOffer && !poa) {
-            add(card, "p", `💰 For sale: ${resaleOffer.price} ${registryUnit(resaleOffer.asset)} (until ${formatClock(resaleOffer.validUntil)}) — Active fixed-price resale listing: ${resaleOffer.price} ${registryUnit(resaleOffer.asset)}`, "badge-ok");
+            add(card, "p", `💰 For sale · ${resaleOffer.price} ${registryUnit(resaleOffer.asset)}`, "badge-ok");
+            add(card, "p", `Fixed-price resale listing until ${formatClock(resaleOffer.validUntil)}.`).setAttribute("data-info-description", "");
             const btn = add(card, "button", "Add to cart", "small");
             btn.id = "addToCartBtn";
             btn.type = "button";
@@ -719,7 +721,8 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
             });
         }
         else {
-            add(card, "p", "⚪ Child not minted — no open offer", "badge");
+            add(card, "p", "🔴 Unavailable", "badge-warn");
+            add(card, "p", "Subdomain not minted; no open child offer from the parent owner.").setAttribute("data-info-description", "");
         }
         return;
     }
@@ -729,8 +732,7 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
         catch (error) { add(card, "p", error.message, "badge-warn"); return; }
         add(card, "p", "🟢 Available", "badge-ok");
         add(card, "p", `🪙 ${poaShort(price)} POA`, "badge-ok");
-        add(card, "p", `Permanent name for ${poaShort(price)} POA. Add to cart to copy your agent checkout plan — once your agent’s POA transfer reaches finality and runs issue, ownership mints to your address right away.`, "muted poa-search-expect");
-        add(card, "p", `Yours forever for ${poaShort(price)} POA. After your agent sends POA and it reaches PoA finality (K=5 attestations or checkpoint), escrow credits your balance and your agent mints the name permanently in one step. Unused POA stays refundable only to your original address. Nothing is paid here.`).setAttribute("data-info-description", "");
+        add(card, "p", `Permanent name for ${poaShort(price)} POA. After your agent sends POA and it reaches PoA finality (K=5 attestations or checkpoint), escrow credits your balance and your agent mints the name permanently in one step. Unused POA stays refundable only to your original address. Nothing is paid here.`).setAttribute("data-info-description", "");
         if (autoAdd)
             addToCart({ name, action: "poaCheckout" });
         const inCart = ui.cart.some((x) => x.name === name && x.action === "poaCheckout");
@@ -754,7 +756,7 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
     }
     const { reserve } = pricing;
     const tierNote = `${compactAmount(reserve)} registry units ${info.isSingleEmoji ? "single-emoji" : info.isMultiEmoji ? "multi-emoji" : "root"} minimum bid`;
-    add(card, "p", "🟢 Available in the registry snapshot", "badge-ok");
+    add(card, "p", "🟢 Available", "badge-ok");
     add(card, "p", `Unclaimed ${info.tier} root domain (${tierNote}). Opening auction reserve: ${reserve} registry units (${formatDuration(pricing.window)} minimum window + ${formatDuration(pricing.quiet)} quiet period).`).setAttribute("data-info-description", "");
     if (autoAdd && fromSuggestion) {
         addToCart({
@@ -799,12 +801,17 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
 /** POA subname: shows the parent holder's open escrow price, if any, and copies an agent request. */
 function poaSubnameCard(card, name, parent, parentDeed) {
     const status = add(card, "p", "⏳ Checking subname price…", "badge");
-    if (!parentDeed) { status.textContent = "⚪ Subnames aren't for sale right now"; return; }
+    const markUnavailable = () => {
+        status.textContent = "🔴 Unavailable";
+        status.className = "badge-warn";
+        add(card, "p", "Subnames under this parent aren't for sale right now.").setAttribute("data-info-description", "");
+    };
+    if (!parentDeed) { markUnavailable(); return; }
     const base = endpointBase();
     json(`${base}/v1/escrow/subnames?parent=${encodeURIComponent(parent)}`).then((r) => {
         const l = (Array.isArray(r?.items) ? r.items : []).find((x) => x && x.status === "OPEN" && x.parent === parent &&
             x.seller === parentDeed.owner && typeof x.price === "string" && /^[0-9]+\.[0-9]{6}$/.test(x.price) && /^[0-9a-f]{64}$/.test(x.id));
-        if (!l) { status.textContent = "⚪ Subnames aren't for sale right now"; return; }
+        if (!l) { markUnavailable(); return; }
         status.textContent = "🟢 Available"; status.className = "badge-ok";
         add(card, "p", `🪙 ${poaShort(l.price)} POA`, "badge-ok");
         add(card, "p", `Price set by the holder of ${parent}. Your agent pays with POA checkout after you approve, and the holder is paid from escrow. Nothing is paid here.`).setAttribute("data-info-description", "");
@@ -819,5 +826,5 @@ function poaSubnameCard(card, name, parent, parentDeed) {
             const res = await copyText(text, box);
             note.textContent = res.ok ? "✅ Copied" : "📋 Press Ctrl/Cmd+C to copy from the box.";
         });
-    }).catch(() => { status.textContent = "⚪ Subnames aren't for sale right now"; });
+    }).catch(() => { markUnavailable(); });
 }

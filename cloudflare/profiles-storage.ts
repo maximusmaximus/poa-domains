@@ -6,6 +6,7 @@ import { parseMcpJSON } from "../src/mcp-json.js";
 import {
   ALLOWED_IMAGE_TYPES,
   cidForBytes,
+  extractLatestProfile,
   MAX_PROFILE_IMAGE_BYTES,
   PROFILE_SCHEMA_V1,
   sniffImageFormat,
@@ -51,8 +52,8 @@ function pinataError(body: unknown, secret: string): { code?: string; message?: 
 const MAX_JSON_UPLOAD_BYTES = Math.ceil((MAX_PROFILE_IMAGE_BYTES * 4) / 3) + 4096;
 const ALLOWED_MIME_SET = new Set<string>(ALLOWED_IMAGE_TYPES);
 
-async function readBoundedBytes(request: Request, limit: number, tooLargeCode: string): Promise<Uint8Array> {
-  const reader = request.body?.getReader();
+async function readBoundedBytes(source: { body: ReadableStream<Uint8Array> | null }, limit: number, tooLargeCode: string): Promise<Uint8Array> {
+  const reader = source.body?.getReader();
   need(reader, "EMPTY_BODY");
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -357,6 +358,165 @@ export async function handleMediaGet(request: Request, env: ProfileStorageEnv, r
       "cache-control": "public, max-age=31536000, immutable",
       "content-disposition": "inline",
     },
+  });
+}
+
+export interface DomainAvatarLookupResult {
+  status: number;
+  deed?: any;
+  code?: string;
+}
+
+const BLOCKED_IMAGE_TLDS = new Set([
+  "localhost",
+  "local",
+  "internal",
+  "lan",
+  "arpa",
+  "localdomain",
+  "invalid",
+]);
+
+/** Validates an external committed profile image URL against SSRF/private-host rules. */
+export function validateSafePublicImageUrl(rawUrl: string): URL | null {
+  if (typeof rawUrl !== "string" || !rawUrl || rawUrl.length > 2048) return null;
+  let u: URL;
+  try {
+    u = new URL(rawUrl);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "https:") return null;
+  if (u.username || u.password) return null;
+  if (u.port !== "" && u.port !== "443") return null;
+  const host = u.hostname.toLowerCase().replace(/\.$/, "");
+  if (!host || host.includes(":") || host.startsWith("[")) return null;
+  const labels = host.split(".");
+  if (labels.length < 2) return null;
+  const tld = labels[labels.length - 1]!;
+  // Alphabetic or punycode TLD automatically excludes numeric/octal/hex IPv4 and single-label hosts.
+  if (!/^(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$/.test(tld)) return null;
+  if (BLOCKED_IMAGE_TLDS.has(tld)) return null;
+  return u;
+}
+
+function isSelfHost(hostname: string, env: ProfileStorageEnv): boolean {
+  const h = hostname.toLowerCase().replace(/\.$/, "");
+  if (h === "poadomains.grok.me" || h === env.BACKEND_HOST.toLowerCase()) return true;
+  if (env.PUBLIC_EXPLORER_URL) {
+    try {
+      if (h === new URL(env.PUBLIC_EXPLORER_URL).hostname.toLowerCase()) return true;
+    } catch {}
+  }
+  return false;
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Same-origin read-only avatar endpoint for a domain's committed profile.image.
+ * Only ever serves images committed in the registry state (never arbitrary caller URLs),
+ * validates image magic bytes, enforces the 5 MiB cap, and caches verified external images in R2.
+ */
+export async function handleDomainAvatarGet(
+  request: Request,
+  env: ProfileStorageEnv,
+  rawName: string,
+  lookupDeed: (rawName: string, requestId: string) => Promise<DomainAvatarLookupResult>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Response> {
+  const requestId = correlationId(request.headers.get("x-request-id"));
+  const fail = (status: number, code: string) =>
+    Response.json(errorEnvelope(code, requestId), {
+      status,
+      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+    });
+  if (request.method !== "GET" && request.method !== "HEAD") return fail(405, "METHOD_NOT_ALLOWED");
+  if (!rawName || rawName.includes("/")) return fail(400, "NAME");
+  const lookup = await lookupDeed(rawName, requestId);
+  if (lookup.status >= 400) return fail(lookup.status, lookup.code ?? "RESOURCE_NOT_FOUND");
+  const deed = lookup.deed;
+  if (!deed || deed.retired) return fail(404, "RESOURCE_NOT_FOUND");
+  const extracted = extractLatestProfile(deed);
+  const image = extracted && !extracted.isDefault ? extracted.profile?.image : null;
+  if (typeof image !== "string" || !image) return fail(404, "RESOURCE_NOT_FOUND");
+  if (image.startsWith("ipfs://")) {
+    return handleMediaGet(request, env, image.slice(7));
+  }
+  const safeUrl = validateSafePublicImageUrl(image);
+  if (!safeUrl || isSelfHost(safeUrl.hostname, env)) return fail(404, "RESOURCE_NOT_FOUND");
+  const urlHash = await sha256Hex("poa-domains:ext-avatar:" + safeUrl.href);
+  const cacheKey = `v1/media/ext/${urlHash}`;
+  const imageHeaders = (ct: string, len?: number): Record<string, string> => ({
+    "content-type": ct,
+    ...(len !== undefined ? { "content-length": String(len) } : {}),
+    "cache-control": "public, max-age=600",
+    "content-disposition": "inline",
+  });
+  if (env.PROFILES) {
+    try {
+      if (request.method === "HEAD") {
+        const head = await env.PROFILES.head(cacheKey);
+        const ct = head?.httpMetadata?.contentType ?? "";
+        if (head && ALLOWED_MIME_SET.has(ct)) {
+          return new Response(null, { status: 200, headers: imageHeaders(ct, head.size) });
+        }
+      } else {
+        const cached = await env.PROFILES.get(cacheKey);
+        const ct = cached?.httpMetadata?.contentType ?? "";
+        if (cached && ALLOWED_MIME_SET.has(ct)) {
+          return new Response(cached.body, { status: 200, headers: imageHeaders(ct, cached.size) });
+        }
+      }
+    } catch {}
+  }
+  let upstream: Response;
+  try {
+    // Workers reject redirect:"error"; use "manual" and treat any non-200 (including 3xx) as failure.
+    upstream = await fetchImpl(safeUrl.href, {
+      method: "GET",
+      headers: { accept: "image/png,image/jpeg,image/webp,image/gif" },
+      redirect: "manual",
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch {
+    return fail(404, "RESOURCE_NOT_FOUND");
+  }
+  if (upstream.status !== 200) return fail(404, "RESOURCE_NOT_FOUND");
+  const lenHeader = upstream.headers.get("content-length");
+  if (lenHeader !== null && (!/^[0-9]+$/.test(lenHeader) || Number(lenHeader) > MAX_PROFILE_IMAGE_BYTES)) {
+    return fail(413, "IMAGE_TOO_LARGE");
+  }
+  let bytes: Uint8Array;
+  try {
+    bytes = await readBoundedBytes(upstream, MAX_PROFILE_IMAGE_BYTES, "IMAGE_TOO_LARGE");
+  } catch (error) {
+    if (error instanceof Fault && error.code === "IMAGE_TOO_LARGE") return fail(413, "IMAGE_TOO_LARGE");
+    return fail(404, "INVALID_IMAGE_FORMAT");
+  }
+  const detected = sniffImageFormat(bytes);
+  if (!detected) return fail(400, "INVALID_IMAGE_FORMAT");
+  if (env.PROFILES) {
+    try {
+      await env.PROFILES.put(cacheKey, bytes, {
+        httpMetadata: { contentType: detected },
+        customMetadata: {
+          urlHash,
+          contentType: detected,
+          bytes: String(bytes.byteLength),
+          cachedAt: new Date().toISOString(),
+        },
+      });
+    } catch {}
+  }
+  const out = new Uint8Array(bytes.byteLength);
+  out.set(bytes);
+  return new Response(request.method === "HEAD" ? null : out, {
+    status: 200,
+    headers: imageHeaders(detected, bytes.byteLength),
   });
 }
 

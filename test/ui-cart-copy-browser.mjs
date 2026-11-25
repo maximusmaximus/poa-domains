@@ -27,7 +27,9 @@ try {
   await page.waitForFunction(() => document.body.dataset.registryStatus === "ready");
   await page.locator("#termsAgreeBtn").click();
   await expect(page.locator("#cartExpectations")).toBeHidden();
-  await expect(page.locator("#searchResult")).toContainText("reaches finality and runs issue");
+  await expect(page.locator("#searchResult")).toContainText("Available");
+  await expect(page.locator("#searchResult")).toContainText("100 POA");
+  await expect(page.locator("#info-searchResult")).toContainText("reaches PoA finality");
   await page.locator("#addToCartBtn").click();
   await expect(page.locator("#copyCartPrompt")).toBeEnabled();
   await expect(page.locator("#cartExpectations")).toBeVisible();
@@ -350,6 +352,9 @@ try {
   await pageUx.route(`**/v1/media/${mockAvatarCid}`, async (route) => {
     await route.fulfill({ status: 200, contentType: "image/png", body: samplePng });
   });
+  await pageUx.route("**/v1/media/domain/moon", async (route) => {
+    await route.fulfill({ status: 200, contentType: "image/png", body: samplePng });
+  });
 
   await pageUx.goto(h.url + "/");
   await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
@@ -576,6 +581,7 @@ try {
   h.payload.state.deeds[agentDeedId].metadata = [{ cid: mockAvatarCid, document: committedDoc }];
   await pageUx.goto(h.url + "/d/agent?q=agent");
   await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageUx.locator("#domainStatus")).toBeHidden();
   await expect(pageUx.locator("#domainOwner")).not.toContainText("Permanent registry rights");
   await expect(pageUx.locator("#domainOwner")).not.toContainText("not proof of native-chain ownership");
   await expect(pageUx.locator("#domainCopyLink")).toBeVisible();
@@ -586,16 +592,67 @@ try {
   await expect(pageUx.locator("#domainTitle .domain-header-avatar img")).toHaveAttribute("src", `/v1/media/${mockAvatarCid}`);
   const domainHeaderAvatarBox = await pageUx.locator("#domainTitle .domain-header-avatar").boundingBox();
   assert.ok(domainHeaderAvatarBox && Math.abs(domainHeaderAvatarBox.width - domainHeaderAvatarBox.height) < 1, "/d/<name> header avatar must be square");
-  await expect(pageUx.locator("#domainProfile img.domain-avatar")).toHaveAttribute("src", `/v1/media/${mockAvatarCid}`);
+  assert.equal(await pageUx.locator("#domainProfile img.domain-avatar").count(), 0);
   await expect(pageUx.locator("#domainProfile .domain-profile-bio")).toHaveText("Agent bio https://minepoa.com <script>alert(1)</script>");
   assert.equal(await pageUx.locator("#domainProfile script").count(), 0);
   await expect(pageUx.locator("#domainProfile")).toContainText("0x5aAe...eAed");
   await expect(pageUx.locator("#domainProfile")).toContainText("bc1qw5...f3t4");
+  // Avatar link and Content ID are folded inside inline "More" until unfolded
+  await expect(pageUx.locator("#domainProfile details.domain-more > summary")).toHaveText("More");
+  await expect(pageUx.locator("#domainProfile details.domain-more code").first()).toBeHidden();
+  await pageUx.locator("#domainProfile details.domain-more > summary").click();
+  await expect(pageUx.locator("#domainProfile details.domain-more")).toContainText(`ipfs://${mockAvatarCid}`);
+  await expect(pageUx.locator("#domainProfile details.domain-more")).toContainText("Content ID:");
   await pageUx.locator('#domainProfile button[aria-label="Copy ETH address for agent"]').click();
   assert.equal(await pageUx.evaluate(() => navigator.clipboard.readText()), "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed");
   await pageUx.locator('#domainProfile button[aria-label="Copy BTC address for agent"]').click();
   assert.equal(await pageUx.evaluate(() => navigator.clipboard.readText()), "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
   await expect(pageUx.locator('#domainActions button[aria-label="Manage agent"]')).toBeVisible();
+
+  // (h) Committed https:// avatar renders same-origin on the domain header icon (/v1/media/domain/moon)
+  //     and keeps the raw https:// avatar link & Content ID folded under inline "More"
+  const moonDeedId = "9".repeat(64);
+  const moonDoc = {
+    schema: "poa-domains.profile.v1",
+    version: 1,
+    name: "moon",
+    rightsHash,
+    poa: buyerOwner,
+    btc: null,
+    eth: null,
+    description: "The moon domain",
+    image: "https://pub-fc606df28da84dbabc0f8782d8ab944e.r2.dev/poa-domains/moon.png",
+  };
+  h.payload.state.names.moon = { name: "moon", key: moonDeedId, generation: 1, activeId: moonDeedId, auctionId: null };
+  h.payload.state.deeds[moonDeedId] = {
+    id: moonDeedId,
+    name: "moon",
+    generation: 1,
+    owner: buyerOwner,
+    parentId: null,
+    rights: { kind: "permanent" },
+    rightsHash,
+    version: 2,
+    ownerVersion: 1,
+    encumbranceVersion: 1,
+    recordsVersion: 1,
+    retired: false,
+    lock: null,
+    records: [],
+    metadata: [{ cid: mockAvatarCid, document: moonDoc }],
+  };
+  await pageUx.goto(h.url + "/d/moon");
+  await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageUx.locator("#domainStatus")).toBeHidden();
+  await expect(pageUx.locator("#domainTitle .domain-header-avatar img")).toHaveAttribute("src", "/v1/media/domain/moon");
+  await expect(pageUx.locator("#domainTitle .domain-header-avatar")).toHaveClass(/has-image/);
+  await expect(pageUx.locator("#domainProfile .domain-profile-bio")).toHaveText("The moon domain");
+  await expect(pageUx.locator("#domainProfile details.domain-more a")).toBeHidden();
+  await pageUx.locator("#domainProfile details.domain-more > summary").click();
+  await expect(pageUx.locator("#domainProfile details.domain-more a")).toBeVisible();
+  await expect(pageUx.locator("#domainProfile details.domain-more a")).toHaveAttribute("href", moonDoc.image);
+  delete h.payload.state.names.moon;
+  delete h.payload.state.deeds[moonDeedId];
 
   assert.deepEqual(errorsUx, []);
   await ctxUx.close();
@@ -726,11 +783,15 @@ try {
   await pageFooter.locator("#clearCart").click();
   await pageFooter.locator("#searchInput").fill("google");
   await pageFooter.locator("#searchBtn").click();
-  await expect(pageFooter.locator("#searchResult")).toContainText("Reserved — not for sale");
+  await expect(pageFooter.locator("#searchResult")).toContainText("Reserved");
   await expect(pageFooter.locator('#searchResult a.domain-tile[href="/d/google"]')).toHaveCount(0);
   await pageFooter.locator("#searchInput").fill("escrow");
   await pageFooter.locator("#searchBtn").click();
-  await expect(pageFooter.locator("#searchResult")).toContainText("Owned (permanent)");
+  await expect(pageFooter.locator("#searchResult")).toContainText("Unavailable");
+  await expect(pageFooter.locator("#searchResult")).not.toContainText("OWNED (PERMANENT DEED)");
+  await pageFooter.locator("#help-searchResult").click();
+  await expect(pageFooter.locator("#info-searchResult")).toContainText("permanent registry deeds");
+  await pageFooter.keyboard.press("Escape");
   await expect(pageFooter.locator('#searchResult a.domain-tile.is-registered[href="/d/escrow"]')).toHaveText("escrow");
 
   // Click the footer [escrow] tiled button -> /d/escrow shows treasury owner, escrow POA address, and description
@@ -901,13 +962,12 @@ try {
   assert.ok(tickerInitial.includes("Auction started") && tickerInitial.includes("comet"), tickerInitial);
   assert.equal(tickerInitial.includes("vault"), false, tickerInitial);
 
-  // Search for a POA auction domain ("comet") -> auto-adds to cart, clearly warns it's For Auction,
+  // Search for a POA auction domain ("comet") -> auto-adds to cart, clearly warns it's Live Auction,
   // and explains all auction nuances inside both the Search card ℹ️ icon and Cart item ℹ️ icon!
   await pageAuc.locator("#searchInput").fill("comet");
   await pageAuc.locator("#searchBtn").click();
-  await expect(pageAuc.locator("#searchResult")).toContainText("For Auction — live POA auction");
-  await expect(pageAuc.locator("#searchResult")).toContainText("not a fixed-price buy");
-  await expect(pageAuc.locator("#searchResult")).toContainText("Added to your cart as a POA auction bid");
+  await expect(pageAuc.locator("#searchResult")).toContainText("Live Auction");
+  await expect(pageAuc.locator("#searchResult")).toContainText("Added to cart as an auction bid");
   await expect(pageAuc.locator("#cartCount")).toHaveText("1");
   await expect(pageAuc.locator('#cartList input[aria-label="Highest bid in POA for comet"]')).toHaveValue("220.000001");
   await pageAuc.locator("#help-searchResult").click();
@@ -937,7 +997,7 @@ try {
   await expect(pageAuc.locator("#auctionsStartNote")).toContainText("An auction starts with the first bid");
   await expect(pageAuc.locator("#auctionTabCurrent")).toHaveAttribute("aria-selected", "true");
   await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"]`)).toBeVisible();
-  await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"]`)).toContainText("Live POA auction");
+  await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"]`)).toContainText("Live auction");
   await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"] .auction-countdown`)).toContainText("left");
   await pageAuc.locator("#auctionTabUpcoming").click();
   const vaultCard = pageAuc.locator(`#auctions article[data-auction-id="${aucQueuedId}"]`);
@@ -1066,12 +1126,12 @@ try {
   const prefixAgentic = pageAuc.locator("#searchSuggestions [role='option']", { hasText: "agentic" }).first();
   await expect(prefixAgentic).toContainText("For auction");
 
-  // Taken/owned domain ("escrow") appears FIRST in RED as Not available; clicking opens /d/escrow without adding to cart
+  // Taken/owned domain ("escrow") appears FIRST in RED as Unavailable; clicking opens /d/escrow without adding to cart
   await pageAuc.locator("#searchInput").fill("escrow");
   await expect(pageAuc.locator("#searchSuggestions")).toBeVisible();
   const optTaken = pageAuc.locator("#search-opt-0");
   await expect(optTaken).toContainText("escrow");
-  await expect(optTaken).toContainText("Not available");
+  await expect(optTaken).toContainText("Unavailable");
   await expect(optTaken).toHaveAttribute("data-status", "taken");
   await expect(optTaken).toHaveAttribute("data-can-add-to-cart", "false");
   assert.ok((await optTaken.getAttribute("class")).includes("is-unavailable"));
@@ -1081,7 +1141,7 @@ try {
   await expect(pageAuc.locator("#domainTitle")).toContainText("escrow");
   await expect(pageAuc.locator("#cartCount")).toHaveText("1");
 
-  // Reserved domain ("google") appears FIRST in RED as Reserved · Not available; clicking opens /d/google without adding to cart
+  // Reserved domain ("google") appears FIRST in RED as Reserved; clicking opens /d/google without adding to cart
   await pageAuc.locator("#domainHomeLink").click();
   await expect(pageAuc.locator("#homeMain")).toBeVisible();
   await pageAuc.locator("#searchInput").fill("google");
@@ -1089,7 +1149,6 @@ try {
   const optReserved = pageAuc.locator("#search-opt-0");
   await expect(optReserved).toContainText("google");
   await expect(optReserved).toContainText("Reserved");
-  await expect(optReserved).toContainText("Not available");
   await expect(optReserved).toHaveAttribute("data-status", "reserved");
   await expect(optReserved).toHaveAttribute("data-can-add-to-cart", "false");
   assert.ok((await optReserved.getAttribute("class")).includes("is-unavailable"));
@@ -1126,7 +1185,7 @@ try {
   // Manual click on Current stays on Current across refreshes (does not snap back to Upcoming)
   await pageAuc.locator("#auctionTabCurrent").click();
   await expect(pageAuc.locator("#auctionTabCurrent")).toHaveAttribute("aria-selected", "true");
-  await expect(pageAuc.locator("#auctions")).toContainText("No live auctions running yet");
+  await expect(pageAuc.locator("#auctions")).toContainText("No live auctions yet");
   await pageAuc.evaluate(async () => {
     const q = new URL(document.querySelector('script[src*="app.js"]').src).search;
     const { refreshEscrowMarket } = await import("/ui-poll.js" + q);
@@ -1167,8 +1226,10 @@ try {
   await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");
   await pageFields.locator("#termsAgreeBtn").click();
 
-  // Unlisted domain shows active profile + attached records + warning in owner sell tools
+  // Unlisted domain shows active profile + folded "More" for attached records + warning in owner sell tools
   await expect(pageFields.locator("#domainProfile")).toBeVisible();
+  await expect(pageFields.locator("#domainProfile details.domain-more .domain-records-list")).toBeHidden();
+  await pageFields.locator("#domainProfile details.domain-more > summary").click();
   await expect(pageFields.locator("#domainProfile")).toContainText("Attached domain records");
   await expect(pageFields.locator("#domainProfile")).toContainText("https://agent.example/endpoint");
   await expect(pageFields.locator("#poaSellTools .sale-fields-warning")).toBeVisible();
@@ -1204,7 +1265,7 @@ try {
   };
   await pageFields.goto(`${h.url}/d/agent`);
   await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");
-  await expect(pageFields.locator("#domainStatus")).toContainText("In live POA auction");
+  await expect(pageFields.locator("#domainStatus")).toContainText("Live auction");
   await expect(pageFields.locator("#domainListing")).toBeVisible();
   await expect(pageFields.locator("#domainListing")).toContainText("Auctions & Sales");
   await expect(pageFields.locator(`#domainListing article[data-auction-id="${agentSaleAucId}"]`)).toContainText("High bid 200 POA");
@@ -1242,8 +1303,8 @@ try {
   };
   await pageFields.reload();
   await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");
-  await expect(pageFields.locator("#domainStatus")).toContainText("For sale (POA)");
-  await expect(pageFields.locator(`#domainListing article[data-sale-id="${agentFixedId}"]`)).toContainText("250 POA (Fixed price)");
+  await expect(pageFields.locator("#domainStatus")).toContainText("For sale");
+  await expect(pageFields.locator(`#domainListing article[data-sale-id="${agentFixedId}"]`)).toContainText("250 POA");
   await expect(pageFields.locator("#domainListing").getByRole("button", { name: /Open My POA to buy/ })).toBeVisible();
 
   // 10d. After transfer to new holder: clean slate in #domainProfile, past completed auction in #domainListing,

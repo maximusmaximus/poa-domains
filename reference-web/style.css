@@ -1425,12 +1425,13 @@ main#homeMain, main#homeMain > section, .ideas { min-width: 0; max-width: 100%; 
 .search-suggestion-meta { flex: 0 0 auto; font-size: 0.8rem; color: #75e0b5; white-space: nowrap; }
 .search-alt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; margin-top: 0.65rem; }
 .cart-owned-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0.65rem 0; padding: 0.6rem 0.8rem; background: #103227; border: 1px solid #65cfa8; border-radius: 0.45rem; color: #d6fff0; font-size: 0.88rem; }
-.domain-profile { margin: 0.75rem 0; }
-.domain-profile-head { display: flex; align-items: flex-start; gap: 0.85rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
-.domain-avatar { width: 64px; height: 64px; aspect-ratio: 1 / 1; border-radius: 0.65rem; object-fit: cover; border: 1px solid #4d6f82; background: #09131a; flex: 0 0 auto; }
-.domain-profile-bio { margin: 0.35rem 0; color: #dfecf5; white-space: pre-wrap; overflow-wrap: anywhere; }
-.domain-profile-fields { display: grid; gap: 0.35rem; margin: 0.5rem 0 0; }
-.domain-profile-field { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; font-size: 0.85rem; }
+.domain-profile{margin:.75rem 0;}
+.domain-profile-bio{margin:.2rem 0 .45rem;color:#dfecf5;white-space:pre-wrap;overflow-wrap:anywhere;}
+.domain-profile-fields{display:grid;gap:.35rem;margin:.35rem 0 0;}
+.domain-more{margin-top:.65rem;padding-top:.45rem;border-top:1px solid #284252;}
+.domain-more>summary{display:inline-flex;align-items:center;gap:.35rem;cursor:pointer;color:#9cffe0;font-size:.86rem;font-weight:600;}
+.domain-more[open]>summary{margin-bottom:.4rem;}
+.domain-more p{margin:.3rem 0;font-size:.85rem;overflow-wrap:anywhere;}
 .is-focused-domain {
   border-color: #65cfa8;
   box-shadow: 0 0 0 2px rgba(101, 207, 168, 0.3);

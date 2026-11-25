@@ -1,12 +1,12 @@
-import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, profileImageMediaPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=e24f44d20e2d";
-import { ui } from "./ui-state.js?v=e24f44d20e2d";
-import { createPoaCopyButton } from "./ui-copy.js?v=e24f44d20e2d";
-import { add, el } from "./ui-core.js?v=e24f44d20e2d";
-import { runSearch } from "./ui-search.js?v=e24f44d20e2d";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=e24f44d20e2d";
-import { updateTabDots } from "./ui-render.js?v=e24f44d20e2d";
-import { syncCartShortcutNow } from "./ui-cart.js?v=e24f44d20e2d";
-import { renderManagement } from "./ui-manage.js?v=e24f44d20e2d";
+import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, profileImageMediaPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=47cf48dc0435";
+import { ui } from "./ui-state.js?v=47cf48dc0435";
+import { createPoaCopyButton } from "./ui-copy.js?v=47cf48dc0435";
+import { add, el } from "./ui-core.js?v=47cf48dc0435";
+import { runSearch } from "./ui-search.js?v=47cf48dc0435";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=47cf48dc0435";
+import { updateTabDots } from "./ui-render.js?v=47cf48dc0435";
+import { syncCartShortcutNow } from "./ui-cart.js?v=47cf48dc0435";
+import { renderManagement } from "./ui-manage.js?v=47cf48dc0435";
 
 const LAST_POA_KEY = "poadomains.lastPoaAddress.v1";
 
@@ -167,7 +167,7 @@ export function domainAvatarMediaPath(name) {
     if (saleInfo.listedForSale) return null;
     const extracted = extractDomainProfile(deed);
     if (!extracted || extracted.isDefault) return null;
-    return profileImageMediaPath(extracted.profile?.image);
+    return profileImageMediaPath(extracted.profile?.image, deed.name || name);
 }
 
 export function updateDomainAvatarElement(avatarEl, name, mediaPath) {
