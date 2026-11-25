@@ -1683,17 +1683,6 @@ code.escrow-value.poa-addr-text {
 .treasury-total {
   color: #75e0b5;
 }
-.treasury-scan-link {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.15rem 0.6rem;
-  border: 1px solid #3d6474;
-  border-radius: 999px;
-  background: #132836;
-  color: #9cffe0;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
 .treasury-wallets {
   display: flex;
   flex-wrap: wrap;

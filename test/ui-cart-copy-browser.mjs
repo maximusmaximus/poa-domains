@@ -525,7 +525,8 @@ try {
   await expect(pageFooter.locator("#domainsServedCount")).toHaveText("0️⃣0️⃣0️⃣0️⃣0️⃣3️⃣");
   await expect(pageFooter.locator("#domainsServedSr")).toHaveText("3");
   await expect(pageFooter.locator("#treasuryTotal")).toHaveText("🪙 201 POA");
-  await expect(pageFooter.locator("#poascanHomeLink")).toHaveAttribute("href", "https://poascan.io/");
+  await expect(pageFooter.locator("#poascanHomeLink")).toHaveCount(0);
+  await expect(pageFooter.locator('#treasuryFooter a[href="https://poascan.io/"]')).toHaveCount(0);
   await expect(pageFooter.locator("#treasuryWallets")).toBeVisible();
   const escrowLink = pageFooter.locator(`#treasuryWallets a[href="https://poascan.io/address/${escrowWallet}"]`);
   const treasuryLink = pageFooter.locator(`#treasuryWallets a[href="https://poascan.io/address/${treasuryWallet}"]`);
