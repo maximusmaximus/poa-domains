@@ -19,12 +19,12 @@ import {
   registryUnit,
   resolveDomainView,
   unavailableKey,
-} from "./shared.js?v=9e213075b5f0";
-import { actionLabel, createPoaCopyButton } from "./ui-copy.js?v=9e213075b5f0";
-import { ui } from "./ui-state.js?v=9e213075b5f0";
-import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=9e213075b5f0";
-import { nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=9e213075b5f0";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=9e213075b5f0";
+} from "./shared.js?v=5a5e37241e4b";
+import { actionLabel, createPoaCopyButton } from "./ui-copy.js?v=5a5e37241e4b";
+import { ui } from "./ui-state.js?v=5a5e37241e4b";
+import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=5a5e37241e4b";
+import { nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=5a5e37241e4b";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=5a5e37241e4b";
 
 function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) {
   const wrap = document.createElement("span");
@@ -87,11 +87,11 @@ function renderDomainProfileCard(deed, { listedForSale = false } = {}) {
   if (listedForSale) {
     box.hidden = false;
     box.classList.add("domain-fields-paused");
-    add(box, "h3", "⏸️ Domain fields & attached tags paused while listed");
+    add(box, "h3", "⏸️ Domain fields paused while listed");
     add(
       box,
       "p",
-      "This domain is currently up for sale or in an auction. Attached domain fields (tags, wallet/service/IPFS records, and public profile) are not active while listed and will be dropped when ownership transfers to a new holder (archived under Previous fields & records below).",
+      "This domain is listed for sale or in an auction. Attached profile fields and records are paused while listed and will be dropped when ownership transfers (archived under Previous fields & records below).",
     );
     return;
   }
@@ -128,7 +128,11 @@ function renderDomainProfileCard(deed, { listedForSale = false } = {}) {
       head.append(img);
     }
     const meta = add(head, "div", "", "domain-profile-meta");
-    add(meta, "h3", `🪪 Public profile (v${p.version} · #${extracted.metadataVersion})`);
+    add(
+    meta,
+    "h3",
+    extracted.metadataVersion > 1 ? `🪪 Public profile (#${extracted.metadataVersion})` : "🪪 Public profile",
+  );
     if (p.description) add(meta, "p", p.description, "domain-profile-bio");
     if (p.image && !mediaPath) {
       const linkLine = add(meta, "p", "🖼️ Avatar: ", "muted");
@@ -155,7 +159,7 @@ function renderDomainProfileCard(deed, { listedForSale = false } = {}) {
       appendCopyableValue(ethRow, p.eth, `Copy ETH address for ${deed.name}`);
     }
     if (extracted.cid) {
-      const cidRow = add(box, "p", "IPFS / R2 CID: ", "muted");
+      const cidRow = add(box, "p", "Content ID: ", "muted");
       add(cidRow, "code", extracted.cid);
     }
   }
@@ -257,7 +261,7 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
     const warn = add(
       listingBox,
       "p",
-      "⚠️ Active sale / auction — attached domain fields (tags & public profile) are paused while listed and will be dropped when transferred to a new holder.",
+      "⚠️ Listed for sale or in auction — profile fields are paused while listed and will be dropped on transfer.",
       "sale-fields-warning",
     );
     warn.setAttribute("role", "note");

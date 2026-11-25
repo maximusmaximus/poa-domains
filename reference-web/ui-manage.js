@@ -1,9 +1,9 @@
-import { ui } from "./ui-state.js?v=9e213075b5f0";
-import { add, el, endpointBase } from "./ui-core.js?v=9e213075b5f0";
-import { nameLink, openPoa } from "./ui-router.js?v=9e213075b5f0";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=9e213075b5f0";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=9e213075b5f0";
-import { createInlineInfo } from "./ui-help.js?v=9e213075b5f0";
+import { ui } from "./ui-state.js?v=5a5e37241e4b";
+import { add, el, endpointBase } from "./ui-core.js?v=5a5e37241e4b";
+import { nameLink, openPoa } from "./ui-router.js?v=5a5e37241e4b";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=5a5e37241e4b";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=5a5e37241e4b";
+import { createInlineInfo } from "./ui-help.js?v=5a5e37241e4b";
 import {
   buildProfileUpdatePrompt,
   checkBtcAddress,
@@ -20,7 +20,7 @@ import {
   SALE_FIELDS_WARNING,
   saveKnownOwner,
   validPrincipal,
-} from "./shared.js?v=9e213075b5f0";
+} from "./shared.js?v=5a5e37241e4b";
 
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
@@ -86,10 +86,10 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
   if (startOpen) details.open = true;
   const summary = document.createElement("summary");
   summary.textContent = listedForSale
-    ? "⏸️ Public profile (paused while listed — drops on transfer)"
+    ? "⏸️ Public profile (paused while listed)"
     : extracted && !extracted.isDefault
-      ? `🪪 Public profile (v1 · #${extracted.metadataVersion})`
-      : "🪪 Public profile (v1 — set addresses, bio & avatar)";
+      ? `🪪 Public profile (#${extracted.metadataVersion})`
+      : "🪪 Public profile";
   details.append(summary);
 
   const form = add(details, "div", "", "profile-form");
@@ -97,7 +97,7 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
     const pausedNote = add(
       form,
       "p",
-      "⏸️ This domain is currently listed for sale or in an auction. Attached domain fields and profile links are paused while listed and will be dropped when ownership transfers to a new holder.",
+      "⏸️ Paused while listed or in auction. Profile fields are dropped when ownership transfers.",
       "sale-fields-warning",
     );
     pausedNote.setAttribute("role", "note");
@@ -106,13 +106,13 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
   add(
     noticeRow,
     "span",
-    "🌐 Public record: Everything you save here is public and will be published publicly in the registry, backed up to R2, and pinned to IPFS.",
+    "🌐 Public info: Everything you save here is public and visible to everyone once published.",
   );
   noticeRow.append(
     createInlineInfo(
       `profile-v1-${deed.id.slice(0, 12)}`,
-      `About public profile v1 for ${deed.name}`,
-      "Profile fields use versioned schema poa-domains.profile.v1 (v1: POA, BTC mainnet, EIP-55 ETH/EVM, 280-char plain-text bio, and PNG/JPG/WebP/GIF avatar up to 5 MB). Saved profiles are published publicly on-registry, backed up to R2, pinned to IPFS, and accessible to agents via MCP (get_domain_profile, build_profile_witness, update_domain_profile).",
+      `About public profile for ${deed.name}`,
+      "Optional public fields for your domain: POA, BTC, and ETH/EVM addresses, a short plain-text bio (up to 280 characters), and an avatar image (PNG, JPG, WebP, or GIF up to 5 MB). Saved profiles are public and readable by apps and agents.",
     ),
   );
 
@@ -193,12 +193,12 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
     descCount.textContent = `${[...descInput.value].length} / ${MAX_PROFILE_DESCRIPTION_CHARS}`;
   });
 
-  // 5. Image / Avatar (URL or upload PNG/JPG/WebP/GIF <= 5 MB pinned to IPFS + R2)
-  const imgLabel = add(form, "label", "Avatar image (https:// or ipfs:// link, or upload PNG/JPG/WebP/GIF up to 5 MB)");
+  // 5. Image / Avatar (URL or upload PNG/JPG/WebP/GIF <= 5 MB)
+  const imgLabel = add(form, "label", "Avatar image (link or upload PNG, JPG, WebP, or GIF up to 5 MB)");
   const imgInput = add(imgLabel, "input", "");
   imgInput.type = "text";
   imgInput.autocomplete = "off";
-  imgInput.placeholder = "ipfs://bafkrei… or https://…";
+  imgInput.placeholder = "https://… or ipfs://…";
   imgInput.value = current.image ?? "";
   imgInput.dataset.profileField = "image";
   imgInput.addEventListener("input", () => {
@@ -212,7 +212,7 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
   fileInput.accept = "image/png,image/jpeg,image/webp,image/gif";
   fileInput.className = "visually-hidden";
   fileInput.setAttribute("aria-label", `Upload avatar image for ${deed.name}`);
-  const uploadBtn = add(uploadRow, "button", "📤 Upload image to IPFS & R2", "secondary small");
+  const uploadBtn = add(uploadRow, "button", "📤 Upload", "secondary small");
   uploadBtn.type = "button";
   const uploadStatus = add(uploadRow, "span", "", "muted");
   uploadStatus.setAttribute("role", "status");
@@ -266,9 +266,7 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
       imgInput.value = body.uri;
       markDirty();
       renderAvatarPreview(body.uri);
-      uploadStatus.textContent = body.ipfsPinned
-        ? "✅ Pinned to IPFS & backed up to R2"
-        : "✅ Stored in R2 (IPFS CIDv1 ready)";
+      uploadStatus.textContent = "✅ Image uploaded";
     } catch (error) {
       uploadStatus.textContent = "⚠️ " + (error?.message || "Image upload failed");
     } finally {
@@ -401,7 +399,7 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
       const liveWarn = add(
         card,
         "p",
-        "⏸️ Listed for sale / in auction — attached domain fields (tags & profile) are paused and will drop on transfer.",
+        "⏸️ Listed for sale or in auction — profile fields are paused and will be dropped on transfer.",
         "sale-fields-warning",
       );
       liveWarn.setAttribute("role", "note");
@@ -413,7 +411,7 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
     const sellWarn = add(
       card,
       "p",
-      "⚠️ Selling or auctioning pauses attached domain fields (tags & public profile) while listed and drops them when transferred to a new holder (archived on the domain page).",
+      "⚠️ Listing or auctioning pauses your profile fields and drops them for the next owner (archived on the domain page).",
       "sale-fields-warning",
     );
     sellWarn.setAttribute("role", "note");

@@ -1,13 +1,13 @@
-import { copyText } from "./ui-copy.js?v=9e213075b5f0";
-import { publicNameUnavailable } from "./shared.js?v=9e213075b5f0";
-import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=9e213075b5f0";
-import { ui } from "./ui-state.js?v=9e213075b5f0";
-import { nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=9e213075b5f0";
-import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=9e213075b5f0";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=9e213075b5f0";
-import { addToCart } from "./ui-cart.js?v=9e213075b5f0";
-import { suggestNames } from "./ideas-generator.js?v=9e213075b5f0";
-import { logSubmittedSearch } from "./ui-search-log.js?v=9e213075b5f0";
+import { copyText } from "./ui-copy.js?v=5a5e37241e4b";
+import { publicNameUnavailable } from "./shared.js?v=5a5e37241e4b";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=5a5e37241e4b";
+import { ui } from "./ui-state.js?v=5a5e37241e4b";
+import { nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=5a5e37241e4b";
+import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=5a5e37241e4b";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=5a5e37241e4b";
+import { addToCart } from "./ui-cart.js?v=5a5e37241e4b";
+import { suggestNames } from "./ideas-generator.js?v=5a5e37241e4b";
+import { logSubmittedSearch } from "./ui-search-log.js?v=5a5e37241e4b";
 
 let activeSuggestionIdx = -1;
 let currentSuggestions = [];

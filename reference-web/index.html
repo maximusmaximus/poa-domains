@@ -237,7 +237,7 @@
           <p data-info-description>View a public owner address. This is not a wallet connection or proof that you own it. These are application-registry names, not verified native-chain ownership.</p>
           <label for="manageOwner">Public owner address — never a private key</label><div class="search-bar"><input id="manageOwner" autocomplete="off" placeholder="poa1… public owner address" /><button id="manageLookup" type="button">View names</button></div>
           <p id="manageOwnerNotice" class="muted" role="status" aria-live="polite" hidden></p>
-          <p data-info-description>Open a name to view it, edit its public profile fields (v1: POA/BTC/ETH addresses, bio, and avatar image backed up to R2 &amp; IPFS), or prepare a sale or subdomain request for its owner's agent. Retiring a subdomain needs both the child holder and parent owner. Nothing is sent from these controls.</p>
+          <p data-info-description>Open a name to view it, edit its public profile (addresses, bio, and avatar), or prepare a sale or subdomain request for its owner's agent. Retiring a subdomain needs both the child holder and parent owner. Nothing is sent from these controls.</p>
           <div id="manageNames" class="cards"></div><pre id="managePrompt" class="prompt-box" role="status"></pre>
           <div id="managePromptActions" class="button-row" hidden><button type="button" id="copyManagePrompt" class="secondary small">📋 Copy agent prompt</button><span id="managePromptStatus" class="muted" role="status" aria-live="polite"></span></div>
         </div>
@@ -255,12 +255,12 @@
         <div id="domainListing" class="card" hidden></div>
         <div id="domainActions" class="button-row"></div>
         <div id="domainOwnerTools" class="owner-tools" hidden>
-          <div id="poaSellTools" hidden><h3>🏷️ Sell for POA</h3><p data-info-description class="howto">List or auction your name for POA in 🪙 My POA. Your agent signs; nothing submits here.</p><p class="sale-fields-warning" role="note">⚠️ <strong>Before you list or auction:</strong> Attached domain fields (tags, wallet/service/IPFS records, and public profile) will not work while listed, and will be dropped when ownership transfers to a new holder (archived as historical records on this page).</p><button type="button" id="poaSellBtn">🏷️ Sell for POA</button>
+          <div id="poaSellTools" hidden><h3>🏷️ Sell for POA</h3><p data-info-description class="howto">List or auction your name for POA in 🪙 My POA. Your agent signs; nothing submits here.</p><p class="sale-fields-warning" role="note">⚠️ <strong>Before you list or auction:</strong> Profile fields and records pause while listed and will be dropped for the next owner (archived on this page).</p><button type="button" id="poaSellBtn">🏷️ Sell for POA</button>
           <div id="poaSubnameTools"><h3>🧩 Sell subnames</h3><p data-info-description class="howto">Set one POA price for new subnames like shop.yourname. Buyers pay with POA checkout and your share is paid out to you from escrow. Your agent signs; nothing submits here.</p><label>Subname price (POA) <input id="subnamePriceInput" inputmode="decimal" placeholder="10" aria-label="Subname price" /></label><button type="button" id="poaSubnameBtn">🧩 Copy agent request</button><pre id="subnamePromptBox" class="prompt-box" hidden></pre><p id="subnamePromptStatus" class="muted" role="status"></p></div></div>
           <div id="unitSellTools">
           <h3>💰 Sell</h3>
           <p data-info-description class="howto">Owners list, change price, or unlist. Copy a prompt for your agent — nothing submits here.</p>
-          <p class="sale-fields-warning" role="note">⚠️ <strong>Before you list:</strong> Attached domain fields (tags, wallet/service/IPFS records, and public profile) will not work while listed, and will be dropped when ownership transfers to a new holder (archived as historical records on this page).</p>
+          <p class="sale-fields-warning" role="note">⚠️ <strong>Before you list:</strong> Profile fields and records pause while listed and will be dropped for the next owner (archived on this page).</p>
           <label>
             Price
             <input id="listPriceInput" inputmode="numeric" placeholder="2500" aria-label="List price" />
@@ -458,6 +458,6 @@
       </details>
     </div>
 
-    <script type="module" src="/app.js?v=9e213075b5f0"></script>
+    <script type="module" src="/app.js?v=5a5e37241e4b"></script>
   </body>
 </html>

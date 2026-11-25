@@ -439,8 +439,10 @@ try {
   const agentCard = pageUx.locator('#manageNames article[data-domain-name="agent"]');
   await expect(agentCard).toBeVisible();
   await expect(agentCard.locator("details.profile-editor")).toHaveAttribute("open", "");
-  await expect(agentCard.locator(".profile-public-notice")).toContainText("publicly");
-  await expect(agentCard.locator(".profile-public-notice")).toContainText("IPFS");
+  await expect(agentCard.locator("details.profile-editor summary")).toHaveText("🪪 Public profile");
+  await expect(agentCard.locator(".profile-public-notice")).toContainText("public");
+  assert.equal(/(IPFS|R2)/.test(await agentCard.locator(".profile-public-notice").innerText()), false);
+  await expect(agentCard.locator(".profile-upload-row button")).toHaveText("📤 Upload");
 
   // (e) Profile v1 editor: EIP-55 checksum fix, BTC mainnet, bio, image upload & agent prompt copy
   await agentCard.locator('input[data-profile-field="btc"]').fill("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
@@ -457,7 +459,7 @@ try {
     mimeType: "image/png",
     buffer: samplePng,
   });
-  await expect(agentCard.locator(".profile-upload-row")).toContainText("Pinned to IPFS & backed up to R2");
+  await expect(agentCard.locator(".profile-upload-row")).toContainText("Image uploaded");
   assert.equal(await agentCard.locator('input[data-profile-field="image"]').inputValue(), `ipfs://${mockAvatarCid}`);
   await agentCard.getByRole("button", { name: /Copy profile prompt for my agent/ }).click();
   const profilePrompt = await pageUx.locator("#managePrompt").textContent();
@@ -937,7 +939,7 @@ try {
   await expect(pageFields.locator("#escrowBalanceNote")).toBeVisible();
   await expect(pageFields.locator("#escrowBalanceNote")).toContainText("available escrow balance");
   await expect(pageFields.locator("#escrowListingFieldWarning")).toBeVisible();
-  await expect(pageFields.locator("#escrowListingFieldWarning")).toContainText("paused while this domain is listed");
+  await expect(pageFields.locator("#escrowListingFieldWarning")).toContainText("paused while listed");
   await pageFields.locator("#escrowPayer").fill(prevOwner);
   await pageFields.locator("#escrowName").fill("agent");
   await pageFields.locator("#escrowAmount").fill("250.000000");

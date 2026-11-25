@@ -1,12 +1,12 @@
-import { publicNameUnavailable } from "./shared.js?v=9e213075b5f0";
-import { registryUnit } from "./shared.js?v=9e213075b5f0";
-import { actionLabel } from "./ui-copy.js?v=9e213075b5f0";
-import { trapDialog } from "./ui-a11y.js?v=9e213075b5f0";
-import { ui } from "./ui-state.js?v=9e213075b5f0";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=9e213075b5f0";
-import { add, el, endpointBase } from "./ui-core.js?v=9e213075b5f0";
-import { nameLink, openManageDomain } from "./ui-router.js?v=9e213075b5f0";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=9e213075b5f0";
+import { publicNameUnavailable } from "./shared.js?v=5a5e37241e4b";
+import { registryUnit } from "./shared.js?v=5a5e37241e4b";
+import { actionLabel } from "./ui-copy.js?v=5a5e37241e4b";
+import { trapDialog } from "./ui-a11y.js?v=5a5e37241e4b";
+import { ui } from "./ui-state.js?v=5a5e37241e4b";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=5a5e37241e4b";
+import { add, el, endpointBase } from "./ui-core.js?v=5a5e37241e4b";
+import { nameLink, openManageDomain } from "./ui-router.js?v=5a5e37241e4b";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=5a5e37241e4b";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
