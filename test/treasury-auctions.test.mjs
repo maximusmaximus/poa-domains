@@ -17,6 +17,7 @@ import {
   TREASURY_CRYPTO_AI_AUCTION_NAMES,
   treasuryAuctionReservePoa,
   provisionTreasuryAuctionDomains,
+  buildTreasuryAutoHandover,
 } from "../dist/src/treasury-auctions.js";
 import { McpCore } from "../dist/src/mcp-core.js";
 import { registryMcpProfile } from "../dist/src/mcp-registry.js";
@@ -358,6 +359,86 @@ test("Escrow seedInventoryAuctions + MCP POA auction tools: atomic 100-auction o
   assert.equal(escrow.state().auctions[relisted[0]].status, "OPEN");
   // Re-running v2 is a 100% idempotent no-op.
   assert.deepEqual(escrow.seedInventoryAuctions(treasury.addr, seedSpecs, "treasury-inventory-auction-v2"), []);
+
+  // buildTreasuryAutoHandover: settles earliest closed Treasury auction with a 7-day transfer deadline,
+  // stays idle while PAYING consent is fresh, auto-repairs expiring PAYING or TITLE_PENDING consents,
+  // and returns null when idle or deed is no longer Treasury-owned.
+  assert.equal(
+    buildTreasuryAutoHandover({
+      engine,
+      treasuryKey: treasury.key,
+      auctions: escrow.state().auctions,
+      settlements: escrow.state().settlements,
+      nowMs: clock.now() * 1000,
+    }),
+    null,
+  );
+  const b2More = await callTool(18, "submit_escrow_command", signEscrowCommand(bidder2, "b2_intent_2", "intent", { amount: "300.000000" }));
+  await creditFinalDeposit(bidder2, b2More.result.intent, "300.000000");
+  const aiAuc = (await callTool(19, "list_poa_auctions", { name: "ai" })).items[0];
+  const botsAuc = (await callTool(20, "list_poa_auctions", { name: "bots" })).items[0];
+  await callTool(21, "submit_escrow_command", signEscrowCommand(bidder2, "b2_bid_bots", "bid", { auction: botsAuc.id, amount: "100.000000" }));
+  advanceMs(3600000 + 5000);
+  const settlePlan = buildTreasuryAutoHandover({
+    engine,
+    treasuryKey: treasury.key,
+    auctions: escrow.state().auctions,
+    settlements: escrow.state().settlements,
+    nowMs: clock.now() * 1000,
+  });
+  assert.ok(settlePlan);
+  assert.equal(settlePlan.action, "settle");
+  assert.equal(settlePlan.name, "bots");
+  assert.ok(settlePlan.packet.command.params.transfer.body.deadline >= clock.now() + 7 * 86400 - 5);
+  await callTool(22, "submit_escrow_command", settlePlan.packet);
+  // While PAYING with fresh 7-day consent, planner returns null (does not spam repair-title).
+  assert.equal(
+    buildTreasuryAutoHandover({
+      engine,
+      treasuryKey: treasury.key,
+      auctions: escrow.state().auctions,
+      settlements: escrow.state().settlements,
+      nowMs: clock.now() * 1000,
+    }),
+    null,
+  );
+  // If PAYING consent is expiring/expired (or settlement is TITLE_PENDING), planner emits repair-title.
+  const staleSettlements = structuredClone(escrow.state().settlements);
+  staleSettlements[botsAuc.id].packet.body.deadline = clock.now() + 60;
+  const repairPaying = buildTreasuryAutoHandover({
+    engine,
+    treasuryKey: treasury.key,
+    auctions: escrow.state().auctions,
+    settlements: staleSettlements,
+    nowMs: clock.now() * 1000,
+  });
+  assert.ok(repairPaying);
+  assert.equal(repairPaying.action, "repair-title");
+  assert.equal(repairPaying.name, "bots");
+  await callTool(23, "submit_escrow_command", repairPaying.packet);
+  // Finish ticks -> bots transfers to bidder2 cleanly in 1 single payout to treasury.
+  for (let i = 0; i < 4; i++) await escrow.tick();
+  assert.equal(engine.resolve("bots").deed.owner, bidder2.addr);
+  assert.equal(escrow.state().auctions[botsAuc.id].status, "COMPLETE");
+  // Simulate TITLE_PENDING on a synthetic Treasury auction and verify repair-title + missing-deed null guard.
+  const synthPending = buildTreasuryAutoHandover({
+    engine,
+    treasuryKey: treasury.key,
+    auctions: { [aiAuc.id]: { ...escrow.state().auctions[aiAuc.id], status: "SETTLING", high: { payer: bidder2.addr, amount: "1000000000" }, closes: clock.now() * 1000 - 10 } },
+    settlements: { [aiAuc.id]: { status: "TITLE_PENDING", packet: null } },
+    nowMs: clock.now() * 1000,
+  });
+  assert.ok(synthPending);
+  assert.equal(synthPending.action, "repair-title");
+  assert.equal(synthPending.name, "ai");
+  const nonTreasuryOwned = buildTreasuryAutoHandover({
+    engine,
+    treasuryKey: treasury.key,
+    auctions: { [botsAuc.id]: { ...escrow.state().auctions[botsAuc.id], status: "OPEN", high: { payer: bidder1.addr, amount: "100000000" }, closes: clock.now() * 1000 - 10 } },
+    settlements: {},
+    nowMs: clock.now() * 1000,
+  });
+  assert.equal(nonTreasuryOwned, null);
 });
 
 test("publicRegistryRoute exposes all 100 Treasury Crypto+AI auction domains while withholding legacy hidden records", () => {

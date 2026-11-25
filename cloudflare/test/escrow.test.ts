@@ -1354,13 +1354,18 @@ test("multi-auction seller handover protection, active-settlement payout priorit
  const ot=await e.command(command(who(5),"ot1","open",{name:"t1",reserve:"5.000000"})) as any;
  await e.command(command(who(3),"bid-t1","bid",{auction:ot.auction,amount:"20.000000"}));
  net.now+=1001;
+ assert.equal(e.hasActiveWork(who(5)),true);
  await e.command(command(who(5),"settle-t1","settle",{auction:ot.auction,transfer:xfer(5,"t1",3,"x-t1")}));
  const tSettlement=e.state().settlements[ot.auction]!;
  assert.deepEqual(tSettlement.payments,[`seller-${ot.auction}`]);
  assert.equal(e.state().payments[`seller-${ot.auction}`]!.amount,"20000000");
  assert.equal(e.state().payments[`fee-${ot.auction}`],undefined);
+ assert.equal(e.hasActiveWork(who(5)),true);
  for(let i=0;i<5;i++)await e.tick();
  assert.equal(e.state().auctions[ot.auction]!.status,"COMPLETE");
  assert.equal(owners.t1,who(3));
+ assert.equal(e.hasActiveWork(who(5)),false);
+ await e.pause(true);
+ assert.equal(e.hasActiveWork(who(5)),false);
  invariant(e.state());
 });

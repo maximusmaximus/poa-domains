@@ -216,6 +216,14 @@ export class Escrow {
   }
   state(): State { return this.journal.load(); }
   titleLocked(): boolean { return Object.values(this.state().auctions).some(a=>a.status==="OPEN"||a.status==="SETTLING"); }
+  hasActiveWork(treasury: string): boolean {
+    const s=this.state();
+    if(s.paused||s.halt)return false;
+    const nowMs=this.now();
+    return Object.values(s.payments).some(p=>p.status!=="FINAL")||
+      Object.values(s.settlements).some(st=>st.status!=="COMPLETE")||
+      Object.values(s.auctions).some(a=>a.status==="OPEN"&&a.seller===treasury&&a.high!==null&&a.closes>0&&nowMs>=a.closes);
+  }
   /**
    * Idempotently open first-bid POA auctions for Treasury-owned inventory in a single atomic
    * journal entry (zero POA moved, timer starts on first bid). Never re-lists previously seeded,

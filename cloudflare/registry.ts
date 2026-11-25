@@ -5,20 +5,19 @@ import { escrowPacketBlocked, registryTitles } from "./escrow-titles.js";
 import { backupCommittedProfile } from "./profiles-storage.js";
 import { validPoaAddr } from "./treasury.js";
 import { DurableObject } from "cloudflare:workers";
-import { createPrivateKey, generateKeyPairSync, KeyObject, sign } from "node:crypto";
+import { createPrivateKey, generateKeyPairSync, KeyObject } from "node:crypto";
 import { Escrow, Policy, SQLiteEscrowJournal, EscrowArchive, exportEscrow, restoreEscrow, reviewedCredit, replay as replayEscrow } from "./escrow.js";
-import { CHAIN, Command, WorkerSecretSigner, verifyCommand, digest } from "./escrow-codec.js";
+import { CHAIN, WorkerSecretSigner, verifyCommand, digest } from "./escrow-codec.js";
 import { PoaHttpNetwork, MAINNET_ENGINE_SHA256, MAINNET_PARAMS_SHA256, PILOT_PER_TX, PILOT_DAILY } from "./escrow-network.js";
-import { DOMAIN, nativePrincipal, signBody } from "../src/auth.js";
-import { base58 } from "../src/native-crypto.js";
+import { nativePrincipal } from "../src/auth.js";
 import { mainnetConfig, Config } from "../src/config.js";
 import { POA_NEW_NAME_PRICE_RULE, POA_NEW_NAME_PRICES } from "../src/new-name-prices.js";
 import { Engine } from "../src/engine.js";
-import { Fault, canonical, exact, need, parseJSON } from "../src/core.js";
+import { Fault, exact, need, parseJSON } from "../src/core.js";
 import { capabilities } from "../src/interface.js";
 import { normalizeName } from "../src/names.js";
 import { provisionProtocolDomains, type ProvisionedProtocolDomain } from "../src/protocol-domains.js";
-import { provisionTreasuryAuctionDomains, treasuryAuctionReservePoa, TREASURY_CRYPTO_AI_AUCTION_NAMES } from "../src/treasury-auctions.js";
+import { buildTreasuryAutoHandover, provisionTreasuryAuctionDomains, treasuryAuctionReservePoa, TREASURY_CRYPTO_AI_AUCTION_NAMES } from "../src/treasury-auctions.js";
 import { BootableSystemClock, seedRegistry } from "../src/seed.js";
 import { SQLiteJournal } from "./sqlite-journal.js";
 import { BackupKind, JournalRow, buildBackup, encryptSecrets, journalHeadOf, secretAad, verifyBackup } from "./backup-codec.js";
@@ -451,102 +450,29 @@ export class PoaRegistry extends DurableObject<Env> {
   }
   private async autoSettleTreasuryAuctions(): Promise<void> {
     if (String(this.env.POA_ESCROW_ENABLED) !== "true" || String(this.env.POA_ESCROW_NETWORK_WRITES) !== "approved-v1") return;
-    const escrow = this.escrow();
-    const es = escrow.state();
+    const escrow = this.escrow(), es = escrow.state();
     if (es.paused || es.halt) return;
-    const treasury = this.engine.config.treasury;
+    const savedRow = this.ctx.storage.sql.exec<{ value: string }>("SELECT value FROM bootstrap WHERE id=1").toArray()[0];
+    if (!savedRow) return;
+    const bootstrap = JSON.parse(savedRow.value) as Bootstrap;
     const nowMs = Date.now();
-    const snap = this.engine.snapshot();
-    const nowSec = Math.max(Math.floor(nowMs / 1000), snap.time);
-
-    const signAndSubmit = async (
-      target: { id: string; name: string; high: { payer: string; amount: string } },
-      action: "settle" | "repair-title",
-    ) => {
-      const savedRow = this.ctx.storage.sql.exec<{ value: string }>("SELECT value FROM bootstrap WHERE id=1").toArray()[0];
-      if (!savedRow) return;
-      const bootstrap = JSON.parse(savedRow.value) as Bootstrap;
-      const treasuryKey = createPrivateKey(bootstrap.keys.treasury!);
-      const deedId = snap.names[target.name]?.activeId;
-      const deed = deedId ? snap.deeds[deedId] : null;
-      if (!deed || deed.owner !== treasury || deed.retired) return;
-      const requestId =
-        action === "repair-title"
-          ? `treasury-repair-${target.id.slice(0, 24)}-${nowSec}`
-          : `treasury-settle-${target.id.slice(0, 32)}`;
-      const key =
-        action === "repair-title"
-          ? `treasury_repair_${target.id.slice(0, 24)}_${nowSec}`
-          : `treasury_settle_${target.id.slice(0, 44)}`;
-      const transfer = signBody(
-        {
-          domain: DOMAIN,
-          revision: this.engine.config.revision,
-          chainId: this.engine.config.chainId,
-          genesisHash: this.engine.config.genesisHash,
-          registryId: this.engine.registryId,
-          policyHash: this.engine.policyHash,
-          normalizationHash: this.engine.config.normalizationHash,
-          signer: treasury,
-          coSigners: [],
-          requestId,
-          nonce: this.engine.nextNonce(treasury),
-          notBefore: 0,
-          deadline: nowSec + 7 * 86400,
-          maxTotal: "0",
-          maxNetworkFee: "0",
-          action: "transfer",
-          params: {
-            name: target.name,
-            expectedDeedId: deed.id,
-            expectedVersion: deed.version,
-            recipient: target.high.payer,
-          },
-        },
-        [treasuryKey],
-      );
-      const command: Command = {
-        domain: "poa-domains.escrow.v1",
-        chainId: CHAIN,
-        registryId: this.engine.registryId,
-        actor: treasury,
-        key,
-        expires: nowSec + 600,
-        action,
-        params: { auction: target.id, transfer },
-      };
-      const signature = base58(sign(null, Buffer.from(canonical(command)), treasuryKey));
-      const verified = verifyCommand({ command, signature }, this.engine.registryId, nowSec);
-      await escrow.command(verified);
-    };
-
-    const settling = Object.values(es.auctions).find((a) => a.status === "SETTLING" && a.seller === treasury);
-    if (settling) {
-      const st = es.settlements[settling.id];
-      const deadline = st?.packet?.body?.deadline;
-      const needsRepair =
-        st &&
-        settling.high &&
-        (st.status === "TITLE_PENDING" ||
-          (st.status === "PAYING" && (typeof deadline !== "number" || deadline <= nowSec + 600)));
-      if (needsRepair) {
-        await signAndSubmit({ id: settling.id, name: settling.name, high: settling.high! }, "repair-title");
-      }
-      return;
-    }
-
-    const ready = Object.values(es.auctions)
-      .filter((a) => a.status === "OPEN" && a.seller === treasury && a.high !== null && a.closes > 0 && nowMs >= a.closes)
-      .sort((a, b) => a.closes - b.closes || a.id.localeCompare(b.id))[0];
-    if (!ready || !ready.high) return;
-    await signAndSubmit({ id: ready.id, name: ready.name, high: ready.high }, "settle");
+    const planned = buildTreasuryAutoHandover({
+      engine: this.engine,
+      treasuryKey: createPrivateKey(bootstrap.keys.treasury!),
+      auctions: es.auctions,
+      settlements: es.settlements,
+      nowMs,
+      chainId: CHAIN,
+    });
+    if (!planned) return;
+    const nowSec = Math.max(Math.floor(nowMs / 1000), this.engine.snapshot().time);
+    await escrow.command(verifyCommand(planned.packet, this.engine.registryId, nowSec));
   }
   async alarm(): Promise<void> {
     if (String(this.env.POA_ESCROW_ENABLED) !== "true" || String(this.env.POA_ESCROW_NETWORK_WRITES) !== "approved-v1") return;
     const runStep = async (step: string, fn: () => Promise<unknown>) => {
-      try {
-        await fn();
-      } catch (error) {
+      try { await fn(); }
+      catch (error) {
         if (error instanceof Error && /^ESCROW_[A-Z_]+$/.test(error.message)) {
           console.error(JSON.stringify({ event: "escrow-alarm-held", step, code: error.message }));
           return;
@@ -558,19 +484,8 @@ export class PoaRegistry extends DurableObject<Env> {
     await runStep("auto-settle-pre", () => this.autoSettleTreasuryAuctions());
     await runStep("tick", () => this.escrow().tick());
     await runStep("auto-settle-post", () => this.autoSettleTreasuryAuctions());
-    const s = this.escrow().state();
-    const nowMs = Date.now();
-    const treasury = this.engine.config.treasury;
-    const hasActiveWork =
-      !s.paused &&
-      !s.halt &&
-      (Object.values(s.payments).some((p) => p.status !== "FINAL") ||
-        Object.values(s.settlements).some((st) => st.status !== "COMPLETE") ||
-        Object.values(s.auctions).some(
-          (a) => a.status === "OPEN" && a.seller === treasury && a.high !== null && a.closes > 0 && nowMs >= a.closes,
-        ));
     // Drain active payouts/settlements every 15s; fall back to 60s when idle.
-    await this.ctx.storage.setAlarm(Date.now() + (hasActiveWork ? 15000 : 60000));
+    await this.ctx.storage.setAlarm(Date.now() + (this.escrow().hasActiveWork(this.engine.config.treasury) ? 15000 : 60000));
   }
   /** Authenticated Worker RPC only. There is no browser signing, key-read, or generic send route. */
   async escrowAdmin(packetText: string): Promise<RegistryReply> {
