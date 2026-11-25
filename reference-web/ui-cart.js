@@ -1,20 +1,22 @@
-import { publicNameUnavailable } from "./shared.js?v=5a5e37241e4b";
-import { registryUnit } from "./shared.js?v=5a5e37241e4b";
-import { actionLabel } from "./ui-copy.js?v=5a5e37241e4b";
-import { trapDialog } from "./ui-a11y.js?v=5a5e37241e4b";
-import { ui } from "./ui-state.js?v=5a5e37241e4b";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=5a5e37241e4b";
-import { add, el, endpointBase } from "./ui-core.js?v=5a5e37241e4b";
-import { nameLink, openManageDomain } from "./ui-router.js?v=5a5e37241e4b";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=5a5e37241e4b";
+import { publicNameUnavailable } from "./shared.js?v=21431e1ecef6";
+import { registryUnit } from "./shared.js?v=21431e1ecef6";
+import { actionLabel } from "./ui-copy.js?v=21431e1ecef6";
+import { trapDialog } from "./ui-a11y.js?v=21431e1ecef6";
+import { ui } from "./ui-state.js?v=21431e1ecef6";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=21431e1ecef6";
+import { add, el, endpointBase } from "./ui-core.js?v=21431e1ecef6";
+import { domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=21431e1ecef6";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=21431e1ecef6";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
 }
 
 export function updateCartCopyState() {
-    for (const id of ["copyCartPrompt", "copyCheckoutBtn", "downloadCartJSON"])
-        el(id).disabled = !ui.cart.length || cartCopyBlocked() || ui.handoffPending || !ui.handoffData;
+    for (const id of ["copyCartPrompt", "copyCheckoutBtn", "downloadCartJSON", "floatingDownloadCartJSON"]) {
+        const btn = el(id);
+        if (btn) btn.disabled = !ui.cart.length || cartCopyBlocked() || ui.handoffPending || !ui.handoffData;
+    }
 }
 
 export function persistCart() {
@@ -68,28 +70,47 @@ export function renderCurrentCartHandoff() {
         : renderAgentCartHandoff(ui.handoffData);
 }
 
+function syncFloatingPrompt(text) {
+    const fp = el("floatingCartPrompt");
+    if (!fp) return;
+    if (!ui.cart.length || !text) {
+        fp.hidden = true;
+        fp.textContent = "";
+    } else {
+        fp.textContent = text;
+        fp.hidden = false;
+    }
+}
+
 export async function updatePromptText() {
     const generation=++handoffGeneration;
     el("cartAnchor").classList.toggle("cart-empty",!ui.cart.length);
     ui.handoffData=null;ui.handoffPending=false;ui.handoffError="";
     if(!ui.cart.length||!ui.cap){
         if(!ui.cart.length)el("cartPrompt").textContent="🛒 Your cart is empty. Add a name from Find, Auctions or For sale.";
+        syncFloatingPrompt("");
         updateHandoffAge();updateCartCopyState();return;
     }
     if(cartCopyBlocked()){
-        el("cartPrompt").textContent=ui.refreshing?"⏳ Checking the registry…":ui.registryReadFailed||ui.lastLoadedAt===null?"🔄 Refresh registry data first.":shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)||ui.networkStatus.hold?"⏸️ Handoff paused while the PoA network is down. Nothing was sent.":"✏️ Fix the cart items marked for review.";
+        const blockedText=ui.refreshing?"⏳ Checking the registry…":ui.registryReadFailed||ui.lastLoadedAt===null?"🔄 Refresh registry data first.":shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)||ui.networkStatus.hold?"⏸️ Handoff paused while the PoA network is down. Nothing was sent.":"✏️ Fix the cart items marked for review.";
+        el("cartPrompt").textContent=blockedText;
+        syncFloatingPrompt(blockedText);
         updateHandoffAge();updateCartCopyState();return;
     }
     ui.handoffPending=true;updateHandoffAge();updateCartCopyState();
     el("cartPrompt").textContent="🧾 Building your handoff…";
+    syncFloatingPrompt("🧾 Building your handoff…");
     try{
         const poa=poaOnlyMode(ui.cap);
         const data=poa?buildPoaCheckoutHandoff(structuredClone(ui.cart),ui.cap,endpointBase(),structuredClone(ui.rawSnapshot))
             :await buildAgentCartHandoff(structuredClone(ui.cart),ui.cap,"",endpointBase(),ui.configMode,structuredClone(ui.rawSnapshot));
         if(generation!==handoffGeneration||cartCopyBlocked())return;
-        ui.handoffData=data;el("cartPrompt").textContent=renderCurrentCartHandoff();
+        ui.handoffData=data;
+        const rendered=renderCurrentCartHandoff();
+        el("cartPrompt").textContent=rendered;
+        syncFloatingPrompt(rendered);
     }catch(error){
-        if(generation===handoffGeneration){ui.handoffError=String(error?.message||error).slice(0,200);el("cartPrompt").textContent="😕 Couldn't build your handoff. Tap 🔄 Refresh and try again. Nothing was sent.";}
+        if(generation===handoffGeneration){ui.handoffError=String(error?.message||error).slice(0,200);const errText="😕 Couldn't build your handoff. Tap 🔄 Refresh and try again. Nothing was sent.";el("cartPrompt").textContent=errText;syncFloatingPrompt(errText);}
     }finally{
         if(generation===handoffGeneration){ui.handoffPending=false;updateHandoffAge();updateCartCopyState();}
     }
@@ -312,6 +333,7 @@ export function maybePrefillOwnerFromPurchasedCart(state) {
             ui.knownOwner = ownerToUse;
             saveKnownOwner(globalThis.localStorage, ownerToUse);
         }
+        syncEscrowPayerAddress(ownerToUse);
         const ownerInput = el("manageOwner");
         const manageNotice = el("manageOwnerNotice");
         if (ownerInput && (!ownerInput.value.trim() || ownerInput.value.trim() === ui.inferredCartOwner)) {
@@ -373,7 +395,7 @@ export function renderFloatingCart() {
     ui.cart.forEach((item, index) => {
         const card = add(list, "div", "", "card cart-item");
         const h = add(card, "h3", "");
-        nameLink(h, item.name);
+        domainHeader(h, item.name);
         if (item.action === "poaCheckout") {
             add(card, "p", `🪙 ${poaShort(item.amount)} POA · ${poaPurchaseTypeLabel(item)}`, "badge-ok");
         }
@@ -426,7 +448,7 @@ export function renderCart() {
     ui.cart.forEach((item, index) => {
         const card = add(listNode, "div", "", "card cart-item");
         const h = add(card, "h4", "");
-        nameLink(h, item.name);
+        domainHeader(h, item.name);
         if (item.action === "poaCheckout") {
             add(card, "p", `🪙 ${poaShort(item.amount)} POA · ${poaPurchaseTypeLabel(item)}`, "badge-ok");
             if (item.needsReview)
@@ -587,8 +609,8 @@ export function setFloatingCartOpen(open) {
     panel.hidden = !open;
     backdrop.hidden = !open;
     btn.setAttribute("aria-expanded", String(open));
-    if(open){renderFloatingCart();releaseCartFocus=trapDialog(panel,backdrop,btn);}
-    else{const fp=el("floatingCartPrompt");if(fp){fp.hidden=true;fp.textContent="";}releaseCartFocus?.();releaseCartFocus=null;}
+    if(open){renderFloatingCart();syncFloatingPrompt(ui.cart.length?el("cartPrompt")?.textContent:"");releaseCartFocus=trapDialog(panel,backdrop,btn);}
+    else{releaseCartFocus?.();releaseCartFocus=null;}
     syncCartShortcut();
 }
 

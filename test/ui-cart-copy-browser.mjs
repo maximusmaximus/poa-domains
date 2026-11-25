@@ -304,11 +304,10 @@ try {
   const errorsUx = [];
   pageUx.on("pageerror", (e) => errorsUx.push(e.message));
   await pageUx.route("https://**", (r) => r.abort());
-  const samplePng = Buffer.from([
-    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-    0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
-    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-  ]);
+  const samplePng = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAECAIAAAA8r+mnAAAAIklEQVR4nGNg+M/A8J+BgYGBkYGBgYmBgYGBiYGBgQEAQhgBA9N0j98AAAAASUVORK5CYII=",
+    "base64",
+  );
   const mockAvatarCid = "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku";
   await pageUx.route("**/v1/media/upload", async (route) => {
     await route.fulfill({
@@ -444,7 +443,14 @@ try {
   assert.equal(/(IPFS|R2)/.test(await agentCard.locator(".profile-public-notice").innerText()), false);
   await expect(agentCard.locator(".profile-upload-row button")).toHaveText("📤 Upload");
 
-  // (e) Profile v1 editor: EIP-55 checksum fix, BTC mainnet, bio, image upload & agent prompt copy
+  // (e) Profile v1 editor: EIP-55 checksum fix, BTC mainnet, bio, image upload,
+  //     square header avatar live update, and live Agent prompt window with familiar buttons
+  await expect(pageUx.locator("#managePromptPanel")).toBeVisible();
+  const initialHeaderAvatarBox = await agentCard.locator("h3 .domain-header-avatar").boundingBox();
+  assert.ok(initialHeaderAvatarBox && Math.abs(initialHeaderAvatarBox.width - initialHeaderAvatarBox.height) < 1, "Manage header avatar must be square");
+  assert.equal(await pageUx.locator("#escrowPayer").inputValue(), buyerOwner);
+  await expect(agentCard.locator('button[aria-label="Sell for POA: agent"]')).toBeVisible();
+  await expect(agentCard.locator('button[aria-label="Auction for POA: agent"]')).toBeVisible();
   await agentCard.locator('input[data-profile-field="btc"]').fill("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
   await agentCard.locator('input[data-profile-field="eth"]').fill("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed");
   await expect(agentCard.locator(".profile-eth-fix")).toBeVisible();
@@ -454,6 +460,12 @@ try {
     "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
   );
   await agentCard.locator('textarea[data-profile-field="description"]').fill("Agent bio https://minepoa.com <script>alert(1)</script>");
+  // Live Agent Prompt window updates automatically from fields interacted with above (before clicking Copy!)
+  await expect(pageUx.locator("#managePrompt")).toContainText("0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed");
+  await expect(pageUx.locator("#managePrompt")).toContainText("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
+  await expect(pageUx.locator("#copyManagePrompt")).toBeEnabled();
+  await expect(pageUx.locator("#downloadManageJSON")).toBeEnabled();
+  await expect(pageUx.locator("#clearManagePrompt")).toBeEnabled();
   await agentCard.locator('input[type="file"]').setInputFiles({
     name: "avatar.png",
     mimeType: "image/png",
@@ -461,6 +473,8 @@ try {
   });
   await expect(agentCard.locator(".profile-upload-row")).toContainText("Image uploaded");
   assert.equal(await agentCard.locator('input[data-profile-field="image"]').inputValue(), `ipfs://${mockAvatarCid}`);
+  await expect(agentCard.locator("h3 .domain-header-avatar img")).toHaveAttribute("src", `/v1/media/${mockAvatarCid}`);
+  await expect(pageUx.locator("#managePrompt")).toContainText(`ipfs://${mockAvatarCid}`);
   await agentCard.getByRole("button", { name: /Copy profile prompt for my agent/ }).click();
   const profilePrompt = await pageUx.locator("#managePrompt").textContent();
   assert.match(profilePrompt, /poa-domains\.profile\.v1/);
@@ -468,6 +482,27 @@ try {
   assert.match(profilePrompt, /0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed/);
   assert.match(profilePrompt, /bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4/);
   assert.equal((await pageUx.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, "\n"), profilePrompt);
+
+  // Familiar Clear button clears the preview window & disables Copy/Download
+  await pageUx.locator("#clearManagePrompt").click();
+  await expect(pageUx.locator("#copyManagePrompt")).toBeDisabled();
+  await expect(pageUx.locator("#downloadManageJSON")).toBeDisabled();
+
+  // Clicking "Auction for POA" on an available held domain populates My POA with auto-filled POA address,
+  // domain name, active "open" auction command, and live updates when amount changes!
+  await pageUx.locator('#manageNames button[aria-label="Auction for POA: lunar"]').click();
+  assert.equal(await pageUx.locator("#escrowPayer").inputValue(), buyerOwner);
+  assert.equal(await pageUx.locator("#escrowName").inputValue(), "lunar");
+  await expect(pageUx.locator("#escrowPrompt")).toContainText('"action": "open"');
+  await expect(pageUx.locator("#escrowPrompt")).toContainText('"name": "lunar"');
+  await expect(pageUx.locator("#escrowPrompt")).toContainText("Sale & auction notice");
+  await expect(pageUx.locator("#downloadEscrowJSON")).toBeEnabled();
+  await expect(pageUx.locator("#clearEscrowPrompt")).toBeEnabled();
+  await pageUx.locator("#escrowAmount").fill("325");
+  await expect(pageUx.locator("#escrowPrompt")).toContainText('"reserve": "325.000000"');
+  await pageUx.locator("#clearEscrowPrompt").click();
+  await expect(pageUx.locator("#downloadEscrowJSON")).toBeDisabled();
+  await expect(pageUx.locator("#clearEscrowPrompt")).toBeDisabled();
 
   // (f) Reorganized Escrow Signed Request workflow with steps + ℹ️ popovers
   await expect(pageUx.locator('#escrowPayments .escrow-step[data-step="1"] h3')).toContainText("1. Pick an action");
@@ -494,6 +529,9 @@ try {
   await pageUx.goto(h.url + "/d/agent");
   await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
   await expect(pageUx.locator("#domainProfile")).toBeVisible();
+  await expect(pageUx.locator("#domainTitle .domain-header-avatar img")).toHaveAttribute("src", `/v1/media/${mockAvatarCid}`);
+  const domainHeaderAvatarBox = await pageUx.locator("#domainTitle .domain-header-avatar").boundingBox();
+  assert.ok(domainHeaderAvatarBox && Math.abs(domainHeaderAvatarBox.width - domainHeaderAvatarBox.height) < 1, "/d/<name> header avatar must be square");
   await expect(pageUx.locator("#domainProfile img.domain-avatar")).toHaveAttribute("src", `/v1/media/${mockAvatarCid}`);
   await expect(pageUx.locator("#domainProfile .domain-profile-bio")).toHaveText("Agent bio https://minepoa.com <script>alert(1)</script>");
   assert.equal(await pageUx.locator("#domainProfile script").count(), 0);
@@ -971,6 +1009,14 @@ try {
   await expect(pageFields.locator("#domainListing .sale-fields-warning")).toBeVisible();
   await expect(pageFields.locator("#domainProfile")).toContainText("paused while listed");
   assert.equal(await pageFields.locator("#domainProfile img.domain-avatar").count(), 0);
+  assert.equal(await pageFields.locator("#domainTitle .domain-header-avatar img").count(), 0);
+  await expect(pageFields.locator("#domainTitle .domain-header-avatar")).toBeVisible();
+  // While listed/in auction, "Auction for POA" is hidden in Manage domains for that domain
+  await pageFields.locator('#domainActions button[aria-label="Manage agent"]').click();
+  await expect(pageFields.locator('#manageNames button[aria-label="Auction for POA: agent"]')).toHaveCount(0);
+  await expect(pageFields.locator('#manageNames button[aria-label="Open in My POA: agent"]')).toBeVisible();
+  await pageFields.goto(`${h.url}/d/agent`);
+  await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");
   await expect(pageFields.locator("#domainPreviousFields")).toBeVisible();
   await expect(pageFields.locator('#domainPreviousFields article[data-record-status="paused"]')).toContainText("Paused while listed");
   await expect(pageFields.locator("#domainPreviousFields")).toContainText("https://agent.example/endpoint");

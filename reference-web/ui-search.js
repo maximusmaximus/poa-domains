@@ -1,13 +1,13 @@
-import { copyText } from "./ui-copy.js?v=5a5e37241e4b";
-import { publicNameUnavailable } from "./shared.js?v=5a5e37241e4b";
-import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=5a5e37241e4b";
-import { ui } from "./ui-state.js?v=5a5e37241e4b";
-import { nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=5a5e37241e4b";
-import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=5a5e37241e4b";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=5a5e37241e4b";
-import { addToCart } from "./ui-cart.js?v=5a5e37241e4b";
-import { suggestNames } from "./ideas-generator.js?v=5a5e37241e4b";
-import { logSubmittedSearch } from "./ui-search-log.js?v=5a5e37241e4b";
+import { copyText } from "./ui-copy.js?v=21431e1ecef6";
+import { publicNameUnavailable } from "./shared.js?v=21431e1ecef6";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=21431e1ecef6";
+import { ui } from "./ui-state.js?v=21431e1ecef6";
+import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=21431e1ecef6";
+import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=21431e1ecef6";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=21431e1ecef6";
+import { addToCart } from "./ui-cart.js?v=21431e1ecef6";
+import { suggestNames } from "./ideas-generator.js?v=21431e1ecef6";
+import { logSubmittedSearch } from "./ui-search-log.js?v=21431e1ecef6";
 
 let activeSuggestionIdx = -1;
 let currentSuggestions = [];
@@ -266,7 +266,7 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
     const name = info.canonical;
     const card = add(container, "div", "", "card");
     const title = add(card, "h4", "");
-    nameLink(title, name);
+    domainHeader(title, name);
     const openPage = add(card, "button", "Open page", "secondary small");
     openPage.type = "button";
     openPage.addEventListener("click", () => navigateDomain(name));

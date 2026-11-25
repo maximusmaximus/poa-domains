@@ -1,18 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=5a5e37241e4b";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=5a5e37241e4b";
-import { renderManagement } from "./ui-manage.js?v=5a5e37241e4b";
-import { actionLabel } from "./ui-copy.js?v=5a5e37241e4b";
-import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=5a5e37241e4b";
-import { ui } from "./ui-state.js?v=5a5e37241e4b";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=5a5e37241e4b";
-import { createPoaCopyButton } from "./ui-copy.js?v=5a5e37241e4b";
-import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=5a5e37241e4b";
-import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=5a5e37241e4b";
-import { renderDomainPage } from "./ui-domain.js?v=5a5e37241e4b";
-import { runSearch } from "./ui-search.js?v=5a5e37241e4b";
-import { renderIdeas } from "./ui-ideas.js?v=5a5e37241e4b";
-import { mountEscrow } from "./escrow.js?v=5a5e37241e4b";
-import { applyRoute, isRegisteredDomain, nameLink, navigateHome, setSectionTab } from "./ui-router.js?v=5a5e37241e4b";
+import { publicNameUnavailable } from "./shared.js?v=21431e1ecef6";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=21431e1ecef6";
+import { renderManagement } from "./ui-manage.js?v=21431e1ecef6";
+import { actionLabel } from "./ui-copy.js?v=21431e1ecef6";
+import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=21431e1ecef6";
+import { ui } from "./ui-state.js?v=21431e1ecef6";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=21431e1ecef6";
+import { createPoaCopyButton } from "./ui-copy.js?v=21431e1ecef6";
+import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=21431e1ecef6";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=21431e1ecef6";
+import { renderDomainPage } from "./ui-domain.js?v=21431e1ecef6";
+import { runSearch } from "./ui-search.js?v=21431e1ecef6";
+import { renderIdeas } from "./ui-ideas.js?v=21431e1ecef6";
+import { mountEscrow } from "./escrow.js?v=21431e1ecef6";
+import { applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=21431e1ecef6";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -84,8 +84,9 @@ function enhanceEscrowSignedRequestUx(root) {
     );
 
     const lead2 = document.createElement("p");
+    lead2.id = "escrowPromptMeta";
     lead2.className = "muted escrow-step-lead";
-    lead2.textContent = "Choose an action above to generate instructions for your agent, then copy them below.";
+    lead2.textContent = "Choose an action above to preview the code generated for your agent, then copy or download it below.";
     step2.append(lead2);
 
     const lead3 = document.createElement("p");
@@ -113,6 +114,129 @@ function enhanceEscrowSignedRequestUx(root) {
         ),
     );
 
+    const payerInput = root.querySelector("#escrowPayer");
+    const nameInput = root.querySelector("#escrowName");
+    const amountInput = root.querySelector("#escrowAmount");
+    const step1Buttons = actionRow ? [...actionRow.querySelectorAll("button")] : [];
+    let lastActionBtn = null;
+    let liveRegenTimer = null;
+    let regenerating = false;
+
+    const extractEscrowCommand = () => {
+        const text = prompt.textContent ?? "";
+        const match = text.match(/\n(\{[\s\S]*?\})\nSubmit/);
+        if (!match) return null;
+        try { return JSON.parse(match[1]); } catch { return null; }
+    };
+
+    prompt.classList.add("prompt-box");
+    const promptActions = document.createElement("div");
+    promptActions.id = "escrowPromptActions";
+    promptActions.className = "button-row";
+    if (copyBtn) {
+        copyBtn.className = "small";
+        promptActions.append(copyBtn);
+    }
+    const downloadEscrowBtn = document.createElement("button");
+    downloadEscrowBtn.id = "downloadEscrowJSON";
+    downloadEscrowBtn.type = "button";
+    downloadEscrowBtn.className = "secondary small";
+    downloadEscrowBtn.textContent = "📥 Download JSON";
+    downloadEscrowBtn.disabled = true;
+    const clearEscrowBtn = document.createElement("button");
+    clearEscrowBtn.id = "clearEscrowPrompt";
+    clearEscrowBtn.type = "button";
+    clearEscrowBtn.className = "secondary small";
+    clearEscrowBtn.textContent = "🗑️ Clear";
+    clearEscrowBtn.disabled = true;
+    promptActions.append(downloadEscrowBtn, clearEscrowBtn);
+
+    const syncEscrowPromptUi = () => {
+        const text = (prompt.textContent ?? "").trim();
+        const cmd = extractEscrowCommand();
+        if (copyBtn) copyBtn.disabled = !text;
+        downloadEscrowBtn.disabled = !cmd;
+        clearEscrowBtn.disabled = !text;
+        if (!text) {
+            lead2.textContent = "Choose an action above to preview the code generated for your agent, then copy or download it below.";
+            return;
+        }
+        if (cmd?.action) {
+            const target = cmd.params?.name ? ` for "${cmd.params.name}"` : "";
+            const amt = cmd.params?.reserve || cmd.params?.price || cmd.params?.amount;
+            const amtLabel = typeof amt === "string" ? ` (${poaShort(amt)} POA)` : "";
+            const actName = {
+                open: "Open POA auction",
+                list: "List name for POA",
+                intent: "Add POA deposit intent",
+                view: "Read escrow account",
+                withdraw: "Request POA refund",
+                detect: "Check deposit",
+                buy: "Buy with credited POA",
+                bid: "Bid with credited POA",
+            }[cmd.action] || cmd.action;
+            lead2.textContent = `Live preview · ${actName}${target}${amtLabel}`;
+        } else {
+            lead2.textContent = "Generated instructions for your agent — review before approving.";
+        }
+    };
+
+    downloadEscrowBtn.addEventListener("click", () => {
+        const cmd = extractEscrowCommand();
+        if (!cmd) return;
+        const blob = new Blob([JSON.stringify({ command: cmd }, null, 2) + "\n"], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `poa-domains-escrow-${cmd.action || "command"}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        if (message) message.textContent = "📥 JSON downloaded — unsigned, nothing submitted.";
+    });
+
+    clearEscrowBtn.addEventListener("click", () => {
+        clearTimeout(liveRegenTimer);
+        lastActionBtn = null;
+        delete root.dataset.selectedAction;
+        for (const b of step1Buttons) b.classList.remove("is-selected-action");
+        prompt.textContent = "";
+        if (message) message.textContent = "";
+        syncEscrowPromptUi();
+    });
+
+    const canAutoRegenerate = (btn) => {
+        if (!btn || btn.disabled) return false;
+        const payerVal = payerInput?.value.trim() ?? "";
+        if (!isPoaAddress(payerVal)) return false;
+        const label = btn.textContent ?? "";
+        if (/Read my escrow/.test(label)) return true;
+        try { poaAmount(amountInput?.value.trim() ?? ""); } catch { return false; }
+        if (/List my name for POA|Open my POA auction/.test(label)) {
+            return Boolean(nameInput?.value.trim());
+        }
+        return true;
+    };
+
+    const scheduleLiveRegen = () => {
+        if (regenerating || !lastActionBtn || !(prompt.textContent ?? "").trim() || signed.value.trim()) return;
+        clearTimeout(liveRegenTimer);
+        liveRegenTimer = setTimeout(() => {
+            if (regenerating || !lastActionBtn || signed.value.trim() || !canAutoRegenerate(lastActionBtn)) return;
+            regenerating = true;
+            try { lastActionBtn.click(); } finally { regenerating = false; }
+        }, 120);
+    };
+
+    for (const input of [payerInput, nameInput, amountInput]) {
+        input?.addEventListener("input", scheduleLiveRegen);
+    }
+    signed.addEventListener("input", () => clearTimeout(liveRegenTimer));
+    root.addEventListener("click", (ev) => {
+        if (ev.target?.closest?.("button")) clearTimeout(liveRegenTimer);
+    }, true);
+
     step1.append(grid);
     if (limits)
         step1.append(limits);
@@ -131,29 +255,31 @@ function enhanceEscrowSignedRequestUx(root) {
         sellWarning.setAttribute("role", "note");
         sellWarning.textContent = SALE_FIELDS_WARNING;
         step1.append(sellWarning);
-        for (const btn of actionRow.querySelectorAll("button")) {
+        for (const btn of step1Buttons) {
             const label = btn.textContent ?? "";
-            if (!/List my name for POA|Open my POA auction/.test(label))
-                continue;
             btn.addEventListener("click", () => {
-                const txt = prompt.textContent ?? "";
-                if (/"action":\s*"(?:list|open)"/.test(txt) && !txt.includes("Sale & auction notice")) {
-                    prompt.textContent = txt.trimEnd() + "\n" + SALE_FIELDS_WARNING;
-                    if (message && !message.textContent.includes("paused while listed")) {
-                        message.textContent =
-                            (message.textContent ? message.textContent + " " : "") +
-                            "⚠️ Attached domain fields & profile are paused while listed and dropped on transfer.";
+                clearTimeout(liveRegenTimer);
+                lastActionBtn = btn;
+                for (const other of step1Buttons) other.classList.toggle("is-selected-action", other === btn);
+                if (/List my name for POA|Open my POA auction/.test(label)) {
+                    const txt = prompt.textContent ?? "";
+                    if (/"action":\s*"(?:list|open)"/.test(txt) && !txt.includes("Sale & auction notice")) {
+                        prompt.textContent = txt.trimEnd() + "\n" + SALE_FIELDS_WARNING;
+                        if (message && !message.textContent.includes("paused while listed")) {
+                            message.textContent =
+                                (message.textContent ? message.textContent + " " : "") +
+                                "⚠️ Attached domain fields & profile are paused while listed and dropped on transfer.";
+                        }
                     }
                 }
+                syncEscrowPromptUi();
             });
         }
     }
 
     if (message)
         step2.append(message);
-    step2.append(prompt);
-    if (copyBtn)
-        step2.append(copyBtn);
+    step2.append(prompt, promptActions);
 
     step3.append(fieldHead, signedLabel, submit);
 
@@ -164,6 +290,11 @@ function enhanceEscrowSignedRequestUx(root) {
     } else {
         content.append(step1, step2, step3);
     }
+    if (typeof MutationObserver !== "undefined") {
+        new MutationObserver(syncEscrowPromptUi).observe(prompt, { childList: true, characterData: true, subtree: true });
+    }
+    syncEscrowPromptUi();
+    syncEscrowPayerAddress();
 }
 
 function observeEscrowAddresses(root) {
@@ -182,6 +313,17 @@ function observeEscrowAddresses(root) {
         busy = true;
         try {
             enhancePoaAddressesIn(root, { onCopy });
+            const domainHeaders = root.id === "escrowDomain"
+                ? root.querySelectorAll("article.card > h3")
+                : root.querySelectorAll("#escrowMarket article.card > h3");
+            for (const h3 of domainHeaders) {
+                if (h3.dataset.avatarDecorated === "1") continue;
+                const domainName = h3.textContent?.trim();
+                if (!domainName) continue;
+                h3.dataset.avatarDecorated = "1";
+                h3.classList.add("domain-heading");
+                h3.prepend(createDomainAvatar(domainName, { size: "sm" }));
+            }
         }
         finally {
             busy = false;
@@ -510,10 +652,12 @@ export function applyNetworkHold() {
     const hold = shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level) || !!ui.networkStatus.hold;
     const heldIds = [
         "poaSellBtn",
+        "poaAuctionBtn",
         "poaSubnameBtn",
         "copyCheckoutBtn",
         "copyCartPrompt",
         "downloadCartJSON",
+        "floatingDownloadCartJSON",
         "copyListPromptBtn",
         "copyChangePromptBtn",
         "copyUnlistPromptBtn",

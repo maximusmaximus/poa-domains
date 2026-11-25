@@ -1,13 +1,13 @@
-import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, validPrincipal } from "./shared.js?v=5a5e37241e4b";
-import { drawTicker } from "./ui-ticker.js?v=5a5e37241e4b";
-import { actionLabel } from "./ui-copy.js?v=5a5e37241e4b";
-import { returnFocus } from "./ui-a11y.js?v=5a5e37241e4b";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=5a5e37241e4b";
-import { ui } from "./ui-state.js?v=5a5e37241e4b";
-import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=5a5e37241e4b";
-import { nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=5a5e37241e4b";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=5a5e37241e4b";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=5a5e37241e4b";
+import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, validPrincipal } from "./shared.js?v=21431e1ecef6";
+import { drawTicker } from "./ui-ticker.js?v=21431e1ecef6";
+import { actionLabel } from "./ui-copy.js?v=21431e1ecef6";
+import { returnFocus } from "./ui-a11y.js?v=21431e1ecef6";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=21431e1ecef6";
+import { ui } from "./ui-state.js?v=21431e1ecef6";
+import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=21431e1ecef6";
+import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=21431e1ecef6";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=21431e1ecef6";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=21431e1ecef6";
 
 export function updateLiveAuctionsBadge(state = ui.latestState) {
     const badge = el("liveAuctionsBadge");
@@ -101,7 +101,8 @@ export function openDetail(item) {
     const view = el("detailView");
     view.hidden = false;
     el("detailTitle").replaceChildren();
-    if(item.name)nameLink(el("detailTitle"),item.name);else el("detailTitle").textContent=actionLabel(item.label||"Detail");
+    el("detailTitle").classList.remove("domain-heading");
+    if(item.name)domainHeader(el("detailTitle"),item.name,{size:"lg"});else el("detailTitle").textContent=actionLabel(item.label||"Detail");
     el("detailTitle").classList.toggle("domain-name", !!item.name);
     el("detailSummary").replaceChildren();namedText(el("detailSummary"),actionLabel(item.label || item.kind || ""));
     const hist = el("detailHistory");
@@ -178,7 +179,7 @@ function renderPoaAuctions(box) {
         const cartItem = ui.cart.find((x) => x.action === "poaBid" && x.params?.auctionId === a.id) ?? null;
         const outbidInfo = poaAuctionOutbidStatus(a, { bidderAddress: ui.bidderAddress, cartItem });
         const ah = add(card, "h4", "");
-        nameLink(ah, a.name);
+        domainHeader(ah, a.name);
         if (a.status !== "OPEN") {
             add(card, "p", a.status === "COMPLETE" ? "✅ Complete" : a.status === "SETTLING" ? "⏳ Settling handover" : "✖️ Cancelled", a.status === "COMPLETE" ? "badge-ok" : "badge");
         } else if (awaiting) {
@@ -300,7 +301,7 @@ export function renderAuctions(s) {
                         : "open / no bids"
                     : "eligible to close";
         const ah = add(card, "h4", "");
-        nameLink(ah, a.name);
+        domainHeader(ah, a.name);
         add(card, "p", phase, "badge");
         const cartBid = ui.cart.find((x) => x.action === "bid" && x.params?.auctionId === a.id);
         if (cartBid && (cartBid.outbid || cartBid.needsReview)) {
@@ -357,7 +358,7 @@ export function renderMarketplace(s) {
         for (const item of fixed) {
             const card = add(box, "article", "", "card");
             const h = add(card, "h4", "");
-            nameLink(h, item.name);
+            domainHeader(h, item.name);
             add(card, "p", `🪙 ${poaShort(item.price)} POA · Fixed price`, "badge-ok");
             const sellerLine = add(card, "p", "Seller: ");
             appendPrincipal(sellerLine, item.seller);
@@ -377,7 +378,7 @@ export function renderMarketplace(s) {
     for (const row of listings) {
         const card = add(box, "article", "", "card");
         const h = add(card, "h4", "");
-        nameLink(h, row.name);
+        domainHeader(h, row.name);
         add(card, "p", `💰 ${row.price} registry units`, "badge-ok");
         const ownerLine = add(card, "p", "Seller: ");
         if (row.offer?.owner)
@@ -464,7 +465,7 @@ export function render(payload) {
     for (const n of names) {
         const d = s.deeds[n.activeId], card = add(el("names"), "article", "", "card");
         const nh = add(card, "h4", "");
-        nameLink(nh, n.name);
+        domainHeader(nh, n.name);
         const ownerLine = add(card, "p", "", "badge");
         ownerLine.append((ui.demo ? "Synthetic " : "") + d.rights.kind + " deed · ");
         ownerLink(ownerLine, d.owner, person(d.owner));
@@ -516,14 +517,7 @@ export function render(payload) {
                     ? "expired"
                     : "active";
         const oh = add(card, "h4", "");
-        if (o.kind === "child") {
-            oh.append("Child offer on .");
-            nameLink(oh, targetName);
-        }
-        else {
-            oh.append("Resale of ");
-            nameLink(oh, targetName);
-        }
+        domainHeader(oh, targetName, { prefix: o.kind === "child" ? "Child offer on ." : "Resale of " });
         add(card, "p", `${o.kind} offer · ${statusText} · price ${o.price} ${registryUnit(o.asset)}`, active ? "badge-ok" : "badge");
         const sellerLine = add(card, "p", "Seller: ");
         ownerLink(sellerLine, o.owner, person(o.owner));
@@ -559,8 +553,7 @@ export function render(payload) {
         const domainName = a ? a.name : b.auctionId.slice(0, 14);
         const card = add(el("history"), "div", "", "card");
         const hh = add(card, "h4", "");
-        nameLink(hh, domainName);
-        hh.append(` — ${b.amount} ${registryUnit(a ? a.asset : "POA")}`);
+        domainHeader(hh, domainName, { suffix: ` — ${b.amount} ${registryUnit(a ? a.asset : "POA")}` });
         add(card, "p", `Bid status: ${b.status.toUpperCase()} · Sequence #${b.sequence} · ${formatClock(b.at)}`, b.status === "won" || b.status === "high" ? "badge-ok" : "badge");
         const partyLine = add(card, "p", "Payer: ");
         appendPrincipal(partyLine, b.payer);

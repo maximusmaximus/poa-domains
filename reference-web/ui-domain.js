@@ -19,12 +19,12 @@ import {
   registryUnit,
   resolveDomainView,
   unavailableKey,
-} from "./shared.js?v=5a5e37241e4b";
-import { actionLabel, createPoaCopyButton } from "./ui-copy.js?v=5a5e37241e4b";
-import { ui } from "./ui-state.js?v=5a5e37241e4b";
-import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=5a5e37241e4b";
-import { nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=5a5e37241e4b";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=5a5e37241e4b";
+} from "./shared.js?v=21431e1ecef6";
+import { actionLabel, createPoaCopyButton } from "./ui-copy.js?v=21431e1ecef6";
+import { ui } from "./ui-state.js?v=21431e1ecef6";
+import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=21431e1ecef6";
+import { domainHeader, nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=21431e1ecef6";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=21431e1ecef6";
 
 function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) {
   const wrap = document.createElement("span");
@@ -425,6 +425,7 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
 export function renderDomainPage(name) {
   if (!ui.latestState || !name) return;
   if (publicNameUnavailable(name, ui.cap)) {
+    el("domainTitle").classList.remove("domain-heading");
     el("domainTitle").textContent = "Name unavailable";
     el("domainStatus").textContent = "🔒 Stored record withheld — not free to register";
     el("domainOwner").textContent = "No public ownership record.";
@@ -452,8 +453,8 @@ export function renderDomainPage(name) {
     nowMs,
   });
 
-  el("domainTitle").textContent = "";
-  nameLink(el("domainTitle"), name);
+  el("domainTitle").replaceChildren();
+  domainHeader(el("domainTitle"), name, { size: "lg" });
   if (salesInfo.activePoaAuctions.length) {
     const first = salesInfo.activePoaAuctions[0];
     el("domainStatus").textContent = isPoaAuctionAwaitingFirstBid(first)
@@ -530,7 +531,10 @@ export function renderDomainPage(name) {
 
   const tools = el("domainOwnerTools");
   tools.hidden = !view.deed;
+  const availableToList = Boolean(view.deed && !view.deed.retired && !salesInfo.listedForSale && !view.deed.lock);
   if (el("poaSellTools")) el("poaSellTools").hidden = !poa;
+  if (el("poaSellBtn")) el("poaSellBtn").hidden = !availableToList;
+  if (el("poaAuctionBtn")) el("poaAuctionBtn").hidden = !availableToList;
   if (el("poaSubnameTools")) el("poaSubnameTools").hidden = !poa || String(ui.currentDomainName ?? "").includes(".");
   if (el("unitSellTools")) el("unitSellTools").hidden = poa;
   el("listingPromptStatus").textContent = "";
@@ -575,7 +579,7 @@ export function renderOwnerPage(ownerId) {
     const d = ui.latestState.deeds[n.activeId];
     const card = add(namesBox, "article", "", "card");
     const h = add(card, "h4", "");
-    nameLink(h, n.name);
+    domainHeader(h, n.name);
     add(card, "p", d.rights.kind, "badge");
     const manageBtn = add(card, "button", "⚙️ Manage this domain", "secondary small");
     manageBtn.type = "button";
@@ -589,7 +593,7 @@ export function renderOwnerPage(ownerId) {
   for (const row of listings) {
     const card = add(listBox, "article", "", "card");
     const h = add(card, "h4", "");
-    nameLink(h, row.name);
+    domainHeader(h, row.name);
     add(card, "p", `💰 ${row.price} registry units`, "badge-ok");
   }
 }
