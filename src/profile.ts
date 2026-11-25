@@ -372,6 +372,7 @@ export function extractLatestProfile(deed: {
   name: string;
   owner: string;
   rightsHash: string;
+  profileResetAt?: number;
   metadata?: readonly { cid: string; document: any }[];
 } | null | undefined): {
   profile: ProfileDocumentV1;
@@ -381,7 +382,9 @@ export function extractLatestProfile(deed: {
 } | null {
   if (!deed) return null;
   const list = Array.isArray(deed.metadata) ? deed.metadata : [];
-  for (let i = list.length - 1; i >= 0; i--) {
+  const rawReset = Number(deed.profileResetAt);
+  const resetAt = Number.isSafeInteger(rawReset) && rawReset > 0 ? Math.min(rawReset, list.length) : 0;
+  for (let i = list.length - 1; i >= resetAt; i--) {
     const entry = list[i];
     if (entry?.document?.schema === PROFILE_SCHEMA_V1) {
       return {
@@ -392,7 +395,7 @@ export function extractLatestProfile(deed: {
       };
     }
   }
-  const latest = list.at(-1);
+  const latest = resetAt === 0 ? list.at(-1) : undefined;
   return {
     profile: {
       schema: PROFILE_SCHEMA_V1,

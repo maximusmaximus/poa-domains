@@ -75,7 +75,7 @@ async function fromCart(cart,{loseBid=false}={}){
  return last;
 }
 async function human(name){
- await page.goto(base+'/');await page.waitForFunction(()=>document.body.dataset.registryStatus==='ready');await page.locator('#searchInput').fill(name);await page.locator('#searchBtn').click();await expect(page.locator('#addToCartBtn')).toBeVisible();
+ await page.goto(base+'/');await page.waitForFunction(()=>document.body.dataset.registryStatus==='ready');if(await page.locator('#termsAgreeBtn').isVisible())await page.locator('#termsAgreeBtn').click();await page.locator('#searchInput').fill(name);await page.locator('#searchBtn').click();await expect(page.locator('#addToCartBtn')).toBeVisible();
  await page.locator('#addToCartBtn').click();await expect(page.locator('#copyCartPrompt')).toBeEnabled();await page.locator('#copyCartPrompt').click();
  const text=await page.evaluate(()=>window.__copied.at(-1));assert.match(text,/Agent Cart Handoff v2/);return JSON.parse(text.split('```json\n')[1].split('\n```')[0]);
 }

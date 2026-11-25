@@ -42,6 +42,7 @@ export async function verifyReferenceStaticPage(
     const start = performance.now(),
       response = await page.goto(url);
     assert.equal(response?.status(), 200);
+    await page.locator("#termsAgreeBtn").click();
     await page.waitForFunction(
       () => document.querySelectorAll("#action option").length === 17,
     );

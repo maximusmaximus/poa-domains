@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=8ff897acbf21" />
+    <link rel="stylesheet" href="/style.css?v=308982d129a2" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -39,7 +39,7 @@
         <span class="tab-icon" aria-hidden="true">🔍</span><span class="tab-label">Find</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
       </button>
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="auctions" id="tabAuctions" aria-controls="auctionsSection" tabindex="-1">
-        <span class="tab-icon" aria-hidden="true">🏷️</span><span class="tab-label">Auctions</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
+        <span class="tab-icon" aria-hidden="true">🏷️</span><span id="liveAuctionsBadge" class="tab-live-badge" hidden aria-hidden="true">0</span><span class="tab-label">Auctions</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span><span id="liveAuctionsSr" class="visually-hidden"></span>
       </button>
       <button type="button" class="section-tab" role="tab" aria-selected="false" data-tab="market" id="tabMarket" aria-controls="marketSection" tabindex="-1">
         <span class="tab-icon" aria-hidden="true">💰</span><span class="tab-label">For sale</span><small class="tab-age" title="Registry data only; POA payments refresh separately.">not loaded yet</small><span class="tab-dot" hidden></span><span class="visually-hidden tab-new-text" hidden>(new)</span>
@@ -121,7 +121,7 @@
           <div id="cartExpectations" class="cart-expectations" hidden>
             <h4>What happens after your agent sends POA</h4>
             <p id="cartExpectLead" class="muted"></p>
-            <ol class="cart-expect-steps">
+            <ol id="cartExpectList" class="cart-expect-steps">
               <li><strong>Finality first:</strong> Your agent creates an escrow intent and sends the exact POA total with the unique memo. PoA network finality (<code>K=5</code> attestations or checkpoint) is required — <em>seen</em> is not credited yet.</li>
               <li><strong>Instant permanent mint:</strong> Once final, escrow credits your balance and your agent submits <code>issue</code> for each name. Each domain is minted permanently to your address immediately in that step — no auction or wait for treasury payout.</li>
               <li><strong>Verify ownership right away:</strong> Open each name’s <code>/d/&lt;name&gt;</code> page or the <strong>Manage domains</strong> tab with your public <code>poa1…</code> address to see <strong>Owned (permanent)</strong>.</li>
@@ -133,7 +133,11 @@
 
       <section id="auctionsSection" data-section="auctions" role="tabpanel" aria-labelledby="tabAuctions" tabindex="0" hidden>
         <h2>🏷️ Auctions</h2>
-        <p data-info-description class="howto">Past · Current · Upcoming. Tap a name for history.</p>
+        <p data-info-description class="howto">Past · Current · Upcoming. Queued inventory auctions start their timer when the first bid is placed. Tap a name for history.</p>
+        <div id="auctionsBidderBar" class="auctions-bidder-bar" hidden>
+          <label for="auctionsBidderInput">👤 Track your bids (optional public <code>poa1…</code> address — never a private key)</label>
+          <input id="auctionsBidderInput" type="text" autocomplete="off" placeholder="poa1… to highlight leading &amp; outbid auctions" maxlength="80" />
+        </div>
         <div class="auction-tabs" role="tablist" aria-label="Auction filters">
           <button type="button" class="auction-tab is-active" role="tab" aria-selected="true" data-auction-tab="current" id="auctionTabCurrent" aria-controls="auctions" tabindex="0">Current</button>
           <button type="button" class="auction-tab" role="tab" aria-selected="false" data-auction-tab="upcoming" id="auctionTabUpcoming" aria-controls="auctions" tabindex="-1">Upcoming</button>
@@ -249,11 +253,12 @@
         <div id="domainListing" class="card" hidden></div>
         <div id="domainActions" class="button-row"></div>
         <div id="domainOwnerTools" class="owner-tools" hidden>
-          <div id="poaSellTools" hidden><h3>🏷️ Sell for POA</h3><p data-info-description class="howto">List or auction your name for POA in 🪙 My POA. Your agent signs; nothing submits here.</p><button type="button" id="poaSellBtn">🏷️ Sell for POA</button>
+          <div id="poaSellTools" hidden><h3>🏷️ Sell for POA</h3><p data-info-description class="howto">List or auction your name for POA in 🪙 My POA. Your agent signs; nothing submits here.</p><p class="sale-fields-warning" role="note">⚠️ <strong>Before you list or auction:</strong> Attached domain fields (tags, wallet/service/IPFS records, and public profile) will not work while listed, and will be dropped when ownership transfers to a new holder (archived as historical records on this page).</p><button type="button" id="poaSellBtn">🏷️ Sell for POA</button>
           <div id="poaSubnameTools"><h3>🧩 Sell subnames</h3><p data-info-description class="howto">Set one POA price for new subnames like shop.yourname. Buyers pay with POA checkout and your share is paid out to you from escrow. Your agent signs; nothing submits here.</p><label>Subname price (POA) <input id="subnamePriceInput" inputmode="decimal" placeholder="10" aria-label="Subname price" /></label><button type="button" id="poaSubnameBtn">🧩 Copy agent request</button><pre id="subnamePromptBox" class="prompt-box" hidden></pre><p id="subnamePromptStatus" class="muted" role="status"></p></div></div>
           <div id="unitSellTools">
           <h3>💰 Sell</h3>
           <p data-info-description class="howto">Owners list, change price, or unlist. Copy a prompt for your agent — nothing submits here.</p>
+          <p class="sale-fields-warning" role="note">⚠️ <strong>Before you list:</strong> Attached domain fields (tags, wallet/service/IPFS records, and public profile) will not work while listed, and will be dropped when ownership transfers to a new holder (archived as historical records on this page).</p>
           <label>
             Price
             <input id="listPriceInput" inputmode="numeric" placeholder="2500" aria-label="List price" />
@@ -271,6 +276,7 @@
           <p id="listingPromptStatus" class="muted" role="status"></p>
           </div>
         </div>
+        <div id="domainPreviousFields" class="card domain-previous-fields" hidden></div>
         <h3>History</h3>
         <div id="domainHistory" class="cards"></div>
       </section>
@@ -290,10 +296,24 @@
     </main>
 
     <footer id="siteFooter" class="site-footer">
+      <div id="treasuryFooter" class="treasury-footer" aria-label="Domains treasury">
+        <div class="treasury-summary">
+          <span class="treasury-label">🏦 Domains Treasury:</span>
+          <strong id="treasuryTotal" class="treasury-total">—</strong>
+          <a id="poascanHomeLink" href="https://poascan.io/" target="_blank" rel="noopener noreferrer" class="treasury-scan-link">🔎 POAScan</a>
+        </div>
+        <div id="treasuryWallets" class="treasury-wallets" hidden></div>
+      </div>
+      <p id="domainsServedFooter" class="domains-served-footer">
+        <span class="domains-served-label">Number of Domains Served:</span>
+        <span id="domainsServedCount" class="domains-served-digits" aria-hidden="true">0️⃣0️⃣0️⃣0️⃣0️⃣0️⃣</span>
+        <span id="domainsServedSr" class="visually-hidden">0</span>
+      </p>
       <nav class="footer-links" aria-label="Project links">
         <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer"><svg class="github-mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg> <span>poa-domains on GitHub</span></a>
         <a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer" title="Mirror Site — static read-only landing page"><svg class="github-mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg> <span>Mirror Site</span></a>
         <a href="/terms" target="_blank" rel="noopener noreferrer">📜 Terms</a>
+        <button type="button" id="openFeedbackBtn" class="footer-action-btn" aria-haspopup="dialog" aria-controls="feedbackModal">💬 Bug / Feature</button>
       </nav>
       <p class="footer-credit">made with ❤️ in SF by Tesselate Army | <a href="https://maxi.grok.me" rel="noreferrer">maxi.grok.me</a></p>
     </footer>
@@ -343,6 +363,100 @@
       <p id="floatingCartStatus" class="muted" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
 
-    <script type="module" src="/app.js?v=775cd3b55381"></script>
+    <div id="feedbackBackdrop" class="floating-cart-backdrop" hidden></div>
+    <div
+      id="feedbackModal"
+      class="feedback-modal"
+      role="dialog"
+      tabindex="-1"
+      aria-modal="true"
+      aria-labelledby="feedbackHeading"
+      hidden
+    >
+      <div class="floating-cart-header">
+        <h2 id="feedbackHeading">💬 Bug or Feature Request</h2>
+        <button type="button" id="feedbackClose" class="secondary" aria-label="Close feedback form">Close</button>
+      </div>
+      <p class="feedback-public-notice">🌐 Submissions are posted publicly as GitHub issues on <code>maximusmaximus/poa-domains</code> for maintainer review. Never include private keys, seed phrases, or passwords.</p>
+      <form id="feedbackForm" novalidate>
+        <fieldset class="feedback-kind-group">
+          <legend>Category</legend>
+          <label class="feedback-kind-pill" for="feedbackKindBug">
+            <input type="radio" id="feedbackKindBug" name="feedbackKind" value="bug" checked />
+            <span>🐛 Bug report</span>
+          </label>
+          <label class="feedback-kind-pill" for="feedbackKindFeature">
+            <input type="radio" id="feedbackKindFeature" name="feedbackKind" value="feature" />
+            <span>✨ Feature request</span>
+          </label>
+        </fieldset>
+        <label for="feedbackPoa">Your public POA address (optional — prefilled when available)
+          <input id="feedbackPoa" type="text" autocomplete="off" placeholder="poa1… public address" maxlength="80" />
+        </label>
+        <label for="feedbackTitle">Summary (5–120 characters)
+          <input id="feedbackTitle" type="text" autocomplete="off" minlength="5" maxlength="120" placeholder="Brief title of the bug or feature" required />
+        </label>
+        <label for="feedbackDetails">Details (15–3000 characters)
+          <textarea id="feedbackDetails" rows="4" minlength="15" maxlength="3000" placeholder="Describe what happened, steps to reproduce, or what you would like added…" required></textarea>
+        </label>
+        <div class="feedback-hp" aria-hidden="true">
+          <label for="feedbackWebsite">Leave this field empty</label>
+          <input id="feedbackWebsite" name="website" type="text" tabindex="-1" autocomplete="off" />
+        </div>
+        <div class="feedback-captcha-box">
+          <div class="feedback-captcha-row">
+            <div id="feedbackCaptchaSlot" class="feedback-captcha-slot"></div>
+            <button type="button" id="feedbackRefreshCaptcha" class="secondary small" title="Get a new verification code">🔄 New code</button>
+          </div>
+          <label for="feedbackCaptchaAnswer">Verification code (CAPTCHA)
+            <input id="feedbackCaptchaAnswer" type="text" autocomplete="off" spellcheck="false" maxlength="8" placeholder="Enter the 5 characters shown above" required />
+          </label>
+        </div>
+        <div class="button-row">
+          <button type="button" id="feedbackSubmit">📨 Submit for review</button>
+        </div>
+        <p id="feedbackStatus" class="muted feedback-status" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+
+    <div id="termsGateBackdrop" class="terms-gate-backdrop" hidden></div>
+    <div
+      id="termsGateModal"
+      class="terms-gate-modal"
+      role="alertdialog"
+      tabindex="-1"
+      aria-modal="true"
+      aria-labelledby="termsGateHeading"
+      aria-describedby="termsGateSummary termsGateWarning termsGateConsent"
+      hidden
+    >
+      <h2 id="termsGateHeading">📜 Welcome to PoA Domains</h2>
+      <p id="termsGateSummary">PoA Domains is a standalone application registry for permanent names and public profiles using custodial POA escrow, not a native PoA naming protocol.</p>
+      <p id="termsGateWarning" class="terms-gate-warning">⚠️ Never enter private keys, seed phrases, or passwords on this site — your agent signs locally in your own wallet.</p>
+      <p id="termsGateConsent">By continuing, you acknowledge this warning and agree to the <a id="termsGateLink" href="/terms" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions and Privacy Policy</a>.</p>
+      <div class="button-row terms-gate-actions">
+        <button type="button" id="termsAgreeBtn">✅ I Agree</button>
+      </div>
+      <details id="termsAgentDetails" class="terms-agent-details">
+        <summary>🤖 Agree with an AI agent (signed attestation)</summary>
+        <p class="muted">Agents can cryptographically sign and record agreement via <code>POST /v1/terms/agree</code> or MCP <code>agree_terms</code>.</p>
+        <label for="termsAgentActor">Public POA address (<code>poa1…</code>)
+          <input id="termsAgentActor" type="text" autocomplete="off" placeholder="poa1… public address" maxlength="80" />
+        </label>
+        <div class="button-row">
+          <button type="button" id="termsAgentCopyBtn" class="secondary small">📋 Copy agent signing prompt</button>
+        </div>
+        <pre id="termsAgentPrompt" class="prompt-box" hidden></pre>
+        <label for="termsAgentPacket">Paste signed attestation JSON (<code>{"statement":…,"signature":"…"}</code>)
+          <textarea id="termsAgentPacket" rows="3" autocomplete="off" spellcheck="false" placeholder='{"statement":{…},"signature":"…"}'></textarea>
+        </label>
+        <div class="button-row">
+          <button type="button" id="termsAgentSubmitBtn" class="secondary small">✅ Submit signed agreement</button>
+        </div>
+        <p id="termsAgentStatus" class="muted feedback-status" role="status" aria-live="polite"></p>
+      </details>
+    </div>
+
+    <script type="module" src="/app.js?v=38947c454eb2"></script>
   </body>
 </html>

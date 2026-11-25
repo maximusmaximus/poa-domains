@@ -1,6 +1,6 @@
-import { createPoaCopyButton, decorateEmojiButton } from "./ui-copy.js?v=775cd3b55381";
-import { buildOwnershipIndex, isPoaAddress, ownershipConflict, safeObject, shortenPoaAddress } from "./shared.js?v=775cd3b55381";
-import { ui } from "./ui-state.js?v=775cd3b55381";
+import { createPoaCopyButton, decorateEmojiButton } from "./ui-copy.js?v=38947c454eb2";
+import { buildOwnershipIndex, isPoaAddress, ownershipConflict, safeObject, shortenPoaAddress } from "./shared.js?v=38947c454eb2";
+import { ui } from "./ui-state.js?v=38947c454eb2";
 
 export const el = (id) => document.getElementById(id);
 

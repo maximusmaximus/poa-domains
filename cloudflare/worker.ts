@@ -1,5 +1,8 @@
 import { searchLog } from "./search-log.js";
 import { backupCommittedProfile, handleMediaGet, handleMediaUpload } from "./profiles-storage.js";
+import { handleTreasuryRequest } from "./treasury.js";
+import { handleFeedbackCaptcha, handleFeedbackChallenge, handleFeedbackSubmit } from "./feedback.js";
+import { handleTermsAgree, handleTermsInfo, handleTermsStatus } from "./terms.js";
 import { UI_SECURITY, secureUiResponse } from "../src/ui-policy.js";
 import { discoveryDocument } from "../src/discovery.js";
 import {mcpHttp} from "./mcp-http.js";
@@ -141,6 +144,32 @@ const gateway = {
       if(u.pathname === "/v1/media/upload") return handleMediaUpload(request,env);
       // GET/HEAD /v1/media/:cid
       if(u.pathname.startsWith("/v1/media/")) return handleMediaGet(request,env,u.pathname.slice("/v1/media/".length));
+      if(u.pathname === "/v1/treasury") {
+        const stub = env.REGISTRY.getByName(SINGLETON);
+        return handleTreasuryRequest(request, env, () => stub.treasuryAddresses());
+      }
+      if(u.pathname === "/v1/terms" || u.pathname === "/v1/terms/status" || u.pathname === "/v1/terms/agree") {
+        if (u.pathname === "/v1/terms") return handleTermsInfo(request, env);
+        const stub = env.REGISTRY.getByName(SINGLETON);
+        const termsStore = {
+          getTermsAgreement: (actor: string, termsVersion: string) => stub.getTermsAgreement(actor, termsVersion),
+          recordTermsAgreement: (row: Parameters<typeof stub.recordTermsAgreement>[0]) => stub.recordTermsAgreement(row),
+        };
+        if (u.pathname === "/v1/terms/status") return handleTermsStatus(request, env, termsStore);
+        return handleTermsAgree(request, env, termsStore);
+      }
+      // GET/HEAD /v1/feedback/captcha/:id
+      if(u.pathname === "/v1/feedback/challenge" || u.pathname.startsWith("/v1/feedback/captcha/") || u.pathname === "/v1/feedback") {
+        const stub = env.REGISTRY.getByName(SINGLETON);
+        const feedbackStore = {
+          createFeedbackChallenge: (row: Parameters<typeof stub.createFeedbackChallenge>[0]) => stub.createFeedbackChallenge(row),
+          getFeedbackChallengeMeta: (id: string, now: number) => stub.getFeedbackChallengeMeta(id, now),
+          consumeFeedbackChallenge: (input: Parameters<typeof stub.consumeFeedbackChallenge>[0]) => stub.consumeFeedbackChallenge(input),
+        };
+        if (u.pathname === "/v1/feedback/challenge") return handleFeedbackChallenge(request, env, feedbackStore);
+        if (u.pathname.startsWith("/v1/feedback/captcha/")) return handleFeedbackCaptcha(request, env, feedbackStore, u.pathname.slice("/v1/feedback/captcha/".length));
+        return handleFeedbackSubmit(request, env, feedbackStore);
+      }
       if(u.pathname === "/mcp") return mcpHttp(request,env,ctx);
 
       // Same-origin network status: Worker probes minepoa.com; browser never needs a PoA key.

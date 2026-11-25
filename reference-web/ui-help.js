@@ -1,8 +1,8 @@
-import { decorateEmojiButton } from "./ui-copy.js?v=775cd3b55381";
+import { decorateEmojiButton } from "./ui-copy.js?v=38947c454eb2";
 // Native nonmodal popovers provide touch/keyboard dismissal and do not trap page focus.
 const watched=new WeakSet();
 export function decoratePoaFields(){
- for(const input of document.querySelectorAll("input")){const label=input.getAttribute("aria-label")??"",id=input.id;if(!["escrowAmount","listPriceInput"].includes(id)&&!/(?:bid|amount|price).*(?:POA|registry)|(?:POA|registry).*(?:bid|amount|price)/i.test(label))continue;if(input.closest(".amount-unit"))continue;const wrap=document.createElement("span"),unit=document.createElement("span");wrap.className="amount-unit";unit.className="input-unit";unit.textContent=id==="escrowAmount"?"POA":"units";unit.setAttribute("aria-hidden","true");input.before(wrap);wrap.append(input,unit);}
+ for(const input of document.querySelectorAll("input")){const label=input.getAttribute("aria-label")??"",id=input.id;if(!["escrowAmount","listPriceInput"].includes(id)&&!/(?:bid|amount|price).*(?:POA|registry)|(?:POA|registry).*(?:bid|amount|price)/i.test(label))continue;if(input.closest(".amount-unit"))continue;const wrap=document.createElement("span"),unit=document.createElement("span");wrap.className="amount-unit";unit.className="input-unit";unit.textContent=(id==="escrowAmount"||(/POA/i.test(label)&&!/registry/i.test(label)))?"POA":"units";unit.setAttribute("aria-hidden","true");input.before(wrap);wrap.append(input,unit);}
 }
 export function installHelp(){
  decoratePoaFields();

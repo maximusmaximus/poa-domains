@@ -1,8 +1,11 @@
 // GET-only loopback regression test for POA-mode cart copy, clipboard fallbacks, and modal navigation.
 import assert from "node:assert/strict";
+import { generateKeyPairSync } from "node:crypto";
 import { chromium, expect } from "@playwright/test";
 import { uiHarness } from "./fixtures/ui-harness.mjs";
 import { auditedEngine, get } from "./fixtures/audited-engine.mjs";
+import { nativePrincipal } from "../dist/src/auth.js";
+import { TERMS_DOMAIN, TERMS_HASH, TERMS_VERSION, signTermsAgreement } from "../dist/src/terms.js";
 
 const browser = await chromium.launch({ headless: true });
 const h = await uiHarness("mainnet");
@@ -20,6 +23,7 @@ try {
   await page.route("https://**", (r) => r.abort());
   await page.goto(h.url + "/?q=freshpoaname");
   await page.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await page.locator("#termsAgreeBtn").click();
   await expect(page.locator("#cartExpectations")).toBeHidden();
   await expect(page.locator("#searchResult")).toContainText("reaches finality and runs issue");
   await page.locator("#addToCartBtn").click();
@@ -101,6 +105,7 @@ try {
   });
   await pageNoClip.goto(h.url + "/?q=freshpoaname");
   await pageNoClip.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageNoClip.locator("#termsAgreeBtn").click();
   await pageNoClip.locator("#addToCartBtn").click();
   await expect(pageNoClip.locator("#copyCartPrompt")).toBeEnabled();
   const fallbackPrompt = await pageNoClip.locator("#cartPrompt").textContent();
@@ -129,6 +134,7 @@ try {
   });
   await pageManual.goto(h.url + "/?q=freshpoaname");
   await pageManual.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageManual.locator("#termsAgreeBtn").click();
   await pageManual.locator("#addToCartBtn").click();
   await expect(pageManual.locator("#copyCartPrompt")).toBeEnabled();
   await pageManual.locator("#copyCartPrompt").click();
@@ -168,6 +174,7 @@ try {
   await pageEscrow.route("https://**", (r) => r.abort());
   await pageEscrow.goto(h.url + "/?q=freshpoaname");
   await pageEscrow.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageEscrow.locator("#termsAgreeBtn").click();
   await expect(pageEscrow.locator("#cartEscrowStatus")).toBeVisible();
   await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("currently on hold");
   await expect(pageEscrow.locator("#cartEscrowStatus")).toContainText("reconciliation hold");
@@ -243,6 +250,7 @@ try {
   await pageAddr.route("https://**", (r) => r.abort());
   await pageAddr.goto(h.url + "/?q=addrcheck");
   await pageAddr.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageAddr.locator("#termsAgreeBtn").click();
 
   // Search result shows shortened owner + copy icon that copies full owner address
   await expect(pageAddr.locator("#searchResult .poa-addr-text")).toHaveText("poa1...piRf");
@@ -321,6 +329,7 @@ try {
 
   await pageUx.goto(h.url + "/");
   await pageUx.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageUx.locator("#termsAgreeBtn").click();
 
   // (a) Autofill + dropdown + click auto-adds to cart
   await pageUx.locator("#searchInput").fill("agen");
@@ -450,7 +459,478 @@ try {
   assert.deepEqual(errorsUx, []);
   await ctxUx.close();
 
-  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations, escrow readiness banner, shortened PoA address copy, search autofill/dropdown, clean cart cards, cart-owned prefill, Manage this domain, Profile v1 editor & reorganized escrow signed request");
+  // 7. Footer Domains Treasury balance + POAScan links + shortened address copy,
+  //    and Bug/Feature popup form with prefilled POA address + CAPTCHA + PoW submission.
+  const escrowWallet = "poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf";
+  const treasuryWallet = "poa1GHppB8pYZ43gK8yBzR1RJhzfWjzrJn29q96ykwngUP7N";
+  h.treasury = {
+    total: "201.000000",
+    escrow: { address: escrowWallet, balance: "201.000000", poascanUrl: `https://poascan.io/address/${escrowWallet}` },
+    treasury: { address: treasuryWallet, balance: "0.000000", poascanUrl: `https://poascan.io/address/${treasuryWallet}` },
+    poascanHomeUrl: "https://poascan.io/",
+    checkedAt: Date.now(),
+    stale: false,
+  };
+  const ctxFooter = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+  await ctxFooter.grantPermissions(["clipboard-read", "clipboard-write"], { origin: h.url });
+  const pageFooter = await ctxFooter.newPage();
+  const errorsFooter = [];
+  pageFooter.on("pageerror", (e) => errorsFooter.push(e.message));
+  await pageFooter.route("https://**", (r) => r.abort());
+
+  const submittedFeedback = [];
+  const mockChallengeId = "a".repeat(32);
+  await pageFooter.route("**/v1/feedback/challenge", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        challengeId: mockChallengeId,
+        captchaUrl: `/v1/feedback/captcha/${mockChallengeId}`,
+        powSalt: "test-salt-1234",
+        powBits: 4,
+        minDwellMs: 0,
+        expiresAt: Date.now() + 600_000,
+        enabled: true,
+      }),
+    });
+  });
+  await pageFooter.route(`**/v1/feedback/captcha/${mockChallengeId}`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="180" height="56"><rect width="180" height="56" fill="#09131a"/><text x="20" y="36" fill="#9cffe0">K7M4P</text></svg>',
+    });
+  });
+  await pageFooter.route("**/v1/feedback", async (route) => {
+    const body = route.request().postDataJSON();
+    submittedFeedback.push(body);
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        id: "fb123456",
+        kind: body.kind,
+        issueNumber: 114,
+        issueUrl: "https://github.com/maximusmaximus/poa-domains/issues/114",
+      }),
+    });
+  });
+
+  await pageFooter.goto(h.url + "/");
+  await pageFooter.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageFooter.locator("#termsAgreeBtn").click();
+  await expect(pageFooter.locator("#domainsServedFooter")).toContainText("Number of Domains Served:");
+  await expect(pageFooter.locator("#domainsServedCount")).toHaveText("0️⃣0️⃣0️⃣0️⃣0️⃣3️⃣");
+  await expect(pageFooter.locator("#domainsServedSr")).toHaveText("3");
+  await expect(pageFooter.locator("#treasuryTotal")).toHaveText("🪙 201 POA");
+  await expect(pageFooter.locator("#poascanHomeLink")).toHaveAttribute("href", "https://poascan.io/");
+  await expect(pageFooter.locator("#treasuryWallets")).toBeVisible();
+  const escrowLink = pageFooter.locator(`#treasuryWallets a[href="https://poascan.io/address/${escrowWallet}"]`);
+  const treasuryLink = pageFooter.locator(`#treasuryWallets a[href="https://poascan.io/address/${treasuryWallet}"]`);
+  await expect(escrowLink).toHaveText("poa1...piRf");
+  await expect(treasuryLink).toHaveText("poa1...UP7N");
+  await pageFooter.locator("#treasuryWallets .poa-copy-btn").first().click();
+  assert.equal(await pageFooter.evaluate(() => navigator.clipboard.readText()), escrowWallet);
+
+  // Set user's POA address in Manage domains, then open Bug/Feature modal -> prefilled automatically
+  await pageFooter.locator("#tabEscrow").click();
+  await pageFooter.locator("#manageOwner").fill(buyerOwner);
+  await pageFooter.locator("#openFeedbackBtn").click();
+  await expect(pageFooter.locator("#feedbackModal")).toBeVisible();
+  assert.equal(await pageFooter.locator("#feedbackPoa").inputValue(), buyerOwner);
+  await expect(pageFooter.locator("#feedbackCaptchaImg")).toBeVisible();
+  await pageFooter.locator('label[for="feedbackKindFeature"]').click();
+  await pageFooter.locator("#feedbackTitle").fill("Add bulk export to CSV");
+  await pageFooter.locator("#feedbackDetails").fill("Would love a one-click CSV export of my managed domains.");
+  await pageFooter.locator("#feedbackCaptchaAnswer").fill("K7M4P");
+  await pageFooter.locator("#feedbackSubmit").click();
+  await expect(pageFooter.locator("#feedbackStatus")).toContainText("Submitted to the repository for review");
+  await expect(pageFooter.locator('#feedbackStatus a[href="https://github.com/maximusmaximus/poa-domains/issues/114"]')).toBeVisible();
+  assert.equal(submittedFeedback.length, 1);
+  assert.equal(submittedFeedback[0].kind, "feature");
+  assert.equal(submittedFeedback[0].poaAddress, buyerOwner);
+  assert.equal(submittedFeedback[0].captchaAnswer, "K7M4P");
+  assert.match(submittedFeedback[0].powNonce, /^[0-9]+$/);
+  await pageFooter.locator("#feedbackClose").click();
+  await expect(pageFooter.locator("#feedbackModal")).toBeHidden();
+
+  assert.deepEqual(errorsFooter, []);
+  await ctxFooter.close();
+
+  // 8. First-visit non-dismissible Terms modal + localStorage persistence + signed agent agreement
+  const hTerms = await uiHarness("mainnet", { allowTermsAgree: true });
+  hTerms.cap = h.cap;
+  hTerms.payload = h.payload;
+  try {
+    const ctxGate = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+    await ctxGate.grantPermissions(["clipboard-read", "clipboard-write"], { origin: hTerms.url });
+    const pageGate = await ctxGate.newPage();
+    const errorsGate = [];
+    pageGate.on("pageerror", (e) => errorsGate.push(e.message));
+    await pageGate.route("https://**", (r) => r.abort());
+    await pageGate.goto(hTerms.url + "/");
+    await pageGate.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+
+    // Modal is open, contains summary, key warning, Terms link, and NO close button
+    await expect(pageGate.locator("#termsGateModal")).toBeVisible();
+    await expect(pageGate.locator("#termsGateSummary")).toContainText("application registry");
+    await expect(pageGate.locator("#termsGateWarning")).toContainText("Never enter private keys");
+    await expect(pageGate.locator("#termsGateLink")).toHaveAttribute("href", "/terms");
+    await expect(pageGate.locator("#termsGateLink")).toHaveAttribute("target", "_blank");
+    assert.equal(await pageGate.locator("#termsGateModal button", { hasText: /close|dismiss/i }).count(), 0);
+    assert.equal(await pageGate.locator("#homeMain").evaluate((n) => n.inert), true);
+
+    // Pressing Escape or clicking backdrop MUST NOT dismiss the modal
+    await pageGate.keyboard.press("Escape");
+    await expect(pageGate.locator("#termsGateModal")).toBeVisible();
+    await pageGate.locator("#termsGateBackdrop").click({ position: { x: 8, y: 8 }, force: true });
+    await expect(pageGate.locator("#termsGateModal")).toBeVisible();
+
+    // Clicking I Agree dismisses modal, un-inerts page, and persists across reload
+    await pageGate.locator("#termsAgreeBtn").click();
+    await expect(pageGate.locator("#termsGateModal")).toBeHidden();
+    assert.equal(await pageGate.locator("#homeMain").evaluate((n) => n.inert), false);
+    await pageGate.reload();
+    await pageGate.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await expect(pageGate.locator("#termsGateModal")).toBeHidden();
+
+    // Fresh visit: agent signs Terms attestation with Ed25519 and unlocks the modal via POST /v1/terms/agree
+    await pageGate.evaluate(() => localStorage.clear());
+    await pageGate.reload();
+    await pageGate.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await expect(pageGate.locator("#termsGateModal")).toBeVisible();
+
+    const { privateKey: agentKey } = generateKeyPairSync("ed25519");
+    const agentActor = nativePrincipal(agentKey);
+    await pageGate.locator("#termsAgentDetails summary").click();
+    await pageGate.locator("#termsAgentActor").fill(agentActor);
+    await pageGate.locator("#termsAgentCopyBtn").click();
+    const copiedTermsPrompt = await pageGate.evaluate(() => navigator.clipboard.readText());
+    assert.ok(copiedTermsPrompt.includes(TERMS_VERSION) && copiedTermsPrompt.includes(TERMS_HASH) && copiedTermsPrompt.includes(agentActor));
+
+    const signedPacket = signTermsAgreement(
+      {
+        domain: TERMS_DOMAIN,
+        chainId: "poa-mainnet-1",
+        actor: agentActor,
+        termsVersion: TERMS_VERSION,
+        termsHash: TERMS_HASH,
+        agreed: true,
+        agreedAt: Math.floor(Date.now() / 1000),
+      },
+      agentKey,
+    );
+    await pageGate.locator("#termsAgentPacket").fill(JSON.stringify(signedPacket));
+    await pageGate.locator("#termsAgentSubmitBtn").click();
+    await expect(pageGate.locator("#termsGateModal")).toBeHidden();
+    const statusCheck = await (await fetch(`${hTerms.url}/v1/terms/status?actor=${encodeURIComponent(agentActor)}`)).json();
+    assert.equal(statusCheck.agreed, true);
+    assert.deepEqual(errorsGate, []);
+    await ctxGate.close();
+  } finally {
+    await hTerms.close();
+  }
+
+  // 9. POA Auctions: first-bid starts timer, live auctions icon count badge, top scroll bar "Auction started",
+  //    cart highest-bid ceiling, outbid indicators in cart & auctions page, and nuanced auction copy prompt.
+  const aucQueuedId = "1".repeat(64);
+  const aucLiveId = "2".repeat(64);
+  const sellerAddr = "poa1GHppB8pYZ43gK8yBzR1RJhzfWjzrJn29q96ykwngUP7N";
+  const bidder1 = "poa1An2SNaVU6NYV7RBCFKnpjXra91BzPs8qm45qh2u8EeSL";
+  const bidder2 = "poa1BMrTXjLwLQoxzPQGK3nfdLD9RnVsHdLHU4ikFdyYW1pb";
+  const nowAuctionMs = Date.now();
+  h.cap = { ...h.cap, escrow: { enabled: true } };
+  h.escrowCap = { enabled: true, paused: false, held: false, address: escrowWallet, limits: { perTransaction: "250000.000000", daily: "1000000.000000" }, serverTime: nowAuctionMs };
+  h.escrowMarket = {
+    serverTime: nowAuctionMs,
+    items: [
+      {
+        id: aucQueuedId, name: "vault", seller: sellerAddr, kind: "auction",
+        price: "100.000000", minimumNextBid: "100.000000", status: "OPEN",
+        closes: 0, window: 3600000, quiet: 3600000, createdAt: nowAuctionMs - 60000,
+        startedAt: null, awaitingFirstBid: true, high: null, bidders: [], settlement: null,
+        history: [{ event: "Auction queued; timer starts on first bid", at: nowAuctionMs - 60000 }],
+      },
+      {
+        id: aucLiveId, name: "comet", seller: sellerAddr, kind: "auction",
+        price: "100.000000", minimumNextBid: "220.000001", status: "OPEN",
+        closes: nowAuctionMs + 3600000, window: 3600000, quiet: 3600000, createdAt: nowAuctionMs - 120000,
+        startedAt: nowAuctionMs - 30000, awaitingFirstBid: false,
+        high: { payer: bidder1, amount: "200.000000" }, bidders: [bidder1], settlement: null,
+        history: [
+          { event: "Auction queued; timer starts on first bid", at: nowAuctionMs - 120000 },
+          { event: "Auction started (first bid)", at: nowAuctionMs - 30000, amount: "200.000000", payer: bidder1 },
+        ],
+      },
+    ],
+  };
+  const ctxAuc = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+  await ctxAuc.grantPermissions(["clipboard-read", "clipboard-write"], { origin: h.url });
+  const pageAuc = await ctxAuc.newPage();
+  const errorsAuc = [];
+  pageAuc.on("pageerror", (e) => errorsAuc.push(e.message));
+  await pageAuc.route("https://**", (r) => r.abort());
+  await pageAuc.goto(h.url);
+  await pageAuc.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageAuc.locator("#termsAgreeBtn").click();
+
+  // Top auction icon shows 1 live auction (NOT the queued unbid item "vault")
+  await expect(pageAuc.locator("#liveAuctionsBadge")).toBeVisible();
+  await expect(pageAuc.locator("#liveAuctionsBadge")).toHaveText("🔥1");
+  // Top scroll bar announces "comet" started and does NOT announce queued "vault"
+  const tickerInitial = await pageAuc.locator("#liveTickerTrack").innerText();
+  assert.ok(tickerInitial.includes("Auction started") && tickerInitial.includes("comet"), tickerInitial);
+  assert.equal(tickerInitial.includes("vault"), false, tickerInitial);
+
+  // Auctions tab: Current shows live "comet" with countdown timer, Upcoming shows queued "vault" ("Starts on first bid")
+  await pageAuc.locator("#tabAuctions").click();
+  await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"]`)).toBeVisible();
+  await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"]`)).toContainText("Live POA auction");
+  await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"] .auction-countdown`)).toContainText("left");
+  await pageAuc.locator("#auctionTabUpcoming").click();
+  const vaultCard = pageAuc.locator(`#auctions article[data-auction-id="${aucQueuedId}"]`);
+  await expect(vaultCard).toBeVisible();
+  await expect(vaultCard).toContainText("Starts on first bid");
+  await vaultCard.locator("input").fill("150");
+  await vaultCard.getByRole("button", { name: /Add vault auction bid to cart/ }).click();
+
+  // Back to Current tab: add "comet" with highest bid 300 POA
+  await pageAuc.locator("#auctionTabCurrent").click();
+  const cometCard = pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"]`);
+  await cometCard.locator("input").fill("300");
+  await cometCard.getByRole("button", { name: /Add comet auction bid to cart/ }).click();
+
+  // Switch to Find/Cart: verify highest bid inputs, ceiling total, auction expectations & copied prompt nuances
+  await pageAuc.locator("#tabFind").click();
+  await expect(pageAuc.locator("#cartCount")).toHaveText("2");
+  await expect(pageAuc.locator("#cartExpectations")).toContainText("First bid starts the timer");
+  await expect(pageAuc.locator("#copyCartPrompt")).toBeEnabled();
+  await pageAuc.locator("#copyCartPrompt").click();
+  const auctionPrompt = await pageAuc.evaluate(() => navigator.clipboard.readText());
+  assert.match(auctionPrompt, /Whole-cart ceiling 450\.000000 POA/);
+  assert.match(auctionPrompt, /First-bid timer nuance/);
+  assert.match(auctionPrompt, /Outbid & refund nuance/);
+  assert.match(auctionPrompt, /credited instantly back to my available escrow balance/);
+  assert.match(auctionPrompt, /ESCROW_SELF_RAISE/);
+  assert.match(auctionPrompt, /Settlement handover nuance/);
+
+  // Simulate: another user places first bid on "vault" (starting its timer!) AND outbids "comet" to 350 POA (> user's 300 max bid)
+  h.escrowMarket = {
+    serverTime: nowAuctionMs + 10000,
+    items: [
+      {
+        ...h.escrowMarket.items[0],
+        awaitingFirstBid: false,
+        startedAt: nowAuctionMs + 5000,
+        closes: nowAuctionMs + 5000 + 3600000,
+        minimumNextBid: "110.000001",
+        high: { payer: bidder2, amount: "100.000000" },
+        bidders: [bidder2],
+        history: [
+          ...h.escrowMarket.items[0].history,
+          { event: "Auction started (first bid)", at: nowAuctionMs + 5000, amount: "100.000000", payer: bidder2 },
+        ],
+      },
+      {
+        ...h.escrowMarket.items[1],
+        minimumNextBid: "385.000001",
+        high: { payer: bidder2, amount: "350.000000" },
+        bidders: [bidder1, bidder2],
+        history: [
+          ...h.escrowMarket.items[1].history,
+          { event: "Bid placed", at: nowAuctionMs + 6000, amount: "350.000000", payer: bidder2 },
+        ],
+      },
+    ],
+  };
+  await pageAuc.reload();
+  await pageAuc.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+
+  // Top badge now shows 2 live auctions, and top scroll bar announces "vault" auction started!
+  await expect(pageAuc.locator("#liveAuctionsBadge")).toHaveText("🔥2");
+  const tickerUpdated = await pageAuc.locator("#liveTickerTrack").innerText();
+  assert.ok(tickerUpdated.includes("Auction started") && tickerUpdated.includes("vault"), tickerUpdated);
+
+  // Cart shows Outbid warning on "comet", blocks Copy prompt, and NEVER auto-raises the 300 POA cap
+  await expect(pageAuc.locator("#cartList")).toContainText("Outbid!");
+  await expect(pageAuc.locator("#copyCartPrompt")).toBeDisabled();
+  assert.equal(await pageAuc.locator('#cartList input[aria-label="Highest bid in POA for comet"]').inputValue(), "300");
+
+  // Auctions page ALSO shows Outbid badge on "comet" (both via cart and via tracked bidder1 address!)
+  await pageAuc.locator("#tabAuctions").click();
+  await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"] .auction-outbid-badge`)).toBeVisible();
+  await pageAuc.locator("#auctionsBidderInput").fill(bidder1);
+  await expect(pageAuc.locator(`#auctions article[data-auction-id="${aucLiveId}"] .auction-outbid-badge`)).toContainText("You were outbid");
+
+  // Explicit user action in Cart raises "comet" max bid and acknowledges "vault" -> unlocks Copy prompt
+  await pageAuc.locator("#tabFind").click();
+  await pageAuc.getByRole("button", { name: /Raise max bid to 385\.000001 POA/ }).click();
+  await pageAuc.locator("#cartList").getByRole("button", { name: /Review changed item/ }).click();
+  await expect(pageAuc.locator("#copyCartPrompt")).toBeEnabled();
+  assert.deepEqual(errorsAuc, []);
+  await ctxAuc.close();
+
+  // 10. Sale & auction field-drop warnings, paused fields while listed, clear sales/auctions on /d/<name>,
+  //     and post-transfer clean slate + archived previous fields as records on /d/<name>.
+  const ownedAgentDeed = h.payload.state.deeds[agentDeedId];
+  const prevOwner = ownedAgentDeed.owner;
+  const newOwner = bidder2;
+  const agentSaleAucId = "3".repeat(64);
+  const agentFixedId = "4".repeat(64);
+  const sampleIpfsCid = "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku";
+  const agentAttachedRecords = [
+    { type: "wallet", chain: "poa", address: prevOwner },
+    { type: "service", url: "https://agent.example/endpoint" },
+    { type: "ipfs", cid: sampleIpfsCid },
+  ];
+  const agentProfileMeta = ownedAgentDeed.metadata[ownedAgentDeed.metadata.length - 1];
+  const nowFieldMs = Date.now();
+
+  // 10a. Unlisted domain: owner tools + Manage domains + My POA all show clear field-drop warnings
+  h.payload.state.deeds[agentDeedId] = { ...ownedAgentDeed, records: agentAttachedRecords };
+  h.escrowMarket = { serverTime: nowFieldMs, items: [] };
+  const ctxFields = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+  await ctxFields.grantPermissions(["clipboard-read", "clipboard-write"], { origin: h.url });
+  const pageFields = await ctxFields.newPage();
+  const errorsFields = [];
+  pageFields.on("pageerror", (e) => errorsFields.push(e.message));
+  await pageFields.route("https://**", (r) => r.abort());
+  await pageFields.goto(`${h.url}/d/agent`);
+  await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pageFields.locator("#termsAgreeBtn").click();
+
+  // Unlisted domain shows active profile + attached records + warning in owner sell tools
+  await expect(pageFields.locator("#domainProfile")).toBeVisible();
+  await expect(pageFields.locator("#domainProfile")).toContainText("Attached domain records");
+  await expect(pageFields.locator("#domainProfile")).toContainText("https://agent.example/endpoint");
+  await expect(pageFields.locator("#poaSellTools .sale-fields-warning")).toBeVisible();
+  await expect(pageFields.locator("#poaSellTools .sale-fields-warning")).toContainText("will be dropped");
+
+  // Manage domains + My POA show clear field-drop warnings AND held-balance/withdrawal guidance
+  await pageFields.locator('#domainActions button[aria-label="Manage agent"]').click();
+  await expect(pageFields.locator('#manageNames article[data-domain-name="agent"] .sale-fields-warning')).toBeVisible();
+  await expect(pageFields.locator("#escrowBalanceNote")).toBeVisible();
+  await expect(pageFields.locator("#escrowBalanceNote")).toContainText("available escrow balance");
+  await expect(pageFields.locator("#escrowListingFieldWarning")).toBeVisible();
+  await expect(pageFields.locator("#escrowListingFieldWarning")).toContainText("paused while this domain is listed");
+  await pageFields.locator("#escrowPayer").fill(prevOwner);
+  await pageFields.locator("#escrowName").fill("agent");
+  await pageFields.locator("#escrowAmount").fill("250.000000");
+  await pageFields.getByRole("button", { name: "🏷️ List my name for POA", exact: true }).click();
+  await expect(pageFields.locator("#escrowPrompt")).toContainText("Sale & auction notice");
+  await expect(pageFields.locator("#escrowMessage")).toContainText("paused while listed");
+
+  // 10b. Listed in live POA auction: /d/agent shows auction card + pauses active fields + shows paused fields as records
+  h.escrowMarket = {
+    serverTime: nowFieldMs,
+    items: [
+      {
+        id: agentSaleAucId, name: "agent", seller: prevOwner, kind: "auction",
+        price: "100.000000", minimumNextBid: "220.000001", status: "OPEN",
+        closes: nowFieldMs + 3600000, window: 3600000, quiet: 3600000,
+        createdAt: nowFieldMs - 120000, startedAt: nowFieldMs - 30000, awaitingFirstBid: false,
+        high: { payer: bidder1, amount: "200.000000" }, bidders: [bidder1], settlement: null,
+        history: [{ event: "Auction started (first bid)", at: nowFieldMs - 30000, amount: "200.000000", payer: bidder1 }],
+      },
+    ],
+  };
+  await pageFields.goto(`${h.url}/d/agent`);
+  await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageFields.locator("#domainStatus")).toContainText("In live POA auction");
+  await expect(pageFields.locator("#domainListing")).toBeVisible();
+  await expect(pageFields.locator("#domainListing")).toContainText("Auctions & Sales");
+  await expect(pageFields.locator(`#domainListing article[data-auction-id="${agentSaleAucId}"]`)).toContainText("High bid 200 POA");
+  await expect(pageFields.locator(`#domainListing article[data-auction-id="${agentSaleAucId}"] .auction-countdown`)).toContainText("left");
+  await expect(pageFields.locator("#domainListing .sale-fields-warning")).toBeVisible();
+  await expect(pageFields.locator("#domainProfile")).toContainText("paused while listed");
+  assert.equal(await pageFields.locator("#domainProfile img.domain-avatar").count(), 0);
+  await expect(pageFields.locator("#domainPreviousFields")).toBeVisible();
+  await expect(pageFields.locator('#domainPreviousFields article[data-record-status="paused"]')).toContainText("Paused while listed");
+  await expect(pageFields.locator("#domainPreviousFields")).toContainText("https://agent.example/endpoint");
+  await expect(pageFields.locator("#domainPreviousFields")).toContainText("0x5aAe...eAed");
+  assert.equal(await pageFields.locator("#domainPreviousFields script").count(), 0);
+
+  // 10c. Listed for fixed-price POA sale: /d/agent clearly shows fixed sale + buy button
+  h.escrowMarket = {
+    serverTime: nowFieldMs,
+    items: [
+      {
+        id: agentFixedId, name: "agent", seller: prevOwner, kind: "fixed",
+        price: "250.000000", minimumNextBid: "250.000000", status: "OPEN",
+        closes: nowFieldMs + 7200000, window: 7200000, quiet: 0,
+        createdAt: nowFieldMs - 60000, startedAt: nowFieldMs - 60000, awaitingFirstBid: false,
+        high: null, bidders: [], settlement: null,
+        history: [{ event: "Fixed-price listing created", at: nowFieldMs - 60000, amount: "250.000000" }],
+      },
+    ],
+  };
+  await pageFields.reload();
+  await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageFields.locator("#domainStatus")).toContainText("For sale (POA)");
+  await expect(pageFields.locator(`#domainListing article[data-sale-id="${agentFixedId}"]`)).toContainText("250 POA (Fixed price)");
+  await expect(pageFields.locator("#domainListing").getByRole("button", { name: /Open My POA to buy/ })).toBeVisible();
+
+  // 10d. After transfer to new holder: clean slate in #domainProfile, past completed auction in #domainListing,
+  //      and all previous holder's dropped fields & records preserved in #domainPreviousFields!
+  h.payload.state.deeds[agentDeedId] = {
+    ...ownedAgentDeed,
+    owner: newOwner,
+    ownerVersion: 2,
+    version: ownedAgentDeed.version + 1,
+    records: [],
+    recordsVersion: (ownedAgentDeed.recordsVersion ?? 0) + 1,
+    profileResetAt: ownedAgentDeed.metadata.length,
+    previousFields: [
+      {
+        owner: prevOwner,
+        ownerVersion: 1,
+        transferredAt: Math.floor(nowFieldMs / 1000),
+        records: agentAttachedRecords,
+        profile: agentProfileMeta,
+      },
+    ],
+  };
+  h.escrowMarket = {
+    serverTime: nowFieldMs + 5000,
+    items: [
+      {
+        id: agentSaleAucId, name: "agent", seller: prevOwner, kind: "auction",
+        price: "100.000000", minimumNextBid: "275.000001", status: "COMPLETE",
+        closes: nowFieldMs, window: 3600000, quiet: 3600000,
+        createdAt: nowFieldMs - 120000, startedAt: nowFieldMs - 60000, awaitingFirstBid: false,
+        high: { payer: newOwner, amount: "250.000000" }, bidders: [bidder1, newOwner], settlement: "COMPLETE",
+        history: [
+          { event: "Auction started (first bid)", at: nowFieldMs - 60000, amount: "200.000000", payer: bidder1 },
+          { event: "Bid placed", at: nowFieldMs - 30000, amount: "250.000000", payer: newOwner },
+          { event: "Handover settled", at: nowFieldMs, amount: "250.000000", payer: newOwner },
+        ],
+      },
+    ],
+  };
+  await pageFields.reload();
+  await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pageFields.locator("#domainOwner")).toContainText(`${newOwner.slice(0, 4)}...${newOwner.slice(-4)}`);
+  await expect(pageFields.locator("#domainProfile")).toContainText("Clean slate for current holder");
+  assert.equal(await pageFields.locator("#domainProfile img.domain-avatar").count(), 0);
+  await expect(pageFields.locator("#domainProfile")).not.toContainText("0x5aAe...eAed");
+  await expect(pageFields.locator("#domainListing")).toBeVisible();
+  await expect(pageFields.locator(`#domainListing article[data-past-sale-id="${agentSaleAucId}"]`)).toContainText("Past POA Auction · ✅ Complete");
+  await expect(pageFields.locator(`#domainListing article[data-past-sale-id="${agentSaleAucId}"]`)).toContainText("Final: 250 POA");
+  await expect(pageFields.locator("#domainPreviousFields")).toBeVisible();
+  const droppedCard = pageFields.locator('#domainPreviousFields article[data-record-status="dropped"]');
+  await expect(droppedCard).toBeVisible();
+  await expect(droppedCard).toContainText("Dropped on ownership transfer");
+  await expect(droppedCard).toContainText("0x5aAe...eAed");
+  await expect(droppedCard).toContainText("bc1qw5...f3t4");
+  await expect(droppedCard).toContainText("https://agent.example/endpoint");
+  await expect(droppedCard).toContainText("Agent bio https://minepoa.com <script>alert(1)</script>");
+  assert.equal(await pageFields.locator("#domainPreviousFields script").count(), 0);
+  assert.deepEqual(errorsFields, []);
+  await ctxFields.close();
+
+  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations, escrow readiness banner, shortened PoA address copy, search autofill/dropdown, clean cart cards, cart-owned prefill, Manage this domain, Profile v1 editor, reorganized escrow signed request, treasury footer, domains served counter, bug/feature feedback modal, non-dismissible Terms gate, POA first-bid auctions/outbid cart & sale/auction field-drop warnings + archived previous fields");
 } finally {
   await h.close();
   await browser.close();

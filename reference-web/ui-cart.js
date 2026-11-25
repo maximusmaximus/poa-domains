@@ -1,11 +1,11 @@
-import { publicNameUnavailable } from "./shared.js?v=775cd3b55381";
-import { registryUnit } from "./shared.js?v=775cd3b55381";
-import { actionLabel } from "./ui-copy.js?v=775cd3b55381";
-import { trapDialog } from "./ui-a11y.js?v=775cd3b55381";
-import { ui } from "./ui-state.js?v=775cd3b55381";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions, validPrincipal } from "./shared.js?v=775cd3b55381";
-import { add, el, endpointBase } from "./ui-core.js?v=775cd3b55381";
-import { nameLink, openManageDomain } from "./ui-router.js?v=775cd3b55381";
+import { publicNameUnavailable } from "./shared.js?v=38947c454eb2";
+import { registryUnit } from "./shared.js?v=38947c454eb2";
+import { actionLabel } from "./ui-copy.js?v=38947c454eb2";
+import { trapDialog } from "./ui-a11y.js?v=38947c454eb2";
+import { ui } from "./ui-state.js?v=38947c454eb2";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, shouldHoldTransactions, validPrincipal } from "./shared.js?v=38947c454eb2";
+import { add, el, endpointBase } from "./ui-core.js?v=38947c454eb2";
+import { nameLink, openManageDomain } from "./ui-router.js?v=38947c454eb2";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
@@ -28,7 +28,7 @@ function resetCopyFeedback() {
 }
 
 export function addToCart(item) {
-    item = buildCartItem(item, ui.cap, ui.latestState);
+    item = buildCartItem(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now());
     const existingIdx = ui.cart.findIndex((x) => x.name === item.name && x.action === item.action);
     if (existingIdx >= 0)
         ui.cart[existingIdx] = item;
@@ -193,12 +193,50 @@ export function renderCartExpectations() {
     if (floatingBox)
         floatingBox.hidden = !show;
     const lead = el("cartExpectLead");
-    if (lead && show) {
+    const list = el("cartExpectList");
+    if (show) {
         const total = poaCartTotalShort(ui.cart);
-        const count = `${ui.cart.length} ${ui.cart.length === 1 ? "name" : "names"}`;
-        lead.textContent = total
-            ? `For ${count} (${total} POA total) — nothing is paid or minted until you approve your agent.`
-            : `For ${count} — nothing is paid or minted until you approve your agent.`;
+        const bidCount = ui.cart.filter((x) => x.action === "poaBid").length;
+        const newCount = ui.cart.length - bidCount;
+        const count = `${ui.cart.length} ${ui.cart.length === 1 ? "item" : "items"}`;
+        if (lead) {
+            lead.textContent = bidCount > 0
+                ? (total
+                    ? `For ${count} (ceiling ${total} POA across ${bidCount} ${bidCount === 1 ? "auction bid" : "auction bids"}${newCount ? ` + ${newCount} new` : ""}) — nothing is paid or bid until you approve your agent.`
+                    : `For ${count} — nothing is paid or bid until you approve your agent.`)
+                : (total
+                    ? `For ${ui.cart.length} ${ui.cart.length === 1 ? "name" : "names"} (${total} POA total) — nothing is paid or minted until you approve your agent.`
+                    : `For ${ui.cart.length} ${ui.cart.length === 1 ? "name" : "names"} — nothing is paid or minted until you approve your agent.`);
+        }
+        if (list) {
+            const mode = bidCount > 0 ? (newCount > 0 ? "mixed" : "auction") : "new";
+            if (list.dataset.expectMode !== mode) {
+                list.dataset.expectMode = mode;
+                list.replaceChildren();
+                const steps = bidCount > 0
+                    ? [
+                        ["Finality first: ", "Your agent checks existing available escrow POA, creates an intent only for any shortfall, sends exact POA with the unique memo, and waits for PoA finality (K=5 attestations or checkpoint — seen is not credited yet)."],
+                        ["First bid starts the timer: ", "Queued inventory auctions have no ticking timer until the first bid lands. Your agent bids the minimum valid amount (>10% above any live high bid) up to your highest bid cap — never above it."],
+                        ["Instant outbid credit & easy withdraw: ", "Late bids extend the close time by the quiet window. If another user outbids you, your outbid POA credits instantly back to your available escrow balance so you can re-bid right away — or withdraw it back to your original wallet anytime in My POA."],
+                        ["Seller handover after close: ", newCount > 0
+                            ? "New names mint immediately via issue. Winning an auction waits for the seller's signed settle handover (seller/fee paid before title commits); if unsettled past close + quiet, escrow auto-expires and refunds the winner."
+                            : "Winning a POA auction waits for the seller's signed settle handover after close (seller + fee are paid on-chain before title commits). If unsettled past close + quiet, escrow auto-expires and refunds the winner to the original payer."],
+                    ]
+                    : [
+                        ["Finality first: ", "Your agent creates an escrow intent and sends the exact POA total with the unique memo. PoA network finality (K=5 attestations or checkpoint) is required — seen is not credited yet."],
+                        ["Instant permanent mint: ", "Once final, escrow credits your balance and your agent submits issue for each name. Each domain is minted permanently to your address immediately in that step — no auction or wait for treasury payout."],
+                        ["Verify ownership right away: ", "Open each name’s /d/<name> page or the Manage domains tab with your public poa1… address to see Owned (permanent)."],
+                        ["Safety & unused POA: ", "If a name is taken first or checkout is held, nothing is minted for it. Any unused POA credit stays in your escrow balance and can be withdrawn back only to your original sending address."],
+                    ];
+                for (const [strongText, bodyText] of steps) {
+                    const li = document.createElement("li");
+                    const st = document.createElement("strong");
+                    st.textContent = strongText;
+                    li.append(st, document.createTextNode(bodyText));
+                    list.append(li);
+                }
+            }
+        }
     }
 }
 
@@ -211,9 +249,11 @@ function poaPurchaseTypeLabel(item) {
 export function inferOwnerFromPurchasedCart(state) {
     if (!state || !ui.cap || !ui.cart.length)
         return null;
+    if (ui.cart.some((x) => x.action === "poaBid"))
+        return null;
     const owners = [];
     for (const item of ui.cart) {
-        const review = cartReview(item, ui.cap, state);
+        const review = cartReview(item, ui.cap, state, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now());
         if (review.canAcknowledge || !review.issues.length)
             return null;
         const entry = state.names?.[item.name];
@@ -294,11 +334,17 @@ export function renderFloatingCart() {
         if (item.action === "poaCheckout") {
             add(card, "p", `🪙 ${poaShort(item.amount)} POA · ${poaPurchaseTypeLabel(item)}`, "badge-ok");
         }
+        else if (item.action === "poaBid") {
+            const p = item.params ?? {};
+            add(card, "p", `${p.awaitingFirstBid ? "⏳ Starts auction" : "🔥 POA auction"} · Max ${poaShort(item.amount)} POA`, "badge-ok");
+            if (item.outbid)
+                add(card, "p", "⚠️ Outbid — open Cart to review or raise your highest bid.", "auction-outbid-badge");
+        }
         else {
             add(card, "p", `${actionLabel(item.action)} · ${item.amount} ${registryUnit(item.asset)}`, "badge");
             add(card, "p", item.summary);
         }
-        if (item.needsReview)
+        if (item.needsReview && !(item.action === "poaBid" && item.outbid))
             add(card, "p", "⚠️ " + item.reviewMessage + " Open Find to review your cart.", "badge-warn");
         const btn = add(card, "button", "✖️", "secondary small cart-remove");
         btn.setAttribute("aria-label", "Remove " + item.name + " from cart");
@@ -348,6 +394,84 @@ export function renderCart() {
             removePoa.setAttribute("aria-label", "Remove " + item.name + " from cart");
             removePoa.type = "button";
             removePoa.addEventListener("click", () => removeCartAt(index));
+            return;
+        }
+        if (item.action === "poaBid") {
+            const p = item.params ?? {};
+            const nowMs = ui.escrowMarketServerTime || Date.now();
+            const review = cartReview(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, nowMs);
+            const liveMin = review.minimum ?? item.latestMinimum ?? item.minimumAmount ?? item.amount;
+            add(card, "p", `${p.awaitingFirstBid ? "⏳ Starts auction on 1st bid" : "🔥 Live POA auction"} · Min ${poaShort(liveMin)} POA`, "badge-ok");
+            if (item.needsReview || item.outbid)
+                add(card, "p", "⚠️ " + (item.reviewMessage || "Auction changed — review your highest bid."), item.outbid ? "auction-outbid-badge" : "badge-warn");
+            const actionBtns = add(card, "div", "", "button-row");
+            const reviewBtn = item.needsReview ? add(actionBtns, "button", "✅ Review changed item", "secondary small") : null;
+            if (reviewBtn) {
+                reviewBtn.type = "button";
+                reviewBtn.disabled = ui.registryReadFailed || !review.canAcknowledge;
+                reviewBtn.addEventListener("click", () => {
+                    if (ui.registryReadFailed)
+                        return;
+                    try {
+                        ui.cart[index] = acknowledgeCartItem(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now());
+                        persistCart();
+                        renderCart();
+                    } catch {
+                        el("cartStatus").textContent = "✏️ Fix the amount or remove this item.";
+                    }
+                });
+            }
+            if (item.outbid && !review.canAcknowledge && liveMin && liveMin !== item.amount) {
+                const raiseBtn = add(actionBtns, "button", `⬆️ Raise max bid to ${poaShort(liveMin)} POA`, "secondary small");
+                raiseBtn.type = "button";
+                raiseBtn.addEventListener("click", () => {
+                    try {
+                        const raised = editCartAmount(item, liveMin, ui.cap, ui.latestState, ui.escrowMarket);
+                        ui.cart[index] = acknowledgeCartItem(raised, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now());
+                        resetCopyFeedback();
+                        persistCart();
+                        renderCart();
+                    } catch (err) {
+                        el("cartStatus").textContent = err?.message || "✏️ Raise your highest bid or remove this item.";
+                    }
+                });
+            }
+            const errorNode = add(card, "p", item.validationError || "", "badge-warn");
+            errorNode.setAttribute("role", "alert");
+            const controls = add(card, "div", "", "inline-controls");
+            const bidInput = document.createElement("input");
+            bidInput.value = poaShort(item.amount);
+            bidInput.dataset.fieldKey = `poaBidCart:${p.auctionId || item.name}`;
+            bidInput.setAttribute("inputmode", "decimal");
+            bidInput.setAttribute("aria-label", "Highest bid in POA for " + item.name);
+            bidInput.placeholder = poaShort(liveMin);
+            bidInput.addEventListener("input", () => {
+                try {
+                    Object.assign(item, editCartAmount(item, bidInput.value, ui.cap, ui.latestState, ui.escrowMarket));
+                    delete item.validationError;
+                    persistCart();
+                } catch (error) {
+                    item.validationError = error.message;
+                }
+                errorNode.textContent = item.validationError || "";
+                bidInput.setAttribute("aria-invalid", item.validationError ? "true" : "false");
+                resetCopyFeedback();
+                persistCart();
+                if (reviewBtn)
+                    reviewBtn.disabled = ui.registryReadFailed || !cartReview(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now()).canAcknowledge;
+                updateCartCopyState();
+                updatePromptText();
+                renderFloatingCart();
+            });
+            const removeBid = add(card, "button", "✖️", "secondary small cart-remove");
+            removeBid.setAttribute("aria-label", "Remove " + item.name + " from cart");
+            removeBid.type = "button";
+            removeBid.addEventListener("click", () => removeCartAt(index));
+            const bidLabel = add(controls, "label", "Your highest bid (POA)", "amount-label");
+            const unitBox = add(bidLabel, "span", "", "amount-unit");
+            unitBox.append(bidInput);
+            add(unitBox, "span", "POA", "input-unit");
+            add(bidLabel, "small", "Ceiling for your agent (never exceeded). Editing it does not send POA.", "muted");
             return;
         }
         add(card, "p", `${actionLabel(item.action)} · ${item.tier} ${item.isRoot ? "root" : "child"}`, "badge");
@@ -462,6 +586,11 @@ export function addDetailToCart(item) {
         return;
     }
     if (poaOnlyMode(ui.cap)) {
+        const poaAuction = findOpenPoaAuctionByName(ui.escrowMarket, name, ui.escrowMarketServerTime || Date.now());
+        if (poaAuction) {
+            try { addToCart({ name, action: "poaBid", auctionId: poaAuction.id, amount: poaMinimumNextBid(poaAuction) }); } catch (error) { el("ideasStatus").textContent = error.message; }
+            return;
+        }
         if (info.isRoot && !s.names[name]?.activeId && !s.names[name]?.auctionId && !ui.reservedSet.has(name))
             try { addToCart({ name, action: "poaCheckout" }); } catch (error) { el("ideasStatus").textContent = error.message; }
         return;

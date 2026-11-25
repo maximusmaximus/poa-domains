@@ -1,8 +1,8 @@
-import { ui } from "./ui-state.js?v=775cd3b55381";
-import { add, el, endpointBase } from "./ui-core.js?v=775cd3b55381";
-import { nameLink, openPoa } from "./ui-router.js?v=775cd3b55381";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=775cd3b55381";
-import { createInlineInfo } from "./ui-help.js?v=775cd3b55381";
+import { ui } from "./ui-state.js?v=38947c454eb2";
+import { add, el, endpointBase } from "./ui-core.js?v=38947c454eb2";
+import { nameLink, openPoa } from "./ui-router.js?v=38947c454eb2";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=38947c454eb2";
+import { createInlineInfo } from "./ui-help.js?v=38947c454eb2";
 import {
   buildProfileUpdatePrompt,
   checkBtcAddress,
@@ -11,12 +11,14 @@ import {
   checkProfileImage,
   cidForDocument,
   extractDomainProfile,
+  findDomainSalesAndAuctions,
   MAX_PROFILE_DESCRIPTION_CHARS,
   MAX_PROFILE_IMAGE_BYTES,
   PROFILE_SCHEMA_V1,
   profileImageMediaPath,
+  SALE_FIELDS_WARNING,
   validPrincipal,
-} from "./shared.js?v=775cd3b55381";
+} from "./shared.js?v=38947c454eb2";
 
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
@@ -68,7 +70,7 @@ function showManagePrompt(text) {
   if (statusEl) statusEl.textContent = "";
 }
 
-function buildProfileEditor(card, deed, owner, startOpen) {
+function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = false } = {}) {
   const extracted = extractDomainProfile(deed);
   const current = extracted?.profile ?? {
     poa: deed.owner,
@@ -81,12 +83,23 @@ function buildProfileEditor(card, deed, owner, startOpen) {
   details.className = "profile-editor";
   if (startOpen) details.open = true;
   const summary = document.createElement("summary");
-  summary.textContent = extracted && !extracted.isDefault
-    ? `🪪 Public profile (v1 · #${extracted.metadataVersion})`
-    : "🪪 Public profile (v1 — set addresses, bio & avatar)";
+  summary.textContent = listedForSale
+    ? "⏸️ Public profile (paused while listed — drops on transfer)"
+    : extracted && !extracted.isDefault
+      ? `🪪 Public profile (v1 · #${extracted.metadataVersion})`
+      : "🪪 Public profile (v1 — set addresses, bio & avatar)";
   details.append(summary);
 
   const form = add(details, "div", "", "profile-form");
+  if (listedForSale) {
+    const pausedNote = add(
+      form,
+      "p",
+      "⏸️ This domain is currently listed for sale or in an auction. Attached domain fields and profile links are paused while listed and will be dropped when ownership transfers to a new holder.",
+      "sale-fields-warning",
+    );
+    pausedNote.setAttribute("role", "note");
+  }
   const noticeRow = add(form, "div", "", "profile-public-notice");
   add(
     noticeRow,
@@ -372,8 +385,33 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
       const p = add(card, "p", "Child of ");
       nameLink(p, ui.latestState.deeds[d.parentId]?.name ?? "");
     }
-    buildProfileEditor(card, d, owner, isFocused || ordered.length === 1);
+    const saleInfo = findDomainSalesAndAuctions({
+      name: d.name,
+      deed: d,
+      state: ui.latestState,
+      escrowMarket: ui.escrowMarket,
+      nowMs: ui.escrowMarketServerTime || Date.now(),
+    });
+    if (saleInfo.listedForSale) {
+      const liveWarn = add(
+        card,
+        "p",
+        "⏸️ Listed for sale / in auction — attached domain fields (tags & profile) are paused and will drop on transfer.",
+        "sale-fields-warning",
+      );
+      liveWarn.setAttribute("role", "note");
+    }
+    buildProfileEditor(card, d, owner, isFocused || ordered.length === 1, {
+      listedForSale: saleInfo.listedForSale,
+    });
     const poa = ui.cap?.poaOnly?.status === "on";
+    const sellWarn = add(
+      card,
+      "p",
+      "⚠️ Selling or auctioning pauses attached domain fields (tags & public profile) while listed and drops them when transferred to a new holder (archived on the domain page).",
+      "sale-fields-warning",
+    );
+    sellWarn.setAttribute("role", "note");
     if (poa) {
       const sell = add(card, "button", "🏷️ Sell for POA", "secondary small");
       sell.type = "button";
@@ -405,7 +443,7 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
                 ? "Offers one permanent direct subdomain; the buyer chooses its label. Existing subdomains do not disappear."
                 : action === "revokeChild"
                   ? "Retiring requires the child holder AND parent owner's signatures. A permanent path stays reserved; it does not become available again."
-                  : "This prepares a registry-unit listing only; it does not sell the name now.",
+                  : `This prepares a registry-unit listing only; it does not sell the name now.\n${SALE_FIELDS_WARNING}`,
               JSON.stringify(plan, null, 2),
             ].join("\n"),
           );

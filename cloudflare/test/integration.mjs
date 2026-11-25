@@ -12,6 +12,7 @@ import { nativePrincipal, signBody, intentId } from "../../dist/src/auth.js";
 import { prepare, buildMetadataWitness } from "../../dist/src/interface.js";
 import { browserSmoke } from "./browser.mjs";
 import { EMOJI17_NORMALIZATION_HASH } from "../../dist/src/names.js";
+import { signTermsAgreement, TERMS_VERSION, TERMS_HASH } from "../../dist/src/terms.js";
 
 const root = resolve(import.meta.dirname, "../..");
 const ev = resolve(root, process.env.CF_TEST_EVIDENCE ?? "cloudflare/test/evidence"); mkdirSync(ev, { recursive: true });
@@ -101,6 +102,14 @@ try {
     assert.equal(net.body.chainId, "poa-mainnet-1");
     assert.ok(typeof net.body.message === "string" && net.body.message.length > 0);
   });
+  const treas = await api("/v1/treasury");
+  check("treasury endpoint shape", () => {
+    assert.equal(treas.status, 200);
+    assert.equal(treas.body.poascanHomeUrl, "https://poascan.io/");
+    assert.equal(treas.body.treasury?.address, first.principals.treasury);
+    assert.equal(treas.body.treasury?.poascanUrl, `https://poascan.io/address/${first.principals.treasury}`);
+    assert.equal(typeof treas.body.checkedAt, "number");
+  });
   const domainPage = await fetch(base + "/d/nexus"); const domainHtml = await domainPage.text();
   check("SPA domain page serves HTML shell", () => { assert.equal(domainPage.status, 200); assert.ok(domainHtml.includes('id="domainMain"')); assert.ok(domainHtml.includes('id="siteTitle"')); });
     for (const asset of ["/app.js","/shared.js","/style.css","/config.json","/icon.svg"]) { const status=(await fetch(base+asset)).status; check(`asset ${asset}`,()=>assert.equal(status,200)); }
@@ -164,8 +173,25 @@ try {
   check("oversize body blocked",()=>{assert.equal(huge.status,413);assert.equal(huge.body.code,"BODY_TOO_LARGE");});
   const utf8 = await api("/v1/intents",{method:"POST",headers:{"content-type":"application/json"},body:Uint8Array.from([255,254])});
   check("invalid UTF-8 blocked",()=>assert.equal(utf8.status,400));
+  const termsInfo = await api("/v1/terms");
+  check("terms info endpoint shape", () => {
+    assert.equal(termsInfo.status, 200);
+    assert.equal(termsInfo.body.termsVersion, TERMS_VERSION);
+    assert.equal(termsInfo.body.termsHash, TERMS_HASH);
+    assert.equal(termsInfo.body.termsUrl, "https://poadomains.grok.me/terms");
+  });
   const unknown = await api(`/v1/receipts/${"f".repeat(64)}`);
   check("unknown receipt remains unknown",()=>{assert.equal(unknown.status,404);assert.equal(unknown.body.code,"UNKNOWN_OUTCOME");});
+  const termsBefore = await api(`/v1/terms/status?actor=${encodeURIComponent(signer)}`);
+  check("terms status before agreement", () => { assert.equal(termsBefore.status, 200); assert.equal(termsBefore.body.agreed, false); });
+  const signedTerms = signTermsAgreement({ ...termsInfo.body.statementTemplate, actor: signer, agreedAt: Math.floor(Date.now() / 1000) }, privateKey);
+  const termsAgreed = await api("/v1/terms/agree", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(signedTerms) });
+  check("signed agent terms agreement persists without touching registry state", () => {
+    assert.equal(termsAgreed.status, 201);
+    assert.equal(termsAgreed.body.ok, true);
+    assert.equal(termsAgreed.body.actor, signer);
+    assert.equal(termsAgreed.body.alreadyAgreed, false);
+  });
   const before = (await api("/v1/state")).body, beforeHealth=(await api("/healthz")).body;
   save("state-before-restart.json",before);save("healthz-before-restart.json",beforeHealth);
   await stop();
@@ -174,6 +200,12 @@ try {
   save("state-after-restart.json",after);save("healthz-after-restart.json",afterHealth);
   check("full Wrangler restart preserves all principals",()=>assert.deepEqual(afterHealth.principals,first.principals));
   check("full Wrangler restart preserves every state table and state hash",()=>{assert.deepEqual(after.state,before.state);assert.equal(after.stateHash,before.stateHash);assert.equal(afterHealth.sequence,beforeHealth.sequence);});
+  const termsAfterRestart = await api(`/v1/terms/status?actor=${encodeURIComponent(signer)}`);
+  check("signed agent terms agreement survives restart", () => {
+    assert.equal(termsAfterRestart.status, 200);
+    assert.equal(termsAfterRestart.body.agreed, true);
+    assert.equal(termsAfterRestart.body.termsHash, TERMS_HASH);
+  });
   const afterReceipt=await api(`/v1/receipts/${receipt.body.intentId}`);
   check("signed receipt survives restart",()=>assert.deepEqual(afterReceipt.body,receiptRead.body));
   const duplicateAfter=await post(packet);

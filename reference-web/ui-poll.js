@@ -1,16 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=775cd3b55381";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=775cd3b55381";
-import { renderManagement } from "./ui-manage.js?v=775cd3b55381";
-import { actionLabel } from "./ui-copy.js?v=775cd3b55381";
-import { poaOnlyMode, poaNewNamePrice, poaShort, cartMinimum, cartSummary, formatDuration, isNetworkBannerDismissed, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, shouldHoldTransactions, updatedAge } from "./shared.js?v=775cd3b55381";
-import { ui } from "./ui-state.js?v=775cd3b55381";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=775cd3b55381";
-import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=775cd3b55381";
-import { render, updateTabDots } from "./ui-render.js?v=775cd3b55381";
-import { runSearch } from "./ui-search.js?v=775cd3b55381";
-import { renderIdeas } from "./ui-ideas.js?v=775cd3b55381";
-import { mountEscrow } from "./escrow.js?v=775cd3b55381";
-import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=775cd3b55381";
+import { publicNameUnavailable } from "./shared.js?v=38947c454eb2";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=38947c454eb2";
+import { renderManagement } from "./ui-manage.js?v=38947c454eb2";
+import { actionLabel } from "./ui-copy.js?v=38947c454eb2";
+import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=38947c454eb2";
+import { ui } from "./ui-state.js?v=38947c454eb2";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=38947c454eb2";
+import { createPoaCopyButton } from "./ui-copy.js?v=38947c454eb2";
+import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=38947c454eb2";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=38947c454eb2";
+import { renderDomainPage } from "./ui-domain.js?v=38947c454eb2";
+import { runSearch } from "./ui-search.js?v=38947c454eb2";
+import { renderIdeas } from "./ui-ideas.js?v=38947c454eb2";
+import { mountEscrow } from "./escrow.js?v=38947c454eb2";
+import { applyRoute, navigateHome, setSectionTab } from "./ui-router.js?v=38947c454eb2";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -18,6 +20,12 @@ export function updateFreshness() {
     for (const node of document.querySelectorAll(".tab-age"))
         node.textContent = text;
     el("registryAge").textContent = "Registry data " + text + " · POA payments refresh separately.";
+    const nowMs = Date.now();
+    for (const cd of document.querySelectorAll(".auction-countdown[data-closes-ms]")) {
+        const closes = Number(cd.dataset.closesMs);
+        if (Number.isFinite(closes) && closes > 0)
+            cd.textContent = `⏳ ${formatCountdown(closes - nowMs)}`;
+    }
 }
 
 function enhanceEscrowSignedRequestUx(root) {
@@ -108,8 +116,38 @@ function enhanceEscrowSignedRequestUx(root) {
     step1.append(grid);
     if (limits)
         step1.append(limits);
-    if (actionRow)
+    if (actionRow) {
         step1.append(actionRow);
+        const balanceNote = document.createElement("p");
+        balanceNote.id = "escrowBalanceNote";
+        balanceNote.className = "escrow-balance-note";
+        balanceNote.setAttribute("role", "note");
+        balanceNote.textContent =
+            "💡 Held balance & withdrawals: Deposited POA and outbid auction funds return immediately to your available escrow balance so you can re-bid right away — tap ↩️ Request my refund anytime to withdraw back to your original wallet (up to the per-tx limit per request; funds locked in an active leading bid unlock if outbid, cancelled, or expired).";
+        step1.append(balanceNote);
+        const sellWarning = document.createElement("p");
+        sellWarning.id = "escrowListingFieldWarning";
+        sellWarning.className = "sale-fields-warning";
+        sellWarning.setAttribute("role", "note");
+        sellWarning.textContent = SALE_FIELDS_WARNING;
+        step1.append(sellWarning);
+        for (const btn of actionRow.querySelectorAll("button")) {
+            const label = btn.textContent ?? "";
+            if (!/List my name for POA|Open my POA auction/.test(label))
+                continue;
+            btn.addEventListener("click", () => {
+                const txt = prompt.textContent ?? "";
+                if (/"action":\s*"(?:list|open)"/.test(txt) && !txt.includes("Sale & auction notice")) {
+                    prompt.textContent = txt.trimEnd() + "\n" + SALE_FIELDS_WARNING;
+                    if (message && !message.textContent.includes("paused while listed")) {
+                        message.textContent =
+                            (message.textContent ? message.textContent + " " : "") +
+                            "⚠️ Attached domain fields & profile are paused while listed and dropped on transfer.";
+                    }
+                }
+            });
+        }
+    }
 
     if (message)
         step2.append(message);
@@ -190,18 +228,42 @@ export function preserveInputs(draw) {
     }
 }
 
+async function fetchEscrowMarketData() {
+    if (ui.demo || !ui.cap || !ui.cap.escrow?.enabled)
+        return false;
+    try {
+        const response = await fetch(endpointBase() + "/v1/escrow/market", {
+            method: "GET",
+            credentials: "omit",
+            cache: "no-store",
+            signal: globalThis.AbortSignal?.timeout ? AbortSignal.timeout(15000) : undefined,
+        });
+        if (!response.ok)
+            return false;
+        const body = await response.json();
+        if (!body || !Array.isArray(body.items))
+            return false;
+        ui.escrowMarket = body.items;
+        ui.escrowMarketServerTime = Number.isSafeInteger(body.serverTime) ? body.serverTime : Date.now();
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
+
 export async function refreshRegistry() {
     if (ui.refreshing || !ui.readState)
         return;
     ui.refreshing = true;
     pageStatus("", true);
     try {
-        const payload = await ui.readState();
+        const [payload] = await Promise.all([ui.readState(), fetchEscrowMarketData()]);
         const viewState = registryViewState(payload);
         ui.registryReadFailed = false;
         ui.lastLoadedAt = Date.now();
         preserveInputs(() => {
-            ui.cart = ui.cart.map(item => recheckCartItem(item, ui.cap, viewState));
+            ui.cart = ui.cart.map(item => recheckCartItem(item, ui.cap, viewState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now()));
             persistCart();
             render(payload);
             renderCart();
@@ -286,6 +348,130 @@ export async function refreshEscrowCaps() {
             ui.escrowCaps = { enabled: true, held: true, holdReason: "Could not check live POA checkout status" };
     }
     renderCartEscrowStatus();
+}
+
+export async function refreshEscrowMarket() {
+    if (!(await fetchEscrowMarketData()))
+        return;
+    if (ui.latestState) {
+        preserveInputs(() => {
+            ui.cart = ui.cart.map((item) =>
+                recheckCartItem(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime),
+            );
+            persistCart();
+            renderAuctions(ui.latestState);
+            renderMarketplace(ui.latestState);
+            renderTicker(ui.latestState);
+            updateLiveAuctionsBadge(ui.latestState);
+            renderCart();
+            if (ui.lastSearch)
+                runSearch(ui.lastSearch, false);
+            renderManagement();
+            if (ui.route.kind === "domain" && ui.currentDomainName)
+                renderDomainPage(ui.currentDomainName);
+        });
+    } else {
+        updateLiveAuctionsBadge(null);
+    }
+}
+
+export function renderTreasuryFooter() {
+    const totalEl = el("treasuryTotal");
+    const walletsEl = el("treasuryWallets");
+    const scanHome = el("poascanHomeLink");
+    if (!totalEl || !walletsEl)
+        return;
+    const data = ui.treasury;
+    if (scanHome && typeof data?.poascanHomeUrl === "string" && data.poascanHomeUrl.startsWith("https://poascan.io/"))
+        scanHome.href = data.poascanHomeUrl;
+    if (!data) {
+        totalEl.textContent = "—";
+        walletsEl.hidden = true;
+        walletsEl.replaceChildren();
+        return;
+    }
+    if (typeof data.total === "string" && /^[0-9]+\.[0-9]{6}$/.test(data.total)) {
+        totalEl.textContent = `🪙 ${poaShort(data.total)} POA${data.stale ? " · 🕰️" : ""}`;
+    } else {
+        totalEl.textContent = "View on POAScan";
+    }
+    const entries = [
+        ["Escrow", data.escrow],
+        ["Treasury", data.treasury],
+    ].filter(([, w]) => w && isPoaAddress(w.address) && typeof w.poascanUrl === "string" && w.poascanUrl.startsWith("https://poascan.io/"));
+    walletsEl.replaceChildren();
+    if (!entries.length) {
+        walletsEl.hidden = true;
+        return;
+    }
+    for (const [label, wallet] of entries) {
+        const item = document.createElement("span");
+        item.className = "treasury-item";
+        const tag = document.createElement("span");
+        tag.className = "muted";
+        tag.textContent = `${label}: `;
+        const wrap = document.createElement("span");
+        wrap.className = "poa-addr-inline";
+        const link = document.createElement("a");
+        link.className = "poa-addr-text treasury-addr-link";
+        link.href = wallet.poascanUrl;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = shortenPoaAddress(wallet.address);
+        link.title = `Inspect ${wallet.address} on POAScan`;
+        link.setAttribute("aria-label", `${label} address ${shortenPoaAddress(wallet.address)} on POAScan`);
+        wrap.append(link, createPoaCopyButton(wallet.address));
+        item.append(tag, wrap);
+        if (typeof wallet.balance === "string" && /^[0-9]+\.[0-9]{6}$/.test(wallet.balance)) {
+            const bal = document.createElement("span");
+            bal.className = "treasury-bal muted";
+            bal.textContent = ` (${poaShort(wallet.balance)} POA)`;
+            item.append(bal);
+        }
+        walletsEl.append(item);
+    }
+    walletsEl.hidden = false;
+}
+
+let treasuryAbort = null;
+if (typeof globalThis.addEventListener === "function") {
+    globalThis.addEventListener("pagehide", () => {
+        treasuryAbort?.abort();
+        treasuryAbort = null;
+    });
+}
+
+export async function refreshTreasury() {
+    if (ui.demo)
+        return;
+    treasuryAbort?.abort();
+    const ctrl = typeof AbortController === "function" ? new AbortController() : null;
+    treasuryAbort = ctrl;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), 10000) : null;
+    try {
+        const response = await fetch(endpointBase() + "/v1/treasury", {
+            method: "GET",
+            credentials: "omit",
+            cache: "no-store",
+            signal: ctrl?.signal,
+        });
+        if (!response.ok)
+            return;
+        const body = await response.json();
+        if (body && typeof body === "object") {
+            ui.treasury = body;
+            renderTreasuryFooter();
+        }
+    }
+    catch {
+        /* keep last known treasury snapshot */
+    }
+    finally {
+        if (timer)
+            clearTimeout(timer);
+        if (treasuryAbort === ctrl)
+            treasuryAbort = null;
+    }
 }
 
 // Keep critical holds visible in a few words; explanations belong in the window's ℹ️ popover.
@@ -418,6 +604,7 @@ export async function loadRegistry() {
                     throw Error("Public endpoint only");
                 ui.base = u.origin;
             }
+            void refreshTreasury();
             ui.cap = await json(ui.base + "/v1/capabilities?include=emoji");
             ui.readState = () => json(ui.base + "/v1/state");
         }
@@ -443,12 +630,24 @@ export async function loadRegistry() {
         // Keep stored cart data; omit withheld entries from this public session.
         ui.cart=ui.cart.filter(item=>!publicNameUnavailable(item.name,ui.cap));
         // Production is POA-only: saved registry-unit plans can't be completed there, so they are left out.
-        ui.cart=ui.cart.filter(item=>poaOnlyMode(ui.cap)?item.action==="poaCheckout":item.action!=="poaCheckout");
+        ui.cart=ui.cart.filter(item=>poaOnlyMode(ui.cap)?(item.action==="poaCheckout"||item.action==="poaBid"):(item.action!=="poaCheckout"&&item.action!=="poaBid"));
         for (const item of ui.cart) {
             if (item.action === "poaCheckout") {
                 try { item.minimumAmount = cartMinimum(item, ui.cap, null); item.summary = cartSummary(item);
                     if (item.minimumAmount !== item.amount) throw Error("⚠️ The POA price changed. Remove it and add it again."); }
                 catch (error) { item.validationError = error.message; }
+                continue;
+            }
+            if (item.action === "poaBid") {
+                try {
+                    if (!item.params || !/^[0-9a-f]{64}$/.test(item.params.auctionId ?? ""))
+                        throw Error("⚠️ Remove this invalid saved auction bid.");
+                    item.amount = poaAmount(item.amount);
+                    item.minimumAmount = cartMinimum(item, ui.cap, null, ui.escrowMarket);
+                    if (poaToMicros(item.amount) < poaToMicros(item.minimumAmount))
+                        throw Error(`⚠️ Minimum bid is ${poaShort(item.minimumAmount)} POA.`);
+                    item.summary = cartSummary(item);
+                } catch (error) { item.validationError = error.message; }
                 continue;
             }
             // Repair old saved carts affected by the amount/maxBid mismatch, without raising any cap.
@@ -496,7 +695,7 @@ export async function loadRegistry() {
             ui.tickerTimer = setInterval(refreshRegistry, ui.TICKER_MS);
             refreshNetworkStatus();
             refreshEscrowCaps();
-            ui.networkTimer = setInterval(() => { refreshNetworkStatus(); refreshEscrowCaps(); }, ui.NETWORK_MS);
+            ui.networkTimer = setInterval(() => { refreshNetworkStatus(); refreshEscrowCaps(); refreshEscrowMarket(); refreshTreasury(); }, ui.NETWORK_MS);
         }
         else if (ui.demo)
             renderNetworkStatus();

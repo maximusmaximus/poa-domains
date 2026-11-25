@@ -1,24 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { randomBytes } from "node:crypto";
-import { build } from "esbuild";
 import { buildProfileWitness } from "../dist/src/profile.js";
 import { nativeAddress } from "../dist/src/native-crypto.js";
-
-const root = resolve(import.meta.dirname, "..");
-const work = mkdtempSync(join(tmpdir(), "poa-profiles-storage-"));
-await build({
-  entryPoints: [join(root, "cloudflare/profiles-storage.ts")],
-  bundle: true,
-  platform: "node",
-  format: "esm",
-  outfile: join(work, "profiles-storage.mjs"),
-});
-const {
+import {
   handleMediaUpload,
   handleMediaGet,
   backupCommittedProfile,
@@ -26,13 +11,7 @@ const {
   checkHourlyUploadCaps,
   MEDIA_UPLOAD_HOURLY_PER_CLIENT,
   MEDIA_UPLOAD_HOURLY_GLOBAL,
-} = await import(
-  pathToFileURL(join(work, "profiles-storage.mjs")).href
-);
-
-test.after(() => {
-  rmSync(work, { recursive: true, force: true });
-});
+} from "../dist/profiles-storage.mjs";
 
 function mockR2() {
   const store = new Map();

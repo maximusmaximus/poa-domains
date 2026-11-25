@@ -11,7 +11,7 @@ import { normalizeName } from "../../src/names.js";
 import { poaNewNamePriceMicros } from "../../src/new-name-prices.js";
 import { SQLiteJournal } from "../sqlite-journal.js";
 import { Escrow, SQLiteEscrowJournal, invariant, exportEscrow, restoreEscrow } from "../escrow.js";
-import { registryTitles } from "../escrow-titles.js";
+import { escrowPacketBlocked, registryTitles } from "../escrow-titles.js";
 import { verifyCommand } from "../escrow-codec.js";
 import { canonical, need } from "../../src/core.js";
 import { sign } from "node:crypto";
@@ -73,7 +73,7 @@ export class EscrowHarness extends DurableObject<TestEnv> {
       if(v.op==="restore-archive")restoreEscrow(this.ctx.storage,v.archive);
       if(v.op==="tick")await this.escrow.tick();
       if(v.op==="reconcile")await this.escrow.reconcile();
-      if(v.op==="normal-write"){need(!this.escrow.titleLocked(),"ESCROW_TITLE_RESERVED");this.engine.submit(v.packet);}
+      if(v.op==="normal-write"){need(!escrowPacketBlocked(this.escrow.state(),this.engine,v.packet),"ESCROW_TITLE_RESERVED");this.engine.submit(v.packet);}
       return this.result();
     }finally{
       this.ctx.storage.sql.exec("INSERT OR REPLACE INTO test_network(id,value) VALUES(1,?)",JSON.stringify(this.net,(_k,v)=>typeof v==="bigint"?String(v):v));

@@ -14,7 +14,7 @@ try {
     const errors = []; page.on("pageerror", error => errors.push(error.message));
     await page.route("https://**", route => route.abort());
     try {
-      await page.goto(h.url); await readyFind(page);
+      await page.goto(h.url); await page.locator("#termsAgreeBtn").click(); await readyFind(page);
       for (const name of ["🚀", "🚀🚀"]) {
         await page.locator("#searchInput").fill(name); await page.locator("#searchBtn").click();
         const tier = inspectName(name, h.cap.emojiManifest).tier;

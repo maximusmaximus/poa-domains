@@ -1,13 +1,13 @@
-import { copyText } from "./ui-copy.js?v=775cd3b55381";
-import { publicNameUnavailable } from "./shared.js?v=775cd3b55381";
-import { registryUnit, poaOnlyMode, poaNewNamePrice, poaShort, buildSubnamePurchasePrompt } from "./shared.js?v=775cd3b55381";
-import { ui } from "./ui-state.js?v=775cd3b55381";
-import { nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=775cd3b55381";
-import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=775cd3b55381";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=775cd3b55381";
-import { addToCart } from "./ui-cart.js?v=775cd3b55381";
-import { suggestNames } from "./ideas-generator.js?v=775cd3b55381";
-import { logSubmittedSearch } from "./ui-search-log.js?v=775cd3b55381";
+import { copyText } from "./ui-copy.js?v=38947c454eb2";
+import { publicNameUnavailable } from "./shared.js?v=38947c454eb2";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=38947c454eb2";
+import { ui } from "./ui-state.js?v=38947c454eb2";
+import { nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=38947c454eb2";
+import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=38947c454eb2";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=38947c454eb2";
+import { addToCart } from "./ui-cart.js?v=38947c454eb2";
+import { suggestNames } from "./ideas-generator.js?v=38947c454eb2";
+import { logSubmittedSearch } from "./ui-search-log.js?v=38947c454eb2";
 
 let activeSuggestionIdx = -1;
 let currentSuggestions = [];
@@ -26,6 +26,8 @@ function isAvailableCandidate(name) {
     if (entry?.activeId || entry?.auctionId)
         return false;
     if (Object.values(ui.latestState.auctions ?? {}).some((a) => a.name === name && a.status === "live"))
+        return false;
+    if (findOpenPoaAuctionByName(ui.escrowMarket, name, ui.escrowMarketServerTime || Date.now()))
         return false;
     return true;
 }
@@ -285,10 +287,73 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
         return;
     }
     const entry = s.names[name];
+    const poa = poaOnlyMode(ui.cap);
+    const poaAuction = poa ? findOpenPoaAuctionByName(ui.escrowMarket, name, ui.escrowMarketServerTime || Date.now()) : null;
+    if (poaAuction) {
+        const awaiting = isPoaAuctionAwaitingFirstBid(poaAuction);
+        const minNext = poaMinimumNextBid(poaAuction);
+        const cartItem = ui.cart.find((x) => x.action === "poaBid" && x.params?.auctionId === poaAuction.id) ?? null;
+        const outbidInfo = poaAuctionOutbidStatus(poaAuction, { bidderAddress: ui.bidderAddress, cartItem });
+        add(card, "p", awaiting ? "⏳ POA Auction queued — starts on first bid" : "🔥 Live POA Auction", awaiting ? "badge" : "badge-ok");
+        if (outbidInfo.status === "leading")
+            add(card, "p", outbidInfo.message, "auction-leading-badge");
+        else if (outbidInfo.status === "outbid" || outbidInfo.status === "outbid-covered")
+            add(card, "p", outbidInfo.message, "auction-outbid-badge");
+        const auctionInfo = add(card, "p", `Reserve ${poaShort(poaAuction.price)} POA · `);
+        if (poaAuction.high) {
+            auctionInfo.append(`Current high bid ${poaShort(poaAuction.high.amount)} POA by `);
+            appendPrincipal(auctionInfo, poaAuction.high.payer);
+        } else {
+            auctionInfo.append("No bids yet — first bid starts the countdown timer.");
+        }
+        if (!awaiting && poaAuction.closes > 0) {
+            const nowMs = ui.escrowMarketServerTime || Date.now();
+            const timerRow = add(card, "p", "");
+            const cd = add(timerRow, "span", `⏳ ${formatCountdown(poaAuction.closes - nowMs)}`, "auction-countdown");
+            cd.dataset.closesMs = String(poaAuction.closes);
+            timerRow.append(` · Closes ${formatClock(Math.floor(poaAuction.closes / 1000))}`);
+        }
+        add(card, "p", `Minimum ${awaiting ? "opening" : "next"} bid (>10%): ${poaShort(minNext)} POA`, "badge-ok");
+        const controls = add(card, "div", "", "inline-controls");
+        const bidInput = document.createElement("input");
+        bidInput.value = cartItem ? poaShort(cartItem.amount) : poaShort(minNext);
+        bidInput.setAttribute("inputmode", "decimal");
+        bidInput.setAttribute("aria-label", "Highest bid in POA for " + name);
+        const amountLabel = add(controls, "label", "Your highest bid (POA)", "amount-label");
+        const unitBox = add(amountLabel, "span", "", "amount-unit");
+        unitBox.append(bidInput);
+        add(unitBox, "span", "POA", "input-unit");
+        bidInput.placeholder = poaShort(minNext);
+        add(amountLabel, "small", awaiting ? "Starts the auction timer when your agent places the first bid. Nothing is paid here." : "Ceiling for your agent (never exceeded). Nothing is paid here.", "muted");
+        const btn = add(controls, "button", cartItem ? "Update cart bid" : "Add to cart", "small");
+        btn.id = "addToCartBtn";
+        btn.type = "button";
+        const inputError = add(card, "p", "", "badge-warn");
+        inputError.setAttribute("role", "alert");
+        btn.addEventListener("click", () => {
+            try {
+                const exact = poaAmount(bidInput.value);
+                if (poaToMicros(exact) < poaToMicros(minNext))
+                    throw Error(`⚠️ Enter at least ${poaShort(minNext)} POA.`);
+                inputError.textContent = "";
+                bidInput.removeAttribute("aria-invalid");
+                addToCart({
+                    name,
+                    action: "poaBid",
+                    amount: exact,
+                    auctionId: poaAuction.id,
+                });
+                btn.textContent = "✅ Added to cart";
+            } catch (e) {
+                inputError.textContent = e?.message || `⚠️ Enter at least ${poaShort(minNext)} POA.`;
+                bidInput.setAttribute("aria-invalid", "true");
+            }
+        });
+        return;
+    }
     const liveAuction = entry?.auctionId && s.auctions[entry.auctionId]?.status === "live"
         ? s.auctions[entry.auctionId]
         : Object.values(s.auctions).find((a) => a.name === name && a.status === "live");
-    const poa = poaOnlyMode(ui.cap);
     if (liveAuction && poa) {
         add(card, "p", "⏳ Not available right now", "badge");
         return;

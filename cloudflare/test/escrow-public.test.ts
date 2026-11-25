@@ -18,6 +18,27 @@ test('signed account is read-only, payer-scoped, repeatable, and available while
 test('public intent replay is exact; changed payload cannot create a second obligation',async()=>{const e=fixture();await e.escrow.pause(false);const a:any=await call(e,3,'intent',{amount:'1.000000'},'once','intent');const b:any=await call(e,3,'intent',{amount:'1.000000'},'once','intent');assert.deepEqual(a,b);await assert.rejects(()=>call(e,3,'intent',{amount:'2.000000'},'once','intent'),/ESCROW_IDEMPOTENCY_CONFLICT/);assert.equal(Object.keys(e.escrow.state().deposits).length,1);});
 test('read-only receipt states wait, see a verified bound transfer, and show final only after signed credit',async()=>{const e=fixture();await e.escrow.pause(false);const {intent,txid}=await fund(e,3,'1.000000','receipt',false);assert.equal((await e.escrow.depositView(intent) as any).status,'waiting');assert.equal((await e.escrow.depositView(intent,txid) as any).status,'seen');const seq=e.escrow.state().sequence;assert.equal(e.escrow.state().assets,'0');assert.equal(e.net.calls,0);e.net.txs[txid]!.valid=false;assert.equal((await e.escrow.depositView(intent,txid) as any).status,'waiting');e.net.txs[txid]!.valid=true;e.net.txs[txid]!.attestations=5;assert.equal((await e.escrow.depositView(intent,txid) as any).status,'seen');assert.equal(e.escrow.state().sequence,seq);await call(e,3,'detect',{intent,txid},'credit');assert.equal((await e.escrow.depositView(intent,txid) as any).status,'final');assert.equal(e.escrow.state().assets,'1000000');});
 test('fixed-price purchase reserves exact funds, rejects bid/wrong price and preserves public history',async()=>{const e=fixture();await e.escrow.pause(false);await fund(e,3,'5.000000','fixed-fund');const x:any=await call(e,2,'list',{name:'name',price:'2.000000'},'fixed-list');const auction=x.result.auction;await assert.rejects(()=>call(e,3,'bid',{auction,amount:'2.000000'},'wrong-kind'),/ESCROW_MARKET_KIND/);await assert.rejects(()=>call(e,3,'buy',{auction,amount:'2.000001'},'wrong-price'),/ESCROW_PRICE/);await call(e,3,'buy',{auction,amount:'2.000000'},'fixed-buy');assert.equal(e.escrow.state().available[who(3)],'3000000');assert.equal(e.escrow.state().auctions[auction]!.high!.payer,who(3));await assert.rejects(()=>call(e,4,'buy',{auction,amount:'2.000000'},'twice'));assert.equal(marketView(e.escrow.state())[0]!.kind,'fixed');assert.equal(marketView(e.escrow.state())[0]!.history.length,2);invariant(e.escrow.state());assert.equal(e.net.calls,0);});
+test('marketView reports awaitingFirstBid until first bid starts timer, exact >10% minimumNextBid, and bidder history for outbid tracking',async()=>{
+ const e=fixture();await e.escrow.pause(false);
+ await fund(e,3,'10.000000','m3');await fund(e,4,'10.000000','m4');
+ const opened:any=await call(e,2,'open',{name:'popular',reserve:'2.000000'},'open-pop');
+ const before=marketView(e.escrow.state(),'popular')[0]!;
+ assert.equal(before.awaitingFirstBid,true);assert.equal(before.closes,0);assert.equal(before.startedAt,null);assert.equal(before.minimumNextBid,'2.000000');assert.deepEqual(before.bidders,[]);
+ const startMs=e.net.now+5000;e.net.now=startMs;
+ await call(e,3,'bid',{auction:opened.result.auction,amount:'2.000000'},'bid-3');
+ const acc3Leading=accountView(e.escrow.state(),who(3));
+ assert.equal(acc3Leading.available,'8.000000');assert.equal(acc3Leading.lockedInAuctions,'2.000000');
+ const live=marketView(e.escrow.state(),'popular')[0]!;
+ assert.equal(live.awaitingFirstBid,false);assert.equal(live.startedAt,startMs);assert.equal(live.closes,startMs+86400000);assert.equal(live.minimumNextBid,'2.200001');assert.deepEqual(live.bidders,[who(3)]);
+ await call(e,4,'bid',{auction:opened.result.auction,amount:'3.000000'},'bid-4');
+ // Outbid returns who(3)'s 2 POA immediately to available balance (locked drops to 0) so who(3) can re-bid or withdraw right away.
+ const acc3Outbid=accountView(e.escrow.state(),who(3));
+ assert.equal(acc3Outbid.available,'10.000000');assert.equal(acc3Outbid.lockedInAuctions,'0.000000');
+ const acc4Leading=accountView(e.escrow.state(),who(4));
+ assert.equal(acc4Leading.available,'7.000000');assert.equal(acc4Leading.lockedInAuctions,'3.000000');
+ const outbid=marketView(e.escrow.state(),'popular')[0]!;
+ assert.equal(outbid.high?.payer,who(4));assert.equal(outbid.high?.amount,'3.000000');assert.equal(outbid.minimumNextBid,'3.300001');assert.deepEqual(outbid.bidders,[who(3),who(4)]);
+});
 test('public projections contain no signed request, retained outbox body, title consent or journal',async()=>{const e=fixture();await e.escrow.pause(false);await fund(e,3,'1.000000','private');await call(e,3,'withdraw',{amount:'1.000000'},'refund','withdraw');await e.escrow.tick();const text=JSON.stringify({market:marketView(e.escrow.state()),account:accountView(e.escrow.state(),who(3))});for(const field of ['"body"','"packet"','"requests"','"signature"','"sig"','"journal"'])assert(!text.includes(field));assert(text.includes('UNKNOWN'));});
 test('freshness/paused UI display cannot bypass uncached financial hold',async()=>{const e=fixture();await e.escrow.pause(false);assert.equal((await e.escrow.readiness()).held,false);e.net.stale=true;await assert.rejects(()=>call(e,3,'intent',{amount:'1.000000'},'stale','intent'),/ESCROW_STALE/);e.net.now+=10001;assert.equal((await e.escrow.readiness()).held,true);assert.equal(e.net.calls,0);});
 const env={POA_ESCROW_ENABLED:'true',PUBLIC_EXPLORER_URL:'https://app.example'};

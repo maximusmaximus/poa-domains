@@ -6,6 +6,9 @@ import { Engine } from "../../dist/src/engine.js";
 import { fixtureConfig, mainnetConfig } from "../../dist/src/config.js";
 import { ManualClock } from "../../dist/src/clock.js";
 import { capabilities } from "../../dist/src/interface.js";
+import { principal } from "../../dist/src/auth.js";
+import { buildTermsInfo, TERMS_HASH, TERMS_VERSION, verifyTermsAgreement } from "../../dist/src/terms.js";
+import { parseMcpJSON } from "../../dist/src/mcp-json.js";
 export const SIGNER = "ed25519:" + "1".repeat(64);
 export function profileEngine(profile = "fixture") {
   const issuer = profile === "mainnet" ? "poa1" + "1".repeat(32) : "ed25519:" + "2".repeat(64);
@@ -17,7 +20,7 @@ export function profileEngine(profile = "fixture") {
 export async function uiHarness(profile = "fixture", options = {}) {
   const engine = profileEngine(profile);
   const h = { cap: capabilities(engine), payload: { state: engine.snapshot(), finality: "registry-committed" },
-    stateStatus: 200, stateDelay: 0, stateReads: 0, writes: [], telemetry: [] };
+    stateStatus: 200, stateDelay: 0, stateReads: 0, writes: [], telemetry: [], termsAgreements: new Map() };
   const root = resolve("reference-web");
   const server = createServer(async (req, res) => {
     const u = new URL(req.url, "http://127.0.0.1");
@@ -26,6 +29,26 @@ export async function uiHarness(profile = "fixture", options = {}) {
     if(options.logSearches && u.pathname === "/v1/search-log" && req.method === "POST") {
       let body="";for await(const part of req){body+=part;if(body.length>1024){res.writeHead(413);return res.end();}}
       h.telemetry.push(JSON.parse(body));res.writeHead(200,{"content-type":"application/json"});return res.end(JSON.stringify(h.telemetryReply??{saved:true,key:'v1/2026-11-10/00000000-0000-0000-0000-000000000001.jsonl'}));
+    }
+    if(options.allowTermsAgree && u.pathname === "/v1/terms/agree" && req.method === "POST") {
+      let body="";for await(const part of req){body+=part;if(body.length>8192){res.writeHead(413);return res.end();}}
+      try {
+        const nowMs = Date.now();
+        const verified = verifyTermsAgreement(parseMcpJSON(body, 8192, 8), Math.floor(nowMs / 1000));
+        const key = `${verified.statement.actor}:${verified.statement.termsVersion}`;
+        const prev = h.termsAgreements.get(key);
+        if (prev && prev.termsHash === verified.statement.termsHash) {
+          res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+          return res.end(JSON.stringify({ ok: true, actor: prev.actor, termsVersion: prev.termsVersion, termsHash: prev.termsHash, agreedAt: prev.agreedAt, recordedAt: prev.recordedAt, alreadyAgreed: true }));
+        }
+        const rec = { actor: verified.statement.actor, termsVersion: verified.statement.termsVersion, termsHash: verified.statement.termsHash, agreedAt: verified.statement.agreedAt, recordedAt: nowMs, signature: verified.signature, statementJson: verified.statementJson };
+        h.termsAgreements.set(key, rec);
+        res.writeHead(201, { "content-type": "application/json", "cache-control": "no-store" });
+        return res.end(JSON.stringify({ ok: true, actor: rec.actor, termsVersion: rec.termsVersion, termsHash: rec.termsHash, agreedAt: rec.agreedAt, recordedAt: rec.recordedAt, alreadyAgreed: false }));
+      } catch (err) {
+        res.writeHead(400, { "content-type": "application/json", "cache-control": "no-store" });
+        return res.end(JSON.stringify({ code: err?.code ?? "TERMS_INVALID_INPUT", message: err?.message ?? "Invalid terms agreement" }));
+      }
     }
     if (req.method !== "GET" && req.method !== "HEAD") { h.writes.push(req.method); res.writeHead(405); return res.end(); }
     const json = (body, status = 200) => { res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" }); res.end(JSON.stringify(body)); };
@@ -37,7 +60,20 @@ export async function uiHarness(profile = "fixture", options = {}) {
       return json(h.stateStatus === 200 ? h.payload : { code: "UNAVAILABLE" }, h.stateStatus);
     }
     if (u.pathname === "/v1/network-status") return json(h.networkStatus??{ level: "online", hold: false, message: "🟢 Local test network", livePoA: false });
+    if (u.pathname === "/v1/treasury") return json(h.treasury ?? { total: null, escrow: null, treasury: null, poascanHomeUrl: "https://poascan.io/", checkedAt: Date.now(), stale: false });
+    if (u.pathname === "/v1/terms") return json(buildTermsInfo({ baseUrl: h.url }));
+    if (u.pathname === "/v1/terms/status") {
+      try {
+        const actor = principal(u.searchParams.get("actor") ?? "");
+        const rec = h.termsAgreements.get(`${actor}:${TERMS_VERSION}`);
+        const agreed = Boolean(rec && rec.termsHash === TERMS_HASH);
+        return json({ actor, agreed, termsVersion: TERMS_VERSION, termsHash: TERMS_HASH, agreedAt: agreed ? rec.agreedAt : null, recordedAt: agreed ? rec.recordedAt : null });
+      } catch {
+        return json({ code: "PRINCIPAL" }, 400);
+      }
+    }
     if (u.pathname === "/v1/escrow/capabilities") return json(h.escrowCap ?? { enabled: false });
+    if (u.pathname === "/v1/escrow/market") return json(h.escrowMarket ?? { items: [], serverTime: Date.now() });
     if (u.pathname.startsWith("/v1/")) return json({ code: "NOT_FOUND" }, 404);
     const pathname = u.pathname === "/" || /^\/(d|p)\/[^/]+$/.test(u.pathname) ? "/index.html" : u.pathname === "/terms" ? "/terms.html" : u.pathname;
     const file = resolve(root, "." + pathname);

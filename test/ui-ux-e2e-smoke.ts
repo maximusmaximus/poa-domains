@@ -197,6 +197,7 @@ async function runFullUiUxFlowsOnRegistryApp(
 
   await syntheticNetworkStatus(page,appUrl);
   await page.goto(appUrl);
+  await page.locator("#termsAgreeBtn").click();
   await page.waitForFunction(
     () =>
       document.querySelectorAll("#action option").length === 17 &&
@@ -491,6 +492,7 @@ async function runAgentRoundtripVerification(
 ) {
   await syntheticNetworkStatus(page,app.url);
   await page.goto(app.url);
+  await page.locator("#termsAgreeBtn").click();
   await page.waitForFunction(
     () => document.querySelectorAll("#names article").length >= 3,
   );
@@ -665,6 +667,7 @@ async function runStaticReferenceMultiBrowserSmoke(staticUrl: string) {
         }
       });
       await page.goto(staticUrl);
+      await page.locator("#termsAgreeBtn").click();
       await page.waitForFunction(
         () => document.querySelectorAll("#names article").length === 3,
       );

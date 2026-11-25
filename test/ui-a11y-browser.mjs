@@ -60,7 +60,7 @@ async function tabTo(page, id, direction = "Tab") {
 }
 const h = await uiHarness();
 let browser;
-async function setup(page) {
+async function setup(page, { scanGateLabel = "", keyboardOnly = false } = {}) {
   await page.route("https://**", (r) => {
     report.upstreamRequests.push(r.request().url());
     return r.abort();
@@ -75,6 +75,15 @@ async function setup(page) {
   await page.waitForFunction(
     () => document.body.dataset.registryStatus === "ready",
   );
+  if (await page.locator("#termsAgreeBtn").isVisible()) {
+    if (scanGateLabel) await scan(page, scanGateLabel);
+    if (keyboardOnly) {
+      await expect(page.locator("#termsAgreeBtn")).toBeFocused();
+      await page.keyboard.press("Enter");
+    } else {
+      await page.locator("#termsAgreeBtn").click();
+    }
+  }
 }
 try {
   browser = await chromium.launch();
@@ -83,7 +92,7 @@ try {
         viewport: { width, height: 900 },
       }),
       page = await context.newPage();
-    await setup(page);
+    await setup(page, { scanGateLabel: `explorer ${width} terms-gate` });
     // Public enabled/unpaused escrow UI, no signed account request and no financial button activation.
     await page.route("**/v1/escrow/**", async (r) => {
       assert.equal(r.request().method(), "GET");
@@ -154,7 +163,7 @@ try {
     const page = await browser.newPage({
       viewport: { width: 1440, height: 900 },
     });
-    await setup(page);
+    await setup(page, { keyboardOnly: true });
     // No .focus(), click() or mouse operations in this search → add → copy journey.
     await tabTo(page, "searchInput");
     await page.keyboard.type("keyboardalpha");

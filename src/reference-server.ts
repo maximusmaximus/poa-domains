@@ -6,6 +6,9 @@ import { readFileSync } from "node:fs";
 import { Engine } from "./engine.js";
 import { Fault, need } from "./core.js";
 import { registryRoute, RegistryRouteOptions } from "./registry-routes.js";
+import { principal } from "./auth.js";
+import { buildTermsInfo, TERMS_HASH, TERMS_VERSION, verifyTermsAgreement } from "./terms.js";
+import { parseMcpJSON } from "./mcp-json.js";
 const files: Record<string, [string, string]> = {
   "/icon.svg": ["icon.svg", "image/svg+xml"],
   "/": ["index.html", "text/html; charset=utf-8"],
@@ -15,6 +18,8 @@ const files: Record<string, [string, string]> = {
   "/shared.js": ["shared.js", "text/javascript; charset=utf-8"],
   "/config.json": ["config.json", "application/json; charset=utf-8"],
   "/style.css": ["style.css", "text/css; charset=utf-8"],
+  "/terms": ["terms.html", "text/html; charset=utf-8"],
+  "/terms.css": ["terms.css", "text/css; charset=utf-8"],
   ["/" + DOMAIN_FONT_FILE]: [DOMAIN_FONT_FILE, "font/woff2"],
   "/XeroEmoji-COLRv1.woff2": ["XeroEmoji-COLRv1.woff2", "font/woff2"],
 };
@@ -32,6 +37,7 @@ export async function startReferenceServer(
   options: ReferenceServerOptions = {},
 ): Promise<{ server: Server; url: string; close: () => Promise<void> }> {
   const bindHost = options.host ?? "127.0.0.1";
+  const termsAgreements = new Map<string, { actor: string; termsVersion: string; termsHash: string; agreedAt: number; recordedAt: number; signature: string; statementJson: string }>();
   const allowedHostnames = new Set<string>([
     "127.0.0.1",
     "localhost",
@@ -73,6 +79,53 @@ export async function startReferenceServer(
       const discovery=discoveryDocument(u.pathname);
       if(discovery){if(req.method!=="GET"&&req.method!=="HEAD")return send(405,{code:"METHOD_NOT_ALLOWED"});res.setHeader("content-type",discovery.type);res.setHeader("access-control-allow-origin","*");return void res.end(req.method==="HEAD"?undefined:discovery.text);}
       if (req.method === "GET" && u.pathname === "/config.json") return send(200,{mode:"local-reference-only",publicApiBase:""});
+      if ((req.method === "GET" || req.method === "HEAD") && u.pathname === "/v1/treasury") {
+        res.setHeader("access-control-allow-origin", "*");
+        if (req.method === "HEAD") { res.statusCode = 200; return void res.end(); }
+        return send(200, { total: null, escrow: null, treasury: null, poascanHomeUrl: "https://poascan.io/", checkedAt: Date.now(), stale: false });
+      }
+      if ((req.method === "GET" || req.method === "HEAD") && u.pathname === "/v1/terms") {
+        need(u.search === "", "QUERY_NOT_ALLOWED");
+        res.setHeader("access-control-allow-origin", "*");
+        if (req.method === "HEAD") { res.statusCode = 200; return void res.end(); }
+        return send(200, buildTermsInfo({ baseUrl: options.publicUrl || "" }));
+      }
+      if ((req.method === "GET" || req.method === "HEAD") && u.pathname === "/v1/terms/status") {
+        const keys = [...u.searchParams.keys()];
+        need(keys.length === 1 && keys[0] === "actor", "QUERY_NOT_ALLOWED");
+        const actor = principal(u.searchParams.get("actor") ?? "");
+        res.setHeader("access-control-allow-origin", "*");
+        if (req.method === "HEAD") { res.statusCode = 200; return void res.end(); }
+        const rec = termsAgreements.get(`${actor}:${TERMS_VERSION}`);
+        const agreed = Boolean(rec && rec.termsHash === TERMS_HASH);
+        return send(200, { actor, agreed, termsVersion: TERMS_VERSION, termsHash: TERMS_HASH, agreedAt: agreed ? rec!.agreedAt : null, recordedAt: agreed ? rec!.recordedAt : null });
+      }
+      if (req.method === "POST" && u.pathname === "/v1/terms/agree") {
+        need(u.search === "", "QUERY_NOT_ALLOWED");
+        const ctype = (req.headers["content-type"] ?? "").split(";")[0]!.trim().toLowerCase();
+        need(ctype === "application/json", "CONTENT_TYPE");
+        need(!req.headers["content-encoding"], "ENCODING");
+        let bytes = 0;
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+          bytes += chunk.length;
+          need(bytes <= 8192, "BODY_TOO_LARGE");
+          chunks.push(chunk);
+        }
+        need(bytes > 0, "EMPTY_BODY");
+        const raw = new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks));
+        const parsed = parseMcpJSON(raw, 8192, 8);
+        const nowMs = Date.now();
+        const verified = verifyTermsAgreement(parsed, Math.floor(nowMs / 1000));
+        const key = `${verified.statement.actor}:${verified.statement.termsVersion}`;
+        const prev = termsAgreements.get(key);
+        if (prev && prev.termsHash === verified.statement.termsHash) {
+          return send(200, { ok: true, actor: prev.actor, termsVersion: prev.termsVersion, termsHash: prev.termsHash, agreedAt: prev.agreedAt, recordedAt: prev.recordedAt, alreadyAgreed: true });
+        }
+        const rec = { actor: verified.statement.actor, termsVersion: verified.statement.termsVersion, termsHash: verified.statement.termsHash, agreedAt: verified.statement.agreedAt, recordedAt: nowMs, signature: verified.signature, statementJson: verified.statementJson };
+        termsAgreements.set(key, rec);
+        return send(201, { ok: true, actor: rec.actor, termsVersion: rec.termsVersion, termsHash: rec.termsHash, agreedAt: rec.agreedAt, recordedAt: rec.recordedAt, alreadyAgreed: false });
+      }
       if (req.method === "GET") {
         res.setHeader("access-control-allow-origin", "*");
         const assetPath = /^\/(d|p)\/[^/]+\/?$/.test(u.pathname) ? "/" : u.pathname;

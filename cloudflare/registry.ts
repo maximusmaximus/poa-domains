@@ -1,7 +1,7 @@
 import { publicRegistryRoute } from "./public-registry-view.js";
 import { registryRoute, type RegistryCall, type RegistryReply } from "../src/registry-routes.js";
 import { marketView, publicCommand, subnameView } from "./escrow-public.js";
-import { registryTitles } from "./escrow-titles.js";
+import { escrowPacketBlocked, registryTitles } from "./escrow-titles.js";
 import { DurableObject } from "cloudflare:workers";
 import { createPrivateKey, generateKeyPairSync, KeyObject } from "node:crypto";
 import { Escrow, Policy, SQLiteEscrowJournal, EscrowArchive, exportEscrow, restoreEscrow, reviewedCredit, replay as replayEscrow } from "./escrow.js";
@@ -17,6 +17,8 @@ import { normalizeName } from "../src/names.js";
 import { BootableSystemClock, seedRegistry } from "../src/seed.js";
 import { SQLiteJournal } from "./sqlite-journal.js";
 import { BackupKind, JournalRow, buildBackup, encryptSecrets, journalHeadOf, secretAad, verifyBackup } from "./backup-codec.js";
+import type { FeedbackChallengeRow, FeedbackConsumeInput, FeedbackConsumeResult } from "./feedback.js";
+import type { TermsAgreementRecord } from "./terms.js";
 
 export interface BackupExport { bodyText: string; sha256: string; size: number; sequence: number; stateHash: string; createdAt: string; }
 export type EscrowExport = EscrowArchive;
@@ -73,6 +75,182 @@ export class PoaRegistry extends DurableObject<Env> {
     sql.exec("CREATE TABLE IF NOT EXISTS network_status_cache (id INTEGER PRIMARY KEY CHECK(id=1), at INTEGER NOT NULL, value TEXT NOT NULL)");
     // Newest observation wins across isolates.
     sql.exec("INSERT INTO network_status_cache(id, at, value) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET at=excluded.at, value=excluded.value WHERE excluded.at >= network_status_cache.at", at, value);
+  }
+  /** Read-only public addresses for the Domains Treasury footer balance aggregator. */
+  treasuryAddresses(): { escrow: string | null; treasury: string | null } {
+    const escrow = typeof this.env.POA_ESCROW_ADDRESS === "string" && this.env.POA_ESCROW_ADDRESS.trim()
+      ? this.env.POA_ESCROW_ADDRESS.trim()
+      : null;
+    const treasury = typeof this.engine?.config?.treasury === "string" && this.engine.config.treasury.trim()
+      ? this.engine.config.treasury.trim()
+      : null;
+    return { escrow, treasury };
+  }
+  #ensureTermsTable(): void {
+    this.ctx.storage.sql.exec(
+      "CREATE TABLE IF NOT EXISTS terms_agreements (actor TEXT NOT NULL, terms_version TEXT NOT NULL, terms_hash TEXT NOT NULL, agreed_at INTEGER NOT NULL, recorded_at INTEGER NOT NULL, signature TEXT NOT NULL, statement_json TEXT NOT NULL, PRIMARY KEY (actor, terms_version));",
+    );
+  }
+  /** Isolated Terms acceptance table for signed agent attestations; never part of registry state, journal, or backups. */
+  getTermsAgreement(actor: string, termsVersion: string): TermsAgreementRecord | null {
+    this.#ensureTermsTable();
+    const row = this.ctx.storage.sql.exec<{
+      actor: string;
+      terms_version: string;
+      terms_hash: string;
+      agreed_at: number;
+      recorded_at: number;
+      signature: string;
+      statement_json: string;
+    }>(
+      "SELECT actor, terms_version, terms_hash, agreed_at, recorded_at, signature, statement_json FROM terms_agreements WHERE actor = ? AND terms_version = ?",
+      actor,
+      termsVersion,
+    ).toArray()[0];
+    if (!row) return null;
+    return {
+      actor: String(row.actor),
+      termsVersion: String(row.terms_version),
+      termsHash: String(row.terms_hash),
+      agreedAt: Number(row.agreed_at),
+      recordedAt: Number(row.recorded_at),
+      signature: String(row.signature),
+      statementJson: String(row.statement_json),
+    };
+  }
+  recordTermsAgreement(row: TermsAgreementRecord): { record: TermsAgreementRecord; alreadyAgreed: boolean } {
+    this.#ensureTermsTable();
+    return this.ctx.storage.transactionSync(() => {
+      const existing = this.getTermsAgreement(row.actor, row.termsVersion);
+      if (existing && existing.termsHash === row.termsHash) {
+        return { record: existing, alreadyAgreed: true };
+      }
+      this.ctx.storage.sql.exec(
+        "INSERT OR REPLACE INTO terms_agreements(actor, terms_version, terms_hash, agreed_at, recorded_at, signature, statement_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        row.actor,
+        row.termsVersion,
+        row.termsHash,
+        row.agreedAt,
+        row.recordedAt,
+        row.signature,
+        row.statementJson,
+      );
+      return { record: row, alreadyAgreed: false };
+    });
+  }
+  #ensureFeedbackTables(): void {
+    const sql = this.ctx.storage.sql;
+    sql.exec(
+      "CREATE TABLE IF NOT EXISTS feedback_challenges (id TEXT PRIMARY KEY, answer_hash TEXT NOT NULL, svg TEXT NOT NULL, pow_salt TEXT NOT NULL, pow_bits INTEGER NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, ip_hash TEXT NOT NULL, used INTEGER NOT NULL DEFAULT 0);" +
+      "CREATE TABLE IF NOT EXISTS feedback_events (id TEXT PRIMARY KEY, ip_hash TEXT NOT NULL, poa_hash TEXT, content_hash TEXT NOT NULL, created_at INTEGER NOT NULL);",
+    );
+  }
+  /** Ephemeral side table for single-use CAPTCHA challenges; never part of registry state, journal, or backups. */
+  createFeedbackChallenge(row: FeedbackChallengeRow): { ok: true } | { ok: false; code: string } {
+    this.#ensureFeedbackTables();
+    const sql = this.ctx.storage.sql;
+    const now = row.createdAt;
+    sql.exec("DELETE FROM feedback_challenges WHERE expires_at <= ? OR used = 1", now);
+    const recentIp = sql.exec<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM feedback_challenges WHERE ip_hash = ? AND created_at > ?",
+      row.ipHash,
+      now - 10 * 60_000,
+    ).one().n;
+    if (recentIp >= 15) return { ok: false, code: "FEEDBACK_RATE_LIMITED" };
+    const totalActive = sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM feedback_challenges").one().n;
+    if (totalActive >= 500) {
+      sql.exec("DELETE FROM feedback_challenges WHERE id IN (SELECT id FROM feedback_challenges ORDER BY created_at ASC LIMIT 100)");
+    }
+    sql.exec(
+      "INSERT INTO feedback_challenges(id, answer_hash, svg, pow_salt, pow_bits, created_at, expires_at, ip_hash, used) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)",
+      row.id,
+      row.answerHash,
+      row.svg,
+      row.powSalt,
+      row.powBits,
+      row.createdAt,
+      row.expiresAt,
+      row.ipHash,
+    );
+    return { ok: true };
+  }
+  getFeedbackChallengeMeta(id: string, now: number): { powSalt: string; powBits: number; svg: string } | null {
+    this.#ensureFeedbackTables();
+    const sql = this.ctx.storage.sql;
+    const row = sql.exec<{ pow_salt: string; pow_bits: number; svg: string }>(
+      "SELECT pow_salt, pow_bits, svg FROM feedback_challenges WHERE id = ? AND used = 0 AND expires_at > ?",
+      id,
+      now,
+    ).toArray()[0];
+    if (!row) return null;
+    return { powSalt: row.pow_salt, powBits: Number(row.pow_bits), svg: row.svg };
+  }
+  consumeFeedbackChallenge(input: FeedbackConsumeInput): FeedbackConsumeResult {
+    this.#ensureFeedbackTables();
+    const sql = this.ctx.storage.sql;
+    return this.ctx.storage.transactionSync((): FeedbackConsumeResult => {
+      sql.exec("DELETE FROM feedback_events WHERE created_at <= ?", input.now - 24 * 60 * 60_000);
+      const row = sql.exec<{
+        answer_hash: string;
+        pow_salt: string;
+        pow_bits: number;
+        created_at: number;
+        expires_at: number;
+        ip_hash: string;
+        used: number;
+      }>(
+        "SELECT answer_hash, pow_salt, pow_bits, created_at, expires_at, ip_hash, used FROM feedback_challenges WHERE id = ?",
+        input.id,
+      ).toArray()[0];
+      if (!row || row.used !== 0 || row.expires_at <= input.now || row.ip_hash !== input.ipHash) {
+        return { ok: false, code: "FEEDBACK_CAPTCHA_EXPIRED" };
+      }
+      if (input.now - Number(row.created_at) < input.minDwellMs) {
+        return { ok: false, code: "FEEDBACK_TOO_FAST" };
+      }
+      // Single-use burn on any attempt so callers get strictly one guess per challenge.
+      sql.exec("UPDATE feedback_challenges SET used = 1, svg = '' WHERE id = ?", input.id);
+      let diff = row.answer_hash.length ^ input.answerHash.length;
+      const len = Math.min(row.answer_hash.length, input.answerHash.length);
+      for (let i = 0; i < len; i++) diff |= row.answer_hash.charCodeAt(i) ^ input.answerHash.charCodeAt(i);
+      if (diff !== 0) {
+        return { ok: false, code: "FEEDBACK_CAPTCHA_INVALID" };
+      }
+      const ipHour = sql.exec<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM feedback_events WHERE ip_hash = ? AND created_at > ?",
+        input.ipHash,
+        input.now - 60 * 60_000,
+      ).one().n;
+      if (ipHour >= 3) return { ok: false, code: "FEEDBACK_RATE_LIMITED", retryAfterSec: 1800 };
+      const ipDay = sql.exec<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM feedback_events WHERE ip_hash = ?",
+        input.ipHash,
+      ).one().n;
+      if (ipDay >= 6) return { ok: false, code: "FEEDBACK_RATE_LIMITED", retryAfterSec: 3600 };
+      if (input.poaHash) {
+        const poaDay = sql.exec<{ n: number }>(
+          "SELECT COUNT(*) AS n FROM feedback_events WHERE poa_hash = ?",
+          input.poaHash,
+        ).one().n;
+        if (poaDay >= 5) return { ok: false, code: "FEEDBACK_RATE_LIMITED", retryAfterSec: 3600 };
+      }
+      const globalDay = sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM feedback_events").one().n;
+      if (globalDay >= 25) return { ok: false, code: "FEEDBACK_RATE_LIMITED", retryAfterSec: 3600 };
+      const dup = sql.exec<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM feedback_events WHERE content_hash = ?",
+        input.contentHash,
+      ).one().n;
+      if (dup > 0) return { ok: false, code: "FEEDBACK_DUPLICATE" };
+      sql.exec(
+        "INSERT INTO feedback_events(id, ip_hash, poa_hash, content_hash, created_at) VALUES (?, ?, ?, ?, ?)",
+        input.id,
+        input.ipHash,
+        input.poaHash,
+        input.contentHash,
+        input.now,
+      );
+      return { ok: true, powSalt: row.pow_salt, powBits: Number(row.pow_bits) };
+    });
   }
   #initialize(): void {
     const sql = this.ctx.storage.sql;
@@ -198,13 +376,14 @@ export class PoaRegistry extends DurableObject<Env> {
     }catch(e){if(e instanceof Fault||e instanceof Error&&/^ESCROW_[A-Z_]+$/.test(e.message))throw e;
       this.ctx.abort("Escrow public command storage failure");throw new Error("ESCROW_UNAVAILABLE");}
   }
-  private escrowTitleLocked(): boolean {
+  private escrowTitleLocked(packet?: unknown): boolean {
     const sql = this.ctx.storage.sql;
     if (!sql.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='escrow_journal'").toArray().length) return false;
     const row = sql.exec<{record:string}>("SELECT record FROM escrow_journal ORDER BY sequence DESC LIMIT 1").toArray()[0];
     if (!row) return false;
     const state = JSON.parse(row.record).state as import("./escrow.js").State;
-    return Object.values(state.auctions).some(a => a.status === "OPEN" || a.status === "SETTLING");
+    if (packet === undefined) return Object.values(state.auctions).some(a => a.status === "OPEN" || a.status === "SETTLING");
+    return escrowPacketBlocked(state, this.engine, packet);
   }
   async alarm(): Promise<void> {
     if (String(this.env.POA_ESCROW_ENABLED) !== "true" || String(this.env.POA_ESCROW_NETWORK_WRITES) !== "approved-v1") return;
@@ -247,8 +426,8 @@ export class PoaRegistry extends DurableObject<Env> {
       return publicRegistryRoute(e, call, {
         health: { livePoA: false, principals: this.principals },
         capabilities: { publicExplorerUrl: this.env.PUBLIC_EXPLORER_URL, escrow: {enabled:String(this.env.POA_ESCROW_ENABLED)==="true",capabilities:"/v1/escrow/capabilities"} },
-        // Keep the title/nonce reservation hook in its original durable-object boundary.
-        beforeSubmit: () => need(!this.escrowTitleLocked(), "ESCROW_TITLE_RESERVED"),
+        // Scope title/nonce reservation to domains currently in escrow (and settling seller nonces).
+        beforeSubmit: (packet) => need(!this.escrowTitleLocked(packet), "ESCROW_TITLE_RESERVED"),
       });
     } catch (error) {
       if (error instanceof Fault) {

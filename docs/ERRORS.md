@@ -622,6 +622,46 @@ HTTP 503; retryable: true. Escrow outcome may be unknown. Keep the exact signed 
 
 HTTP 400; retryable: false. Escrow unknown deposit. Check the documented inputs and current state.
 
+## FEEDBACK_CAPTCHA_EXPIRED
+
+HTTP 400; retryable: false. The verification challenge expired or was already used. Request a new code and try again.
+
+## FEEDBACK_CAPTCHA_INVALID
+
+HTTP 400; retryable: false. The verification code did not match. A new code is required.
+
+## FEEDBACK_CONTAINS_SECRET
+
+HTTP 400; retryable: false. Submission rejected because it looks like a private key, seed phrase, or secret token. Remove secrets before submitting.
+
+## FEEDBACK_DISABLED
+
+HTTP 503; retryable: true. Public feedback submission is not configured on this server yet.
+
+## FEEDBACK_DUPLICATE
+
+HTTP 409; retryable: false. This feedback was already submitted recently. Avoid duplicate reports.
+
+## FEEDBACK_INVALID_INPUT
+
+HTTP 400; retryable: false. Check the feedback type, title (5–120 chars), details (15–3000 chars), and optional poa1… address.
+
+## FEEDBACK_POW_INVALID
+
+HTTP 400; retryable: false. Browser verification check failed. Reload the code and submit again.
+
+## FEEDBACK_RATE_LIMITED
+
+HTTP 429; retryable: true. Too many feedback submissions right now. Please wait before submitting again.
+
+## FEEDBACK_TOO_FAST
+
+HTTP 400; retryable: false. Please wait a couple of seconds after loading the form before submitting.
+
+## FEEDBACK_UPSTREAM_FAILED
+
+HTTP 502; retryable: true. Could not post feedback to the repository right now. Try again shortly.
+
 ## FILE_REQUIRED
 
 HTTP 400; retryable: false. File required. Check the documented inputs and current state.
@@ -1434,6 +1474,26 @@ HTTP 400; retryable: false. Storage path. Check the documented inputs and curren
 
 HTTP 400; retryable: false. String. Check the documented inputs and current state.
 
+## TERMS_EXPIRED
+
+HTTP 400; retryable: false. The signed Terms statement timestamp is outside the allowed window. Refresh GET /v1/terms and sign again.
+
+## TERMS_INVALID_INPUT
+
+HTTP 400; retryable: false. Provide a valid signed Terms agreement packet { statement, signature } with agreed: true and a valid public principal.
+
+## TERMS_RATE_LIMITED
+
+HTTP 429; retryable: true. Too many Terms agreement requests right now. Wait a moment and try again.
+
+## TERMS_SIGNATURE_INVALID
+
+HTTP 400; retryable: false. The Ed25519 signature does not match the canonical Terms statement and actor public key.
+
+## TERMS_VERSION_MISMATCH
+
+HTTP 409; retryable: false. The signed Terms version or SHA-256 hash does not match the current Terms. Read GET /v1/terms first.
+
 ## TITLE_LOCKED
 
 HTTP 400; retryable: false. Title locked. Check the documented inputs and current state.
@@ -1445,6 +1505,10 @@ HTTP 400; retryable: false. Tool. Check the documented inputs and current state.
 ## TOOL_FAILURE
 
 HTTP 400; retryable: false. Tool failure. Check the documented inputs and current state.
+
+## TREASURY_UNAVAILABLE
+
+HTTP 503; retryable: true. Live treasury balance could not be read right now. Check POAScan directly.
 
 ## UNEXPECTED_BUILD_ARTIFACT
 
