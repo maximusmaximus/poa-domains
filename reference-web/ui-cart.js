@@ -1,12 +1,12 @@
-import { publicNameUnavailable } from "./shared.js?v=a12c4f25ce0d";
-import { registryUnit } from "./shared.js?v=a12c4f25ce0d";
-import { actionLabel } from "./ui-copy.js?v=a12c4f25ce0d";
-import { trapDialog } from "./ui-a11y.js?v=a12c4f25ce0d";
-import { ui } from "./ui-state.js?v=a12c4f25ce0d";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=a12c4f25ce0d";
-import { add, el, endpointBase } from "./ui-core.js?v=a12c4f25ce0d";
-import { domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=a12c4f25ce0d";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=a12c4f25ce0d";
+import { publicNameUnavailable } from "./shared.js?v=d434aec15419";
+import { registryUnit } from "./shared.js?v=d434aec15419";
+import { actionLabel } from "./ui-copy.js?v=d434aec15419";
+import { trapDialog } from "./ui-a11y.js?v=d434aec15419";
+import { ui } from "./ui-state.js?v=d434aec15419";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=d434aec15419";
+import { add, el, endpointBase } from "./ui-core.js?v=d434aec15419";
+import { domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=d434aec15419";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=d434aec15419";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;

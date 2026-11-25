@@ -1,13 +1,13 @@
-import { copyText } from "./ui-copy.js?v=a12c4f25ce0d";
-import { publicNameUnavailable } from "./shared.js?v=a12c4f25ce0d";
-import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=a12c4f25ce0d";
-import { ui } from "./ui-state.js?v=a12c4f25ce0d";
-import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, writeViewURL } from "./ui-router.js?v=a12c4f25ce0d";
-import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=a12c4f25ce0d";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=a12c4f25ce0d";
-import { addToCart } from "./ui-cart.js?v=a12c4f25ce0d";
-import { suggestNames } from "./ideas-generator.js?v=a12c4f25ce0d";
-import { logSubmittedSearch } from "./ui-search-log.js?v=a12c4f25ce0d";
+import { copyText } from "./ui-copy.js?v=d434aec15419";
+import { publicNameUnavailable } from "./shared.js?v=d434aec15419";
+import { registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, activePoaFixedListings, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=d434aec15419";
+import { ui } from "./ui-state.js?v=d434aec15419";
+import { domainHeader, nameLink, navigateDomain, openManageDomain, openPoa, ownerLink, writeViewURL } from "./ui-router.js?v=d434aec15419";
+import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=d434aec15419";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=d434aec15419";
+import { addToCart } from "./ui-cart.js?v=d434aec15419";
+import { suggestNames } from "./ideas-generator.js?v=d434aec15419";
+import { logSubmittedSearch } from "./ui-search-log.js?v=d434aec15419";
 
 let activeSuggestionIdx = -1;
 let currentSuggestions = [];
@@ -86,7 +86,188 @@ function highlightSuggestion(idx) {
     }
 }
 
+function isDropdownSuggestionCandidate(name) {
+    if (isAvailableCandidate(name))
+        return true;
+    if (!ui.cap || !ui.latestState)
+        return false;
+    if (publicNameUnavailable(name, ui.cap))
+        return false;
+    const nowMs = ui.escrowMarketServerTime || Date.now();
+    if (poaOnlyMode(ui.cap))
+        return Boolean(findOpenPoaAuctionByName(ui.escrowMarket, name, nowMs));
+    const entry = ui.latestState.names?.[name];
+    return Boolean(
+        (entry?.auctionId && ui.latestState.auctions?.[entry.auctionId]?.status === "live") ||
+        Object.values(ui.latestState.auctions ?? {}).some((a) => a.name === name && a.status === "live"),
+    );
+}
+
+function classifySearchName(rawQuery) {
+    if (!ui.cap || !ui.latestState)
+        return null;
+    const trimmed = String(rawQuery ?? "").trim();
+    if (!trimmed)
+        return null;
+    const stripped = trimmed.startsWith("poa:") ? trimmed.slice(4).trim() : trimmed;
+    if (!stripped)
+        return null;
+    let info;
+    try {
+        info = inspectName(stripped, ui.cap.emojiManifest);
+    }
+    catch {
+        return null;
+    }
+    const s = ui.latestState;
+    const name = info.canonical;
+    const entry = s.names?.[name];
+    const poa = poaOnlyMode(ui.cap);
+    const nowMs = ui.escrowMarketServerTime || Date.now();
+    if (publicNameUnavailable(name, ui.cap)) {
+        return { name, info, status: "unavailable", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Not available · View" };
+    }
+    if (info.isRoot && ui.reservedSet.has(name) && !(entry?.activeId && s.deeds?.[entry.activeId])) {
+        return { name, info, status: "reserved", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Reserved · Not available" };
+    }
+    if (variantOwner(name)) {
+        return { name, info, status: "unavailable", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Not available · View" };
+    }
+    const poaAuction = poa ? findOpenPoaAuctionByName(ui.escrowMarket, name, nowMs) : null;
+    if (poaAuction) {
+        const awaiting = isPoaAuctionAwaitingFirstBid(poaAuction);
+        const minNext = poaMinimumNextBid(poaAuction);
+        return {
+            name,
+            info,
+            status: "auction",
+            tone: "auction",
+            canAddToCart: true,
+            goToPage: false,
+            meta: `${awaiting ? "🔨 For auction" : "🔥 Live auction"} · ${poaShort(minNext)} POA · + Cart`,
+        };
+    }
+    const poaFixed = poa ? activePoaFixedListings(ui.escrowMarket, nowMs).find((x) => x.name === name) ?? null : null;
+    if (poaFixed) {
+        return {
+            name,
+            info,
+            status: "for-sale",
+            tone: "auction",
+            canAddToCart: false,
+            goToPage: true,
+            meta: `🏷️ For sale · ${poaShort(poaFixed.price)} POA · View`,
+        };
+    }
+    const liveAuction = entry?.auctionId && s.auctions?.[entry.auctionId]?.status === "live"
+        ? s.auctions[entry.auctionId]
+        : Object.values(s.auctions ?? {}).find((a) => a.name === name && a.status === "live");
+    if (liveAuction) {
+        if (poa) {
+            return { name, info, status: "unavailable", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Not available · View" };
+        }
+        const minBid = liveAuction.high ? minimumNextBid(liveAuction.high.amount, ui.cap.increment) : liveAuction.reserve;
+        return {
+            name,
+            info,
+            status: "auction",
+            tone: "auction",
+            canAddToCart: true,
+            goToPage: false,
+            meta: `🔨 For auction · ${compactAmount(minBid)} units · + Cart`,
+        };
+    }
+    if (entry?.activeId && s.deeds?.[entry.activeId]) {
+        const d = s.deeds[entry.activeId];
+        const resaleOffer = !poa
+            ? Object.values(s.offers ?? {}).find((o) => o.kind === "resale" &&
+                o.parentId === d.id &&
+                !o.cancelled &&
+                o.uses < o.maxUses &&
+                s.time < o.validUntil)
+            : null;
+        if (resaleOffer) {
+            return {
+                name,
+                info,
+                status: "for-sale",
+                tone: "auction",
+                canAddToCart: true,
+                goToPage: false,
+                meta: `💰 For sale · ${compactAmount(resaleOffer.price)} units · + Cart`,
+            };
+        }
+        return { name, info, status: "taken", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Not available · View" };
+    }
+    if (!info.isRoot) {
+        const parentEntry = s.names?.[info.parent];
+        const parentDeed = parentEntry?.activeId ? s.deeds?.[parentEntry.activeId] : null;
+        if (poa) {
+            return {
+                name,
+                info,
+                status: parentDeed ? "subname" : "unavailable",
+                tone: parentDeed ? "neutral" : "unavailable",
+                canAddToCart: false,
+                goToPage: true,
+                meta: parentDeed ? "⚪ Subname · View" : "🔴 Not available",
+            };
+        }
+        const childOffer = parentDeed
+            ? Object.values(s.offers ?? {}).find((o) => o.kind === "child" &&
+                o.parentId === parentDeed.id &&
+                !o.cancelled &&
+                o.uses < o.maxUses &&
+                s.time < o.validUntil &&
+                (o.labels === null || o.labels.includes(info.childLabel)))
+            : null;
+        if (childOffer) {
+            return {
+                name,
+                info,
+                status: "available",
+                tone: "available",
+                canAddToCart: true,
+                goToPage: false,
+                meta: `🟢 ${compactAmount(childOffer.price)} units · + Cart`,
+            };
+        }
+        return { name, info, status: "unavailable", tone: "unavailable", canAddToCart: false, goToPage: true, meta: "🔴 Not available" };
+    }
+    const price = suggestionPriceLabel(info);
+    return {
+        name,
+        info,
+        status: "available",
+        tone: "available",
+        canAddToCart: true,
+        goToPage: false,
+        meta: (price ? `🟢 ${price}` : "🟢 Available") + " · + Cart",
+    };
+}
+
+function activateSearchSuggestion(item) {
+    if (!item || !item.name)
+        return;
+    const input = el("searchInput");
+    if (input)
+        input.value = item.name;
+    closeSearchSuggestions();
+    if (!item.canAddToCart && item.goToPage) {
+        logSubmittedSearch(item.name);
+        navigateDomain(item.name);
+        return;
+    }
+    runSearch(item.name, true, { autoAdd: true, fromSuggestion: true });
+    logSubmittedSearch(item.name);
+}
+
 export function selectSearchSuggestion(name) {
+    const classified = classifySearchName(name);
+    if (classified) {
+        activateSearchSuggestion(classified);
+        return;
+    }
     const input = el("searchInput");
     if (input)
         input.value = name;
@@ -106,12 +287,37 @@ export function updateSearchSuggestions() {
         closeSearchSuggestions();
         return;
     }
-    const { completion, items } = suggestNames(q, {
+    const exact = classifySearchName(q);
+    const nowMs = ui.escrowMarketServerTime || Date.now();
+    const extraWords = poaOnlyMode(ui.cap) && Array.isArray(ui.escrowMarket)
+        ? ui.escrowMarket
+            .filter((a) => a && a.status === "OPEN" && a.kind !== "fixed" && (isPoaAuctionAwaitingFirstBid(a) || !a.closes || nowMs < a.closes))
+            .map((a) => a.name)
+        : [];
+    const { completion, items: rawItems } = suggestNames(q, {
         manifest: ui.cap.emojiManifest,
-        accept: isAvailableCandidate,
+        accept: isDropdownSuggestionCandidate,
         limit: 8,
+        extraWords,
     });
-    currentSuggestions = items;
+    const combined = [];
+    const seenNames = new Set();
+    if (exact) {
+        combined.push({ ...exact, kind: "exact" });
+        seenNames.add(exact.name);
+    }
+    for (const raw of rawItems) {
+        if (combined.length >= 8)
+            break;
+        if (seenNames.has(raw.name))
+            continue;
+        const classified = classifySearchName(raw.name);
+        if (!classified)
+            continue;
+        combined.push({ ...classified, kind: raw.kind });
+        seenNames.add(classified.name);
+    }
+    currentSuggestions = combined;
     currentCompletion = completion;
     activeSuggestionIdx = -1;
     input.removeAttribute("aria-activedescendant");
@@ -126,15 +332,19 @@ export function updateSearchSuggestions() {
         }
     }
     list.replaceChildren();
-    if (!items.length) {
+    if (!combined.length) {
         list.hidden = true;
         input.setAttribute("aria-expanded", "false");
         return;
     }
-    items.forEach((item, index) => {
+    combined.forEach((item, index) => {
         const li = document.createElement("li");
         li.id = `search-opt-${index}`;
-        li.className = "search-suggestion-item";
+        li.className = "search-suggestion-item" +
+            (item.kind === "exact" ? " is-exact" : "") +
+            (item.tone === "unavailable" ? " is-unavailable" : item.tone === "auction" ? " is-auction" : "");
+        li.dataset.status = item.status;
+        li.dataset.canAddToCart = String(item.canAddToCart);
         li.setAttribute("role", "option");
         li.setAttribute("aria-selected", "false");
         const nameSpan = document.createElement("span");
@@ -142,12 +352,11 @@ export function updateSearchSuggestions() {
         nameSpan.textContent = item.name;
         const metaSpan = document.createElement("span");
         metaSpan.className = "search-suggestion-meta";
-        const price = suggestionPriceLabel(item);
-        metaSpan.textContent = (price ? `🟢 ${price}` : "🟢 Available") + " · + Cart";
+        metaSpan.textContent = item.meta;
         li.append(nameSpan, metaSpan);
         li.addEventListener("mousedown", (e) => {
             e.preventDefault();
-            selectSearchSuggestion(item.name);
+            activateSearchSuggestion(item);
         });
         list.append(li);
     });
@@ -160,16 +369,13 @@ export function submitSearchQuery() {
     if (!input)
         return;
     const raw = input.value.trim();
-    let chosen = raw;
-    let fromSuggestion = false;
     if (activeSuggestionIdx >= 0 && currentSuggestions[activeSuggestionIdx]) {
-        chosen = currentSuggestions[activeSuggestionIdx].name;
-        input.value = chosen;
-        fromSuggestion = true;
+        activateSearchSuggestion(currentSuggestions[activeSuggestionIdx]);
+        return;
     }
     closeSearchSuggestions();
-    runSearch(chosen, true, { autoAdd: true, fromSuggestion });
-    logSubmittedSearch(chosen);
+    runSearch(raw, true, { autoAdd: true, fromSuggestion: false });
+    logSubmittedSearch(raw);
 }
 
 export function wireSearchAutocomplete() {
@@ -261,7 +467,16 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
         add(card, "p", nameErrorReason(error), "badge-warn");
         return;
     }
-    if(publicNameUnavailable(info.canonical,ui.cap)){add(container,"p","🔒 Name unavailable. Stored records are withheld from public view; this name is not free to register.","badge-warn");return;}
+    if (publicNameUnavailable(info.canonical, ui.cap)) {
+        const card = add(container, "div", "", "card");
+        const title = add(card, "h4", "");
+        domainHeader(title, info.canonical);
+        const openPage = add(card, "button", "Open page", "secondary small");
+        openPage.type = "button";
+        openPage.addEventListener("click", () => navigateDomain(info.canonical));
+        add(card, "p", "🔴 Name unavailable — Stored records are withheld from public view; this name is not free to register.", "badge-warn");
+        return;
+    }
     const s = ui.latestState;
     const name = info.canonical;
     const card = add(container, "div", "", "card");
@@ -273,14 +488,14 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
     const kind=add(card,"p",info.isRoot?"Root":"Child of ");if(!info.isRoot)nameLink(kind,info.parent);kind.append(" · "+info.tier.toUpperCase());
     const entry = s.names[name];
     if (info.isRoot && ui.reservedSet.has(name) && !(entry?.activeId && s.deeds?.[entry.activeId])) {
-        add(card, "p", "🔒 Reserved — not for sale", "badge-warn");
+        add(card, "p", "🔴 Reserved — not for sale (Not available)", "badge-warn");
         add(card, "p", `${ui.reservedSet.size}-name reservation catalog`);
         appendSuggestedAlternatives(card, name);
         return;
     }
     const sameEmoji = variantOwner(name);
     if (sameEmoji) {
-        add(card, "p", "🔒 Taken — same emoji as another name", "badge-warn");
+        add(card, "p", "🔴 Not available — same emoji as another name", "badge-warn");
         const p = add(card, "p", "Owned or in auction as ");
         nameLink(p, sameEmoji);
         add(card, "p", "One owner per emoji, whatever the skin tone or style.").setAttribute("data-info-description", "");
@@ -433,7 +648,15 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
     }
     if (entry?.activeId && s.deeds[entry.activeId]) {
         const d = s.deeds[entry.activeId];
-        add(card, "p", `✅ Owned (${d.rights.kind}) — OWNED (${d.rights.kind.toUpperCase()} DEED)`, "badge");
+        const poaFixed = poa ? activePoaFixedListings(ui.escrowMarket, ui.escrowMarketServerTime || Date.now()).find((x) => x.name === name) ?? null : null;
+        if (poaFixed) {
+            add(card, "p", `🏷️ For sale — ${poaShort(poaFixed.price)} POA (Fixed price)`, "badge-ok");
+            const buyBtn = add(card, "button", "🪙 Open My POA to buy", "small");
+            buyBtn.type = "button";
+            buyBtn.addEventListener("click", () => openPoa(name));
+        } else {
+            add(card, "p", `🔴 Not available — Owned (${d.rights.kind}) — OWNED (${d.rights.kind.toUpperCase()} DEED)`, "badge-warn");
+        }
         const ownerInfo = add(card, "p", "Owner: ");
         ownerLink(ownerInfo, d.owner, person(d.owner));
         ownerInfo.append(` · Generation ${d.generation} · Owner version ${d.ownerVersion} · Deed version ${d.version}`);
