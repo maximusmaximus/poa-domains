@@ -5,7 +5,7 @@ import { base58 } from "../../src/native-crypto.js";
 import { canonical } from "../../src/core.js";
 import { Escrow, PILOT_ADMISSION_LIMIT, PILOT_JOURNAL_LIMIT, REVIEWED_CREDITS, invariant, nextEntry, recoveryReserve, replay, reviewedCredit } from "../escrow.js";
 import { CHAIN, WorkerSecretSigner, digest, micros, decimal, txid, verifyCommand, verifyTransfer } from "../escrow-codec.js";
-import { PoaHttpNetwork, MAINNET_ENGINE_SHA256, MAINNET_PARAMS_SHA256, PILOT_PER_TX, PILOT_DAILY } from "../escrow-network.js";
+import { PoaHttpNetwork, MAINNET_ENGINE_SHA256, MAINNET_PARAMS_SHA256, PILOT_PER_TX, PILOT_DAILY, type CoveredTxCache } from "../escrow-network.js";
 import { MockNetwork, MemoryJournal, policy, who, key, seed, signer, command, depositBody, root, parents } from "./escrow-fixture.js";
 import type { Status } from "../escrow.js";
 function fixture(crash=(point:string)=>{}, p=policy){
@@ -1489,4 +1489,117 @@ test("transport failures in cut/lookup/context map cleanly to ESCROW_NETWORK_HEL
  f.net.context=async()=>{throw new TypeError("socket hang up");};
  await assert.rejects(f.e.tick(),/^Error: ESCROW_NETWORK_HELD$/);
  f.net.context=origContext;
+});
+
+test("cut() persists verified checkpoint-covered batches incrementally, retries one transient 503, and never retries 401",async()=>{
+ let now=1_800_000_120_000;
+ const root="b".repeat(64);
+ const bodies=Array.from({length:5},(_,i)=>depositBody(3,policy.wallet,"1.000000",`inc-${i}`,i+1));
+ const ids=bodies.map(b=>txid(b));
+ const bodyMap=new Map(ids.map((id,i)=>[id,bodies[i]!]));
+ const txFetches=new Map<string,number>();
+ let failBatch2=true;
+ let transientOnce=true;
+ let authFailId:string|null=null;
+ const persisted=new Map<string,number>();
+ const store:CoveredTxCache={
+  get:(w,q)=>{const m=new Map<string,number>();for(const id of q){const h=persisted.get(`${w}:${id}`);if(h!==undefined)m.set(id,h);}return m;},
+  set:(w,entries)=>{for(const [id,h] of entries)persisted.set(`${w}:${id}`,h);},
+  clear:()=>{persisted.clear();},
+ };
+ const request=(async(input:any)=>{
+  const p=new URL(typeof input==="string"?input:input.url).pathname;
+  if(p===`/chain/${CHAIN}/api/network-facts`)return Response.json({chain_id:CHAIN,engine_sha256:root,params_sha256:root,open_epoch:10});
+  if(p===`/chain/${CHAIN}/api/status`||p==="/api/status")
+   return Response.json({K:5,as_of:new Date(now).toISOString(),stale:false,checkpoint:{height:10,cutoff_ts:Math.floor(now/1000)-60},state_root:root,epochs_closed:10});
+  if(p===`/api/explorer/address/${policy.wallet}`)
+   return Response.json({address:policy.wallet,balance:"5.000000",balance_as_of:{checkpoint_height:10},txs:[]});
+  if(p.startsWith("/api/explorer/tx/")){
+   const id=p.slice("/api/explorer/tx/".length);
+   txFetches.set(id,(txFetches.get(id)??0)+1);
+   if(id===authFailId)return new Response("denied",{status:401});
+   if(failBatch2&&id===ids[4])return new Response("upstream 503",{status:503});
+   if(!failBatch2&&transientOnce&&id===ids[4]){transientOnce=false;return new Response("transient 503",{status:503});}
+   const b=bodyMap.get(id)!;
+   return Response.json({id,type:"transfer",from_addr:b.from,to_addr:b.to,amount:b.amount,memo:b.memo,body:b,atts:5,final:1,checkpointed:{height:10}});
+  }
+  if(p.startsWith(`/chain/${CHAIN}/api/explorer/tx/`)){
+   const id=p.slice(`/chain/${CHAIN}/api/explorer/tx/`.length);
+   if(id===authFailId)return new Response("denied",{status:401});
+   return new Response("mirror 503",{status:503});
+  }
+  if(p.startsWith(`/chain/${CHAIN}/api/receipt/`)||p.startsWith("/api/receipt/")){
+   const id=p.split("/").pop()!;
+   return Response.json({txid:id,ts:1,status:"included",height:806});
+  }
+  return new Response("not found",{status:404});
+ }) as typeof fetch;
+
+ const net=new PoaHttpNetwork(()=>false,request,{engine:root,params:root},()=>now,undefined,store);
+ const status=await net.status();
+ // Batch 1 (ids 0..2) succeeds and persists immediately; batch 2 (ids 3..4) fails on id[4].
+ await assert.rejects(net.cut(policy.wallet,ids,status),/ESCROW_NODE_HTTP/);
+ for(const id of ids.slice(0,4))assert.equal(persisted.get(`${policy.wallet}:${id}`),10,"verified txs from completed/partial batches persist");
+ assert.equal(persisted.has(`${policy.wallet}:${ids[4]}`),false,"failed tx is never cached");
+
+ // Retry skips cached ids 0..3 and recovers from one transient 503 on id[4].
+ failBatch2=false;
+ txFetches.clear();
+ const cut=await net.cut(policy.wallet,ids,status);
+ assert.equal(cut.covered.length,5);
+ for(const id of ids.slice(0,4))assert.equal(txFetches.get(id)??0,0,"already-cached tx must not be refetched");
+ assert.equal(txFetches.get(ids[4]!),2,"one transient 503 retries once and succeeds");
+
+ // 401 auth failure is never retried and fails closed.
+ store.clear!();
+ const net2=new PoaHttpNetwork(()=>false,request,{engine:root,params:root},()=>now,undefined,store);
+ authFailId=ids[0]!;
+ txFetches.clear();
+ await assert.rejects(net2.cut(policy.wallet,[ids[0]!],status),/ESCROW_NODE_AUTH/);
+ assert.equal(txFetches.get(ids[0]!),1,"401 auth failure must not retry");
+});
+
+test("receipt primary timeout/503 cools down /chain/.../api/receipt and re-probes after expiry",async()=>{
+ let now=1_800_000_000_000;
+ const root="c".repeat(64);
+ const b1=depositBody(3,policy.wallet,"1.000000","rc-1",1),id1=txid(b1);
+ const b2=depositBody(3,policy.wallet,"1.000000","rc-2",2),id2=txid(b2);
+ const map=new Map([[id1,b1],[id2,b2]]);
+ let primaryReceiptStatus:number|"timeout"=503;
+ let primaryHits=0,fallbackHits=0;
+ const request=(async(input:any)=>{
+  const p=new URL(typeof input==="string"?input:input.url).pathname;
+  if(p.startsWith("/api/explorer/tx/")){
+   const id=p.slice("/api/explorer/tx/".length),b=map.get(id)!;
+   return Response.json({id,type:"transfer",from_addr:b.from,to_addr:b.to,amount:b.amount,memo:b.memo,body:b,atts:5,final:1,checkpointed:{height:10}});
+  }
+  if(p.startsWith(`/chain/${CHAIN}/api/receipt/`)){
+   primaryHits++;
+   if(primaryReceiptStatus==="timeout")throw new DOMException("timed out","TimeoutError");
+   if(primaryReceiptStatus!==200)return new Response("down",{status:primaryReceiptStatus});
+   return Response.json({txid:p.split("/").pop(),ts:1,status:"included",height:806});
+  }
+  if(p.startsWith("/api/receipt/")){
+   fallbackHits++;
+   return Response.json({txid:p.split("/").pop(),ts:1,status:"included",height:806});
+  }
+  return new Response("not found",{status:404});
+ }) as typeof fetch;
+
+ const net=new PoaHttpNetwork(()=>false,request,{engine:root,params:root},()=>now);
+ // First lookup hits failing primary -> falls back to /api/receipt and starts 5m cooldown.
+ assert.equal((await net.lookup(id1))?.valid,true);
+ assert.equal(primaryHits,1);assert.equal(fallbackHits,1);
+
+ // During cooldown, lookup goes straight to /api/receipt without touching primary.
+ now+=60_000;
+ assert.equal((await net.lookup(id2))?.valid,true);
+ assert.equal(primaryHits,1,"primary receipt skipped during cooldown");
+ assert.equal(fallbackHits,2);
+
+ // After cooldown expires, primary is re-probed and restored when healthy.
+ primaryReceiptStatus=200;
+ now+=300_000;
+ assert.equal((await net.lookup(id1))?.valid,true);
+ assert.equal(primaryHits,2,"primary receipt re-probed after cooldown");
 });
