@@ -1,18 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=009a41b2d270";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=009a41b2d270";
-import { renderManagement } from "./ui-manage.js?v=009a41b2d270";
-import { actionLabel } from "./ui-copy.js?v=009a41b2d270";
-import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=009a41b2d270";
-import { ui } from "./ui-state.js?v=009a41b2d270";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=009a41b2d270";
-import { createPoaCopyButton } from "./ui-copy.js?v=009a41b2d270";
-import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=009a41b2d270";
-import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=009a41b2d270";
-import { renderDomainPage } from "./ui-domain.js?v=009a41b2d270";
-import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=009a41b2d270";
-import { renderIdeas } from "./ui-ideas.js?v=009a41b2d270";
-import { mountEscrow } from "./escrow.js?v=009a41b2d270";
-import { applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=009a41b2d270";
+import { publicNameUnavailable } from "./shared.js?v=3035a7bd696b";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=3035a7bd696b";
+import { renderManagement } from "./ui-manage.js?v=3035a7bd696b";
+import { actionLabel } from "./ui-copy.js?v=3035a7bd696b";
+import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=3035a7bd696b";
+import { ui } from "./ui-state.js?v=3035a7bd696b";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=3035a7bd696b";
+import { createPoaCopyButton } from "./ui-copy.js?v=3035a7bd696b";
+import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=3035a7bd696b";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=3035a7bd696b";
+import { renderDomainPage } from "./ui-domain.js?v=3035a7bd696b";
+import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=3035a7bd696b";
+import { renderIdeas } from "./ui-ideas.js?v=3035a7bd696b";
+import { mountEscrow } from "./escrow.js?v=3035a7bd696b";
+import { applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=3035a7bd696b";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -140,10 +140,15 @@ function enhanceEscrowSignedRequestUx(root) {
         }
     }
     const step1Buttons = actionRow ? [...actionRow.querySelectorAll("button")] : [];
+    for (const btn of step1Buttons) {
+        if ((btn.textContent ?? "").includes("List my name for POA")) {
+            btn.textContent = "🏷️ List my name";
+        }
+    }
     const buttonActionName = (btn) => {
         const label = btn?.textContent ?? "";
         if (/Open my POA auction/.test(label)) return "open";
-        if (/List my name for POA/.test(label)) return "list";
+        if (/List my name/.test(label)) return "list";
         if (/Add POA/.test(label)) return "intent";
         if (/Read my escrow/.test(label)) return "view";
         if (/Request my refund/.test(label)) return "withdraw";
@@ -207,7 +212,7 @@ function enhanceEscrowSignedRequestUx(root) {
             const amtLabel = typeof amt === "string" ? ` · ${poaShort(amt)} POA` : "";
             const actName = {
                 open: "Open POA auction",
-                list: "List name for POA",
+                list: "List name",
                 intent: "Add POA deposit intent",
                 view: "Read escrow account",
                 withdraw: "Request POA refund",
@@ -281,6 +286,7 @@ function enhanceEscrowSignedRequestUx(root) {
     root.addEventListener("click", (ev) => {
         const clickedBtn = ev.target?.closest?.("button");
         if (!clickedBtn) return;
+        if (clickedBtn.classList.contains("inline-info") || clickedBtn.classList.contains("info-close") || clickedBtn.classList.contains("module-info")) return;
         clearTimeout(liveRegenTimer);
         if (!step1Buttons.includes(clickedBtn) && !promptActions.contains(clickedBtn)) {
             clearSelectedAction();
@@ -292,6 +298,16 @@ function enhanceEscrowSignedRequestUx(root) {
         step1.append(limits);
     if (actionRow) {
         step1.append(actionRow);
+        const auctionStepBtn = step1Buttons.find((b) => buttonActionName(b) === "open") ?? step1Buttons.find((b) => buttonActionName(b) === "list");
+        if (auctionStepBtn && !actionRow.querySelector("#help-escrow-sale-warn")) {
+            auctionStepBtn.after(
+                createInlineInfo(
+                    "escrow-sale-warn",
+                    "About profile fields when listing or auctioning",
+                    "Listing or auctioning pauses profile fields and drops them on transfer (archived as read-only history on the domain page).",
+                ),
+            );
+        }
         const balanceNote = document.createElement("div");
         balanceNote.id = "escrowBalanceNote";
         balanceNote.className = "escrow-balance-note has-info";
@@ -308,13 +324,13 @@ function enhanceEscrowSignedRequestUx(root) {
         );
         step1.append(balanceNote);
         for (const btn of step1Buttons) {
-            const label = btn.textContent ?? "";
+            const act = buttonActionName(btn);
             btn.addEventListener("click", () => {
                 clearTimeout(liveRegenTimer);
                 lastActionBtn = btn;
-                lastActionName = buttonActionName(btn);
+                lastActionName = act;
                 for (const other of step1Buttons) other.classList.toggle("is-selected-action", other === btn);
-                if (/List my name for POA|Open my POA auction/.test(label)) {
+                if (act === "list" || act === "open") {
                     const txt = prompt.textContent ?? "";
                     if (/"action":\s*"(?:list|open)"/.test(txt) && !txt.includes("Sale & auction notice")) {
                         prompt.textContent = txt.trimEnd() + "\n" + SALE_FIELDS_WARNING;

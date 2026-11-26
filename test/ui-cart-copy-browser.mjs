@@ -643,8 +643,10 @@ try {
   const initialHeaderAvatarBox = await agentCard.locator("h3 .domain-header-avatar").boundingBox();
   assert.ok(initialHeaderAvatarBox && Math.abs(initialHeaderAvatarBox.width - initialHeaderAvatarBox.height) < 1, "Manage header avatar must be square");
   assert.equal(await pageUx.locator("#escrowPayer").inputValue(), buyerOwner);
-  await expect(agentCard.locator('button[aria-label="Sell for POA: agent"]')).toBeVisible();
-  await expect(agentCard.locator('button[aria-label="Auction for POA: agent"]')).toBeVisible();
+  await expect(agentCard.locator('button[aria-label="Sell: agent"]')).toBeVisible();
+  await expect(agentCard.locator('button[aria-label="Sell: agent"]')).toHaveText("🏷️ Sell");
+  await expect(agentCard.locator('button[aria-label="Auction: agent"]')).toBeVisible();
+  await expect(agentCard.locator('button[aria-label="Auction: agent"]')).toHaveText("🔨 Auction");
   await agentCard.locator('input[data-profile-field="btc"]').fill("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
   await agentCard.locator('input[data-profile-field="eth"]').fill("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed");
   await expect(agentCard.locator(".profile-eth-fix")).toBeVisible();
@@ -682,9 +684,9 @@ try {
   await expect(pageUx.locator("#copyManagePrompt")).toBeDisabled();
   await expect(pageUx.locator("#downloadManageJSON")).toBeDisabled();
 
-  // Clicking "Auction for POA" on an available held domain populates My POA with auto-filled POA address,
+  // Clicking "Auction" on an available held domain populates My POA with auto-filled POA address,
   // domain name, active "open" auction command, and live updates when amount changes!
-  await pageUx.locator('#manageNames button[aria-label="Auction for POA: lunar"]').click();
+  await pageUx.locator('#manageNames button[aria-label="Auction: lunar"]').click();
   assert.equal(await pageUx.locator("#escrowPayer").inputValue(), buyerOwner);
   assert.equal(await pageUx.locator("#escrowName").inputValue(), "lunar");
   await expect(pageUx.locator("#escrowPrompt")).toContainText('"action": "open"');
@@ -1401,26 +1403,43 @@ try {
   await expect(pageFields.locator("#domainProfile")).toContainText("Attached domain records");
   await expect(pageFields.locator("#domainProfile")).toContainText("https://agent.example/endpoint");
   await expect(pageFields.locator("#poaSellTools .sale-fields-warning")).toHaveCount(0);
+  await expect(pageFields.locator("#poaSellBtn")).toHaveText("🏷️ Sell");
+  await expect(pageFields.locator("#poaAuctionBtn")).toHaveText("🔨 Auction");
+  await expect(pageFields.locator("#poaSellActions #help-domain-sale-warn")).toBeVisible();
+  await pageFields.locator("#help-domain-sale-warn").click();
+  await expect(pageFields.locator("#info-domain-sale-warn")).toContainText("Listing or auctioning pauses profile fields and drops them on transfer");
+  await pageFields.keyboard.press("Escape");
   await pageFields.locator("#help-domainOwnerTools").click();
   await expect(pageFields.locator("#info-domainOwnerTools")).toContainText("drops them on transfer");
   await pageFields.keyboard.press("Escape");
 
-  // Manage domains + My POA place the pre-listing field-drop note in ℹ️ (no noisy inline banner on unlisted cards)
+  // Manage domains + My POA place the pre-listing field-drop note in ℹ️ next to Sell/Auction (no noisy inline banner, no "for POA" on buttons)
   await pageFields.locator('#domainActions button[aria-label="Manage agent"]').click();
   await expect(pageFields.locator('#manageNames article[data-domain-name="agent"] .sale-fields-warning')).toHaveCount(0);
+  await expect(pageFields.locator('#manageNames article[data-domain-name="agent"] .manage-poa-actions')).toContainText("🏷️ Sell");
+  await expect(pageFields.locator('#manageNames article[data-domain-name="agent"] .manage-poa-actions')).toContainText("🔨 Auction");
+  await expect(pageFields.locator(`#manageNames article[data-domain-name="agent"] .manage-poa-actions #help-manage-sale-warn-${agentDeedId.slice(0, 12)}`)).toBeVisible();
   await pageFields.locator(`#help-manage-sale-warn-${agentDeedId.slice(0, 12)}`).click();
   await expect(pageFields.locator(`#info-manage-sale-warn-${agentDeedId.slice(0, 12)}`)).toContainText("pauses profile fields and drops them on transfer");
   await pageFields.keyboard.press("Escape");
   await expect(pageFields.locator("#escrowBalanceNote")).toBeVisible();
   await expect(pageFields.locator("#escrowBalanceNote")).toContainText("available escrow balance");
   await expect(pageFields.locator("#escrowListingFieldWarning")).toHaveCount(0);
+  await expect(pageFields.locator("#help-escrow-sale-warn")).toBeVisible();
+  await pageFields.locator("#help-escrow-sale-warn").click();
+  await expect(pageFields.locator("#info-escrow-sale-warn")).toContainText("pauses profile fields and drops them on transfer");
+  await pageFields.keyboard.press("Escape");
   await pageFields.locator("#help-escrowPayments").click();
   await expect(pageFields.locator("#info-escrowPayments")).toContainText("pauses profile fields and drops them on transfer");
   await pageFields.keyboard.press("Escape");
+  const forPoaButtons = await pageFields.evaluate(() =>
+    [...document.querySelectorAll("button")].filter((b) => /for POA/i.test(`${b.textContent ?? ""} ${b.getAttribute("aria-label") ?? ""}`)).map((b) => b.textContent?.trim()),
+  );
+  assert.deepEqual(forPoaButtons, [], `No button should contain "for POA": ${JSON.stringify(forPoaButtons)}`);
   await pageFields.locator("#escrowPayer").fill(prevOwner);
   await pageFields.locator("#escrowName").fill("agent");
   await pageFields.locator("#escrowAmount").fill("250.000000");
-  await pageFields.getByRole("button", { name: "🏷️ List my name for POA", exact: true }).click();
+  await pageFields.getByRole("button", { name: "🏷️ List my name", exact: true }).click();
   await expect(pageFields.locator("#escrowPrompt")).toContainText("Sale & auction notice");
   await expect(pageFields.locator("#escrowMessage")).toContainText("paused while listed");
 
@@ -1450,9 +1469,10 @@ try {
   assert.equal(await pageFields.locator("#domainProfile img.domain-avatar").count(), 0);
   assert.equal(await pageFields.locator("#domainTitle .domain-header-avatar img").count(), 0);
   await expect(pageFields.locator("#domainTitle .domain-header-avatar")).toBeVisible();
-  // While listed/in auction, "Auction for POA" is hidden in Manage domains for that domain
+  // While listed/in auction, "Auction" is hidden in Manage domains and Sell/Auction row is hidden on domain page
+  await expect(pageFields.locator("#poaSellActions")).toBeHidden();
   await pageFields.locator('#domainActions button[aria-label="Manage agent"]').click();
-  await expect(pageFields.locator('#manageNames button[aria-label="Auction for POA: agent"]')).toHaveCount(0);
+  await expect(pageFields.locator('#manageNames button[aria-label="Auction: agent"]')).toHaveCount(0);
   await expect(pageFields.locator('#manageNames button[aria-label="Open in My POA: agent"]')).toBeVisible();
   await pageFields.goto(`${h.url}/d/agent`);
   await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");

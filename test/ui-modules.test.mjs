@@ -604,7 +604,7 @@ test('owner profile, domain page, ownerLink primary rendering, and Manage main-d
   for (const id of [
    'ownerTitle', 'ownerPrincipal', 'ownerProfile', 'ownerNames', 'ownerListings',
    'domainTitle', 'domainStatus', 'domainOwner', 'domainProfile', 'domainListing',
-   'domainActions', 'domainOwnerTools', 'poaSellTools', 'poaSellBtn', 'poaAuctionBtn',
+   'domainActions', 'domainOwnerTools', 'poaSellTools', 'poaSellActions', 'poaSellBtn', 'poaAuctionBtn',
    'poaSubnameTools', 'unitSellTools', 'listingPromptStatus', 'listPriceInput',
    'domainPreviousFields', 'domainHistory', 'domainCopyLink',
    'manageOwnerLabelRow', 'manageOwner', 'manageLookup', 'manageOwnerNotice',
@@ -708,8 +708,13 @@ test('owner profile, domain page, ownerLink primary rendering, and Manage main-d
   domainMod.renderDomainPage('nebula');
   assert.ok(collectText(byId.get('domainProfile')).includes('Main bio'));
   assert.ok(collectText(byId.get('domainPreviousFields')).includes('Old bio'));
+  assert.equal(byId.get('poaSellActions').hidden, false);
+  assert.equal(byId.get('poaSellSaleWarn')?.hidden, false);
+  assert.ok(collectText(byId.get('poaSellSaleWarn')).includes('Listing or auctioning pauses profile fields and drops them on transfer'));
   domainMod.renderDomainPage('comet');
   assert.ok(collectText(byId.get('domainProfile')).includes('paused while listed'));
+  assert.equal(byId.get('poaSellActions').hidden, true);
+  assert.equal(byId.get('poaSellSaleWarn')?.hidden, true);
 
   // 4. Manage domains: wireManagement, lookup by domain name, main domain buttons, and Transfer review/confirm/cancel
   ui.escrowMarket = [];
