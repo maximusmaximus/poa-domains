@@ -419,7 +419,19 @@ export class Escrow {
   }
   private async reconcileAt(status:Status): Promise<void> {
     await this.sweepPendingDeposits();
-    const s=this.state(), ids=[...Object.keys(s.credited),...Object.values(s.payments).flatMap(p=>p.txid?[p.txid]:[])];
+    const s=this.state();
+    const ids=[
+      ...Object.keys(s.credited),
+      ...Object.values(s.payments).flatMap(p=>{
+        if(!p.txid)return [];
+        // SIGNED payouts are provably pre-I/O (never transmitted); UNKNOWN payouts signed strictly
+        // after this checkpoint's cutoff cannot be baked into checkpoint `status.height` and may
+        // not yet be indexed by minepoa.com's read node (which returns 503 origin busy on misses).
+        if(p.status==="SIGNED")return [];
+        if(p.status==="UNKNOWN"&&status.cutoff!==undefined&&p.body&&p.body.ts>status.cutoff)return [];
+        return [p.txid];
+      }),
+    ];
     const cut=await this.networkRead(()=>this.network.cut(this.policy.wallet,ids,status));
     need(cut.chain===CHAIN && cut.height===status.height && cut.root===status.root,"ESCROW_UNALIGNED_CUT");
     need(new Set(cut.covered).size===cut.covered.length && cut.covered.every(id=>ids.includes(id)),"ESCROW_CUT");
