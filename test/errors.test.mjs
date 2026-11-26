@@ -15,6 +15,10 @@ test('every literal need/Fault/error code has catalogue status and retryability;
  for(const e of Object.values(ERROR_CATALOGUE)){assert.ok(e.httpStatus>=400&&e.httpStatus<600);assert.equal(typeof e.retryable,'boolean');assertEnvelope(errorEnvelope(e.code,'catalogue-test'));}
  assert.equal(correlationId('safe-request_1'),'safe-request_1');assert.notEqual(correlationId('unsafe value'),'unsafe value');
  assert.equal(errorReply(409,{code:'CONTENT_TYPE'},'test').status,400);assert.equal(errorReply(503,{code:'ESCROW_DISABLED'},'test').status,503);
+ const held=errorReply(503,{code:'ESCROW_HELD',accepted:'unknown'},'test');
+ assert.equal(held.status,503);assert.equal(held.body.code,'ESCROW_HELD');assert.equal(held.body.accepted,'unknown');assert.equal(held.body.retryable,true);
+ const nodeHttp=errorReply(409,{code:'ESCROW_NODE_HTTP',accepted:false},'test');
+ assert.equal(nodeHttp.status,503);assert.equal(nodeHttp.body.code,'ESCROW_NODE_HTTP');assert.equal(nodeHttp.body.retryable,true);
 });
 test('client never treats an ordinary 404 or missing receipt as success, and classifies exact-resend uncertainty',async()=>{
  const previous=globalThis.fetch;let calls=0;const packet=setup().packet('cancelAuction',{auctionId:'a'.repeat(64),expectedVersion:1});
