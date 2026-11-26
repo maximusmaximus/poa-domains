@@ -1,9 +1,9 @@
-import { ui } from "./ui-state.js?v=f35b5bf67d18";
-import { add, el, endpointBase } from "./ui-core.js?v=f35b5bf67d18";
-import { createDomainAvatar, domainHeader, nameLink, openPoa, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=f35b5bf67d18";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=f35b5bf67d18";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=f35b5bf67d18";
-import { createInlineInfo } from "./ui-help.js?v=f35b5bf67d18";
+import { ui } from "./ui-state.js?v=5273b3c9d324";
+import { add, el, endpointBase } from "./ui-core.js?v=5273b3c9d324";
+import { createDomainAvatar, domainHeader, nameLink, notifyOwnerChanged, openPoa, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=5273b3c9d324";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=5273b3c9d324";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=5273b3c9d324";
+import { createInlineInfo } from "./ui-help.js?v=5273b3c9d324";
 import {
   buildProfileUpdatePrompt,
   buildSetPrimaryPrompt,
@@ -27,7 +27,7 @@ import {
   saveKnownOwner,
   shortenPoaAddress,
   validPrincipal,
-} from "./shared.js?v=f35b5bf67d18";
+} from "./shared.js?v=5273b3c9d324";
 
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const IDLE_MANAGE_PROMPT = "Edit profile fields or choose an action above to preview the code for your agent.";
@@ -1043,6 +1043,7 @@ export function wireManagement() {
       }
     }
     renderManagement({ force: true });
+    notifyOwnerChanged();
   };
   el("manageLookup")?.addEventListener("click", onLookup);
   el("manageOwner")?.addEventListener("keydown", (e) => {

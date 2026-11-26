@@ -1,13 +1,13 @@
-import { publicNameUnavailable } from "./shared.js?v=f35b5bf67d18";
-import { registryUnit } from "./shared.js?v=f35b5bf67d18";
-import { actionLabel } from "./ui-copy.js?v=f35b5bf67d18";
-import { createInlineInfo } from "./ui-help.js?v=f35b5bf67d18";
-import { trapDialog } from "./ui-a11y.js?v=f35b5bf67d18";
-import { ui } from "./ui-state.js?v=f35b5bf67d18";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, cartSummary, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=f35b5bf67d18";
-import { add, el, endpointBase } from "./ui-core.js?v=f35b5bf67d18";
-import { domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=f35b5bf67d18";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=f35b5bf67d18";
+import { publicNameUnavailable } from "./shared.js?v=5273b3c9d324";
+import { registryUnit } from "./shared.js?v=5273b3c9d324";
+import { actionLabel } from "./ui-copy.js?v=5273b3c9d324";
+import { createInlineInfo } from "./ui-help.js?v=5273b3c9d324";
+import { trapDialog } from "./ui-a11y.js?v=5273b3c9d324";
+import { ui } from "./ui-state.js?v=5273b3c9d324";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, cartSummary, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=5273b3c9d324";
+import { add, el, endpointBase } from "./ui-core.js?v=5273b3c9d324";
+import { activeUserAddress, domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=5273b3c9d324";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=5273b3c9d324";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
@@ -79,7 +79,7 @@ function appendCartUseDepositToggle(parent, item) {
 }
 
 export function addToCart(item) {
-    item = buildCartItem(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now());
+    item = buildCartItem(item, ui.cap, ui.latestState, ui.escrowMarket, activeUserAddress(), ui.escrowMarketServerTime || Date.now());
     const existingIdx = ui.cart.findIndex((x) => x.name === item.name && x.action === item.action);
     if (existingIdx >= 0)
         ui.cart[existingIdx] = item;
@@ -392,7 +392,7 @@ export function inferOwnerFromPurchasedCart(state) {
         return null;
     const owners = [];
     for (const item of ui.cart) {
-        const review = cartReview(item, ui.cap, state, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now());
+        const review = cartReview(item, ui.cap, state, ui.escrowMarket, activeUserAddress(), ui.escrowMarketServerTime || Date.now());
         if (review.canAcknowledge || !review.issues.length)
             return null;
         const entry = state.names?.[item.name];
@@ -615,7 +615,8 @@ export function renderCart() {
         if (item.action === "poaBid") {
             const p = item.params ?? {};
             const nowMs = ui.escrowMarketServerTime || Date.now();
-            const review = cartReview(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, nowMs);
+            const userAddr = activeUserAddress();
+            const review = cartReview(item, ui.cap, ui.latestState, ui.escrowMarket, userAddr, nowMs);
             const liveMin = review.minimum ?? item.latestMinimum ?? item.minimumAmount ?? item.amount;
             add(card, "p", `${p.awaitingFirstBid ? "⏳ Starts on 1st bid" : "🔥 Live auction"} · Min ${poaShort(liveMin)} POA`, "badge-ok");
             appendCartUseDepositToggle(card, item);
@@ -630,7 +631,7 @@ export function renderCart() {
                     if (ui.registryReadFailed)
                         return;
                     try {
-                        ui.cart[index] = acknowledgeCartItem(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now());
+                        ui.cart[index] = acknowledgeCartItem(item, ui.cap, ui.latestState, ui.escrowMarket, activeUserAddress(), ui.escrowMarketServerTime || Date.now());
                         persistCart();
                         renderCart();
                     } catch {
@@ -644,7 +645,7 @@ export function renderCart() {
                 raiseBtn.addEventListener("click", () => {
                     try {
                         const raised = editCartAmount(item, liveMin, ui.cap, ui.latestState, ui.escrowMarket);
-                        ui.cart[index] = acknowledgeCartItem(raised, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now());
+                        ui.cart[index] = acknowledgeCartItem(raised, ui.cap, ui.latestState, ui.escrowMarket, activeUserAddress(), ui.escrowMarketServerTime || Date.now());
                         resetCopyFeedback();
                         persistCart();
                         renderCart();
@@ -675,7 +676,7 @@ export function renderCart() {
                 resetCopyFeedback();
                 persistCart();
                 if (reviewBtn)
-                    reviewBtn.disabled = ui.registryReadFailed || !cartReview(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now()).canAcknowledge;
+                    reviewBtn.disabled = ui.registryReadFailed || !cartReview(item, ui.cap, ui.latestState, ui.escrowMarket, activeUserAddress(), ui.escrowMarketServerTime || Date.now()).canAcknowledge;
                 updateCartCopyState();
                 updatePromptText();
                 renderFloatingCart();

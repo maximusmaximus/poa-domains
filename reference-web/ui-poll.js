@@ -1,18 +1,34 @@
-import { publicNameUnavailable } from "./shared.js?v=f35b5bf67d18";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=f35b5bf67d18";
-import { renderManagement } from "./ui-manage.js?v=f35b5bf67d18";
-import { actionLabel } from "./ui-copy.js?v=f35b5bf67d18";
-import { activePoaFixedListings, findOpenPoaAuctionByName, poaMinimumNextBid, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=f35b5bf67d18";
-import { ui } from "./ui-state.js?v=f35b5bf67d18";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=f35b5bf67d18";
-import { createPoaCopyButton } from "./ui-copy.js?v=f35b5bf67d18";
-import { addToCart, persistCart, renderCart, renderCartEscrowStatus, setCartItemUseDeposit, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=f35b5bf67d18";
-import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=f35b5bf67d18";
-import { renderDomainPage } from "./ui-domain.js?v=f35b5bf67d18";
-import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=f35b5bf67d18";
-import { renderIdeas } from "./ui-ideas.js?v=f35b5bf67d18";
-import { mountEscrow } from "./escrow.js?v=f35b5bf67d18";
-import { applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=f35b5bf67d18";
+import { publicNameUnavailable } from "./shared.js?v=5273b3c9d324";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=5273b3c9d324";
+import { renderManagement } from "./ui-manage.js?v=5273b3c9d324";
+import { actionLabel } from "./ui-copy.js?v=5273b3c9d324";
+import { activePoaFixedListings, findOpenPoaAuctionByName, isOwnDomainOrListing, poaMinimumNextBid, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, SELF_BID_MESSAGE, SELF_BUY_MESSAGE, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=5273b3c9d324";
+import { ui } from "./ui-state.js?v=5273b3c9d324";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=5273b3c9d324";
+import { createPoaCopyButton } from "./ui-copy.js?v=5273b3c9d324";
+import { addToCart, persistCart, renderCart, renderCartEscrowStatus, setCartItemUseDeposit, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=5273b3c9d324";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=5273b3c9d324";
+import { renderDomainPage } from "./ui-domain.js?v=5273b3c9d324";
+import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=5273b3c9d324";
+import { renderIdeas } from "./ui-ideas.js?v=5273b3c9d324";
+import { mountEscrow } from "./escrow.js?v=5273b3c9d324";
+import { activeUserAddress, applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, renderSelfBidNotice, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=5273b3c9d324";
+
+if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+    document.addEventListener("poa:owner-changed", () => {
+        syncEscrowCardSelfBidGuards();
+        if (ui.latestState && ui.cap) {
+            ui.cart = ui.cart.map((item) =>
+                recheckCartItem(item, ui.cap, ui.latestState, ui.escrowMarket, activeUserAddress(), ui.escrowMarketServerTime || Date.now()),
+            );
+            persistCart();
+            renderAuctions(ui.latestState);
+            renderCart();
+            if (ui.lastSearch) runSearch(ui.lastSearch, false);
+            if (ui.route.kind === "domain" && ui.currentDomainName) renderDomainPage(ui.currentDomainName);
+        }
+    });
+}
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -282,6 +298,8 @@ function enhanceEscrowSignedRequestUx(root) {
     for (const input of [payerInput, nameInput, amountInput]) {
         input?.addEventListener("input", scheduleLiveRegen);
     }
+    payerInput?.addEventListener("input", () => syncEscrowCardSelfBidGuards());
+    payerInput?.addEventListener("change", () => syncEscrowCardSelfBidGuards());
     signed.addEventListener("input", () => clearTimeout(liveRegenTimer));
     root.addEventListener("click", (ev) => {
         const clickedBtn = ev.target?.closest?.("button");
@@ -398,6 +416,53 @@ function queueEscrowListingInCart(domainName, kind, useDeposit) {
     return true;
 }
 
+function findEscrowListingSeller(domainName, kind) {
+    if (Array.isArray(ui.escrowMarket)) {
+        const hit = ui.escrowMarket.find(
+            (x) => x && x.name === domainName && x.status === "OPEN" && (kind === "fixed" ? x.kind === "fixed" : x.kind !== "fixed"),
+        );
+        if (hit?.seller) return hit.seller;
+    }
+    const activeId = ui.latestState?.names?.[domainName]?.activeId;
+    return activeId ? (ui.latestState?.deeds?.[activeId]?.owner ?? "") : "";
+}
+
+export function syncEscrowCardSelfBidGuards() {
+    if (typeof document === "undefined") return;
+    const userAddr = activeUserAddress({ preferEscrowPayer: true });
+    for (const card of document.querySelectorAll('#escrowMarket article.card[data-escrow-card-enhanced="1"], #escrowDomain article.card[data-escrow-card-enhanced="1"]')) {
+        const domainName = card.dataset.escrowDomain || "";
+        const kind = card.dataset.escrowKind || "auction";
+        if (!domainName) continue;
+        const seller = findEscrowListingSeller(domainName, kind);
+        const isOwn = isOwnDomainOrListing({ name: domainName, seller, state: ui.latestState, userAddress: userAddr });
+        const actionsRow = card.querySelector(".escrow-card-actions");
+        const primaryBtn = card.querySelector('.escrow-card-actions > button[data-escrow-primary="1"]');
+        const depLabel = card.querySelector(".escrow-card-actions > label.use-deposit-toggle");
+        const depCb = depLabel?.querySelector('input[type="checkbox"]');
+        let notice = card.querySelector(":scope > .self-bid-notice");
+        card.dataset.selfBidBlocked = isOwn ? "1" : "0";
+        if (primaryBtn) {
+            primaryBtn.hidden = isOwn;
+            primaryBtn.disabled = isOwn || primaryBtn.dataset.escrowBaseDisabled === "1";
+        }
+        if (depLabel) depLabel.hidden = isOwn;
+        if (depCb) depCb.disabled = isOwn || primaryBtn?.dataset.escrowBaseDisabled === "1";
+        if (isOwn) {
+            if (!notice) {
+                notice = renderSelfBidNotice(card, { kind });
+                if (actionsRow) actionsRow.before(notice);
+            }
+            notice.hidden = false;
+        } else if (notice) {
+            notice.hidden = true;
+        }
+        if (actionsRow) {
+            actionsRow.hidden = ![...actionsRow.children].some((ch) => !ch.hidden);
+        }
+    }
+}
+
 function enhanceEscrowListingCard(card, domainName) {
     if (!card || card.dataset.escrowCardEnhanced === "1") return;
     const directBtns = [...card.querySelectorAll(":scope > button")];
@@ -407,6 +472,8 @@ function enhanceEscrowListingCard(card, domainName) {
     if (!primaryBtn && !useBtn && !finishBtn) return;
     card.dataset.escrowCardEnhanced = "1";
     const kind = /Pay with POA|to buy/i.test(`${primaryBtn?.textContent ?? ""} ${useBtn?.textContent ?? ""}`) ? "fixed" : "auction";
+    card.dataset.escrowDomain = domainName;
+    card.dataset.escrowKind = kind;
     const cartAction = kind === "fixed" ? "poaBuy" : "poaBid";
     const prefKey = `${kind}:${domainName}`;
     const actionsRow = document.createElement("div");
@@ -417,6 +484,8 @@ function enhanceEscrowListingCard(card, domainName) {
     let depCb = null;
     if (primaryBtn && useBtn) {
         primaryBtn.textContent = kind === "fixed" ? "🛍️ Buy" : "🏷️ Bid";
+        primaryBtn.dataset.escrowPrimary = "1";
+        primaryBtn.dataset.escrowBaseDisabled = primaryBtn.disabled ? "1" : "0";
         useBtn.hidden = true;
         useBtn.setAttribute("aria-hidden", "true");
         useBtn.tabIndex = -1;
@@ -447,6 +516,16 @@ function enhanceEscrowListingCard(card, domainName) {
         depLabel.append(depCb, depSpan);
 
         primaryBtn.addEventListener("click", (ev) => {
+            const userAddr = activeUserAddress({ preferEscrowPayer: true });
+            const seller = findEscrowListingSeller(domainName, kind);
+            if (isOwnDomainOrListing({ name: domainName, seller, state: ui.latestState, userAddress: userAddr })) {
+                ev.preventDefault();
+                ev.stopImmediatePropagation();
+                const msg = el("escrowMessage");
+                if (msg) msg.textContent = kind === "fixed" ? SELF_BUY_MESSAGE : SELF_BID_MESSAGE;
+                syncEscrowCardSelfBidGuards();
+                return;
+            }
             const useDeposit = Boolean(depCb?.checked);
             ui.escrowUseDeposit?.set?.(prefKey, useDeposit);
             let added = false;
@@ -469,11 +548,14 @@ function enhanceEscrowListingCard(card, domainName) {
         actionsRow.append(primaryBtn, depLabel);
     } else if (primaryBtn) {
         primaryBtn.textContent = kind === "fixed" ? "🛍️ Buy" : "🏷️ Bid";
+        primaryBtn.dataset.escrowPrimary = "1";
+        primaryBtn.dataset.escrowBaseDisabled = primaryBtn.disabled ? "1" : "0";
         actionsRow.append(primaryBtn);
     } else if (useBtn) {
         actionsRow.append(useBtn);
     }
     if (finishBtn) actionsRow.append(finishBtn);
+    syncEscrowCardSelfBidGuards();
 }
 
 function observeEscrowAddresses(root) {
@@ -625,7 +707,7 @@ export async function refreshRegistry() {
         ui.refreshing = false;
         ui.lastLoadedAt = Date.now();
         preserveInputs(() => {
-            ui.cart = ui.cart.map(item => recheckCartItem(item, ui.cap, viewState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now()));
+            ui.cart = ui.cart.map(item => recheckCartItem(item, ui.cap, viewState, ui.escrowMarket, activeUserAddress(), ui.escrowMarketServerTime || Date.now()));
             persistCart();
             render(payload);
             renderTreasuryFooter();
@@ -634,6 +716,7 @@ export async function refreshRegistry() {
             if (!el("searchSuggestions")?.hidden)
                 updateSearchSuggestions();
             renderManagement();
+            syncEscrowCardSelfBidGuards();
             installHelp();
             if (!el("ideasStrip").children.length)
                 renderIdeas();
@@ -721,7 +804,7 @@ export async function refreshEscrowMarket() {
     if (ui.latestState) {
         preserveInputs(() => {
             ui.cart = ui.cart.map((item) =>
-                recheckCartItem(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime),
+                recheckCartItem(item, ui.cap, ui.latestState, ui.escrowMarket, activeUserAddress(), ui.escrowMarketServerTime),
             );
             persistCart();
             renderAuctions(ui.latestState);
@@ -734,6 +817,7 @@ export async function refreshEscrowMarket() {
             if (!el("searchSuggestions")?.hidden)
                 updateSearchSuggestions();
             renderManagement();
+            syncEscrowCardSelfBidGuards();
             if (ui.route.kind === "domain" && ui.currentDomainName)
                 renderDomainPage(ui.currentDomainName);
         });

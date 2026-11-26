@@ -8,6 +8,7 @@ import {
   formatClock,
   formatCountdown,
   formatDuration,
+  isOwnDomainOrListing,
   isPoaAuctionAwaitingFirstBid,
   minimumNextBid,
   partitionPoaAuctions,
@@ -23,13 +24,13 @@ import {
   resolveDomainView,
   resolveOwnerInput,
   unavailableKey,
-} from "./shared.js?v=f35b5bf67d18";
-import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=f35b5bf67d18";
-import { createInlineInfo } from "./ui-help.js?v=f35b5bf67d18";
-import { ui } from "./ui-state.js?v=f35b5bf67d18";
-import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=f35b5bf67d18";
-import { domainHeader, nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=f35b5bf67d18";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=f35b5bf67d18";
+} from "./shared.js?v=5273b3c9d324";
+import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=5273b3c9d324";
+import { createInlineInfo } from "./ui-help.js?v=5273b3c9d324";
+import { ui } from "./ui-state.js?v=5273b3c9d324";
+import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=5273b3c9d324";
+import { activeUserAddress, domainHeader, nameLink, openManageDomain, openPoa, ownerLink, renderSelfBidNotice } from "./ui-router.js?v=5273b3c9d324";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=5273b3c9d324";
 
 function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) {
   const wrap = document.createElement("span");
@@ -258,6 +259,7 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
   }
   const list = add(listingBox, "div", "", "domain-sales-list");
 
+  const userAddr = activeUserAddress();
   for (const a of salesInfo.activePoaAuctions) {
     const item = add(list, "article", "", "domain-sale-item is-active");
     item.dataset.auctionId = a.id;
@@ -265,7 +267,8 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
     const closed = !awaiting && a.closes > 0 && nowMs >= a.closes;
     const minNext = poaMinimumNextBid(a);
     const cartItem = ui.cart.find((x) => x.action === "poaBid" && x.params?.auctionId === a.id) ?? null;
-    const outbidInfo = poaAuctionOutbidStatus(a, { bidderAddress: ui.bidderAddress, cartItem });
+    const isOwn = isOwnDomainOrListing({ name, seller: a.seller, deed: view.deed, state: ui.latestState, userAddress: userAddr });
+    const outbidInfo = poaAuctionOutbidStatus(a, { bidderAddress: ui.bidderAddress || userAddr, cartItem });
 
     if (a.status === "SETTLING") {
       add(item, "p", "⏳ Settling", "badge");
@@ -306,37 +309,41 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
 
     if (a.status === "OPEN" && (awaiting || !closed)) {
       add(item, "p", `Minimum ${awaiting ? "opening" : "next"} bid: ${poaShort(minNext)} POA`, "badge-ok");
-      if (cartItem) add(item, "p", `🛒 In cart · highest bid cap ${poaShort(cartItem.amount)} POA`, "muted");
-      const controls = add(item, "div", "", "auction-bid-controls");
-      const bidLabel = add(controls, "label", "Your highest bid (POA)");
-      const bidInput = document.createElement("input");
-      bidInput.type = "text";
-      bidInput.inputMode = "decimal";
-      bidInput.dataset.fieldKey = `domainPoaBid:${a.id}`;
-      bidInput.value = cartItem ? poaShort(cartItem.amount) : poaShort(minNext);
-      bidInput.placeholder = poaShort(minNext);
-      bidInput.setAttribute("aria-label", `Your highest bid in POA for ${name}`);
-      bidLabel.append(bidInput);
-      const btn = add(controls, "button", cartItem ? "Update cart bid" : "Add to cart", "small");
-      btn.type = "button";
-      btn.setAttribute("aria-label", `Add ${name} auction bid to cart`);
-      const err = add(item, "p", "", "badge-warn");
-      err.setAttribute("role", "alert");
-      btn.addEventListener("click", () => {
-        try {
-          const exact = poaAmount(bidInput.value);
-          if (poaToMicros(exact) < poaToMicros(minNext))
-            throw Error(`⚠️ Enter at least ${poaShort(minNext)} POA.`);
-          err.textContent = "";
-          bidInput.removeAttribute("aria-invalid");
-          addToCart({ name, action: "poaBid", amount: exact, auctionId: a.id });
-          setFloatingCartOpen(true);
-          renderDomainPage(name);
-        } catch (e) {
-          err.textContent = e?.message || `⚠️ Enter at least ${poaShort(minNext)} POA.`;
-          bidInput.setAttribute("aria-invalid", "true");
-        }
-      });
+      if (isOwn) {
+        renderSelfBidNotice(item, { kind: "auction" });
+      } else {
+        if (cartItem) add(item, "p", `🛒 In cart · highest bid cap ${poaShort(cartItem.amount)} POA`, "muted");
+        const controls = add(item, "div", "", "auction-bid-controls");
+        const bidLabel = add(controls, "label", "Your highest bid (POA)");
+        const bidInput = document.createElement("input");
+        bidInput.type = "text";
+        bidInput.inputMode = "decimal";
+        bidInput.dataset.fieldKey = `domainPoaBid:${a.id}`;
+        bidInput.value = cartItem ? poaShort(cartItem.amount) : poaShort(minNext);
+        bidInput.placeholder = poaShort(minNext);
+        bidInput.setAttribute("aria-label", `Your highest bid in POA for ${name}`);
+        bidLabel.append(bidInput);
+        const btn = add(controls, "button", cartItem ? "Update cart bid" : "Add to cart", "small");
+        btn.type = "button";
+        btn.setAttribute("aria-label", `Add ${name} auction bid to cart`);
+        const err = add(item, "p", "", "badge-warn");
+        err.setAttribute("role", "alert");
+        btn.addEventListener("click", () => {
+          try {
+            const exact = poaAmount(bidInput.value);
+            if (poaToMicros(exact) < poaToMicros(minNext))
+              throw Error(`⚠️ Enter at least ${poaShort(minNext)} POA.`);
+            err.textContent = "";
+            bidInput.removeAttribute("aria-invalid");
+            addToCart({ name, action: "poaBid", amount: exact, auctionId: a.id });
+            setFloatingCartOpen(true);
+            renderDomainPage(name);
+          } catch (e) {
+            err.textContent = e?.message || `⚠️ Enter at least ${poaShort(minNext)} POA.`;
+            bidInput.setAttribute("aria-invalid", "true");
+          }
+        });
+      }
     }
     appendActivityDetails(item, a.history);
   }
@@ -512,7 +519,8 @@ export function renderDomainPage(name) {
     manageBtn.setAttribute("aria-label", `Manage ${name}`);
     manageBtn.addEventListener("click", () => openManageDomain(name, view.deed.owner));
   }
-  if (!poa && view.auction && view.auction.status === "live" && view.auctionBucket === "current") {
+  if (!poa && view.auction && view.auction.status === "live" && view.auctionBucket === "current" &&
+      !isOwnDomainOrListing({ name, seller: view.auction.seller, deed: view.deed, state: ui.latestState, userAddress: activeUserAddress() })) {
     const minBid = view.auction.high
       ? minimumNextBid(view.auction.high.amount, ui.cap.increment)
       : view.auction.reserve;

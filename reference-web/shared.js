@@ -414,6 +414,18 @@ export function saveKnownOwner(storage, value) {
     else if (!v) storage?.removeItem?.(KNOWN_OWNER_KEY);
   } catch { /* ignore */ }
 }
+export const SELF_BID_MESSAGE =
+  "🚫 You can't bid on your own domain. Update your public key or domain name in the Public owner address field (Manage domains) if you want to bid with another account.";
+export const SELF_BUY_MESSAGE =
+  "🚫 You can't buy your own domain. Update your public key or domain name in the Public owner address field (Manage domains) if you want to buy with another account.";
+export function isOwnDomainOrListing({ name = "", seller = "", deed = null, state = null, userAddress = "" } = {}) {
+  const addr = typeof userAddress === "string" ? userAddress.trim() : "";
+  if (!addr || !validPrincipal(addr)) return false;
+  if (typeof seller === "string" && seller && seller === addr) return true;
+  const targetDeed =
+    deed ?? (name && state?.names?.[name]?.activeId ? state.deeds?.[state.names[name].activeId] : null);
+  return Boolean(targetDeed && !targetDeed.retired && targetDeed.owner === addr);
+}
 export function countOwnedDomains(state, owner) {
   const addr = String(owner ?? "").trim();
   if (!state || !validPrincipal(addr)) return 0;
@@ -502,7 +514,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=f35b5bf67d18";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=5273b3c9d324";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -1616,7 +1628,9 @@ export function cartReview(item, cap, state, escrowMarket = null, bidderAddress 
         const capMicros = poaToMicros(item.amount);
         const minMicros = poaToMicros(minimum);
         const highChanged = a.high && (p.lastHighAmount !== a.high.amount || p.lastHighPayer !== a.high.payer);
-        if (addr && a.high?.payer === addr) {
+        if (isOwnDomainOrListing({ name: item.name, seller: a.seller, state, userAddress: addr })) {
+          stop(SELF_BID_MESSAGE);
+        } else if (addr && a.high?.payer === addr) {
           stop(`You are already the highest bidder at ${poaShort(a.high.amount)} POA (escrow rejects raising your own leading bid).`);
         } else if (highChanged) {
           outbid = true;
@@ -1654,6 +1668,9 @@ export function cartReview(item, cap, state, escrowMarket = null, bidderAddress 
         proposed.price = livePrice;
         proposed.seller = l.seller;
         proposed.closes = l.closes ?? 0;
+        const addr = isPoaAddress(bidderAddress) ? bidderAddress : "";
+        if (isOwnDomainOrListing({ name: item.name, seller: l.seller, state, userAddress: addr }))
+          stop(SELF_BUY_MESSAGE);
         if (livePrice !== item.amount)
           stop(`The listing price is now ${poaShort(livePrice)} POA. Remove it and add it again only if you agree.`);
         facts = { auctionId: l.id, status: l.status, price: livePrice, closes: l.closes ?? 0 };
@@ -1677,6 +1694,8 @@ export function cartReview(item, cap, state, escrowMarket = null, bidderAddress 
       if (!a || a.status !== "live" || a.name !== item.name || state.time < a.openAt || state.time >= auctionCloseAt(a))
         stop("This auction is no longer open. Remove it and check Find again.");
       if (a) {
+        if (isOwnDomainOrListing({ name: item.name, seller: a.seller, state, userAddress: bidderAddress }))
+          stop(SELF_BID_MESSAGE);
         minimum = a.high ? minimumNextBid(a.high.amount, cap.increment) : a.reserve;
         proposed.expectedVersion = a.version;
         if (p.expectedVersion !== a.version) { outbid = true; issues.push("The auction changed or was outbid. Review the new version and minimum bid."); }
@@ -1744,6 +1763,8 @@ export function buildCartItem(input, cap, state, escrowMarket = null, bidderAddr
         findOpenPoaAuctionByName(escrowMarket, name, nowMs))
       : null;
     if (!a) throw Error("Check the current POA auction again.");
+    if (isOwnDomainOrListing({ name, seller: a.seller, state, userAddress: bidderAddress }))
+      throw Error(SELF_BID_MESSAGE);
     const minNext = poaMinimumNextBid(a);
     const chosen = poaAmount(input.amount ?? minNext);
     if (poaToMicros(chosen) < poaToMicros(minNext)) throw Error(`⚠️ Minimum bid is ${poaShort(minNext)} POA.`);
@@ -1769,6 +1790,8 @@ export function buildCartItem(input, cap, state, escrowMarket = null, bidderAddr
         activePoaFixedListings(escrowMarket, nowMs).find((x) => x.name === name))
       : null;
     if (!l) throw Error("Check the current POA listing again.");
+    if (isOwnDomainOrListing({ name, seller: l.seller, state, userAddress: bidderAddress }))
+      throw Error(SELF_BUY_MESSAGE);
     asset = "POA"; amount = poaAmount(l.price);
     params = {
       auctionId: l.id,
@@ -1784,6 +1807,8 @@ export function buildCartItem(input, cap, state, escrowMarket = null, bidderAddr
   } else if (action === "bid") {
     const a = state.auctions?.[input.auctionId];
     if (!a || a.name !== name || a.status !== "live") throw Error("Check the current auction again.");
+    if (isOwnDomainOrListing({ name, seller: a.seller, state, userAddress: bidderAddress }))
+      throw Error(SELF_BID_MESSAGE);
     asset = a.asset; amount = input.amount ?? (a.high ? minimumNextBid(a.high.amount, cap.increment) : a.reserve);
     params = { auctionId: a.id, expectedVersion: a.version, asset, amount };
   } else if (["buyFixed", "fillChildOffer"].includes(action)) {

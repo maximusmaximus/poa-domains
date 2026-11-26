@@ -1,14 +1,56 @@
-import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, primaryNameForOwner, profileImageMediaPath, readViewQuery, resolveOwnerInput, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=f35b5bf67d18";
-import { ui } from "./ui-state.js?v=f35b5bf67d18";
-import { createPoaCopyButton } from "./ui-copy.js?v=f35b5bf67d18";
-import { add, el } from "./ui-core.js?v=f35b5bf67d18";
-import { runSearch } from "./ui-search.js?v=f35b5bf67d18";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=f35b5bf67d18";
-import { updateTabDots } from "./ui-render.js?v=f35b5bf67d18";
-import { syncCartShortcutNow } from "./ui-cart.js?v=f35b5bf67d18";
-import { renderManagement } from "./ui-manage.js?v=f35b5bf67d18";
+import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, primaryNameForOwner, profileImageMediaPath, readViewQuery, resolveOwnerInput, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=5273b3c9d324";
+import { ui } from "./ui-state.js?v=5273b3c9d324";
+import { createPoaCopyButton } from "./ui-copy.js?v=5273b3c9d324";
+import { add, el } from "./ui-core.js?v=5273b3c9d324";
+import { runSearch } from "./ui-search.js?v=5273b3c9d324";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=5273b3c9d324";
+import { updateTabDots } from "./ui-render.js?v=5273b3c9d324";
+import { syncCartShortcutNow } from "./ui-cart.js?v=5273b3c9d324";
+import { renderManagement } from "./ui-manage.js?v=5273b3c9d324";
 
 const LAST_POA_KEY = "poadomains.lastPoaAddress.v1";
+
+export function activeUserAddress({ preferEscrowPayer = false } = {}) {
+    const payerVal = el("escrowPayer")?.value?.trim() ?? "";
+    const manageVal = el("manageOwner")?.value?.trim() ?? "";
+    const candidates = preferEscrowPayer
+        ? [payerVal, manageVal, ui.knownOwner, ui.bidderAddress]
+        : [manageVal, ui.knownOwner, ui.bidderAddress, payerVal];
+    for (const raw of candidates) {
+        const s = typeof raw === "string" ? raw.trim() : "";
+        if (!s) continue;
+        if (isPoaAddress(s)) return s;
+        const resolved = resolveOwnerInput(ui.latestState, s, ui.cap)?.owner;
+        if (isPoaAddress(resolved)) return resolved;
+    }
+    return "";
+}
+
+export function focusPublicOwnerField() {
+    navigateHome();
+    setSectionTab("escrow");
+    const input = el("manageOwner");
+    if (input) {
+        input.scrollIntoView?.({ block: "center", behavior: "smooth" });
+        input.focus?.({ preventScroll: true });
+        input.select?.();
+    }
+}
+
+export function renderSelfBidNotice(parent, { kind = "auction" } = {}) {
+    const box = add(parent, "div", "", "self-bid-notice");
+    box.setAttribute("role", "note");
+    const verb = kind === "fixed" ? "buy" : "bid on";
+    add(
+        box,
+        "span",
+        `🚫 You can't ${verb} your own domain. Update your public key or domain name in the Public owner address field to ${kind === "fixed" ? "buy" : "bid"} with another account.`,
+    );
+    const btn = add(box, "button", "👤 Public owner address", "secondary small");
+    btn.type = "button";
+    btn.addEventListener("click", () => focusPublicOwnerField());
+    return box;
+}
 
 export function resolveKnownPoaAddress(preferred = "") {
     const candidates = [
@@ -29,6 +71,12 @@ export function resolveKnownPoaAddress(preferred = "") {
         if (isPoaAddress(resolved)) return resolved;
     }
     return "";
+}
+
+export function notifyOwnerChanged() {
+    if (typeof document !== "undefined" && typeof CustomEvent === "function" && typeof document.dispatchEvent === "function") {
+        document.dispatchEvent(new CustomEvent("poa:owner-changed"));
+    }
 }
 
 export function syncEscrowPayerAddress(preferred = "", { force = false } = {}) {
@@ -62,6 +110,7 @@ export function openManageDomain(name, ownerId) {
     syncEscrowPayerAddress(resolvedOwner);
     ui.focusedManageDomain = typeof name === "string" && name ? name : null;
     renderManagement({ focusDomain: ui.focusedManageDomain });
+    notifyOwnerChanged();
     const target = ui.focusedManageDomain
         ? [...document.querySelectorAll("#manageNames article.card")].find((c) => c.dataset.domainName === ui.focusedManageDomain)
         : el("manageDomains");

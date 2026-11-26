@@ -1,8 +1,8 @@
-import { copyText } from "./ui-copy.js?v=f35b5bf67d18";
-import { trapDialog } from "./ui-a11y.js?v=f35b5bf67d18";
-import { ui } from "./ui-state.js?v=f35b5bf67d18";
-import { el, endpointBase, ownershipView } from "./ui-core.js?v=f35b5bf67d18";
-import { buildAgentTermsPrompt, buildListingPrompt, buildSubnameListingPrompt, hasAgreedToTerms, isPoaAddress, parsePublicJSON, resolveDomainView, resolveOwnerInput, saveTermsAgreement, shouldHoldTransactions } from "./shared.js?v=f35b5bf67d18";
+import { copyText } from "./ui-copy.js?v=5273b3c9d324";
+import { trapDialog } from "./ui-a11y.js?v=5273b3c9d324";
+import { ui } from "./ui-state.js?v=5273b3c9d324";
+import { el, endpointBase, ownershipView } from "./ui-core.js?v=5273b3c9d324";
+import { buildAgentTermsPrompt, buildListingPrompt, buildSubnameListingPrompt, hasAgreedToTerms, isPoaAddress, parsePublicJSON, resolveDomainView, resolveOwnerInput, saveTermsAgreement, shouldHoldTransactions } from "./shared.js?v=5273b3c9d324";
 
 export function clearHandoff() {
     ui.generation++;

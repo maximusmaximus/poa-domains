@@ -257,6 +257,20 @@ test("POA auction cart supports highest bid ceiling, outbid detection without au
   const soldFixed = [{ ...fixedListing, high: { payer: BIDDER_A, amount: "250.000000" } }];
   assert.equal(cartReview(buyDeposit, cap, state, soldFixed, "", nowMs).canAcknowledge, false);
 
+  // Seller cannot bid on or buy their own domain (blocked in buildCartItem, cartReview, and handoff prompt)
+  assert.throws(
+    () => buildCartItem({ name: "moon", action: "poaBid", auctionId: AUC_QUEUED, amount: "150" }, cap, state, fullMarket, SELLER, nowMs),
+    /can't bid on your own domain.*Public owner address/i,
+  );
+  assert.throws(
+    () => buildCartItem({ name: "fixedname", action: "poaBuy", auctionId: fixedListing.id }, cap, state, fullMarket, SELLER, nowMs),
+    /can't buy your own domain.*Public owner address/i,
+  );
+  const selfReview = cartReview(bidDeposit, cap, state, fullMarket, SELLER, nowMs);
+  assert.equal(selfReview.canAcknowledge, false);
+  assert.ok(selfReview.issues.some((m) => /Public owner address/i.test(m)));
+  assert.match(allDepositPrompt, /ESCROW_SELF_SALE/);
+
   // Bidder address storage helper round-trips valid poa1 addresses and clears empty values
   const mem = new Map();
   const storage = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v), removeItem: (k) => mem.delete(k) };
