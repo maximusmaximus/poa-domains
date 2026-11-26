@@ -15,7 +15,7 @@ export async function browserSmoke(base, evidence) {
     assert.equal(await page.locator("#ideasStrip .ideas-row").count(),1);
     assert.equal(await page.locator("#siteTitle .title-glyph").count(),10);
     assert.match(await page.locator("#names").innerText(),/nexus/);
-    assert.equal(await page.locator("#action option").count(),17);
+    assert.equal(await page.locator("#action option").count(),18);
     assert.ok((await page.locator("#stats").innerText()).length>10);
     const idea=page.locator("#ideasStrip .idea").first(); const ideaName=await idea.getAttribute("data-query");
     await idea.click();
@@ -66,6 +66,6 @@ export async function browserSmoke(base, evidence) {
     await page.locator("#floatingCartBtn").click();
     assert.equal(await page.locator("#floatingCartPanel").isVisible(),true);
     await page.screenshot({path:resolve(evidence,"browser.png"),fullPage:true});
-    return {actionOptions:17,ideaRows:3,cartPrompt:true,pageErrors:errors,browserWrites:writes,anonymousSearchLogs:searchLogs.length};
+    return {actionOptions:18,ideaRows:3,cartPrompt:true,pageErrors:errors,browserWrites:writes,anonymousSearchLogs:searchLogs.length};
   } finally {await browser.close();}
 }
