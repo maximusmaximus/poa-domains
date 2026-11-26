@@ -481,6 +481,7 @@ test('resolveDefaultAuctionTab defaults to upcoming when current is empty and re
 test('owner profile, domain page, ownerLink primary rendering, and Manage main-domain + transfer flows work in Node DOM', async () => {
  const revision = /app\.js\?v=([a-f0-9]{12})/.exec(readFileSync('reference-web/index.html', 'utf8'))[1];
  const { ui } = await import(`../reference-web/ui-state.js?v=${revision}`);
+ const coreMod = await import(`../reference-web/ui-core.js?v=${revision}`);
  const routerMod = await import(`../reference-web/ui-router.js?v=${revision}`);
  const domainMod = await import(`../reference-web/ui-domain.js?v=${revision}`);
  const manageMod = await import(`../reference-web/ui-manage.js?v=${revision}`);
@@ -683,13 +684,31 @@ test('owner profile, domain page, ownerLink primary rendering, and Manage main-d
   const remix2 = renderMod.applySiteTitle({ creative: true });
   assert.notEqual(remix2.signature, remix1.signature);
 
-  // 2. ownerLink renders main domain + avatar for ownerA, and falls back to address when no primary is set
+  // 2. ownerLink & appendPrincipal render main domain (/d/<primary>) + abbreviated Owner Profile link (/p/<primary>) + POA copy button
   const linkBox = makeNode('p');
   routerMod.ownerLink(linkBox, ownerA);
   assert.ok(collectText(linkBox).includes('nebula'));
+  assert.ok(collectText(linkBox).includes(shortenPoaAddress(ownerA)));
+  const domLinksA = findAll(linkBox, (n) => n.tagName === 'A' && n.classList?.contains('owner-primary-link'));
+  const profLinksA = findAll(linkBox, (n) => n.tagName === 'A' && n.classList?.contains('owner-addr-link'));
+  assert.equal(domLinksA.length, 1);
+  assert.equal(domLinksA[0].href, '/d/nebula');
+  assert.equal(profLinksA.length, 1);
+  assert.equal(profLinksA[0].href, '/p/nebula');
+  assert.equal(profLinksA[0].textContent, shortenPoaAddress(ownerA));
+  const principalBox = makeNode('p');
+  coreMod.appendPrincipal(principalBox, ownerB);
+  const domLinksB = findAll(principalBox, (n) => n.tagName === 'A' && n.classList?.contains('owner-primary-link'));
+  const profLinksB = findAll(principalBox, (n) => n.tagName === 'A' && n.classList?.contains('owner-addr-link'));
+  assert.equal(domLinksB.length, 1);
+  assert.equal(domLinksB[0].href, '/d/peer');
+  assert.equal(profLinksB.length, 1);
+  assert.equal(profLinksB[0].href, '/p/peer');
+  assert.equal(profLinksB[0].textContent, shortenPoaAddress(ownerB));
   const plainBox = makeNode('p');
   routerMod.ownerLink(plainBox, hiddenOwner);
   assert.ok(collectText(plainBox).includes('poa1...1119'));
+  assert.equal(findAll(plainBox, (n) => n.classList?.contains('owner-primary-link')).length, 0);
 
   // 2. renderOwnerPage via domain name & via address displays main domain + profile fields + held names + POA listings
   domainMod.renderOwnerPage('comet');

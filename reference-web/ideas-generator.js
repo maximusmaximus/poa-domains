@@ -1,4 +1,4 @@
-import { IDEA_WORDS, IDEA_EMOJI, inspectName } from "./shared.js?v=297d0c9f759c";
+import { IDEA_WORDS, IDEA_EMOJI, inspectName } from "./shared.js?v=e822e8d11185";
 
 // Massive curated list of obvious everyday, tech, AI, crypto, finance, nature, creative & short root words.
 const CURATED_WORD_BANK = (

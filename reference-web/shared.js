@@ -337,10 +337,16 @@ export function countLiveAuctions({ cap, state, escrowMarket = [], nowMs = Date.
   : 0;
  return regLive + poaLive;
 }
-export function poaAuctionOutbidStatus(auction, { bidderAddress = "", cartItem = null } = {}) {
+export function formatAddressWithPrimary(state, value) {
+ const short = shortenPoaAddress(value);
+ const primary = state && value ? primaryNameForOwner(state, value) : null;
+ return primary ? `${primary} (${short})` : short;
+}
+export function poaAuctionOutbidStatus(auction, { bidderAddress = "", cartItem = null, state = null } = {}) {
  const minNext = poaMinimumNextBid(auction);
  const currentHigh = auction?.high?.amount ?? null;
  const currentHighPayer = auction?.high?.payer ?? null;
+ const payerText = currentHighPayer ? formatAddressWithPrimary(state, currentHighPayer) : "";
  const addr = isPoaAddress(bidderAddress) ? bidderAddress : "";
  if (addr && currentHighPayer === addr) {
   return {
@@ -354,7 +360,7 @@ export function poaAuctionOutbidStatus(auction, { bidderAddress = "", cartItem =
  if (addr && Array.isArray(auction?.bidders) && auction.bidders.includes(addr) && currentHigh && currentHighPayer !== addr) {
   return {
    status: "outbid",
-   message: `⚠️ You were outbid! Your prior bid is back in your available escrow balance to re-bid or withdraw. High bid is now ${poaShort(currentHigh)} POA by ${shortenPoaAddress(currentHighPayer)} (min next ${poaShort(minNext)} POA).`,
+   message: `⚠️ You were outbid! Your prior bid is back in your available escrow balance to re-bid or withdraw. High bid is now ${poaShort(currentHigh)} POA by ${payerText} (min next ${poaShort(minNext)} POA).`,
    minimumNextBid: minNext,
    currentHigh,
    currentHighPayer,
@@ -368,7 +374,7 @@ export function poaAuctionOutbidStatus(auction, { bidderAddress = "", cartItem =
   if (capMicros < minMicros) {
    return {
     status: "outbid",
-    message: `⚠️ Outbid! High bid is ${poaShort(currentHigh)} POA by ${shortenPoaAddress(currentHighPayer)} — min next ${poaShort(minNext)} POA exceeds your ${poaShort(cartItem.amount)} POA highest bid.`,
+    message: `⚠️ Outbid! High bid is ${poaShort(currentHigh)} POA by ${payerText} — min next ${poaShort(minNext)} POA exceeds your ${poaShort(cartItem.amount)} POA highest bid.`,
     minimumNextBid: minNext,
     currentHigh,
     currentHighPayer,
@@ -377,7 +383,7 @@ export function poaAuctionOutbidStatus(auction, { bidderAddress = "", cartItem =
   if (changed) {
    return {
     status: "outbid-covered",
-    message: `⚠️ Higher bid placed (${poaShort(currentHigh)} POA by ${shortenPoaAddress(currentHighPayer)}). Your ${poaShort(cartItem.amount)} POA highest bid still covers the ${poaShort(minNext)} POA minimum.`,
+    message: `⚠️ Higher bid placed (${poaShort(currentHigh)} POA by ${payerText}). Your ${poaShort(cartItem.amount)} POA highest bid still covers the ${poaShort(minNext)} POA minimum.`,
     minimumNextBid: minNext,
     currentHigh,
     currentHighPayer,
@@ -514,7 +520,7 @@ export function cartParamsForSigner(item, signer) {
  return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
- validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=297d0c9f759c";
+ validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=e822e8d11185";
 const b58Alphabet =
  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -1635,9 +1641,9 @@ export function cartReview(item, cap, state, escrowMarket = null, bidderAddress 
     } else if (highChanged) {
      outbid = true;
      if (capMicros < minMicros) {
-      stop(`Outbid! Current high bid is ${poaShort(a.high.amount)} POA by ${shortenPoaAddress(a.high.payer)}. Your highest bid (${poaShort(item.amount)} POA) is below the new minimum (${poaShort(minimum)} POA). Raise it yourself or remove the item; your cap was not raised.`);
+      stop(`Outbid! Current high bid is ${poaShort(a.high.amount)} POA by ${formatAddressWithPrimary(state, a.high.payer)}. Your highest bid (${poaShort(item.amount)} POA) is below the new minimum (${poaShort(minimum)} POA). Raise it yourself or remove the item; your cap was not raised.`);
      } else {
-      issues.push(`Outbid update: high bid is now ${poaShort(a.high.amount)} POA by ${shortenPoaAddress(a.high.payer)} (min next ${poaShort(minimum)} POA). Your highest bid (${poaShort(item.amount)} POA) still covers it — confirm review before copying.`);
+      issues.push(`Outbid update: high bid is now ${poaShort(a.high.amount)} POA by ${formatAddressWithPrimary(state, a.high.payer)} (min next ${poaShort(minimum)} POA). Your highest bid (${poaShort(item.amount)} POA) still covers it — confirm review before copying.`);
      }
     } else if (capMicros < minMicros) {
      outbid = Boolean(a.high);

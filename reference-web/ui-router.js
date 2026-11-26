@@ -1,12 +1,11 @@
-import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, primaryNameForOwner, profileImageMediaPath, readViewQuery, resolveOwnerInput, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=297d0c9f759c";
-import { ui } from "./ui-state.js?v=297d0c9f759c";
-import { createPoaCopyButton } from "./ui-copy.js?v=297d0c9f759c";
-import { add, el } from "./ui-core.js?v=297d0c9f759c";
-import { runSearch } from "./ui-search.js?v=297d0c9f759c";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=297d0c9f759c";
-import { updateTabDots } from "./ui-render.js?v=297d0c9f759c";
-import { syncCartShortcutNow } from "./ui-cart.js?v=297d0c9f759c";
-import { renderManagement } from "./ui-manage.js?v=297d0c9f759c";
+import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, primaryNameForOwner, profileImageMediaPath, readViewQuery, resolveOwnerInput, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=e822e8d11185";
+import { ui } from "./ui-state.js?v=e822e8d11185";
+import { add, appendPoaAddress, el, registerAddressNav } from "./ui-core.js?v=e822e8d11185";
+import { runSearch } from "./ui-search.js?v=e822e8d11185";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=e822e8d11185";
+import { updateTabDots } from "./ui-render.js?v=e822e8d11185";
+import { syncCartShortcutNow } from "./ui-cart.js?v=e822e8d11185";
+import { renderManagement } from "./ui-manage.js?v=e822e8d11185";
 
 const LAST_POA_KEY = "poadomains.lastPoaAddress.v1";
 
@@ -288,52 +287,54 @@ export function nameLink(parent, name, css = "domain-link", opts = {}) {
 export function ownerLink(parent, ownerId, label) {
  const short = isPoaAddress(ownerId) ? shortenPoaAddress(ownerId) : null;
  const isRoleLabel = Boolean(label && !isPoaAddress(label) && label !== short && label !== ownerId.slice(0, 18) + "…" && label !== ownerId);
+ if (!isRoleLabel && short) {
+  const wrap = appendPoaAddress(parent, ownerId, { resolvePrimary: true, linkOwner: true });
+  return wrap.children?.[0] ?? wrap;
+ }
  const primary = !isRoleLabel ? primaryNameForOwner(ui.latestState, ownerId) : null;
  if (primary) {
-  const a = document.createElement("a");
-  a.href = "/p/" + encodeURIComponent(primary);
-  a.className = "domain-link owner-primary-link";
-  a.title = ownerId;
-  a.append(createDomainAvatar(primary, { size: "xs" }));
+  const domLink = document.createElement("a");
+  domLink.href = domainPath(primary);
+  domLink.className = "domain-link owner-primary-link";
+  domLink.title = `Open ${primary} domain page`;
+  domLink.append(createDomainAvatar(primary, { size: "xs" }));
   const nameSpan = document.createElement("span");
   nameSpan.className = "domain-name";
   nameSpan.textContent = primary;
-  a.append(nameSpan);
-  a.addEventListener("click", (event) => {
+  domLink.append(nameSpan);
+  domLink.addEventListener("click", (event) => {
+   event.preventDefault();
+   navigateDomain(primary);
+  });
+  const addrLink = document.createElement("a");
+  addrLink.href = "/p/" + encodeURIComponent(primary);
+  addrLink.className = "domain-link poa-addr-text owner-addr-link";
+  addrLink.textContent = ownerId.slice(0, 18) + "…";
+  addrLink.title = `Owner profile (${ownerId})`;
+  addrLink.addEventListener("click", (event) => {
    event.preventDefault();
    navigateOwner(primary);
   });
   const wrap = document.createElement("span");
   wrap.className = "poa-addr-inline owner-primary-inline";
-  wrap.append(a);
-  if (short)
-   wrap.append(createPoaCopyButton(ownerId));
+  wrap.append(domLink, addrLink);
   parent.append(wrap);
-  return a;
+  return domLink;
  }
- const display = isRoleLabel ? label : (short ?? (ownerId.slice(0, 18) + "…"));
- const showCopy = Boolean(short && display === short);
+ const display = isRoleLabel ? label : (ownerId.slice(0, 18) + "…");
  const a = document.createElement("a");
  a.href = "/p/" + encodeURIComponent(ownerId);
- a.className = showCopy ? "domain-link poa-addr-text" : "domain-link";
+ a.className = "domain-link";
  a.textContent = display;
- if (short)
-  a.title = ownerId;
  a.addEventListener("click", (event) => {
   event.preventDefault();
   navigateOwner(ownerId);
  });
- if (showCopy) {
-  const wrap = document.createElement("span");
-  wrap.className = "poa-addr-inline";
-  wrap.append(a, createPoaCopyButton(ownerId));
-  parent.append(wrap);
- }
- else {
-  parent.append(a);
- }
+ parent.append(a);
  return a;
 }
+
+registerAddressNav({ createDomainAvatar, navigateDomain, navigateOwner });
 
 function closeOverlaysBeforeNavigate() {
  if (el("floatingCartPanel") && !el("floatingCartPanel").hidden) el("floatingCartClose")?.click();

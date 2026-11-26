@@ -1,9 +1,9 @@
-import { ui } from "./ui-state.js?v=297d0c9f759c";
-import { add, el, endpointBase } from "./ui-core.js?v=297d0c9f759c";
-import { createDomainAvatar, domainHeader, nameLink, notifyOwnerChanged, openPoa, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=297d0c9f759c";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=297d0c9f759c";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=297d0c9f759c";
-import { createInlineInfo } from "./ui-help.js?v=297d0c9f759c";
+import { ui } from "./ui-state.js?v=e822e8d11185";
+import { add, el, endpointBase, person } from "./ui-core.js?v=e822e8d11185";
+import { createDomainAvatar, domainHeader, nameLink, notifyOwnerChanged, openPoa, ownerLink, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=e822e8d11185";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=e822e8d11185";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=e822e8d11185";
+import { createInlineInfo } from "./ui-help.js?v=e822e8d11185";
 import {
  buildProfileUpdatePrompt,
  buildSetPrimaryPrompt,
@@ -27,7 +27,7 @@ import {
  saveKnownOwner,
  shortenPoaAddress,
  validPrincipal,
-} from "./shared.js?v=297d0c9f759c";
+} from "./shared.js?v=e822e8d11185";
 
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const IDLE_MANAGE_PROMPT = "Edit profile fields or choose an action above to preview the code for your agent.";
@@ -497,11 +497,15 @@ function syncDomainLookupNotice(resolved) {
   notice.dataset.fromDomainLookup = "1";
   notice.hidden = false;
   notice.replaceChildren();
-  add(
-   notice,
-   "span",
-   `Viewing domains for ${resolved.viaDomain} · ${shortenPoaAddress(resolved.owner)}`,
-  );
+  const row = add(notice, "span", "Viewing domains for ");
+  const primary = primaryNameForOwner(ui.latestState, resolved.owner);
+  if (primary === resolved.viaDomain) {
+   ownerLink(row, resolved.owner, person(resolved.owner));
+  } else {
+   nameLink(row, resolved.viaDomain);
+   row.append(" · ");
+   ownerLink(row, resolved.owner, person(resolved.owner));
+  }
   notice.append(
    createInlineInfo(
     "manage-domain-lookup",
@@ -638,9 +642,10 @@ function buildTransferSection(card, deed, owner, { isPrimary = false } = {}) {
   }
   const res = resolveCurrent();
   if (res.ok) {
+   const recPrimary = res.source === "address" ? primaryNameForOwner(ui.latestState, res.recipient) : null;
    previewNode.textContent =
     res.source === "address"
-     ? `✅ Recipient address: ${shortenPoaAddress(res.recipient)}`
+     ? (recPrimary ? `✅ Recipient: ${recPrimary} (${shortenPoaAddress(res.recipient)})` : `✅ Recipient address: ${shortenPoaAddress(res.recipient)}`)
      : res.source === "default-domain"
       ? `✅ Default domain "${res.domainName}" → ${shortenPoaAddress(res.recipient)}`
       : `✅ Domain "${res.domainName}" POA address → ${shortenPoaAddress(res.recipient)}`;
