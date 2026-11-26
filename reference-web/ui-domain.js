@@ -24,13 +24,13 @@ import {
  resolveDomainView,
  resolveOwnerInput,
  unavailableKey,
-} from "./shared.js?v=5349a6f92d4b";
-import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=5349a6f92d4b";
-import { createInlineInfo } from "./ui-help.js?v=5349a6f92d4b";
-import { ui } from "./ui-state.js?v=5349a6f92d4b";
-import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=5349a6f92d4b";
-import { activeUserAddress, domainHeader, nameLink, openManageDomain, openPoa, ownerLink, renderSelfBidNotice } from "./ui-router.js?v=5349a6f92d4b";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=5349a6f92d4b";
+} from "./shared.js?v=297d0c9f759c";
+import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=297d0c9f759c";
+import { createInlineInfo } from "./ui-help.js?v=297d0c9f759c";
+import { ui } from "./ui-state.js?v=297d0c9f759c";
+import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=297d0c9f759c";
+import { activeUserAddress, domainHeader, nameLink, openManageDomain, openPoa, ownerLink, renderSelfBidNotice } from "./ui-router.js?v=297d0c9f759c";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=297d0c9f759c";
 
 function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) {
  const wrap = document.createElement("span");
@@ -79,7 +79,6 @@ function appendActivityDetails(parent, history) {
 function renderProfileInto(box, deed, { listedForSale = false, showCleanSlate = true } = {}) {
  if (!box) return;
  box.replaceChildren();
- box.classList.remove("domain-fields-paused");
  if (!deed) {
   box.hidden = true;
   return;
@@ -90,10 +89,7 @@ function renderProfileInto(box, deed, { listedForSale = false, showCleanSlate = 
  const wasReset = Number(deed.profileResetAt) > 0;
 
  if (listedForSale) {
-  box.hidden = false;
-  box.classList.add("domain-fields-paused");
-  add(box, "h3", "⏸️ Domain fields paused while listed");
-  add(box, "p", "Profile fields are paused while listed and reset on transfer.");
+  box.hidden = true;
   return;
  }
 
@@ -248,15 +244,6 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
  if (!showAny) return;
 
  add(listingBox, "h3", "🏷️ Auctions & Sales");
- if (salesInfo.listedForSale) {
-  const warn = add(
-   listingBox,
-   "p",
-   "⚠️ Listed for sale or in auction — profile fields are paused while listed and will be dropped on transfer.",
-   "sale-fields-warning",
-  );
-  warn.setAttribute("role", "note");
- }
  const list = add(listingBox, "div", "", "domain-sales-list");
 
  const userAddr = activeUserAddress();

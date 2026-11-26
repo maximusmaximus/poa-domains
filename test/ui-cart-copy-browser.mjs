@@ -1465,14 +1465,17 @@ try {
   await expect(pageFields.locator("#domainListing")).toContainText("Auctions & Sales");
   await expect(pageFields.locator(`#domainListing article[data-auction-id="${agentSaleAucId}"]`)).toContainText("High bid 200 POA");
   await expect(pageFields.locator(`#domainListing article[data-auction-id="${agentSaleAucId}"] .auction-countdown`)).toContainText("left");
-  await expect(pageFields.locator("#domainListing .sale-fields-warning")).toBeVisible();
-  await expect(pageFields.locator("#domainProfile")).toContainText("paused while listed");
+  await expect(pageFields.locator("#domainListing .sale-fields-warning")).toHaveCount(0);
+  await expect(pageFields.locator("#domainProfile")).toBeHidden();
+  await expect(pageFields.locator("#domainMain")).not.toContainText("Domain fields paused while listed");
+  await expect(pageFields.locator("#domainMain")).not.toContainText("Listed for sale or in auction");
   assert.equal(await pageFields.locator("#domainProfile img.domain-avatar").count(), 0);
   assert.equal(await pageFields.locator("#domainTitle .domain-header-avatar img").count(), 0);
   await expect(pageFields.locator("#domainTitle .domain-header-avatar")).toBeVisible();
   // While listed/in auction, "Auction" is hidden in Manage domains and Sell/Auction row is hidden on domain page
   await expect(pageFields.locator("#poaSellActions")).toBeHidden();
   await pageFields.locator('#domainActions button[aria-label="Manage agent"]').click();
+  await expect(pageFields.locator('#manageNames article[data-domain-name="agent"] > .sale-fields-warning')).toHaveCount(0);
   await expect(pageFields.locator('#manageNames button[aria-label="Auction: agent"]')).toHaveCount(0);
   await expect(pageFields.locator('#manageNames button[aria-label="Open in My POA: agent"]')).toBeVisible();
   await pageFields.goto(`${h.url}/d/agent`);

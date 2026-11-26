@@ -1,9 +1,9 @@
-import { ui } from "./ui-state.js?v=5349a6f92d4b";
-import { add, el, endpointBase } from "./ui-core.js?v=5349a6f92d4b";
-import { createDomainAvatar, domainHeader, nameLink, notifyOwnerChanged, openPoa, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=5349a6f92d4b";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=5349a6f92d4b";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=5349a6f92d4b";
-import { createInlineInfo } from "./ui-help.js?v=5349a6f92d4b";
+import { ui } from "./ui-state.js?v=297d0c9f759c";
+import { add, el, endpointBase } from "./ui-core.js?v=297d0c9f759c";
+import { createDomainAvatar, domainHeader, nameLink, notifyOwnerChanged, openPoa, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=297d0c9f759c";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=297d0c9f759c";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=297d0c9f759c";
+import { createInlineInfo } from "./ui-help.js?v=297d0c9f759c";
 import {
  buildProfileUpdatePrompt,
  buildSetPrimaryPrompt,
@@ -27,7 +27,7 @@ import {
  saveKnownOwner,
  shortenPoaAddress,
  validPrincipal,
-} from "./shared.js?v=5349a6f92d4b";
+} from "./shared.js?v=297d0c9f759c";
 
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const IDLE_MANAGE_PROMPT = "Edit profile fields or choose an action above to preview the code for your agent.";
@@ -884,15 +884,6 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
    nowMs: ui.escrowMarketServerTime || Date.now(),
   });
   const availableToList = !saleInfo.listedForSale && !d.lock;
-  if (saleInfo.listedForSale) {
-   const liveWarn = add(
-    card,
-    "p",
-    "⏸️ Listed for sale or in auction — profile fields are paused and will be dropped on transfer.",
-    "sale-fields-warning",
-   );
-   liveWarn.setAttribute("role", "note");
-  }
   buildProfileEditor(card, d, owner, isFocused || ordered.length === 1, {
    listedForSale: saleInfo.listedForSale,
    headerAvatar,

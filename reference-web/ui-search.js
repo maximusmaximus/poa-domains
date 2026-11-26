@@ -1,13 +1,13 @@
-import { copyText } from "./ui-copy.js?v=5349a6f92d4b";
-import { publicNameUnavailable } from "./shared.js?v=5349a6f92d4b";
-import { isOwnDomainOrListing, registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, activePoaFixedListings, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=5349a6f92d4b";
-import { ui } from "./ui-state.js?v=5349a6f92d4b";
-import { activeUserAddress, domainHeader, nameLink, navigateDomain, openManageDomain, openPoa, ownerLink, renderSelfBidNotice, writeViewURL } from "./ui-router.js?v=5349a6f92d4b";
-import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=5349a6f92d4b";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=5349a6f92d4b";
-import { addToCart } from "./ui-cart.js?v=5349a6f92d4b";
-import { suggestNames } from "./ideas-generator.js?v=5349a6f92d4b";
-import { logSubmittedSearch } from "./ui-search-log.js?v=5349a6f92d4b";
+import { copyText } from "./ui-copy.js?v=297d0c9f759c";
+import { publicNameUnavailable } from "./shared.js?v=297d0c9f759c";
+import { isOwnDomainOrListing, registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, activePoaFixedListings, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=297d0c9f759c";
+import { ui } from "./ui-state.js?v=297d0c9f759c";
+import { activeUserAddress, domainHeader, nameLink, navigateDomain, openManageDomain, openPoa, ownerLink, renderSelfBidNotice, writeViewURL } from "./ui-router.js?v=297d0c9f759c";
+import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=297d0c9f759c";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=297d0c9f759c";
+import { addToCart } from "./ui-cart.js?v=297d0c9f759c";
+import { suggestNames } from "./ideas-generator.js?v=297d0c9f759c";
+import { logSubmittedSearch } from "./ui-search-log.js?v=297d0c9f759c";
 
 let activeSuggestionIdx = -1;
 let currentSuggestions = [];
