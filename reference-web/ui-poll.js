@@ -1,18 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=69895dc026c0";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=69895dc026c0";
-import { renderManagement } from "./ui-manage.js?v=69895dc026c0";
-import { actionLabel } from "./ui-copy.js?v=69895dc026c0";
-import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=69895dc026c0";
-import { ui } from "./ui-state.js?v=69895dc026c0";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=69895dc026c0";
-import { createPoaCopyButton } from "./ui-copy.js?v=69895dc026c0";
-import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=69895dc026c0";
-import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=69895dc026c0";
-import { renderDomainPage } from "./ui-domain.js?v=69895dc026c0";
-import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=69895dc026c0";
-import { renderIdeas } from "./ui-ideas.js?v=69895dc026c0";
-import { mountEscrow } from "./escrow.js?v=69895dc026c0";
-import { applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=69895dc026c0";
+import { publicNameUnavailable } from "./shared.js?v=004104527527";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=004104527527";
+import { renderManagement } from "./ui-manage.js?v=004104527527";
+import { actionLabel } from "./ui-copy.js?v=004104527527";
+import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=004104527527";
+import { ui } from "./ui-state.js?v=004104527527";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=004104527527";
+import { createPoaCopyButton } from "./ui-copy.js?v=004104527527";
+import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=004104527527";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=004104527527";
+import { renderDomainPage } from "./ui-domain.js?v=004104527527";
+import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=004104527527";
+import { renderIdeas } from "./ui-ideas.js?v=004104527527";
+import { mountEscrow } from "./escrow.js?v=004104527527";
+import { applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=004104527527";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -838,7 +838,7 @@ export async function loadRegistry() {
             ]);
             ui.readState = () => json(staticURL(files.state));
             el("mode").textContent =
-                "🧪 SYNTHETIC DEMO · No backend, wallet connection, signing or browser writes. Names, balances and principals are test data, not native PoA ownership or assets; fixture signing keys were discarded.";
+                "🧪 SYNTHETIC DEMO · No backend, wallet connection, signing or browser writes. Names, balances and principals are test data; fixture signing keys were discarded.";
             el("example").hidden = false;
             el("exampleNotice").textContent =
                 "Synthetic examples only. Do not sign or submit.";
@@ -846,7 +846,7 @@ export async function loadRegistry() {
         else {
             if (config.mode !== "local-reference-only" && config.mode !== "live-registry")
                 throw Error("Unknown mode");
-            el("mode").textContent = ui.configMode === "live-registry" ? "🏠 Hosted registry data. Native naming is not enabled." : "🧪 Local registry data. Not native PoA ownership.";
+            el("mode").textContent = ui.configMode === "live-registry" ? "🏠 Live registry data." : "🧪 Local registry data.";
             if (config.publicApiBase) {
                 const u = new URL(config.publicApiBase);
                 if (u.username ||

@@ -149,9 +149,9 @@ export async function verifyStaticPage(url: string, screenshot?: string) {
     assert.equal(await page.evaluate(() => (window as any).__poaPwned), undefined);
     const body = await page.locator('body').innerText();
     assert.ok(!body.includes('BROKEN_SECRET') && !body.includes('attacker.invalid') && !body.includes('onerror='), 'Raw upstream data must not be reflected');
-    assert.match(body, /Native on-chain registration, ownership and settlement are not verified/i);
-    assert.doesNotMatch(body, /xero\s*emoji|roadmap|coming\s+soon|future\s+plans/i);
-    assert.match((await page.locator('#availability').innerText()).trim(), /^Native registry unavailable$/i);
+    assert.match(body, /This static page does not accept writes or payments/i);
+    assert.doesNotMatch(body, /xero\s*emoji|roadmap|coming\s+soon|future\s+plans|Native naming is not enabled/i);
+    assert.match((await page.locator('#availability').innerText()).trim(), /^Read-only mirror$/i);
   }
   async function settled() {
     await page.waitForFunction(() => {
@@ -161,8 +161,8 @@ export async function verifyStaticPage(url: string, screenshot?: string) {
   }
   async function ready(expectedTransactions = txs) {
     await settled();
-    await page.waitForFunction(() => /Verified application guard/i.test(document.querySelector('#status')?.textContent || ''));
-    await page.waitForFunction(() => /Official.node observation\s*\(unverified\)/i.test(document.querySelector('#network-status')?.textContent || ''));
+    await page.waitForFunction(() => /Verified read-only mirror/i.test(document.querySelector('#status')?.textContent || ''));
+    await page.waitForFunction(() => /Live PoA network reading\s*\(read-only\)/i.test(document.querySelector('#network-status')?.textContent || ''));
     assert.equal(await page.locator('dl#network-details > dt').count(), 8);
     assert.equal(await page.locator('dl#network-details > dd').count(), 8);
     const local = await page.locator('#network-details time').evaluate(time => ({actual:time.textContent,expected:new Date((time as HTMLTimeElement).dateTime).toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'})}));

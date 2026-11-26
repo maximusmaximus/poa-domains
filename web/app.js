@@ -51,7 +51,7 @@ function renderNetwork(value) {
   exact(value.checkpoint, ["height", "cutoffTs"]);
   const counts = [value.observedAt, value.expiresAt, value.checkpoint.height, value.checkpoint.cutoffTs, value.epochsClosed, value.agentsJoined, value.transactions, value.reportedFinalTransactions, value.attestationThreshold];
   if (value.kind !== "native-network-observation" || value.source !== "https://minepoa.com" || value.chainId !== "poa-mainnet-1" || value.verification !== "node-reported-unverified" || value.finalityVerified !== false || value.registryReady !== false || !counts.every(n => Number.isSafeInteger(n) && n >= 0) || value.expiresAt !== value.observedAt + 900000 || value.observedAt > now + 300000 || now > value.expiresAt || value.checkpoint.cutoffTs * 1000 > value.observedAt + 300000 || value.reportedFinalTransactions > value.transactions || value.attestationThreshold < 1 || value.attestationThreshold > 256 || !/^[a-f0-9]{64}$/.test(value.engineSha256) || !/^[a-f0-9]{64}$/.test(value.paramsSha256)) throw Error("Observation unavailable");
-  document.getElementById("network-status").textContent = "Official-node observation (unverified). Native registry still unavailable.";
+  document.getElementById("network-status").textContent = "Live PoA network reading (read-only).";
   const details = document.getElementById("network-details");
   details.replaceChildren();
   const row = (label, text) => {
@@ -110,7 +110,7 @@ async function refreshOnce() {
     )
       throw Error("Unavailable");
     document.getElementById("status").textContent =
-      "Verified application guard: this page is read-only. Native registry unavailable.";
+      "Verified read-only mirror: open the Explorer for live registry actions.";
     try { renderNetwork(await liveReader.observe()); }
     catch (failure) {
       const code = failure instanceof LiveNetworkError ? failure.code : "INVALID_RESPONSE";
@@ -127,7 +127,7 @@ async function refreshOnce() {
   } catch {
     clearNetwork("Network check was not started. Refresh network to try again.");
     document.getElementById("status").textContent =
-      "Fail-closed: this page is read-only. Native registry unavailable.";
+      "Fail-closed: this page is read-only.";
     error.textContent =
       "This page’s availability document could not be validated. Refresh network to try again. No registry request was sent.";
   }

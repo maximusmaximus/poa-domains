@@ -19,7 +19,7 @@
       <div class="status-network"><span id="networkStatusIcon" class="network-status-icon" aria-hidden="true">⚪</span><span id="networkStatusText" class="network-status-text" role="status" aria-live="polite">Checking PoA network…</span></div>
               <p id="mode" data-info-description>⏳ Loading registry data…</p>
     <p id="networkStatusDetail" data-info-description class="muted">Checking PoA network…</p>
-    <p id="registryUnitsNotice" data-info-description class="muted">💡 Everything is priced and paid in POA 🪙. New names: 100 POA (common) or 1000 POA (premium). Buy, bid, sell and get refunds through POA checkout; its live status is checked before any payment. Native naming is not enabled. Some stored names stay reserved even when hidden from public lists.</p>
+    <p id="registryUnitsNotice" data-info-description class="muted">💡 Everything is priced and paid in POA 🪙. New names: 100 POA (common) or 1000 POA (premium). Buy, bid, sell and get refunds through POA checkout; its live status is checked before any payment. Some stored names stay reserved even when hidden from public lists.</p>
         <p id="registryLoading" data-info-description role="status">⏳ Loading registry data… You can use the tabs and type a search now.</p>
         <p id="registryAge" data-info-description title="Registry data only. POA payments refresh separately.">Registry data not loaded yet · POA payments refresh separately.</p>
         <div id="registryError" role="alert" hidden><span id="registryErrorText"></span> <button id="registryRetry" type="button" class="secondary small">🔄 Refresh</button></div>
@@ -232,7 +232,7 @@
       <section id="escrowSection" data-section="escrow" role="tabpanel" aria-labelledby="tabEscrow" tabindex="0" hidden>
         <div id="manageDomains" class="manage-domains">
           <h2>🌱 Manage domains and subdomains</h2>
-          <p data-info-description>View a public owner address. This is not a wallet connection or proof that you own it. These are application-registry names, not verified native-chain ownership.</p>
+          <p data-info-description>View a public owner address. This is not a wallet connection or proof that you own it.</p>
           <div id="manageOwnerLabelRow" class="field-label-row"><label for="manageOwner">Public owner address</label></div><div class="search-bar"><input id="manageOwner" autocomplete="off" placeholder="poa1… public owner address" /><button id="manageLookup" type="button">View names</button></div>
           <div id="manageOwnerNotice" class="muted has-info" role="status" aria-live="polite" hidden></div>
           <p data-info-description>Open a name to view it, edit its public profile (addresses, bio, and avatar), or prepare a sale or subdomain request for its owner's agent. Retiring a subdomain needs both the child holder and parent owner. Nothing is sent from these controls.</p>
@@ -444,7 +444,7 @@
       hidden
     >
       <h2 id="termsGateHeading">📜 Welcome to PoA Domains</h2>
-      <p id="termsGateSummary">PoA Domains is a standalone application registry for permanent names and public profiles using custodial POA escrow, not a native PoA naming protocol.</p>
+      <p id="termsGateSummary">PoA Domains provides permanent names and public profiles with POA escrow checkout.</p>
       <p id="termsGateWarning" class="terms-gate-warning">⚠️ Never enter private keys, seed phrases, or passwords on this site — your agent signs locally in your own wallet.</p>
       <p id="termsGateConsent">By continuing, you acknowledge this warning and agree to the <a id="termsGateLink" href="/terms" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions and Privacy Policy</a>.</p>
       <div class="button-row terms-gate-actions">
@@ -470,6 +470,6 @@
       </details>
     </div>
 
-    <script type="module" src="/app.js?v=69895dc026c0"></script>
+    <script type="module" src="/app.js?v=004104527527"></script>
   </body>
 </html>

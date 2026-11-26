@@ -64,7 +64,7 @@ export async function installFetchMetadataProbe(page){
 export async function waitForIntegratedChecker(page){
  await page.waitForFunction(()=>{const root=window.__POA_FORMAT_REVIEW__?.root(),input=root?.querySelector('textarea'),status=root?.querySelector('[role="status"]')?.textContent;return !!input&&(!input.matches(':disabled')||/could not initialize/.test(status));},{},{timeout:8000});
  const ready=await page.evaluate(()=>!window.__POA_FORMAT_REVIEW__.root().querySelector('textarea').matches(':disabled'));
- await page.waitForFunction(()=>document.getElementById('status')?.textContent==='Verified application guard: this page is read-only. Native registry unavailable.'&&document.getElementById('network-status')?.textContent.includes('(unverified)')&&document.getElementById('refresh')?.disabled===false,{},{timeout:8000});
+ await page.waitForFunction(()=>document.getElementById('status')?.textContent==='Verified read-only mirror: open the Explorer for live registry actions.'&&document.getElementById('network-status')?.textContent.includes('(read-only)')&&document.getElementById('refresh')?.disabled===false,{},{timeout:8000});
  return ready;
 }
 export async function readNativeGuard(page){return page.evaluate(()=>({availability:document.getElementById('availability').textContent,operations:document.getElementById('operations').textContent,status:document.getElementById('status').textContent,error:document.getElementById('error').textContent,refreshDisabled:document.getElementById('refresh').disabled,explanation:document.getElementById('explanation').textContent,source:document.getElementById('source').textContent}));}

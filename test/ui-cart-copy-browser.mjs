@@ -1019,7 +1019,8 @@ try {
 
     // Modal is open, contains summary, key warning, Terms link, and NO close button
     await expect(pageGate.locator("#termsGateModal")).toBeVisible();
-    await expect(pageGate.locator("#termsGateSummary")).toContainText("application registry");
+    await expect(pageGate.locator("#termsGateSummary")).toContainText("permanent names");
+    await expect(pageGate.locator("#termsGateSummary")).not.toContainText("not a native");
     await expect(pageGate.locator("#termsGateWarning")).toContainText("Never enter private keys");
     await expect(pageGate.locator("#termsGateLink")).toHaveAttribute("href", "/terms");
     await expect(pageGate.locator("#termsGateLink")).toHaveAttribute("target", "_blank");
