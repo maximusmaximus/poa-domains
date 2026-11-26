@@ -192,7 +192,7 @@ try {
     (await client.listResourceTemplates()).resourceTemplates.length,
     2,
   );
-  assert.equal((await client.listPrompts()).prompts.length, 4);
+  assert.equal((await client.listPrompts()).prompts.length, 5);
   const quote = (
     await client.callTool({
       name: "quote_domain",

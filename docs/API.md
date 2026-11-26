@@ -58,7 +58,7 @@ maxTotal maxNetworkFee action params
 - `nonce`, versions, generation and times are nonnegative safe integers. `requestId` is 1–64 ASCII letters/digits/underscore/hyphen. Validity is `[notBefore, deadline)` in authoritative local seconds.
 - Amounts/caps are canonical nonnegative decimal strings, up to `2^127-1`; prices/bids/payments must be positive. `maxTotal` caps the exact signer debit; `maxNetworkFee` must be string `"0"` in this profile. No floating point token conversion.
 - `expectedDeedId` plus version protects generation/ownership. An initial root announcement uses `expectedDeedId:null, expectedVersion:0`. Current deed IDs/versions, parent owner version, offer version, auction version and refund-credit version come from committed state, never guessed defaults.
-- Names in a signed body must already be canonical. CLI preparation/UI normalize supported inputs, show the result and preserve exact operation fields. All 17 actions are available through `submit`; there are no privileged alternative mutation routes.
+- Names in a signed body must already be canonical. CLI preparation/UI normalize supported inputs, show the result and preserve exact operation fields. All 18 actions are available through `submit`; there are no privileged alternative mutation routes.
 
 ## Actions
 
@@ -77,9 +77,10 @@ maxTotal maxNetworkFee action params
 | `cancelOffer`      | `offerId,expectedVersion`; original seller cancels unsold standing/fixed offer                                                                                     |
 | `sellFixed`        | `name,expectedDeedId,expectedVersion,asset,price,validUntil`; current unlocked holder; root/child resale                                                           |
 | `buyFixed`         | `offerId,expectedVersion,asset,amount`; checks original owner, deed and encumbrance versions before payment                                                        |
-| `transfer`         | `name,expectedDeedId,expectedVersion,recipient`; holder, unchanged terms; no fresh parent approval for child                                                       |
+| `transfer`         | `name,expectedDeedId,expectedVersion,recipient`; holder, unchanged terms; resets attached profile fields & records (archived as read-only history) and clears prior holder's default/main domain if set; no fresh parent approval for child |
 | `setRecords`       | `name,expectedDeedId,expectedVersion,records`; holder; HTTPS service, wallet chain/address, raw-CID IPFS only                                                      |
 | `setMetadata`      | `name,expectedDeedId,expectedVersion,metadata`; holder; verified new witness appends history, cannot rewrite rights                                                |
+| `setPrimaryName`   | `name,expectedDeedId,expectedVersion`; holder binds one held domain as their public key's default/main domain (`state.primaryNames[signer]`), or clears it with `name:null, expectedDeedId:null, expectedVersion:0` |
 | `renewLease`       | Off. New submissions are refused with `PERMANENT_OWNERSHIP_ONLY` (names are owned forever)                                                                      |
 | `expireLease`      | Off. New submissions are refused with `PERMANENT_OWNERSHIP_ONLY` (names never expire)                                                                           |
 | `revokeChild`      | `name,expectedDeedId,expectedVersion,parentOwnerVersion`; current child holder primary + current parent co-signature; permanent path remains reserved              |
@@ -102,7 +103,13 @@ owned or auctioned name is refused with `OWNERSHIP_CLASS_TAKEN`. `/v1/resolve` r
 `ownershipConflict` and `/v1/capabilities` publishes `ownership` and `emojiOwnership`
 (the multi-member classes).
 
-Metadata is `{cid,document:{schema:"poa-domains.metadata.v1",name,rightsHash,description}}`. Use `rightsHash(rights,parentDeedIdOrNull)` and `cidFor(document)` from the SDK. CIDv1 raw SHA-256 addresses exact canonical JSON bytes. Both witnesses and hashes are verified without fetching/pinning. Descriptions are inert untrusted public data. Current ownership/derived expiry/records cannot be overridden by a CID.
+Metadata is `{cid,document:{schema:"poa-domains.metadata.v1",name,rightsHash,description}}` or public profile v1 `{cid,document:{schema:"poa-domains.profile.v1",version:1,name,rightsHash,poa,btc,eth,description,image}}`. Use `rightsHash(rights,parentDeedIdOrNull)` and `cidFor(document)` from the SDK. CIDv1 raw SHA-256 addresses exact canonical JSON bytes. Both witnesses and hashes are verified without fetching/pinning. Descriptions are inert untrusted public data. Current ownership/derived expiry/records cannot be overridden by a CID.
+
+### Default / main domain address and transfer field reset
+
+- **Default domain address (`setPrimaryName`)**: Any holder can bind one active domain they hold to their public key (`state.primaryNames[signer]`). Owner Profile (`/p/<principal>` and `/p/<domain>`) then displays that domain's name, avatar icon, public profile fields, and all names the owner holds, and owner links across the UI resolve to that main domain. Pass `{ name: null, expectedDeedId: null, expectedVersion: 0 }` to clear it.
+- **Transfer field reset**: Transferring a domain (`transfer`, `buyFixed`, `finalize`, or POA escrow settlement) automatically clears active `records`, advances `profileResetAt` so prior profile fields are no longer active for the new holder (archiving them in `previousFields` as read-only history on `/d/<name>`), and clears `state.primaryNames[oldOwner]` if the transferred name was the prior holder's main domain.
+- **Listing/auction pause**: Listing or auctioning a domain pauses active profile fields on `/d/<name>` and `/p/<owner>` until unlisted or transferred, and drops them on transfer.
 
 ### Receipts and errors
 
@@ -114,7 +121,7 @@ Business receipt: `intentId,requestId,signer,sequence,time,status,code,result`, 
 
 The isolated `reference-cli.js mcp --url ORIGIN` stdio MCP adapter uses the shared **2025-11-25** core: nine typed registry tools, capability/name/receipt resources, and buy-domain/cart-handoff prompts. Enabled actions use one action-tagged packet schema under `simulate_intent` and `submit_intent`; disabled lease actions are not advertised. See [MCP](MCP.md) for discovery and the bounded JSON-only transport contract. The Worker source now also includes stateless Streamable HTTP `/mcp`, pending Max’s separate production-deploy approval; see [MCP](MCP.md). No signing service is exposed.
 
-The isolated reference UI lists all 17 reference actions and builds unsigned local test handoffs. It lives in `reference-web/`, not in the production Pages artifact. Its static fixture variant is exercised only in a temporary test directory. Production CLI/MCP/API do not consume these bodies, states, receipts or fixture capabilities.
+The isolated reference UI lists all 18 reference actions and builds unsigned local test handoffs. It lives in `reference-web/`, not in the production Pages artifact. Its static fixture variant is exercised only in a temporary test directory. Production CLI/MCP/API do not consume these bodies, states, receipts or fixture capabilities.
 
 ## Local emoji spelling check
 

@@ -1,12 +1,12 @@
-import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, profileImageMediaPath, readViewQuery, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=004104527527";
-import { ui } from "./ui-state.js?v=004104527527";
-import { createPoaCopyButton } from "./ui-copy.js?v=004104527527";
-import { add, el } from "./ui-core.js?v=004104527527";
-import { runSearch } from "./ui-search.js?v=004104527527";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=004104527527";
-import { updateTabDots } from "./ui-render.js?v=004104527527";
-import { syncCartShortcutNow } from "./ui-cart.js?v=004104527527";
-import { renderManagement } from "./ui-manage.js?v=004104527527";
+import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, primaryNameForOwner, profileImageMediaPath, readViewQuery, resolveOwnerInput, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=74b9108b49c1";
+import { ui } from "./ui-state.js?v=74b9108b49c1";
+import { createPoaCopyButton } from "./ui-copy.js?v=74b9108b49c1";
+import { add, el } from "./ui-core.js?v=74b9108b49c1";
+import { runSearch } from "./ui-search.js?v=74b9108b49c1";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=74b9108b49c1";
+import { updateTabDots } from "./ui-render.js?v=74b9108b49c1";
+import { syncCartShortcutNow } from "./ui-cart.js?v=74b9108b49c1";
+import { renderManagement } from "./ui-manage.js?v=74b9108b49c1";
 
 const LAST_POA_KEY = "poadomains.lastPoaAddress.v1";
 
@@ -23,7 +23,10 @@ export function resolveKnownPoaAddress(preferred = "") {
     } catch {}
     for (const raw of candidates) {
         const s = typeof raw === "string" ? raw.trim() : "";
+        if (!s) continue;
         if (isPoaAddress(s)) return s;
+        const resolved = resolveOwnerInput(ui.latestState, s, ui.cap)?.owner;
+        if (isPoaAddress(resolved)) return resolved;
     }
     return "";
 }
@@ -93,8 +96,8 @@ export function openPoa(name, opts = {}) {
             targetBtn.click();
             if (message) {
                 message.textContent = mode === "auction"
-                    ? `🔨 Auction ready for ${name} — adjust the reserve POA amount if needed; code updates live below. ⚠️ Profile fields pause while listed and drop on transfer.`
-                    : `🏷️ Sale listing ready for ${name} — adjust the POA price if needed; code updates live below. ⚠️ Profile fields pause while listed and drop on transfer.`;
+                    ? `🔨 Auction ready for ${name} — adjust the reserve POA amount if needed; code updates live below.`
+                    : `🏷️ Sale listing ready for ${name} — adjust the POA price if needed; code updates live below.`;
             }
         } else if (message) {
             message.textContent = mode === "auction"
@@ -235,7 +238,31 @@ export function nameLink(parent, name, css = "domain-link", opts = {}) {
 
 export function ownerLink(parent, ownerId, label) {
     const short = isPoaAddress(ownerId) ? shortenPoaAddress(ownerId) : null;
-    const display = label && !isPoaAddress(label) ? label : (short ?? (ownerId.slice(0, 18) + "…"));
+    const isRoleLabel = Boolean(label && !isPoaAddress(label) && label !== short && label !== ownerId.slice(0, 18) + "…" && label !== ownerId);
+    const primary = !isRoleLabel ? primaryNameForOwner(ui.latestState, ownerId) : null;
+    if (primary) {
+        const a = document.createElement("a");
+        a.href = "/p/" + encodeURIComponent(primary);
+        a.className = "domain-link owner-primary-link";
+        a.title = ownerId;
+        a.append(createDomainAvatar(primary, { size: "xs" }));
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "domain-name";
+        nameSpan.textContent = primary;
+        a.append(nameSpan);
+        a.addEventListener("click", (event) => {
+            event.preventDefault();
+            navigateOwner(primary);
+        });
+        const wrap = document.createElement("span");
+        wrap.className = "poa-addr-inline owner-primary-inline";
+        wrap.append(a);
+        if (short)
+            wrap.append(createPoaCopyButton(ownerId));
+        parent.append(wrap);
+        return a;
+    }
+    const display = isRoleLabel ? label : (short ?? (ownerId.slice(0, 18) + "…"));
     const showCopy = Boolean(short && display === short);
     const a = document.createElement("a");
     a.href = "/p/" + encodeURIComponent(ownerId);

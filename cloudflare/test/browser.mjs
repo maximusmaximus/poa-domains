@@ -9,7 +9,7 @@ export async function browserSmoke(base, evidence) {
     page.on("request", request=>{if(!["GET","HEAD"].includes(request.method())){if(request.method()==="POST"&&request.url()===base+"/v1/search-log"){const body=request.postDataJSON();assert.deepEqual(Object.keys(body),["query","result"]);searchLogs.push(body);}else writes.push(request.url());}});
     await page.goto(base,{waitUntil:"networkidle"});
     if(await page.locator("#termsAgreeBtn").isVisible()) await page.locator("#termsAgreeBtn").click();
-    await page.waitForFunction(()=>document.querySelectorAll("#action option").length===17);
+    await page.waitForFunction(()=>document.querySelectorAll("#action option").length===18);
     for(const id of ["searchInput","searchBtn","cartList","cartPrompt","copyCartPrompt","stats","names","auctions","offers","history","balances","handoff"]) assert.equal(await page.locator(`#${id}`).count(),1,id);
     await page.waitForFunction(()=>document.querySelectorAll("#ideasStrip .ideas-row").length===1 && document.querySelectorAll("#ideasStrip .idea").length>=12);
     assert.equal(await page.locator("#ideasStrip .ideas-row").count(),1);

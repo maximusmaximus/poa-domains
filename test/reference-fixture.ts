@@ -306,6 +306,10 @@ export function publicDemoFixture() {
         ),
       },
     },
+    setPrimaryName: {
+      role: "alice",
+      params: vp("alpha"),
+    },
     renewLease: {
       role: "carol",
       params: {

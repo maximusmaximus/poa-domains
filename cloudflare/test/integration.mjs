@@ -64,7 +64,7 @@ try {
     assert.equal(cap.newAccountRegistryUnits, "10000000"); assert.equal(cap.onboardingGrantPoa, "10000000"); assert.equal(cap.publicExplorerUrl, "https://poadomains.grok.me");
     assert.equal(cap.githubMirrorUrl, "https://maximusmaximus.github.io/poa-domains/"); assert.equal(cap.chainId, "poa-mainnet-1");
     assert.equal(cap.revision, "poa-mainnet-v1"); assert.equal(cap.normalizationHash, EMOJI17_NORMALIZATION_HASH);
-    assert.equal(Object.keys(cap.actions).length, 17); assert.equal(cap.durability, "durable-object-sqlite");
+    assert.equal(Object.keys(cap.actions).length, 18); assert.equal(cap.durability, "durable-object-sqlite");
     assert.equal(cap.mode, "poa-domains-registry"); assert.equal(cap.livePoA, false);
   });
   const font = await fetch(base + "/XeroEmoji-COLRv1.woff2"), fontBytes = new Uint8Array(await font.arrayBuffer());

@@ -203,7 +203,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   await page.locator("#termsAgreeBtn").click();
   await page.waitForFunction(
     () =>
-      document.querySelectorAll("#action option").length === 17 &&
+      document.querySelectorAll("#action option").length === 18 &&
       document.querySelectorAll("#stats > div").length === 8 &&
       document.querySelectorAll("#names article").length >= 3,
   );

@@ -1142,6 +1142,12 @@
       "retryable": false
     },
     {
+      "code": "INVARIANT_PRIMARY",
+      "httpStatus": 400,
+      "message": "Invariant primary. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
       "code": "INVARIANT_RIGHTS",
       "httpStatus": 400,
       "message": "Invariant rights. Check the documented inputs and current state.",

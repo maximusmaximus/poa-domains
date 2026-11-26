@@ -205,6 +205,8 @@ export interface State {
   receipts: Record<string, Receipt>;
   requests: Record<string, string>;
   bids: Record<string, any>;
+  /** Optional reverse-resolution map: owner principal -> canonical default/main domain name (omitted when empty). */
+  primaryNames?: Record<string, string>;
 }
 export function leaseEnd(d: Deed): number {
   if (d.rights.kind === "permanent") return Number.MAX_SAFE_INTEGER;

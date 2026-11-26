@@ -707,10 +707,8 @@ try {
     "#manageOwnerLabelRow label",
     "#manageOwnerNotice > span:first-child",
     '#manageNames article[data-domain-name="agent"] .profile-form label',
-    '#manageNames article[data-domain-name="agent"] .sale-fields-warning > span:first-child',
     "#escrowPayments .escrow-grid label",
     "#escrowBalanceNote > span:first-child",
-    "#escrowListingFieldWarning > span:first-child",
   ]) {
     const texts = await pageUx.locator(sel).allInnerTexts();
     assert.ok(texts.length > 0, `Expected visible elements for ${sel}`);
@@ -718,6 +716,9 @@ try {
       assert.equal(/[()]/.test(t), false, `Parenthetical text should live in ℹ️ popover, not ${sel}: ${t}`);
     }
   }
+  // Pre-listing warning lives in ℹ️ info popovers, not as inline banners on unlisted cards / Step 1
+  await expect(pageUx.locator('#manageNames article[data-domain-name="agent"] .sale-fields-warning')).toHaveCount(0);
+  await expect(pageUx.locator("#escrowListingFieldWarning")).toHaveCount(0);
   await pageUx.locator("#help-manage-owner-field").click();
   await expect(pageUx.locator("#info-manage-owner-field")).toBeVisible();
   await pageUx.keyboard.press("Escape");
@@ -1393,22 +1394,29 @@ try {
   await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");
   await pageFields.locator("#termsAgreeBtn").click();
 
-  // Unlisted domain shows active profile + folded "More" for attached records + warning in owner sell tools
+  // Unlisted domain shows active profile + folded "More" for attached records; sale field-drop note lives in ℹ️
   await expect(pageFields.locator("#domainProfile")).toBeVisible();
   await expect(pageFields.locator("#domainProfile details.domain-more .domain-records-list")).toBeHidden();
   await pageFields.locator("#domainProfile details.domain-more > summary").click();
   await expect(pageFields.locator("#domainProfile")).toContainText("Attached domain records");
   await expect(pageFields.locator("#domainProfile")).toContainText("https://agent.example/endpoint");
-  await expect(pageFields.locator("#poaSellTools .sale-fields-warning")).toBeVisible();
-  await expect(pageFields.locator("#poaSellTools .sale-fields-warning")).toContainText("will be dropped");
+  await expect(pageFields.locator("#poaSellTools .sale-fields-warning")).toHaveCount(0);
+  await pageFields.locator("#help-domainOwnerTools").click();
+  await expect(pageFields.locator("#info-domainOwnerTools")).toContainText("drops them on transfer");
+  await pageFields.keyboard.press("Escape");
 
-  // Manage domains + My POA show clear field-drop warnings AND held-balance/withdrawal guidance
+  // Manage domains + My POA place the pre-listing field-drop note in ℹ️ (no noisy inline banner on unlisted cards)
   await pageFields.locator('#domainActions button[aria-label="Manage agent"]').click();
-  await expect(pageFields.locator('#manageNames article[data-domain-name="agent"] .sale-fields-warning')).toBeVisible();
+  await expect(pageFields.locator('#manageNames article[data-domain-name="agent"] .sale-fields-warning')).toHaveCount(0);
+  await pageFields.locator(`#help-manage-sale-warn-${agentDeedId.slice(0, 12)}`).click();
+  await expect(pageFields.locator(`#info-manage-sale-warn-${agentDeedId.slice(0, 12)}`)).toContainText("pauses profile fields and drops them on transfer");
+  await pageFields.keyboard.press("Escape");
   await expect(pageFields.locator("#escrowBalanceNote")).toBeVisible();
   await expect(pageFields.locator("#escrowBalanceNote")).toContainText("available escrow balance");
-  await expect(pageFields.locator("#escrowListingFieldWarning")).toBeVisible();
-  await expect(pageFields.locator("#escrowListingFieldWarning")).toContainText("paused while listed");
+  await expect(pageFields.locator("#escrowListingFieldWarning")).toHaveCount(0);
+  await pageFields.locator("#help-escrowPayments").click();
+  await expect(pageFields.locator("#info-escrowPayments")).toContainText("pauses profile fields and drops them on transfer");
+  await pageFields.keyboard.press("Escape");
   await pageFields.locator("#escrowPayer").fill(prevOwner);
   await pageFields.locator("#escrowName").fill("agent");
   await pageFields.locator("#escrowAmount").fill("250.000000");
@@ -1532,7 +1540,192 @@ try {
   assert.deepEqual(errorsFields, []);
   await ctxFields.close();
 
-  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations, escrow readiness banner, shortened PoA address copy, search autofill/dropdown, clean cart cards, cart-owned prefill, Manage this domain, Profile v1 editor, reorganized escrow signed request, treasury footer, domains served counter, bug/feature feedback modal, non-dismissible Terms gate, POA first-bid auctions/outbid cart & sale/auction field-drop warnings + archived previous fields");
+  // 11. Default / main domain address (top-of-card button, Owner Profile with domain name + avatar + fields + names,
+  //     ownerLink across pages, domain-name lookup in Manage) AND bottom-of-card Transfer flow with recipient resolution
+  //     (POA address, default domain, domain with attached POA, rejecting bare domain) + confirm + prompt copy.
+  const mainOwner = "poa1" + "1".repeat(31) + "5";
+  const peerOwner = "poa1GHppB8pYZ43gK8yBzR1RJhzfWjzrJn29q96ykwngUP7N";
+  const vaultHolder = "poa1" + "1".repeat(31) + "2";
+  const vaultTargetPoa = "poa1" + "1".repeat(31) + "3";
+  const mainDeedId = "1".repeat(64);
+  const altDeedId = "2".repeat(64);
+  const peerDeedId = "3".repeat(64);
+  const vaultDeedId = "4".repeat(64);
+  const bareDeedId = "5".repeat(64);
+  h.escrowMarket = { serverTime: nowFieldMs + 10000, items: [] };
+  h.payload.state.names.nebula = { name: "nebula", activeId: mainDeedId, auctionId: null, generation: 1 };
+  h.payload.state.names.comet = { name: "comet", activeId: altDeedId, auctionId: null, generation: 1 };
+  h.payload.state.names.peer = { name: "peer", activeId: peerDeedId, auctionId: null, generation: 1 };
+  h.payload.state.names.vault = { name: "vault", activeId: vaultDeedId, auctionId: null, generation: 1 };
+  h.payload.state.names.bare = { name: "bare", activeId: bareDeedId, auctionId: null, generation: 1 };
+  h.payload.state.deeds[mainDeedId] = {
+    id: mainDeedId, name: "nebula", parentId: null, generation: 1, owner: mainOwner, version: 3, ownerVersion: 1,
+    rights: { kind: "permanent" }, rightsHash, retired: false, records: [{ type: "service", url: "https://nebula.example" }],
+    metadata: [{
+      cid: "bafkreinebulaprofilecid0000000000000000000000000000000000000",
+      document: {
+        schema: "poa-domains.profile.v1", version: 1, name: "nebula", rightsHash,
+        poa: mainOwner, btc: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", eth: "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
+        description: "Nebula builder bio", image: `ipfs://${mockAvatarCid}`,
+      },
+    }],
+  };
+  h.payload.state.deeds[altDeedId] = {
+    id: altDeedId, name: "comet", parentId: null, generation: 1, owner: mainOwner, version: 2, ownerVersion: 1,
+    rights: { kind: "permanent" }, rightsHash, retired: false, records: [], metadata: [],
+  };
+  h.payload.state.deeds[peerDeedId] = {
+    id: peerDeedId, name: "peer", parentId: null, generation: 1, owner: peerOwner, version: 1, ownerVersion: 1,
+    rights: { kind: "permanent" }, rightsHash, retired: false, records: [], metadata: [],
+  };
+  h.payload.state.deeds[vaultDeedId] = {
+    id: vaultDeedId, name: "vault", parentId: null, generation: 1, owner: vaultHolder, version: 2, ownerVersion: 1,
+    rights: { kind: "permanent" }, rightsHash, retired: false, records: [],
+    metadata: [{
+      cid: "bafkreivaultprofilecid00000000000000000000000000000000000000",
+      document: {
+        schema: "poa-domains.profile.v1", version: 1, name: "vault", rightsHash,
+        poa: vaultTargetPoa, btc: null, eth: null, description: "Vault", image: null,
+      },
+    }],
+  };
+  h.payload.state.deeds[bareDeedId] = {
+    id: bareDeedId, name: "bare", parentId: null, generation: 1, owner: vaultHolder, version: 1, ownerVersion: 1,
+    rights: { kind: "permanent" }, rightsHash, retired: false, records: [], metadata: [],
+  };
+  h.payload.state.primaryNames = { [peerOwner]: "peer" };
+
+  const ctxPrimary = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctxPrimary.grantPermissions(["clipboard-read", "clipboard-write"], { origin: h.url });
+  const pagePrimary = await ctxPrimary.newPage();
+  const errorsPrimary = [];
+  pagePrimary.on("pageerror", (e) => errorsPrimary.push(e.message));
+  await pagePrimary.route("https://**", (r) => r.abort());
+  await pagePrimary.route(`**/v1/media/${mockAvatarCid}`, (r) =>
+    r.fulfill({ status: 200, contentType: "image/png", body: samplePng }),
+  );
+  await pagePrimary.goto(h.url);
+  await pagePrimary.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pagePrimary.locator("#termsAgreeBtn").click();
+
+  // Look up owner by domain name in Manage domains
+  await pagePrimary.locator("#tabEscrow").click();
+  await pagePrimary.locator("#manageOwner").fill("comet");
+  await pagePrimary.locator("#manageLookup").click();
+  await expect(pagePrimary.locator("#manageOwnerNotice")).toBeVisible();
+  await expect(pagePrimary.locator("#manageOwnerNotice")).toContainText("comet");
+  await expect(pagePrimary.locator('#manageNames article[data-domain-name="nebula"]')).toBeVisible();
+  await expect(pagePrimary.locator('#manageNames article[data-domain-name="comet"]')).toBeVisible();
+
+  // Top of domain card has "⭐ Set as main domain" button that copies setPrimaryName prompt + Download JSON
+  const setMainBtn = pagePrimary.locator('#manageNames article[data-domain-name="nebula"] button[data-set-primary-domain="nebula"]');
+  await expect(setMainBtn).toBeVisible();
+  await setMainBtn.click();
+  const mainClip = await pagePrimary.evaluate(() => navigator.clipboard.readText());
+  assert.ok(mainClip.includes('"setPrimaryName"') || mainClip.includes("setPrimaryName"));
+  assert.ok(mainClip.includes(`"expectedDeedId": "${mainDeedId}"`));
+  await expect(pagePrimary.locator("#managePrompt")).toContainText("setPrimaryName");
+  await expect(pagePrimary.locator("#downloadManageJSON")).toBeEnabled();
+
+  // Now commit nebula as mainOwner's primary domain and verify UI across Manage, /d/comet, /p/nebula, and /p/<address>
+  h.payload.state.primaryNames[mainOwner] = "nebula";
+  await pagePrimary.reload();
+  await pagePrimary.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await pagePrimary.locator("#tabEscrow").click();
+  await pagePrimary.locator("#manageOwner").fill(mainOwner);
+  await pagePrimary.locator("#manageLookup").click();
+  await expect(pagePrimary.locator('#manageNames article[data-domain-name="nebula"]')).toContainText("⭐ Main domain");
+  const clearMainBtn = pagePrimary.locator('#manageNames article[data-domain-name="nebula"] button[data-clear-primary-domain="nebula"]');
+  await expect(clearMainBtn).toBeVisible();
+  await clearMainBtn.click();
+  const clearClip = await pagePrimary.evaluate(() => navigator.clipboard.readText());
+  assert.ok(clearClip.includes('"name": null'));
+
+  // /d/comet shows owner as main domain "nebula" with avatar icon, linking to /p/nebula
+  await pagePrimary.goto(`${h.url}/d/comet`);
+  await pagePrimary.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  const ownerPrimaryLink = pagePrimary.locator("#domainOwner a.owner-primary-link");
+  await expect(ownerPrimaryLink).toBeVisible();
+  await expect(ownerPrimaryLink).toContainText("nebula");
+  await expect(ownerPrimaryLink.locator(".domain-header-avatar")).toBeVisible();
+  await ownerPrimaryLink.click();
+
+  // Owner Profile (/p/nebula) displays domain name, avatar icon, main badge, profile fields, and all held names
+  await expect(pagePrimary.locator("#ownerMain")).toBeVisible();
+  await expect(pagePrimary.locator("#ownerTitle")).toContainText("nebula");
+  await expect(pagePrimary.locator("#ownerTitle")).toContainText("⭐ Main domain");
+  await expect(pagePrimary.locator("#ownerTitle .domain-header-avatar img")).toBeVisible();
+  await expect(pagePrimary.locator("#ownerPrincipal .poa-addr-text")).toHaveText("poa1...1115");
+  await expect(pagePrimary.locator("#ownerProfile")).toBeVisible();
+  await expect(pagePrimary.locator("#ownerProfile")).toContainText("Nebula builder bio");
+  await expect(pagePrimary.locator("#ownerProfile")).toContainText("bc1qw5...f3t4");
+  await expect(pagePrimary.locator("#ownerProfile")).toContainText("0x5aAe...eAed");
+  await expect(pagePrimary.locator("#ownerNames article")).toHaveCount(2);
+  await expect(pagePrimary.locator("#ownerNames article").first()).toContainText("nebula");
+  await expect(pagePrimary.locator("#ownerNames article").first()).toContainText("⭐ Main domain");
+  await expect(pagePrimary.locator("#ownerNames")).toContainText("comet");
+
+  // Visiting /p/<poaAddress> directly also renders the same Owner Profile with main domain + fields
+  await pagePrimary.goto(`${h.url}/p/${mainOwner}`);
+  await pagePrimary.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pagePrimary.locator("#ownerTitle")).toContainText("nebula");
+  await expect(pagePrimary.locator("#ownerProfile")).toContainText("Nebula builder bio");
+
+  // Transfer workflow at bottom of domain card:
+  await pagePrimary.locator('#ownerNames article button[aria-label="Manage comet"]').click();
+  const cometManageCard = pagePrimary.locator('#manageNames article[data-domain-name="comet"]');
+  const transferToggle = cometManageCard.locator('button[data-transfer-toggle="comet"]');
+  await expect(transferToggle).toBeVisible();
+  await transferToggle.click();
+  const recipientInput = cometManageCard.locator('input[data-transfer-recipient="comet"]');
+  await expect(recipientInput).toBeVisible();
+  // Ensure transfer recipient label has no parenthetical text
+  const xferLabelText = await cometManageCard.locator(".manage-transfer-box label").innerText();
+  assert.equal(/[()]/.test(xferLabelText), false, `Transfer label must not have parentheses: ${xferLabelText}`);
+
+  // 1) Bare domain with no attached POA address is rejected cleanly
+  await recipientInput.fill("bare");
+  await cometManageCard.locator('button[data-transfer-review="comet"]').click();
+  await expect(cometManageCard.locator('[data-transfer-error="comet"]')).toContainText("does not have a POA address attached");
+  await expect(cometManageCard.locator('[data-transfer-confirm-box="comet"]')).toBeHidden();
+
+  // 2) Default domain address ("peer") resolves to peerOwner -> confirm -> copy transfer prompt
+  await recipientInput.fill("peer");
+  await expect(cometManageCard.locator('[data-transfer-preview="comet"]')).toContainText("Default domain");
+  await cometManageCard.locator('button[data-transfer-review="comet"]').click();
+  await expect(cometManageCard.locator('[data-transfer-confirm-box="comet"]')).toBeVisible();
+  await expect(cometManageCard.locator('[data-transfer-confirm-summary="comet"]')).toContainText(peerOwner);
+  await expect(cometManageCard.locator('[data-transfer-confirm-box="comet"]')).toContainText("reset on transfer");
+  await cometManageCard.locator('button[data-transfer-confirm="comet"]').click();
+  const peerXferClip = await pagePrimary.evaluate(() => navigator.clipboard.readText());
+  assert.ok(peerXferClip.includes('"action": "transfer"') || peerXferClip.includes('action "transfer"'));
+  assert.ok(peerXferClip.includes(`"recipient": "${peerOwner}"`));
+  assert.ok(peerXferClip.includes("resets all attached profile fields and records"));
+
+  // 3) Domain with attached profile POA ("vault") resolves to vaultTargetPoa
+  await recipientInput.fill("vault");
+  await expect(cometManageCard.locator('[data-transfer-preview="comet"]')).toContainText("POA address");
+  await cometManageCard.locator('button[data-transfer-review="comet"]').click();
+  await expect(cometManageCard.locator('[data-transfer-confirm-summary="comet"]')).toContainText(vaultTargetPoa);
+  await cometManageCard.locator('button[data-transfer-confirm="comet"]').click();
+  const vaultXferClip = await pagePrimary.evaluate(() => navigator.clipboard.readText());
+  assert.ok(vaultXferClip.includes(`"recipient": "${vaultTargetPoa}"`));
+
+  // 4) Transferring the main domain ("nebula") to a direct POA address warns that main domain will clear
+  const nebulaCard = pagePrimary.locator('#manageNames article[data-domain-name="nebula"]');
+  await nebulaCard.locator('button[data-transfer-toggle="nebula"]').click();
+  await nebulaCard.locator('input[data-transfer-recipient="nebula"]').fill(peerOwner);
+  await nebulaCard.locator('button[data-transfer-review="nebula"]').click();
+  await expect(nebulaCard.locator('[data-transfer-confirm-box="nebula"]')).toContainText("cleared as your main domain");
+  await nebulaCard.locator('button[data-transfer-confirm="nebula"]').click();
+  const mainXferClip = await pagePrimary.evaluate(() => navigator.clipboard.readText());
+  assert.ok(mainXferClip.includes(`"recipient": "${peerOwner}"`));
+  assert.ok(mainXferClip.includes('clears "nebula" as my default/main domain address'));
+
+  assert.deepEqual(errorsPrimary, []);
+  await ctxPrimary.close();
+
+  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations, escrow readiness banner, shortened PoA address copy, search autofill/dropdown, clean cart cards, cart-owned prefill, Manage this domain, Profile v1 editor, reorganized escrow signed request, treasury footer, domains served counter, bug/feature feedback modal, non-dismissible Terms gate, POA first-bid auctions/outbid cart, sale/auction field-drop info popovers + archived previous fields, default/main domain address & Owner Profile, and Manage domain Transfer confirm flow");
 } finally {
   await h.close();
   await browser.close();

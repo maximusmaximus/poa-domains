@@ -1,4 +1,5 @@
 import {
+  activePoaFixedListings,
   activeResaleOffers,
   collectPreviousDomainFields,
   domainPath,
@@ -9,22 +10,25 @@ import {
   formatDuration,
   isPoaAuctionAwaitingFirstBid,
   minimumNextBid,
+  partitionPoaAuctions,
   poaAmount,
   poaAuctionOutbidStatus,
   poaMinimumNextBid,
   poaOnlyMode,
   poaShort,
   poaToMicros,
+  primaryNameForOwner,
   publicNameUnavailable,
   registryUnit,
   resolveDomainView,
+  resolveOwnerInput,
   unavailableKey,
-} from "./shared.js?v=004104527527";
-import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=004104527527";
-import { ui } from "./ui-state.js?v=004104527527";
-import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=004104527527";
-import { domainHeader, nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=004104527527";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=004104527527";
+} from "./shared.js?v=74b9108b49c1";
+import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=74b9108b49c1";
+import { ui } from "./ui-state.js?v=74b9108b49c1";
+import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=74b9108b49c1";
+import { domainHeader, nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=74b9108b49c1";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=74b9108b49c1";
 
 function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) {
   const wrap = document.createElement("span");
@@ -70,8 +74,7 @@ function appendActivityDetails(parent, history) {
   parent.append(det);
 }
 
-function renderDomainProfileCard(deed, { listedForSale = false } = {}) {
-  const box = el("domainProfile");
+function renderProfileInto(box, deed, { listedForSale = false, showCleanSlate = true } = {}) {
   if (!box) return;
   box.replaceChildren();
   box.classList.remove("domain-fields-paused");
@@ -93,7 +96,7 @@ function renderDomainProfileCard(deed, { listedForSale = false } = {}) {
   }
 
   if (!hasActiveProfile && !activeRecords.length) {
-    if (wasReset) {
+    if (showCleanSlate && wasReset) {
       box.hidden = false;
       add(
         box,
@@ -155,6 +158,10 @@ function renderDomainProfileCard(deed, { listedForSale = false } = {}) {
     }
     box.append(more);
   }
+}
+
+function renderDomainProfileCard(deed, { listedForSale = false } = {}) {
+  renderProfileInto(el("domainProfile"), deed, { listedForSale, showCleanSlate: true });
 }
 
 function renderDomainPreviousFields(deed, { listedForSale = false } = {}) {
@@ -276,12 +283,12 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
     const bidLine = add(item, "p", `Reserve ${poaShort(a.price)} POA · `);
     if (a.high) {
       bidLine.append(`High bid ${poaShort(a.high.amount)} POA by `);
-      appendPrincipal(bidLine, a.high.payer);
+      ownerLink(bidLine, a.high.payer, person(a.high.payer));
     } else {
       bidLine.append("No bids yet.");
     }
     const sellerLine = add(item, "p", "Seller: ", "muted");
-    appendPrincipal(sellerLine, a.seller);
+    ownerLink(sellerLine, a.seller, person(a.seller));
 
     const windowSec = Math.round((a.window ?? a.quiet ?? 3600000) / 1000);
     if (awaiting) {
@@ -347,10 +354,10 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
       s.high || s.status === "SETTLING" ? "badge" : "badge-ok",
     );
     const sellerLine = add(item, "p", "Seller: ", "muted");
-    appendPrincipal(sellerLine, s.seller);
+    ownerLink(sellerLine, s.seller, person(s.seller));
     if (s.high) {
       const buyerLine = add(item, "p", `Reserved at ${poaShort(s.high.amount)} POA by `);
-      appendPrincipal(buyerLine, s.high.payer);
+      ownerLink(buyerLine, s.high.payer, person(s.high.payer));
     }
     if (s.closes > 0) add(item, "p", `Until ${formatClock(Math.floor(s.closes / 1000))}`, "muted");
     if (s.status === "OPEN" && !s.high) {
@@ -395,10 +402,10 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
     );
     if (p.high?.payer) {
       priceLine.append(" · Buyer: ");
-      appendPrincipal(priceLine, p.high.payer);
+      ownerLink(priceLine, p.high.payer, person(p.high.payer));
     }
     const sellerLine = add(item, "p", "Seller: ", "muted");
-    appendPrincipal(sellerLine, p.seller);
+    ownerLink(sellerLine, p.seller, person(p.seller));
     appendActivityDetails(item, p.history);
   }
 }
@@ -565,48 +572,117 @@ export function renderDomainPage(name) {
   }
 }
 
-export function renderOwnerPage(ownerId) {
-  if (!ui.latestState || !ownerId) return;
-  if (ui.cap?.publicView?.unavailableAccountKeys?.includes(unavailableKey(ownerId))) {
-    el("ownerTitle").textContent = "No public owner profile";
-    el("ownerPrincipal").textContent = "";
-    el("ownerNames").replaceChildren();
-    el("ownerListings").replaceChildren();
-    add(el("ownerNames"), "p", "No public registry names or subdomains.");
-    add(el("ownerListings"), "p", "No public listings.");
-    return;
-  }
-  el("ownerTitle").textContent = "👤 Owner profile";
+export function renderOwnerPage(rawOwnerId) {
+  if (!ui.latestState || !rawOwnerId) return;
+  const titleEl = el("ownerTitle");
   const principalNode = el("ownerPrincipal");
-  principalNode.replaceChildren();
-  appendPoaAddress(principalNode, ownerId, { code: true });
+  const profileBox = el("ownerProfile");
   const namesBox = el("ownerNames");
   const listBox = el("ownerListings");
+  const resolved = resolveOwnerInput(ui.latestState, rawOwnerId, ui.cap);
+  const ownerId = resolved?.owner ?? rawOwnerId;
+  if (ui.cap?.publicView?.unavailableAccountKeys?.includes(unavailableKey(ownerId))) {
+    titleEl.classList.remove("domain-heading");
+    titleEl.textContent = "No public owner profile";
+    principalNode.textContent = "";
+    if (profileBox) {
+      profileBox.hidden = true;
+      profileBox.replaceChildren();
+    }
+    namesBox.replaceChildren();
+    listBox.replaceChildren();
+    add(namesBox, "p", "No public registry names or subdomains.");
+    add(listBox, "p", "No public listings.");
+    return;
+  }
+  const primary = primaryNameForOwner(ui.latestState, ownerId);
+  const primaryEntry = primary ? ui.latestState.names?.[primary] : null;
+  const primaryDeed = primaryEntry?.activeId ? ui.latestState.deeds?.[primaryEntry.activeId] : null;
+  titleEl.replaceChildren();
+  if (primary && primaryDeed) {
+    domainHeader(titleEl, primary, { size: "lg" });
+    add(titleEl, "span", "⭐ Main domain", "badge-ok owner-primary-badge");
+  } else {
+    titleEl.classList.remove("domain-heading");
+    titleEl.textContent = "👤 Owner profile";
+  }
+  principalNode.replaceChildren();
+  if (resolved?.viaDomain && resolved.viaDomain !== primary) {
+    principalNode.append("Owner of ");
+    nameLink(principalNode, resolved.viaDomain);
+    principalNode.append(" · ");
+  }
+  appendPoaAddress(principalNode, ownerId, { code: true });
+
+  const nowMs = ui.escrowMarketServerTime || Date.now();
+  if (profileBox) {
+    if (primaryDeed) {
+      const primarySale = findDomainSalesAndAuctions({
+        name: primary,
+        deed: primaryDeed,
+        state: ui.latestState,
+        escrowMarket: ui.escrowMarket,
+        nowMs,
+      });
+      renderProfileInto(profileBox, primaryDeed, {
+        listedForSale: primarySale.listedForSale,
+        showCleanSlate: false,
+      });
+    } else {
+      profileBox.hidden = true;
+      profileBox.replaceChildren();
+    }
+  }
+
   namesBox.replaceChildren();
   listBox.replaceChildren();
-  const owned = Object.values(ui.latestState.names ?? {}).filter(
+  const ownedRaw = Object.values(ui.latestState.names ?? {}).filter(
     (n) => n.activeId && ui.latestState.deeds[n.activeId]?.owner === ownerId,
   );
+  const owned = primary
+    ? [...ownedRaw.filter((n) => n.name === primary), ...ownedRaw.filter((n) => n.name !== primary)]
+    : ownedRaw;
   if (!owned.length) add(namesBox, "p", "No names", "muted");
   for (const n of owned) {
     const d = ui.latestState.deeds[n.activeId];
     const card = add(namesBox, "article", "", "card");
     const h = add(card, "h4", "");
     domainHeader(h, n.name);
+    if (primary && n.name === primary) add(card, "p", "⭐ Main domain", "badge-ok");
     if (d.rights.kind === "lease") add(card, "p", "📜 Legacy lease", "badge");
     const manageBtn = add(card, "button", "⚙️ Manage this domain", "secondary small");
     manageBtn.type = "button";
     manageBtn.setAttribute("aria-label", `Manage ${n.name}`);
     manageBtn.addEventListener("click", () => openManageDomain(n.name, d.owner));
   }
-  const listings = poaOnlyMode(ui.cap)
-    ? []
-    : activeResaleOffers(ui.latestState).filter((x) => x.offer.owner === ownerId && x.asset === "POA");
-  if (!listings.length) add(listBox, "p", "No active listings", "muted");
-  for (const row of listings) {
-    const card = add(listBox, "article", "", "card");
-    const h = add(card, "h4", "");
-    domainHeader(h, row.name);
-    add(card, "p", `💰 ${row.price} registry units`, "badge-ok");
+  if (poaOnlyMode(ui.cap)) {
+    const fixed = activePoaFixedListings(ui.escrowMarket ?? [], nowMs).filter((x) => x.seller === ownerId);
+    const poaGroups = partitionPoaAuctions(ui.escrowMarket ?? [], nowMs);
+    const auctions = [...poaGroups.current, ...poaGroups.upcoming].filter((x) => x.seller === ownerId);
+    if (!fixed.length && !auctions.length) {
+      add(listBox, "p", "No active listings", "muted");
+    } else {
+      for (const item of fixed) {
+        const card = add(listBox, "article", "", "card");
+        const h = add(card, "h4", "");
+        domainHeader(h, item.name);
+        add(card, "p", `💰 ${poaShort(item.price)} POA`, "badge-ok");
+      }
+      for (const item of auctions) {
+        const card = add(listBox, "article", "", "card");
+        const h = add(card, "h4", "");
+        domainHeader(h, item.name);
+        add(card, "p", `🔥 Auction · ${poaShort(item.high?.amount ?? item.price)} POA`, "badge-ok");
+      }
+    }
+  } else {
+    const listings = activeResaleOffers(ui.latestState).filter((x) => x.offer.owner === ownerId && x.asset === "POA");
+    if (!listings.length) add(listBox, "p", "No active listings", "muted");
+    for (const row of listings) {
+      const card = add(listBox, "article", "", "card");
+      const h = add(card, "h4", "");
+      domainHeader(h, row.name);
+      add(card, "p", `💰 ${row.price} registry units`, "badge-ok");
+    }
   }
 }

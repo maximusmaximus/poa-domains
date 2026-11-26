@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=2727e3519895" />
+    <link rel="stylesheet" href="/style.css?v=bdd7254b89d0" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -136,7 +136,7 @@
         <p id="auctionsStartNote" class="escrow-balance-note" role="note">⏱️ An auction starts with the first bid.</p>
         <div id="auctionsBidderBar" class="auctions-bidder-bar" hidden>
           <label for="auctionsBidderInput">👤 Track your bids</label>
-          <input id="auctionsBidderInput" type="text" autocomplete="off" placeholder="poa1… public address" maxlength="80" />
+          <input id="auctionsBidderInput" type="text" autocomplete="off" placeholder="poa1… address or domain name" maxlength="80" />
         </div>
         <div class="auction-tabs" role="tablist" aria-label="Auction filters">
           <button type="button" class="auction-tab is-active" role="tab" aria-selected="true" data-auction-tab="current" id="auctionTabCurrent" aria-controls="auctions" tabindex="0">Current</button>
@@ -233,7 +233,7 @@
         <div id="manageDomains" class="manage-domains">
           <h2>🌱 Manage domains and subdomains</h2>
           <p data-info-description>View a public owner address. This is not a wallet connection or proof that you own it.</p>
-          <div id="manageOwnerLabelRow" class="field-label-row"><label for="manageOwner">Public owner address</label></div><div class="search-bar"><input id="manageOwner" autocomplete="off" placeholder="poa1… public owner address" /><button id="manageLookup" type="button">View names</button></div>
+          <div id="manageOwnerLabelRow" class="field-label-row"><label for="manageOwner">Public owner address</label></div><div class="search-bar"><input id="manageOwner" autocomplete="off" placeholder="poa1… address or domain name" /><button id="manageLookup" type="button">View names</button></div>
           <div id="manageOwnerNotice" class="muted has-info" role="status" aria-live="polite" hidden></div>
           <p data-info-description>Open a name to view it, edit its public profile (addresses, bio, and avatar), or prepare a sale or subdomain request for its owner's agent. Retiring a subdomain needs both the child holder and parent owner. Nothing is sent from these controls.</p>
           <div id="manageNames" class="cards"></div>
@@ -265,12 +265,11 @@
         <div id="domainListing" class="card" hidden></div>
         <div id="domainActions" class="button-row"></div>
         <div id="domainOwnerTools" class="owner-tools" hidden>
-          <div id="poaSellTools" hidden><h3>🏷️ Sell or auction for POA</h3><p data-info-description class="howto">List or auction your name for POA in 🪙 My POA. Your agent signs; nothing submits here.</p><p class="sale-fields-warning" role="note">⚠️ <strong>Before you list or auction:</strong> Profile fields and records pause while listed and will be dropped for the next owner (archived on this page).</p><div class="button-row"><button type="button" id="poaSellBtn">🏷️ Sell for POA</button><button type="button" id="poaAuctionBtn" class="secondary">🔨 Auction for POA</button></div>
+          <div id="poaSellTools" hidden><h3>🏷️ Sell or auction for POA</h3><p data-info-description class="howto">List or auction your name for POA in 🪙 My POA. Listing or auctioning pauses profile fields and drops them on transfer (archived on this page). Your agent signs; nothing submits here.</p><div class="button-row"><button type="button" id="poaSellBtn">🏷️ Sell for POA</button><button type="button" id="poaAuctionBtn" class="secondary">🔨 Auction for POA</button></div>
           <div id="poaSubnameTools"><h3>🧩 Sell subnames</h3><p data-info-description class="howto">Set one POA price for new subnames like shop.yourname. Buyers pay with POA checkout and your share is paid out to you from escrow. Your agent signs; nothing submits here.</p><label>Subname price (POA) <input id="subnamePriceInput" inputmode="decimal" placeholder="10" aria-label="Subname price" /></label><button type="button" id="poaSubnameBtn">🧩 Copy agent request</button><pre id="subnamePromptBox" class="prompt-box" hidden></pre><p id="subnamePromptStatus" class="muted" role="status"></p></div></div>
           <div id="unitSellTools">
           <h3>💰 Sell</h3>
-          <p data-info-description class="howto">Owners list, change price, or unlist. Copy a prompt for your agent — nothing submits here.</p>
-          <p class="sale-fields-warning" role="note">⚠️ <strong>Before you list:</strong> Profile fields and records pause while listed and will be dropped for the next owner (archived on this page).</p>
+          <p data-info-description class="howto">Owners list, change price, or unlist. Listing pauses profile fields and drops them on transfer (archived on this page). Copy a prompt for your agent — nothing submits here.</p>
           <label>
             Price
             <input id="listPriceInput" inputmode="numeric" placeholder="2500" aria-label="List price" />
@@ -300,6 +299,7 @@
       <section id="ownerSection">
         <h2 id="ownerTitle">Owner</h2>
         <p id="ownerPrincipal" class="muted"></p>
+        <div id="ownerProfile" class="card domain-profile" hidden></div>
         <h3>Names</h3>
         <div id="ownerNames" class="cards"></div>
         <h3>💰 Listings</h3>
@@ -470,6 +470,6 @@
       </details>
     </div>
 
-    <script type="module" src="/app.js?v=004104527527"></script>
+    <script type="module" src="/app.js?v=74b9108b49c1"></script>
   </body>
 </html>

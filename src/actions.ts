@@ -47,6 +47,7 @@ export const ACTIONS = {
   transfer: ["name", "expectedDeedId", "expectedVersion", "recipient"],
   setRecords: ["name", "expectedDeedId", "expectedVersion", "records"],
   setMetadata: ["name", "expectedDeedId", "expectedVersion", "metadata"],
+  setPrimaryName: ["name", "expectedDeedId", "expectedVersion"],
   renewLease: [
     "name",
     "expectedDeedId",

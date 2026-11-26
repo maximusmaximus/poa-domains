@@ -179,7 +179,7 @@ test("MCP catalog is a useful JSON Schema and reuses every PR8 tool input and ou
   assert.ok(!v({ name: "unknown", arguments: {} }));
   assert.ok(!v({ name: "submit_intent", arguments: { body: {} } }));
   assert.deepEqual(signedPacketDocument().properties, PACKET_SCHEMA.properties);
-  assert.equal(Object.keys(ACTION_SCHEMAS).length, 15);
+  assert.equal(Object.keys(ACTION_SCHEMAS).length, 16);
   assert.equal(API_LIMITS.bodyBytes, 65536);
   assert.equal(API_LIMITS.timeoutMs, 5000);
   assert.equal(API_LIMITS.workerExecutionTimeoutMs, null);

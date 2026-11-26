@@ -85,6 +85,9 @@ export function escrowPacketBlocked(escrowState: State, engine: Engine, packet: 
     case "setRecords":
     case "setMetadata":
       return isLockedName(p.name) || isLockedDeedId(p.expectedDeedId);
+    case "setPrimaryName":
+      if (p.name === null && p.expectedDeedId === null) return false;
+      return isLockedName(p.name) || isLockedDeedId(p.expectedDeedId);
     case "revokeChild":
     case "renewLease":
     case "expireLease": {

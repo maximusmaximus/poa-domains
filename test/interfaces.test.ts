@@ -187,7 +187,7 @@ test("API and CLI preserve exact signed body, nonce, receipt and canonical resol
         .stdout,
     );
     assert.deepEqual(cap.actions, ACTIONS);
-    assert.equal(Object.keys(cap.actions).length, 17);
+    assert.equal(Object.keys(cap.actions).length, 18);
     assert.equal(cap.livePoA, false);
     const nonceOut = JSON.parse(
       (
@@ -311,7 +311,7 @@ test("MCP stdio handshake and exact signed intent share HTTP receipt/idempotency
       rpc(11, "unknown/method"),
     ]);
     assert.equal(replies[0].result.protocolVersion, "2025-11-25");
-    assert.equal(replies[1].result.tools.length, 17);
+    assert.equal(replies[1].result.tools.length, 18);
     const a = JSON.parse(replies[3].result.content[0].text),
       b = JSON.parse(replies[4].result.content[0].text);
     assert.equal(a.status, "succeeded");
@@ -326,7 +326,7 @@ test("MCP stdio handshake and exact signed intent share HTTP receipt/idempotency
       c.carol.id,
     );
     assert.equal(replies[7].result.resources[0].uri, "poa://capabilities");
-    assert.deepEqual(replies[8].result.prompts.map((p:any)=>p.name), ["buy_a_domain","accept_cart_handoff","update_domain_profile","bid_on_poa_auction"]);
+    assert.deepEqual(replies[8].result.prompts.map((p:any)=>p.name), ["buy_a_domain","accept_cart_handoff","update_domain_profile","set_primary_name","bid_on_poa_auction"]);
     assert.equal(replies[9].error.code, -32602);
     assert.equal(replies[10].error.message, "METHOD_NOT_FOUND");
   } finally {

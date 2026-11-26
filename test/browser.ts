@@ -28,7 +28,7 @@ export async function browserSmoke(
     await page.goto(url);
     await page.locator("#termsAgreeBtn").click();
     await page.waitForFunction(
-      () => document.querySelectorAll("#action option").length === 17,
+      () => document.querySelectorAll("#action option").length === 18,
     );
     assert.match(await page.locator("#mode").innerText(), /(?:Local|Live) registry data/);
     await page.waitForFunction(

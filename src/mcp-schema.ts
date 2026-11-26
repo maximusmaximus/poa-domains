@@ -142,6 +142,11 @@ export const ACTION_SCHEMAS: Record<string, Schema> = {
     records: { type: "array", items: RECORD, maxItems: 16 },
   }),
   setMetadata: objectSchema({ ...deed, metadata: SET_METADATA_VALUE }),
+  setPrimaryName: objectSchema({
+    name: { anyOf: [NAME, { type: "null" }] },
+    expectedDeedId: { anyOf: [ID, { type: "null" }] },
+    expectedVersion: UINT,
+  }),
   revokeChild: objectSchema({ ...deed, parentOwnerVersion: UINT }),
 };
 const common = {

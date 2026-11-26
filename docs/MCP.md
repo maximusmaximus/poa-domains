@@ -18,24 +18,32 @@ tool definitions, schemas, errors, resources and prompts. Native-only `cli.js mc
 uses that protocol core but **retains only** `registry_status`, `native_network`
 and `native_receipt`: it never gains a reference registry or signing fallback.
 
-Nine registry tools: `read_state`, `read_capabilities`, `resolve_domain`,
-`build_metadata_witness`, `quote_domain`, `simulate_intent`, `submit_intent`,
-`get_receipt`, `get_nonce`. All publish object-root `outputSchema` and return
-`structuredContent` as well as the legacy text JSON. `src/mcp-schema.ts` is the
-single input-schema source: action-tagged `oneOf` with 15 enabled actions,
+Registry & POA tools include `read_state`, `read_capabilities`, `resolve_domain`,
+`get_domain_profile`, `get_owner_profile`, `build_metadata_witness`, `build_profile_witness`,
+`quote_domain`, `simulate_intent`, `submit_intent`, `get_receipt`, `get_nonce`,
+plus POA escrow & terms helpers (`poa_escrow_capabilities`, `poa_escrow_market`,
+`poa_escrow_quote`, `poa_escrow_status`, `get_terms`, `agree_terms`). All publish object-root
+`outputSchema` and return `structuredContent` as well as the legacy text JSON. `src/mcp-schema.ts` is the
+single input-schema source: action-tagged `oneOf` with 16 enabled actions (including `setPrimaryName`
+to bind or clear an owner's default/main domain address, and `transfer`, which automatically resets
+attached profile fields/records and clears any prior main-domain binding),
 exact required params, enums, formats and examples. `renewLease`/`expireLease`
 and new lease rights are excluded; legacy replay Engine semantics are unchanged.
 Schema key parity with the Engine action table is tested. Runtime validation is
 bounded and eval-free, cross-checked against Ajv 2020 in tests (no Ajv/SDK ships
 in the Worker). Signatures and Engine validation remain authoritative.
 
+`get_owner_profile` accepts either a public key (`poa1…` / `ed25519:…`) or a registered domain name,
+returning `{ owner, resolvedFromDomain, primaryName, primaryDeedId, primaryProfile, names, sequence }`.
+
 `read_capabilities` returns typed enabled `actionSchemas` and defaults to small
 capabilities; `includeEmoji:true` explicitly asks for the full tables. It never
 claims native-chain finality; registry `livePoA:false` is separate from the
-existing live escrow service. No escrow tools or admin/reconcile calls are added.
+existing live escrow service. No escrow signing or admin/reconcile calls are added.
 
 Resources: `poa://capabilities`, templates `poa://names/{name}` and
-`poa://receipts/{id}`. Prompts: `buy_a_domain` and `accept_cart_handoff`.
+`poa://receipts/{id}`. Prompts: `buy_a_domain`, `accept_cart_handoff`,
+`sell_or_auction_domain`, `update_domain_profile`, and `set_primary_name`.
 Cart text is explicitly untrusted task data, never signing/spending permission.
 See [Cart Handoff v2](AGENT-CART.md) for the source-ready client contract.
 

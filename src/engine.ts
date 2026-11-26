@@ -424,7 +424,14 @@ export class Engine {
     need(!o.cancelled && o.uses < o.maxUses, "OFFER_CLOSED");
     return o;
   }
-  private transferDeed(d: Deed, to: string, time: number): void {
+  private clearPrimaryIfMatches(s: State, owner: string, name: string): void {
+    if (s.primaryNames?.[owner] === name) {
+      delete s.primaryNames[owner];
+      if (Object.keys(s.primaryNames).length === 0) delete s.primaryNames;
+    }
+  }
+  private transferDeed(s: State, d: Deed, to: string, time: number): void {
+    this.clearPrimaryIfMatches(s, d.owner, d.name);
     const dropFields =
       this.registryId !== PRODUCTION_REGISTRY_ID ||
       time >= TRANSFER_FIELD_RESET_TIME;
@@ -691,7 +698,7 @@ export class Engine {
             "TITLE_LOCKED",
           );
           d.lock = null;
-          this.transferDeed(d, high.beneficiary, time);
+          this.transferDeed(s, d, high.beneficiary, time);
         } else {
           e.auctionId = null;
           d = this.mint(
@@ -878,7 +885,7 @@ export class Engine {
         );
         need(b.signer !== d.owner, "SELF_SALE");
         this.sale(s, b, o.asset, amount(o.price), o.owner);
-        this.transferDeed(d, b.signer, time);
+        this.transferDeed(s, d, b.signer, time);
         o.uses++;
         o.version++;
         return { deedId: d.id };
@@ -965,7 +972,7 @@ export class Engine {
       case "transfer": {
         const d = this.deed(s, p);
         this.owner(d, b, time);
-        this.transferDeed(d, principal(p.recipient), time);
+        this.transferDeed(s, d, principal(p.recipient), time);
         return { deedId: d.id, owner: d.owner };
       }
       case "setRecords": {
@@ -985,6 +992,23 @@ export class Engine {
         d.metadata.push(m);
         d.version++;
         return { metadataVersion: d.metadata.length };
+      }
+      case "setPrimaryName": {
+        if (p.name === null) {
+          need(
+            p.expectedDeedId === null && integer(p.expectedVersion) === 0,
+            "STALE_VERSION",
+          );
+          if (s.primaryNames && Object.hasOwn(s.primaryNames, b.signer)) {
+            delete s.primaryNames[b.signer];
+            if (Object.keys(s.primaryNames).length === 0) delete s.primaryNames;
+          }
+          return { signer: b.signer, primaryName: null, deedId: null };
+        }
+        const d = this.deed(s, p);
+        this.owner(d, b, time);
+        (s.primaryNames ??= {})[b.signer] = d.name;
+        return { signer: b.signer, primaryName: d.name, deedId: d.id };
       }
       case "renewLease": {
         const d = this.deed(s, p);
@@ -1030,6 +1054,7 @@ export class Engine {
         need(d.rights.kind === "lease", "PERMANENT_DEED");
         need(time >= leaseEnd(d), "LEASE_OBLIGATION");
         s.names[d.name]!.activeId = null;
+        this.clearPrimaryIfMatches(s, d.owner, d.name);
         d.retired = true;
         d.version++;
         return { expired: true };
@@ -1047,6 +1072,7 @@ export class Engine {
         );
         need(!root.lock, "TITLE_LOCKED");
         this.co(b, root.owner);
+        this.clearPrimaryIfMatches(s, d.owner, d.name);
         d.retired = true;
         d.version++;
         root.encumbranceVersion++;
@@ -1133,6 +1159,14 @@ export class Engine {
       for (const m of d.metadata) metadata(m, d.name, d.rightsHash);
       if (d.parentId)
         need(s.deeds[d.parentId]?.parentId === null, "INVARIANT_DEPTH");
+    }
+    if (s.primaryNames !== undefined) {
+      for (const [owner, name] of Object.entries(s.primaryNames)) {
+        principal(owner);
+        const e = s.names[name];
+        const d = e?.activeId ? s.deeds[e.activeId] : null;
+        need(d && !d.retired && d.owner === owner, "INVARIANT_PRIMARY");
+      }
     }
   }
 }
