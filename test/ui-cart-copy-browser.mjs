@@ -1312,7 +1312,8 @@ try {
   await expect(pageAuc.locator("#cartCount")).toHaveText("1");
 
   // Reserved domain ("google") appears FIRST in RED as Reserved; clicking opens /d/google without adding to cart
-  await pageAuc.locator("#domainHomeLink").click();
+  await expect(pageAuc.locator("#domainHomeLink")).toHaveCount(0);
+  await pageAuc.locator("#siteHomeBtn").click();
   await expect(pageAuc.locator("#homeMain")).toBeVisible();
   await pageAuc.locator("#searchInput").fill("google");
   await expect(pageAuc.locator("#searchSuggestions")).toBeVisible();
@@ -1909,16 +1910,33 @@ try {
         }
       }
 
-      // G. Domain top bar alignment (← Home vs 🔗 Copy link)
-      const topBar = document.querySelector(".domain-top-bar");
-      if (vis(topBar)) {
-        const home = topBar.querySelector("#domainHomeLink");
-        const copy = topBar.querySelector("#domainCopyLink");
-        if (vis(home) && vis(copy)) {
-          const rh = home.getBoundingClientRect(), rc = copy.getBoundingClientRect();
-          if (sameRow(rh, rc)) {
-            const cyDiff = Math.abs((rh.top + rh.bottom) / 2 - (rc.top + rc.bottom) / 2);
-            if (cyDiff > 3) problems.push(`DOMAIN_TOPBAR_VALIGN diff=${cyDiff.toFixed(1)}px`);
+      // G. Domain module top-right controls (🔗 Copy link sits inside #domainSection to the left of ℹ️; no ← Home button)
+      if (document.querySelector("#domainHomeLink, #ownerHomeLink")) {
+        problems.push("LEGACY_HOME_LINK_PRESENT");
+      }
+      const domSec = document.querySelector("#domainSection");
+      if (vis(domSec)) {
+        const copy = domSec.querySelector(":scope > #domainCopyLink");
+        const info = domSec.querySelector(":scope > #help-domainSection");
+        const title = domSec.querySelector(":scope > #domainTitle");
+        if (vis(copy) && vis(info)) {
+          const rs = domSec.getBoundingClientRect(), rc = copy.getBoundingClientRect(), ri = info.getBoundingClientRect();
+          if (rc.left < rs.left - 1 || rc.right > rs.right + 1 || rc.top < rs.top - 1 || rc.bottom > rs.bottom + 1) {
+            problems.push(`DOMAIN_COPY_OUTSIDE_MODULE copy=${JSON.stringify(rc)} sec=${JSON.stringify(rs)}`);
+          }
+          const gap = ri.left - rc.right;
+          if (gap < 4 || gap > 16) problems.push(`DOMAIN_COPY_INFO_GAP gap=${gap.toFixed(1)}px`);
+          const cyDiff = Math.abs((ri.top + ri.bottom) / 2 - (rc.top + rc.bottom) / 2);
+          if (cyDiff > 2.5) problems.push(`DOMAIN_COPY_INFO_VALIGN diff=${cyDiff.toFixed(1)}px`);
+          const hDiff = Math.abs(ri.height - rc.height);
+          if (hDiff > 2.5) problems.push(`DOMAIN_COPY_INFO_HEIGHT diff=${hDiff.toFixed(1)}px`);
+          if (vis(title)) {
+            const rt = title.getBoundingClientRect();
+            const overlapX = Math.min(rt.right, rc.right) - Math.max(rt.left, rc.left);
+            const overlapY = Math.min(rt.bottom, rc.bottom) - Math.max(rt.top, rc.top);
+            if (overlapX > 1 && overlapY > 1) {
+              problems.push(`DOMAIN_COPY_OVERLAPS_TITLE overlap=${overlapX.toFixed(1)}x${overlapY.toFixed(1)}px`);
+            }
           }
         }
       }
@@ -2183,9 +2201,11 @@ try {
     await auditUiGeometry(pageGeom, `${vp.name}:feedback-modal`);
     await pageGeom.locator("#feedbackClose").click();
 
-    // 7) Domain page (/d/nebula with #escrowDomain active auction card + .domain-top-bar + #domainListing)
+    // 7) Domain page (/d/nebula with #escrowDomain active auction card + #domainCopyLink inside #domainSection + #domainListing)
     await pageGeom.goto(`${h.url}/d/nebula`);
     await pageGeom.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await expect(pageGeom.locator("#domainHomeLink")).toHaveCount(0);
+    await expect(pageGeom.locator("#domainSection > #domainCopyLink")).toBeVisible();
     await expect(pageGeom.locator("#escrowDomain article.card")).toHaveCount(1);
     await expect(pageGeom.locator("#domainListing .self-bid-notice")).toBeVisible();
     await expect(pageGeom.locator("#escrowDomain .self-bid-notice")).toBeVisible();
@@ -2195,6 +2215,7 @@ try {
     await pageGeom.goto(`${h.url}/p/nebula`);
     await pageGeom.waitForFunction(() => document.body.dataset.registryStatus === "ready");
     await expect(pageGeom.locator("#ownerMain")).toBeVisible();
+    await expect(pageGeom.locator("#ownerHomeLink")).toHaveCount(0);
     await auditUiGeometry(pageGeom, `${vp.name}:owner-profile-page`);
 
     assert.deepEqual(geomErrors, [], `Page errors on ${vp.name}: ${JSON.stringify(geomErrors)}`);
