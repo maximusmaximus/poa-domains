@@ -669,13 +669,16 @@ test('owner profile, domain page, ownerLink primary rendering, and Manage main-d
   };
 
   // 1. applySiteTitle initial + creative remix preserves #siteHomeBtn and updates signature
+  const headerHost = makeNode('header');
+  headerHost.append(byId.get('siteTitle'));
   const initTitle = renderMod.applySiteTitle();
   assert.equal(initTitle.text, '🅿️🅾️🅰️D🅾️Ⓜ️🅰️INS');
   const homeBtn = byId.get('siteHomeBtn');
-  assert.ok(homeBtn && homeBtn.children.length === 10);
+  assert.ok(homeBtn && homeBtn.parentNode === headerHost);
+  assert.equal(byId.get('siteTitle').children.length, 10);
   const remix1 = renderMod.applySiteTitle({ creative: true });
   assert.equal(byId.get('siteHomeBtn'), homeBtn);
-  assert.equal(homeBtn.children.length, 10);
+  assert.equal(byId.get('siteTitle').children.length, 10);
   assert.notEqual(byId.get('siteTitle').dataset.titleSig, `${initTitle.text}|flat|blue`);
   const remix2 = renderMod.applySiteTitle({ creative: true });
   assert.notEqual(remix2.signature, remix1.signature);

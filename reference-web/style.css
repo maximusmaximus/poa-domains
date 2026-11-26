@@ -856,11 +856,10 @@ body.terms-gate-open{overflow:hidden;}
 #escrowPrompt.escrow-copy{min-height:2.8rem;box-sizing:border-box;}
 #escrowPrompt.escrow-copy:empty::before{content:"Pick an action above to preview the code generated for your agent.";color:#8fb0bf;}
 .escrow-step button.is-selected-action{border-color:#65cfa8;box-shadow:0 0 0 2px rgba(101,207,168,0.35);}
-header{cursor:pointer;}
-.site-home-btn{display:flex;flex-wrap:nowrap;align-items:center;gap:0.08em;width:100%;padding:0;margin:0;border:0;border-radius:0.4rem;background:transparent;color:inherit;font:inherit;line-height:inherit;letter-spacing:inherit;text-align:left;cursor:pointer;}
-.site-home-btn:hover{filter:brightness(1.06);}
-.site-home-btn:focus-visible{outline:3px solid #ffe08a;outline-offset:-3px;}
-@media (max-width:600px){.site-home-btn{grid-column:1/-1;display:grid;grid-template-columns:repeat(10,minmax(0,1fr));justify-items:center;align-items:center;gap:0;}}
+header{position:relative;cursor:pointer;}
+.site-home-btn{position:absolute;inset:0;z-index:1;width:100%;height:100%;padding:0;margin:0;border:0;border-radius:0.4rem;background:transparent;cursor:pointer;}
+header:hover .site-title{filter:brightness(1.06);}
+.site-home-btn:focus-visible{outline:3px solid #ffe08a;outline-offset:2px;}
 .title-tile[data-tone="blue"]{background:#244b70;color:#f2fbff;}
 .title-tile[data-tone="green"]{background:linear-gradient(180deg,#6ee0b6,#2f9e75);color:#062a1f;}
 .title-tile[data-tone="gold"]{background:linear-gradient(180deg,#ffd96b,#e0a52f);color:#2a1a00;}
