@@ -1603,3 +1603,22 @@ test("receipt primary timeout/503 cools down /chain/.../api/receipt and re-probe
  assert.equal((await net.lookup(id1))?.valid,true);
  assert.equal(primaryHits,2,"primary receipt re-probed after cooldown");
 });
+
+test("readStatus accepts compacted-window live status where final > txs while rejecting negative counters",async()=>{
+ const now=1_800_000_000_000,root="d".repeat(64);
+ const makeNet=(statusBody:Record<string,unknown>)=>new PoaHttpNetwork(()=>false,(async(input:any)=>{
+  const p=new URL(typeof input==="string"?input:input.url).pathname;
+  if(p===`/chain/${CHAIN}/api/network-facts`)return Response.json({chain_id:CHAIN,engine_sha256:root,params_sha256:root,open_epoch:128,economics:{K:5}});
+  if(p===`/chain/${CHAIN}/api/status`||p==="/api/status")return Response.json(statusBody);
+  return new Response("not found",{status:404});
+ }) as typeof fetch,{engine:root,params:root},()=>now);
+
+ // Exact compacted-window live shape observed on minepoa.com after checkpoint compaction.
+ const ok=await makeNet({network:"PoA prototype",K:5,txs:1177,final:4285,invalid:0,epochs_closed:128,as_of:new Date(now-1000).toISOString(),checkpoint_height:1776874,state_root:root}).status();
+ assert.equal(ok.height,1776874);
+ assert.equal(ok.stale,false);
+
+ // Negative counters still fail closed.
+ await assert.rejects(makeNet({network:"PoA prototype",K:5,txs:-1,final:10,epochs_closed:128,as_of:new Date(now-1000).toISOString(),checkpoint_height:1776874,state_root:root}).status(),/INTEGER/);
+ await assert.rejects(makeNet({network:"PoA prototype",K:5,txs:10,final:-1,epochs_closed:128,as_of:new Date(now-1000).toISOString(),checkpoint_height:1776874,state_root:root}).status(),/INTEGER/);
+});
