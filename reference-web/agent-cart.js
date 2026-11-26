@@ -1,12 +1,12 @@
-import { registryUnit } from "./shared.js?v=69895dc026c0";
-import { actionLabel } from "./ui-copy.js?v=69895dc026c0";
+import { registryUnit } from "./shared.js?v=004104527527";
+import { actionLabel } from "./ui-copy.js?v=004104527527";
 /** One unsigned Cart Handoff v2 object; text, clipboard and download derive from it. */
 import {
   canonical,
   safeObject,
   validPrincipal,
   cartParamsForSigner,
-} from "./shared.js?v=69895dc026c0";
+} from "./shared.js?v=004104527527";
 export const CART_SCHEMA_VERSION = "poa-domains.agent-cart.v2";
 export const CART_ILLUSTRATION_CONTEXT = "static-synthetic-illustration";
 export const CART_ILLUSTRATION_CONTEXT_DEPRECATED = "static-synthetic-demo";

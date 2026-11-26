@@ -62,7 +62,8 @@ test("production Pages allowlist publishes external Worker discovery but no fixt
     assert.match(html, /<section id="features"/);
     assert.match(html, /<section id="how-it-works"/);
     assert.match(html, /<section id="faq"/);
-    assert.match(html, /Native on-chain registration, ownership and settlement are not verified/);
+    assert.match(html, /Read-only mirror/);
+    assert.doesNotMatch(html, /Native naming is not enabled|Native on-chain|Native registry unavailable/i);
     assert.match(html, /Safety checks can hold payments/);
     assert.doesNotMatch(html, /xero\s*emoji|roadmap|coming\s+soon|future\s+plans/i);
     const footer = /<p class="footer-credit">([\s\S]*?)<\/p>/.exec(html)![1]!.replace(/<[^>]+>/g, "").trim();

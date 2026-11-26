@@ -299,7 +299,7 @@ try {
       await page.goto(site.url);
       await expect(page.locator("#refresh")).toBeEnabled();
       await expect(page.locator("#refreshAnnouncement")).toContainText(
-        "Official-node observation",
+        "Live PoA network reading",
       );
       await scan(page, `Pages ${width}`);
       assert.equal(

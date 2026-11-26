@@ -30,7 +30,7 @@ export async function browserSmoke(
     await page.waitForFunction(
       () => document.querySelectorAll("#action option").length === 17,
     );
-    assert.match(await page.locator("#mode").innerText(), /(?:Local|Hosted) registry data/);
+    assert.match(await page.locator("#mode").innerText(), /(?:Local|Live) registry data/);
     await page.waitForFunction(
       () =>
         document

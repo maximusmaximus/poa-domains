@@ -1,13 +1,13 @@
-import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, validPrincipal } from "./shared.js?v=69895dc026c0";
-import { drawTicker } from "./ui-ticker.js?v=69895dc026c0";
-import { actionLabel } from "./ui-copy.js?v=69895dc026c0";
-import { returnFocus } from "./ui-a11y.js?v=69895dc026c0";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=69895dc026c0";
-import { ui } from "./ui-state.js?v=69895dc026c0";
-import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=69895dc026c0";
-import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=69895dc026c0";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=69895dc026c0";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=69895dc026c0";
+import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, validPrincipal } from "./shared.js?v=004104527527";
+import { drawTicker } from "./ui-ticker.js?v=004104527527";
+import { actionLabel } from "./ui-copy.js?v=004104527527";
+import { returnFocus } from "./ui-a11y.js?v=004104527527";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=004104527527";
+import { ui } from "./ui-state.js?v=004104527527";
+import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=004104527527";
+import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=004104527527";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=004104527527";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=004104527527";
 
 export function updateLiveAuctionsBadge(state = ui.latestState) {
     const badge = el("liveAuctionsBadge");
@@ -437,7 +437,7 @@ export function render(payload) {
     ui.latestState = s;
     el("state").textContent = JSON.stringify(payload, null, 2);
     el("freshness").textContent =
-        (ui.demo ? "SYNTHETIC DEMO · " : ui.configMode === "live-registry" ? "HOSTED REGISTRY DATA · " : "LOCAL REGISTRY DATA · ") +
+        (ui.demo ? "SYNTHETIC DEMO · " : ui.configMode === "live-registry" ? "LIVE REGISTRY DATA · " : "LOCAL REGISTRY DATA · ") +
             `as of ${formatClock(s.time)}, sequence ${s.sequence}. ${payload.finality}.`;
     if(payload.publicView?.filtered) el("freshness").textContent += " Public view only; sequence and hash include stored hidden records.";
     if (ui.demo && ui.details.generatedAt)
