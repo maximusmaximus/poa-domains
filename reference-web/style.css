@@ -539,7 +539,6 @@ body.terms-gate-open{overflow:hidden;}
 .auction-bid-controls label{flex:1 1 11rem;margin:0;font-size:.82rem;}
 .auction-bid-controls input{width:100%;box-sizing:border-box;margin-top:.25rem;}
 .sale-fields-warning{margin:.55rem 0;padding:.55rem .75rem;background:#2b1d12;border:1px solid #b57b3c;border-radius:.45rem;color:#ffe3b8;font-size:.84rem;line-height:1.45;}
-.domain-fields-paused{background:#2b1d12;border:1px solid #b57b3c;color:#ffe3b8;}
 .domain-clean-slate{margin:.45rem 0 0;padding:.5rem .7rem;background:#103227;border:1px solid #45d897;border-radius:.45rem;color:#d6fff0;font-size:.84rem;}
 .domain-records-list{margin-top:.55rem;padding-top:.5rem;border-top:1px solid #284252;}
 .domain-records-list h4{margin:0 0 .35rem;font-size:.88rem;color:#b7d2e2;}

@@ -712,7 +712,9 @@ test('owner profile, domain page, ownerLink primary rendering, and Manage main-d
   assert.equal(byId.get('poaSellSaleWarn')?.hidden, false);
   assert.ok(collectText(byId.get('poaSellSaleWarn')).includes('Listing or auctioning pauses profile fields and drops them on transfer'));
   domainMod.renderDomainPage('comet');
-  assert.ok(collectText(byId.get('domainProfile')).includes('paused while listed'));
+  assert.equal(byId.get('domainProfile').hidden, true);
+  assert.equal(collectText(byId.get('domainProfile')).includes('paused while listed'), false);
+  assert.equal(collectText(byId.get('domainListing')).includes('Listed for sale or in auction'), false);
   assert.equal(byId.get('poaSellActions').hidden, true);
   assert.equal(byId.get('poaSellSaleWarn')?.hidden, true);
 
