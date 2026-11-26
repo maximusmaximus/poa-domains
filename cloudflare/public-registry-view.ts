@@ -223,6 +223,18 @@ export function publicRegistryRoute(e: Engine, call: RegistryCall, options: Regi
         return !hiddenReference(k)&&!hiddenReference(v);
       }));
     }
+    if (state.primaryNames && typeof state.primaryNames === "object") {
+      const filteredPrimary = Object.fromEntries(
+        Object.entries(state.primaryNames).filter(([k, v]) => {
+          if (typeof v !== "string") return false;
+          const activeId = state.names?.[v]?.activeId;
+          if (k === e.config.treasury && activeId && isPublicProtocolDeed(e, state.deeds?.[activeId])) return true;
+          return !hiddenReference(k) && !hiddenReference(v) && Boolean(activeId);
+        }),
+      );
+      if (Object.keys(filteredPrimary).length) state.primaryNames = filteredPrimary;
+      else delete state.primaryNames;
+    }
     data.publicView={filtered:true,policy:PUBLIC_VIEW_POLICY,stateHashScope:"complete-stored-state",sequenceScope:"complete-stored-state"};
   } else if(call.path==="/v1/capabilities") {
     // No internal-unit fields on the production view: new accounts start empty and pay in POA.

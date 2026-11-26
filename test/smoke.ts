@@ -34,7 +34,7 @@ try {
   const cap = await call("capabilities", "--url", server.url);
   assert.equal(cap.livePoA, false);
   assert.equal(cap.durability, "fsynced-journal");
-  assert.equal(Object.keys(cap.actions).length, 17);
+  assert.equal(Object.keys(cap.actions).length, 18);
   checks.push(
     "API/CLI exposes all 17 actions, pinned fixture policies and local journal durability",
   );

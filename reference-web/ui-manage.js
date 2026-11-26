@@ -1,11 +1,13 @@
-import { ui } from "./ui-state.js?v=004104527527";
-import { add, el, endpointBase } from "./ui-core.js?v=004104527527";
-import { createDomainAvatar, domainHeader, nameLink, openPoa, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=004104527527";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=004104527527";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=004104527527";
-import { createInlineInfo } from "./ui-help.js?v=004104527527";
+import { ui } from "./ui-state.js?v=74b9108b49c1";
+import { add, el, endpointBase } from "./ui-core.js?v=74b9108b49c1";
+import { createDomainAvatar, domainHeader, nameLink, openPoa, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=74b9108b49c1";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=74b9108b49c1";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=74b9108b49c1";
+import { createInlineInfo } from "./ui-help.js?v=74b9108b49c1";
 import {
   buildProfileUpdatePrompt,
+  buildSetPrimaryPrompt,
+  buildTransferDomainPrompt,
   checkBtcAddress,
   checkEthAddress,
   checkProfileDescription,
@@ -16,12 +18,16 @@ import {
   isPoaAddress,
   MAX_PROFILE_DESCRIPTION_CHARS,
   MAX_PROFILE_IMAGE_BYTES,
+  primaryNameForOwner,
   PROFILE_SCHEMA_V1,
   profileImageMediaPath,
+  resolveOwnerInput,
+  resolveTransferRecipient,
   SALE_FIELDS_WARNING,
   saveKnownOwner,
+  shortenPoaAddress,
   validPrincipal,
-} from "./shared.js?v=004104527527";
+} from "./shared.js?v=74b9108b49c1";
 
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const IDLE_MANAGE_PROMPT = "Edit profile fields or choose an action above to preview the code for your agent.";
@@ -484,11 +490,270 @@ function buildProfileEditor(card, deed, owner, startOpen, { listedForSale = fals
   card.append(details);
 }
 
+function syncDomainLookupNotice(resolved) {
+  const notice = el("manageOwnerNotice");
+  if (!notice) return;
+  if (resolved?.viaDomain) {
+    notice.dataset.fromDomainLookup = "1";
+    notice.hidden = false;
+    notice.replaceChildren();
+    add(
+      notice,
+      "span",
+      `Viewing domains for ${resolved.viaDomain} · ${shortenPoaAddress(resolved.owner)}`,
+    );
+    notice.append(
+      createInlineInfo(
+        "manage-domain-lookup",
+        `About looking up ${resolved.viaDomain}`,
+        `Resolved domain "${resolved.viaDomain}" to its current public owner key ${resolved.owner}. Viewing domains does not connect a wallet.`,
+      ),
+    );
+  } else if (notice.dataset.fromDomainLookup === "1") {
+    delete notice.dataset.fromDomainLookup;
+    notice.hidden = true;
+    notice.replaceChildren();
+  }
+}
+
+function buildTransferSection(card, deed, owner, { isPrimary = false } = {}) {
+  const slug = deed.id.slice(0, 12);
+  const wrap = add(card, "div", "", "manage-transfer-wrap");
+  const toggleRow = add(wrap, "div", "", "button-row manage-transfer-toggle-row");
+  const toggleBtn = add(toggleRow, "button", "↪️ Transfer", "secondary small");
+  toggleBtn.type = "button";
+  toggleBtn.dataset.transferToggle = deed.name;
+  toggleBtn.setAttribute("aria-expanded", "false");
+  toggleBtn.setAttribute("aria-label", `Transfer ${deed.name}`);
+  toggleRow.append(
+    createInlineInfo(
+      `manage-transfer-info-${slug}`,
+      `About transferring ${deed.name}`,
+      "Transfer ownership to a poa1… POA address, a default domain address, or another registered domain with a POA address attached. Attached profile fields and records reset on transfer (archived as read-only history on the domain page).",
+    ),
+  );
+
+  const transferBox = add(wrap, "div", "", "manage-transfer-box");
+  transferBox.dataset.transferBox = deed.name;
+  transferBox.hidden = true;
+
+  const { input: toInput } = addFieldWithInfo(transferBox, {
+    id: `transfer-to-${slug}`,
+    label: "Transfer recipient",
+    infoId: `manage-transfer-recipient-info-${slug}`,
+    infoLabel: `About transfer recipient for ${deed.name}`,
+    infoText: "Enter a public poa1… POA address, a default domain address name, or another domain name that has a POA address attached to it.",
+  });
+  toInput.type = "text";
+  toInput.autocomplete = "off";
+  toInput.placeholder = "poa1… address or domain name";
+  toInput.dataset.transferRecipient = deed.name;
+
+  const previewNode = add(transferBox, "p", "", "muted manage-transfer-preview");
+  previewNode.dataset.transferPreview = deed.name;
+  const errNode = add(transferBox, "p", "", "badge-warn");
+  errNode.setAttribute("role", "alert");
+  errNode.dataset.transferError = deed.name;
+
+  const reviewRow = add(transferBox, "div", "", "button-row");
+  const reviewBtn = add(reviewRow, "button", "Review transfer", "small");
+  reviewBtn.type = "button";
+  reviewBtn.dataset.transferReview = deed.name;
+  const cancelBtn = add(reviewRow, "button", "Cancel", "secondary small");
+  cancelBtn.type = "button";
+  cancelBtn.dataset.transferClose = deed.name;
+
+  const confirmBox = add(transferBox, "div", "", "manage-transfer-confirm");
+  confirmBox.dataset.transferConfirmBox = deed.name;
+  confirmBox.hidden = true;
+  const confirmSummary = add(confirmBox, "p", "", "manage-transfer-confirm-summary");
+  confirmSummary.dataset.transferConfirmSummary = deed.name;
+  const confirmWarn = add(confirmBox, "p", "", "manage-transfer-confirm-warn");
+  const confirmRow = add(confirmBox, "div", "", "button-row");
+  const confirmBtn = add(confirmRow, "button", "✅ Confirm & copy agent prompt", "small");
+  confirmBtn.type = "button";
+  confirmBtn.dataset.transferConfirm = deed.name;
+  const backBtn = add(confirmRow, "button", "Back", "secondary small");
+  backBtn.type = "button";
+  backBtn.dataset.transferBack = deed.name;
+
+  const statusNode = add(transferBox, "p", "", "muted manage-transfer-status");
+  statusNode.setAttribute("role", "status");
+  statusNode.dataset.transferStatus = deed.name;
+
+  let pending = null;
+
+  const resolveCurrent = () =>
+    resolveTransferRecipient(ui.latestState, toInput.value, {
+      currentOwner: owner,
+      cap: ui.cap,
+      escrowMarket: ui.escrowMarket ?? [],
+      nowMs: ui.escrowMarketServerTime || Date.now(),
+    });
+
+  const hideConfirm = () => {
+    pending = null;
+    confirmBox.hidden = true;
+  };
+
+  toggleBtn.addEventListener("click", () => {
+    const opening = transferBox.hidden;
+    transferBox.hidden = !opening;
+    toggleBtn.setAttribute("aria-expanded", String(opening));
+    const namesBox = el("manageNames");
+    if (opening) {
+      if (namesBox) namesBox.dataset.dirty = "1";
+      toInput.focus();
+    } else {
+      hideConfirm();
+      errNode.textContent = "";
+      statusNode.textContent = "";
+      toInput.removeAttribute("aria-invalid");
+      if (namesBox) delete namesBox.dataset.dirty;
+    }
+  });
+
+  cancelBtn.addEventListener("click", () => {
+    transferBox.hidden = true;
+    toggleBtn.setAttribute("aria-expanded", "false");
+    hideConfirm();
+    errNode.textContent = "";
+    statusNode.textContent = "";
+    toInput.removeAttribute("aria-invalid");
+    const namesBox = el("manageNames");
+    if (namesBox) delete namesBox.dataset.dirty;
+  });
+
+  toInput.addEventListener("input", () => {
+    const namesBox = el("manageNames");
+    if (namesBox) namesBox.dataset.dirty = "1";
+    hideConfirm();
+    errNode.textContent = "";
+    statusNode.textContent = "";
+    toInput.removeAttribute("aria-invalid");
+    const raw = toInput.value.trim();
+    if (!raw) {
+      previewNode.textContent = "";
+      return;
+    }
+    const res = resolveCurrent();
+    if (res.ok) {
+      previewNode.textContent =
+        res.source === "address"
+          ? `✅ Recipient address: ${shortenPoaAddress(res.recipient)}`
+          : res.source === "default-domain"
+            ? `✅ Default domain "${res.domainName}" → ${shortenPoaAddress(res.recipient)}`
+            : `✅ Domain "${res.domainName}" POA address → ${shortenPoaAddress(res.recipient)}`;
+    } else {
+      previewNode.textContent = "";
+    }
+  });
+
+  const onReview = () => {
+    errNode.textContent = "";
+    statusNode.textContent = "";
+    if (ui.registryReadFailed) {
+      errNode.textContent = "⚠️ Refresh registry data before preparing a transfer.";
+      return;
+    }
+    const res = resolveCurrent();
+    if (!res.ok) {
+      hideConfirm();
+      errNode.textContent = "⚠️ " + res.error;
+      toInput.setAttribute("aria-invalid", "true");
+      return;
+    }
+    toInput.removeAttribute("aria-invalid");
+    pending = res;
+    confirmSummary.textContent = res.domainName
+      ? `Transfer "${deed.name}" to ${res.domainName} (${res.recipient})?`
+      : `Transfer "${deed.name}" to ${res.recipient}?`;
+    confirmWarn.textContent = isPrimary
+      ? `⚠️ Attached profile fields and records reset on transfer (archived on the domain page), and "${deed.name}" will be cleared as your main domain.`
+      : "⚠️ Attached profile fields and records reset on transfer (archived on the domain page).";
+    confirmBox.hidden = false;
+    confirmBtn.focus();
+  };
+
+  reviewBtn.addEventListener("click", onReview);
+  toInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      onReview();
+    }
+  });
+
+  backBtn.addEventListener("click", () => {
+    hideConfirm();
+    toInput.focus();
+  });
+
+  confirmBtn.addEventListener("click", async () => {
+    if (!pending) return;
+    if (ui.registryReadFailed) {
+      errNode.textContent = "⚠️ Refresh registry data before preparing a transfer.";
+      return;
+    }
+    const fresh = ui.latestState?.deeds?.[deed.id] ?? deed;
+    const stillPrimary = primaryNameForOwner(ui.latestState, fresh.owner) === fresh.name;
+    const promptText = buildTransferDomainPrompt({
+      name: fresh.name,
+      deed: fresh,
+      recipient: pending.recipient,
+      resolvedFromDomain: pending.domainName,
+      resolutionSource: pending.source,
+      isPrimary: stillPrimary,
+      endpointUrl: endpointBase(),
+    });
+    const payload = {
+      action: "transfer",
+      endpoint: endpointBase(),
+      signer: fresh.owner,
+      coSigners: [],
+      maxTotal: "0",
+      maxNetworkFee: "0",
+      params: {
+        name: fresh.name,
+        expectedDeedId: fresh.id,
+        expectedVersion: fresh.version,
+        recipient: pending.recipient,
+      },
+    };
+    showManagePrompt(promptText, {
+      meta: `↪️ Generated · Transfer "${fresh.name}" to ${shortenPoaAddress(pending.recipient)}`,
+      payload,
+      filename: `poa-domains-${safeSlug(fresh.name)}-transfer.json`,
+      ready: true,
+      showPanel: true,
+    });
+    const copied = await copyText(promptText, el("managePrompt"));
+    if (copied.ok) flashCopied(el("copyManagePrompt"));
+    statusNode.textContent = copied.ok
+      ? "✅ Transfer prompt copied — paste to your agent to sign & submit"
+      : "📋 Copy the transfer prompt below for your agent.";
+    const promptStatus = el("managePromptStatus");
+    if (promptStatus) promptStatus.textContent = copied.ok ? "✅ Copied" : "";
+    const namesBox = el("manageNames");
+    if (namesBox) delete namesBox.dataset.dirty;
+  });
+}
+
 export function renderManagement({ force = false, focusDomain = null } = {}) {
   const box = el("manageNames"),
-    owner = el("manageOwner")?.value.trim();
+    rawInput = el("manageOwner")?.value.trim();
   if (!box) return;
   const activeFocus = focusDomain ?? ui.focusedManageDomain ?? null;
+  if (!rawInput) {
+    box.replaceChildren();
+    delete box.dataset.dirty;
+    delete box.dataset.renderedOwner;
+    syncDomainLookupNotice(null);
+    showManagePrompt("", { showPanel: false });
+    updateManagedDomainsBadge();
+    return;
+  }
+  const resolved = resolveOwnerInput(ui.latestState, rawInput, ui.cap);
+  const owner = resolved?.owner ?? "";
   if (!force && owner && box.dataset.renderedOwner === owner && (box.dataset.dirty === "1" || box.contains(document.activeElement))) {
     return;
   }
@@ -496,17 +761,13 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
   delete box.dataset.dirty;
   if (!owner) {
     delete box.dataset.renderedOwner;
+    syncDomainLookupNotice(null);
     showManagePrompt("", { showPanel: false });
+    add(box, "p", "Enter a public poa1… address or a registered domain name — never a private key.", "badge-warn");
     updateManagedDomainsBadge();
     return;
   }
-  if (!/^(poa1[1-9A-HJ-NP-Za-km-z]{30,60}|ed25519:[0-9a-f]{64})$/.test(owner)) {
-    delete box.dataset.renderedOwner;
-    showManagePrompt("", { showPanel: false });
-    add(box, "p", "Use a public owner address only — never a private key.", "badge-warn");
-    updateManagedDomainsBadge();
-    return;
-  }
+  syncDomainLookupNotice(resolved);
   if (isPoaAddress(owner)) syncEscrowPayerAddress(owner);
   const names = managedNames(ui.latestState, owner);
   box.dataset.renderedOwner = owner;
@@ -516,16 +777,100 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
     add(box, "p", "No active names for this address in the current registry snapshot.", "muted");
     return;
   }
-  // Put focused domain first if requested via "Manage this domain"
-  const ordered = activeFocus
-    ? [...names.filter((d) => d.name === activeFocus), ...names.filter((d) => d.name !== activeFocus)]
-    : names;
+  const primaryName = primaryNameForOwner(ui.latestState, owner);
+  // Put focused domain first, then main domain, then remaining names
+  const ordered = [...names].sort((a, b) => {
+    if (activeFocus && a.name === activeFocus) return -1;
+    if (activeFocus && b.name === activeFocus) return 1;
+    if (primaryName && a.name === primaryName) return -1;
+    if (primaryName && b.name === primaryName) return 1;
+    return 0;
+  });
+  const canSetPrimary = !ui.cap?.ownership?.disabledActions?.includes("setPrimaryName");
+  const canTransfer = !ui.cap?.ownership?.disabledActions?.includes("transfer");
   for (const d of ordered) {
+    const slug = d.id.slice(0, 12);
     const isFocused = activeFocus === d.name;
+    const isPrimary = Boolean(primaryName && d.name === primaryName);
     const card = add(box, "article", "", isFocused ? "card is-focused-domain" : "card");
     card.dataset.domainName = d.name;
-    const h = add(card, "h3", "");
+
+    const topRow = add(card, "div", "", "manage-card-top");
+    const h = add(topRow, "h3", "");
     const { avatar: headerAvatar } = domainHeader(h, d.name);
+    const primaryStatus = add(card, "p", "", "muted manage-primary-status");
+    primaryStatus.setAttribute("role", "status");
+
+    if (canSetPrimary && !d.retired) {
+      const primaryControls = add(topRow, "div", "", "manage-primary-controls");
+      const copyPrimaryPrompt = async ({ clear = false }) => {
+        if (ui.registryReadFailed) {
+          primaryStatus.textContent = "⚠️ Refresh registry data first.";
+          return;
+        }
+        const fresh = ui.latestState?.deeds?.[d.id] ?? d;
+        const promptText = buildSetPrimaryPrompt({
+          name: clear ? null : fresh.name,
+          deed: clear ? null : fresh,
+          signer: owner,
+          endpointUrl: endpointBase(),
+        });
+        const payload = {
+          action: "setPrimaryName",
+          endpoint: endpointBase(),
+          signer: owner,
+          coSigners: [],
+          maxTotal: "0",
+          maxNetworkFee: "0",
+          params: clear
+            ? { name: null, expectedDeedId: null, expectedVersion: 0 }
+            : { name: fresh.name, expectedDeedId: fresh.id, expectedVersion: fresh.version },
+        };
+        showManagePrompt(promptText, {
+          meta: clear
+            ? `⭐ Generated · Clear main domain address`
+            : `⭐ Generated · Set "${fresh.name}" as main domain`,
+          payload,
+          filename: clear
+            ? "poa-domains-clear-main-domain.json"
+            : `poa-domains-${safeSlug(fresh.name)}-main-domain.json`,
+          ready: true,
+          showPanel: true,
+        });
+        const copied = await copyText(promptText, el("managePrompt"));
+        if (copied.ok) flashCopied(el("copyManagePrompt"));
+        primaryStatus.textContent = copied.ok
+          ? clear
+            ? "✅ Clear main-domain prompt copied — paste to your agent"
+            : `✅ Main-domain prompt copied — paste to your agent to set "${fresh.name}"`
+          : "📋 Copy the main-domain prompt below for your agent.";
+        const promptStatus = el("managePromptStatus");
+        if (promptStatus) promptStatus.textContent = copied.ok ? "✅ Copied" : "";
+      };
+
+      if (isPrimary) {
+        add(primaryControls, "span", "⭐ Main domain", "badge-ok");
+        const clearPrimaryBtn = add(primaryControls, "button", "Clear main", "secondary small manage-primary-btn");
+        clearPrimaryBtn.type = "button";
+        clearPrimaryBtn.dataset.clearPrimaryDomain = d.name;
+        clearPrimaryBtn.setAttribute("aria-label", `Clear ${d.name} as main domain`);
+        clearPrimaryBtn.addEventListener("click", () => void copyPrimaryPrompt({ clear: true }));
+      } else if (!d.lock) {
+        const setPrimaryBtn = add(primaryControls, "button", "⭐ Set as main domain", "secondary small manage-primary-btn");
+        setPrimaryBtn.type = "button";
+        setPrimaryBtn.dataset.setPrimaryDomain = d.name;
+        setPrimaryBtn.setAttribute("aria-label", `Set ${d.name} as main domain`);
+        setPrimaryBtn.addEventListener("click", () => void copyPrimaryPrompt({ clear: false }));
+      }
+      primaryControls.append(
+        createInlineInfo(
+          `manage-primary-info-${slug}`,
+          `About main domain for ${d.name}`,
+          "Your main (default) domain binds this name to your public key so Owner Profile and site links show this domain name, avatar icon, profile fields, and all names you hold. Paste the copied prompt into the agent using this key to set it.",
+        ),
+      );
+    }
+
     add(card, "p", d.parentId ? "Subdomain" : "Root domain", "badge");
     if (d.parentId) {
       const p = add(card, "p", "Child of ");
@@ -553,18 +898,13 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
       headerAvatar,
     });
     const poa = ui.cap?.poaOnly?.status === "on";
-    if (availableToList) {
-      const sellWarn = add(card, "div", "", "sale-fields-warning has-info");
-      sellWarn.setAttribute("role", "note");
-      add(sellWarn, "span", "⚠️ Listing or auctioning pauses profile fields and drops them on transfer.");
-      sellWarn.append(
-        createInlineInfo(
-          `manage-sale-warn-${d.id.slice(0, 12)}`,
+    const saleWarnInfo = availableToList
+      ? createInlineInfo(
+          `manage-sale-warn-${slug}`,
           `About profile fields when selling or auctioning ${d.name}`,
-          "While listed or in auction, active profile fields are paused. When ownership transfers, they are dropped for the next owner and archived as read-only history on the domain page.",
-        ),
-      );
-    }
+          "Listing or auctioning pauses profile fields and drops them on transfer (archived as read-only history on the domain page).",
+        )
+      : null;
     if (poa) {
       const poaRow = add(card, "div", "", "button-row manage-poa-actions");
       if (availableToList) {
@@ -576,6 +916,7 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
         auction.type = "button";
         auction.setAttribute("aria-label", "Auction for POA: " + d.name);
         auction.addEventListener("click", () => openPoa(d.name, { mode: "auction", owner }));
+        if (saleWarnInfo) poaRow.append(saleWarnInfo);
       } else {
         const viewPoa = add(poaRow, "button", "🪙 Open in My POA", "secondary small");
         viewPoa.type = "button";
@@ -586,9 +927,9 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
     const priceWrap = add(card, "div", "", "manage-unit-price");
     priceWrap.hidden = poa;
     const { input: price } = addFieldWithInfo(priceWrap, {
-      id: `manage-price-${d.id.slice(0, 12)}`,
+      id: `manage-price-${slug}`,
       label: "Listing / subdomain price",
-      infoId: `manage-price-info-${d.id.slice(0, 12)}`,
+      infoId: `manage-price-info-${slug}`,
       infoLabel: `About listing price for ${d.name}`,
       infoText: "Whole-number price in registry units.",
     });
@@ -641,6 +982,7 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
         buildActionPrompt(action);
       });
     }
+    if (!poa && saleWarnInfo) controls.append(saleWarnInfo);
     for (const o of Object.values(ui.latestState.offers ?? {}).filter(
       (o) => o.parentId === d.id && !o.cancelled && o.uses < o.maxUses && o.validUntil > ui.latestState.time,
     )) {
@@ -662,6 +1004,9 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
         );
       });
     }
+    if (canTransfer && !d.retired && !saleInfo.listedForSale && !d.lock) {
+      buildTransferSection(card, d, owner, { isPrimary });
+    }
   }
   if (force || !managePromptState.ready) {
     showManagePrompt("", { showPanel: true });
@@ -678,7 +1023,7 @@ export function wireManagement() {
       createInlineInfo(
         "manage-owner-field",
         "About public owner address",
-        "Enter a public poa1… owner address only — never paste a private key. Viewing an address does not connect a wallet.",
+        "Enter a public poa1… owner address or a registered domain name — never paste a private key. Viewing domains does not connect a wallet.",
       ),
     );
   }
@@ -689,10 +1034,13 @@ export function wireManagement() {
       ui.knownOwner = "";
       ui.inferredCartOwner = "";
       saveKnownOwner(globalThis.localStorage, "");
-    } else if (validPrincipal(raw)) {
-      ui.knownOwner = raw;
-      saveKnownOwner(globalThis.localStorage, raw);
-      if (isPoaAddress(raw)) syncEscrowPayerAddress(raw, { force: true });
+    } else {
+      const resolved = resolveOwnerInput(ui.latestState, raw, ui.cap);
+      if (resolved?.owner && validPrincipal(resolved.owner)) {
+        ui.knownOwner = resolved.owner;
+        saveKnownOwner(globalThis.localStorage, resolved.owner);
+        if (isPoaAddress(resolved.owner)) syncEscrowPayerAddress(resolved.owner, { force: true });
+      }
     }
     renderManagement({ force: true });
   };

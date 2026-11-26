@@ -185,6 +185,71 @@ export function registryMcpProfile(backend: McpRegistryBackend, beforeWitness?: 
       },
     },
     {
+      name: "get_owner_profile",
+      description:
+        "Read an owner's default/main domain address (primaryName), main-domain public profile fields (POA/BTC/ETH, bio, avatar), and all active domains held by that public key. Accepts either a principal (poa1… / ed25519:…) or a registered domain name.",
+      inputSchema: objectSchema({
+        owner: { type: "string", minLength: 1, maxLength: 256 },
+      }),
+      outputSchema: output({
+        owner: { anyOf: [S, { type: "null" }] },
+        resolvedFromDomain: { anyOf: [S, { type: "null" }] },
+        primaryName: { anyOf: [S, { type: "null" }] },
+        primaryDeedId: { anyOf: [ID, { type: "null" }] },
+        primaryProfile: { anyOf: [PROFILE_DOC, { type: "null" }] },
+        names: { type: "array", items: S },
+        sequence: { type: "integer" },
+      }),
+      call: async (a: any) => {
+        const raw = String(a.owner ?? "").trim();
+        const snap = await read("/v1/state");
+        const state = snap?.state ?? {};
+        let owner: string | null = null;
+        let resolvedFromDomain: string | null = null;
+        if (/^(poa1[1-9A-HJ-NP-Za-km-z]{32,50}|ed25519:[a-f0-9]{64})$/.test(raw)) {
+          owner = raw;
+        } else {
+          const res = await read("/v1/resolve", { name: raw });
+          const d = res?.deed ?? null;
+          if (d && !d.retired && typeof d.owner === "string") {
+            owner = d.owner;
+            resolvedFromDomain = d.name;
+          }
+        }
+        if (!owner) {
+          return {
+            owner: null,
+            resolvedFromDomain: null,
+            primaryName: null,
+            primaryDeedId: null,
+            primaryProfile: null,
+            names: [],
+            sequence: Number(state.sequence ?? 0),
+          };
+        }
+        const heldDeeds = Object.values(state.names ?? {})
+          .map((n: any) => (n?.activeId ? state.deeds?.[n.activeId] : null))
+          .filter((d: any) => d && !d.retired && d.owner === owner);
+        const rawPrimary = state.primaryNames?.[owner] ?? null;
+        const primaryDeed = rawPrimary
+          ? heldDeeds.find((d: any) => d.name === rawPrimary) ?? null
+          : null;
+        const extracted = primaryDeed ? extractLatestProfile(primaryDeed) : null;
+        const names = heldDeeds
+          .map((d: any) => String(d.name))
+          .sort((x, y) => (primaryDeed && x === primaryDeed.name ? -1 : primaryDeed && y === primaryDeed.name ? 1 : x.localeCompare(y)));
+        return {
+          owner,
+          resolvedFromDomain,
+          primaryName: primaryDeed?.name ?? null,
+          primaryDeedId: primaryDeed?.id ?? null,
+          primaryProfile: extracted && !extracted.isDefault ? extracted.profile : null,
+          names,
+          sequence: Number(state.sequence ?? 0),
+        };
+      },
+    },
+    {
       name: "build_profile_witness",
       description:
         "Validate and build a public versioned domain profile witness (poa-domains.profile.v1) plus exact setMetadata params. All fields are PUBLIC (registry, R2 backup, IPFS). Upload PNG/JPG/WebP/GIF avatars <= 5 MB via POST /v1/media/upload first to get ipfs://<cid>. Never signs or accepts keys.",
@@ -514,6 +579,12 @@ export function registryMcpProfile(backend: McpRegistryBackend, beforeWitness?: 
       arguments: [{ name: "name", required: true }],
     },
     {
+      name: "set_primary_name",
+      description:
+        "Set a held domain as the owner's default/main domain address bound to their public key via setPrimaryName.",
+      arguments: [{ name: "name", required: true }],
+    },
+    {
       name: "bid_on_poa_auction",
       description:
         "Inspect a POA auction, check available/outbid escrow balance, and place a user-approved bid or withdrawal via MCP.",
@@ -563,11 +634,13 @@ export function registryMcpProfile(backend: McpRegistryBackend, beforeWitness?: 
         )
       )
         throw new McpProtocolError(-32602, "MCP_BAD_PARAMS");
-      if (name === "buy_a_domain" || name === "update_domain_profile" || name === "bid_on_poa_auction") await beforeWitness?.({ name: args.name });
+      if (name === "buy_a_domain" || name === "update_domain_profile" || name === "set_primary_name" || name === "bid_on_poa_auction") await beforeWitness?.({ name: args.name });
       const guidance =
         name === "update_domain_profile"
           ? "\nNotify the user that all domain profile fields (POA address, BTC address, ETH address, description, image) are PUBLIC and will be published publicly, backed up to R2, and pinned to IPFS. If uploading an avatar file (PNG/JPG/WebP/GIF <= 5 MB), POST it to /v1/media/upload to obtain ipfs://<cid>. Call get_domain_profile, then build_profile_witness to validate and build setMetadata params, confirm with the user, sign locally with the domain owner's key (maxTotal \"0\", maxNetworkFee \"0\"), run simulate_intent, submit_intent, and verify via get_receipt."
-          : name === "bid_on_poa_auction"
+          : name === "set_primary_name"
+            ? "\nCall resolve_domain and quote_domain with action:\"setPrimaryName\" to verify the user's key owns this active domain and get exact expectedDeedId and expectedVersion. Confirm with the user, sign locally with action:\"setPrimaryName\" (maxTotal \"0\", maxNetworkFee \"0\", coSigners []), run simulate_intent, submit_intent, and verify via get_receipt and get_owner_profile. Setting a main domain binds it to the owner's public key across Owner Profiles; transferring or retiring the domain automatically clears it."
+            : name === "bid_on_poa_auction"
             ? "\nCall get_escrow_capabilities (abort if held/paused), then list_poa_auctions with { name } to inspect id, awaitingFirstBid, price (reserve), high, minimumNextBid (strict >10%), closes, window, and quiet. Queued auctions have closes=0 and start their timer on the first bid; bids near close extend by the anti-sniping quiet window. Call submit_escrow_command with action:\"view\" to check existing available escrow balance (including instant credits from outbid auctions). Deposit only the shortfall via intent -> finalized POA transfer -> detect. Confirm the maximum bid ceiling with the user, sign locally, and call submit_escrow_command with action:\"bid\". Unused or outbid POA stays in available balance for instant re-bidding or withdraw back only to the original wallet."
             : "\nCheck identity and the explicitly approved POA amount; quote each name (poaPrice), abort/reconfirm changes, then follow the POA checkout steps above. Never send more POA than approved. Unknown outcome: keep and resend only identical signed bytes; never create a new request key or payment.";
       return {

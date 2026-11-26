@@ -9,7 +9,7 @@ async function rpc(host,method,params={}){calls++;const r=await mf.dispatchFetch
 async function tool(host,name,args={},code){const r=await rpc(host,'tools/call',{name,arguments:args});assert.ok(!r.error,JSON.stringify(r));const d=r.result.structuredContent;if(code){assert.equal(r.result.isError,true);assert.equal(d.code,code);assert.ok(!d.name&&!d.deed&&!d.owner&&!d.intentId);}else assert.equal(r.result.isError,false,JSON.stringify(r));return d;}
 try{for(const host of ['poadomains.grok.me','poadomains-registry.maxinfeld-artshow.workers.dev']){
  const cap=await tool(host,'read_capabilities');assert.equal(cap.livePoA,false);assert.equal(cap.registryUnits,undefined);assert.equal(cap.poaOnly.status,'on');assert.equal(cap.pricing.currency,'POA');assert.ok(!('announceAuction' in cap.actions));
- assert.equal((await rpc(host,'tools/list')).result.tools.length,17);
+ assert.equal((await rpc(host,'tools/list')).result.tools.length,18);
  const state=await tool(host,'read_state');assert.equal(state.stateHash,snapshot.stateHash);assert.equal(state.state.sequence,16);for(const k of ['names','deeds','auctions','offers','bids','balances','credits','receipts','requests','nonces'])assert.deepEqual(state.state[k],{});
  for(const name of [...HIDDEN.names,'👩🏿‍🦰','child.nexus']){
   await tool(host,'resolve_domain',{name},'PUBLIC_RECORD_WITHHELD');await tool(host,'quote_domain',{name,action:'announceAuction'},'PUBLIC_RECORD_WITHHELD');await tool(host,'build_metadata_witness',{name},'PUBLIC_RECORD_WITHHELD');

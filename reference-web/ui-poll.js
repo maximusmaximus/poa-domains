@@ -1,18 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=004104527527";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=004104527527";
-import { renderManagement } from "./ui-manage.js?v=004104527527";
-import { actionLabel } from "./ui-copy.js?v=004104527527";
-import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=004104527527";
-import { ui } from "./ui-state.js?v=004104527527";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=004104527527";
-import { createPoaCopyButton } from "./ui-copy.js?v=004104527527";
-import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=004104527527";
-import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=004104527527";
-import { renderDomainPage } from "./ui-domain.js?v=004104527527";
-import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=004104527527";
-import { renderIdeas } from "./ui-ideas.js?v=004104527527";
-import { mountEscrow } from "./escrow.js?v=004104527527";
-import { applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=004104527527";
+import { publicNameUnavailable } from "./shared.js?v=74b9108b49c1";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=74b9108b49c1";
+import { renderManagement } from "./ui-manage.js?v=74b9108b49c1";
+import { actionLabel } from "./ui-copy.js?v=74b9108b49c1";
+import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=74b9108b49c1";
+import { ui } from "./ui-state.js?v=74b9108b49c1";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=74b9108b49c1";
+import { createPoaCopyButton } from "./ui-copy.js?v=74b9108b49c1";
+import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=74b9108b49c1";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=74b9108b49c1";
+import { renderDomainPage } from "./ui-domain.js?v=74b9108b49c1";
+import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=74b9108b49c1";
+import { renderIdeas } from "./ui-ideas.js?v=74b9108b49c1";
+import { mountEscrow } from "./escrow.js?v=74b9108b49c1";
+import { applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=74b9108b49c1";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -307,21 +307,6 @@ function enhanceEscrowSignedRequestUx(root) {
             ),
         );
         step1.append(balanceNote);
-        const sellWarning = document.createElement("div");
-        sellWarning.id = "escrowListingFieldWarning";
-        sellWarning.className = "sale-fields-warning has-info";
-        sellWarning.setAttribute("role", "note");
-        const sellSpan = document.createElement("span");
-        sellSpan.textContent = "⚠️ Profile fields are paused while listed and dropped when ownership transfers.";
-        sellWarning.append(
-            sellSpan,
-            createInlineInfo(
-                "escrow-listing-fields",
-                "About profile fields while listed",
-                "Profile fields and records are paused while listed or in auction and will be dropped when ownership transfers. Previous fields are archived as read-only history on the domain page.",
-            ),
-        );
-        step1.append(sellWarning);
         for (const btn of step1Buttons) {
             const label = btn.textContent ?? "";
             btn.addEventListener("click", () => {

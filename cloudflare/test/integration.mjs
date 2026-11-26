@@ -64,7 +64,7 @@ try {
     assert.equal(cap.newAccountRegistryUnits, "10000000"); assert.equal(cap.onboardingGrantPoa, "10000000"); assert.equal(cap.publicExplorerUrl, "https://poadomains.grok.me");
     assert.equal(cap.githubMirrorUrl, "https://maximusmaximus.github.io/poa-domains/"); assert.equal(cap.chainId, "poa-mainnet-1");
     assert.equal(cap.revision, "poa-mainnet-v1"); assert.equal(cap.normalizationHash, EMOJI17_NORMALIZATION_HASH);
-    assert.equal(Object.keys(cap.actions).length, 17); assert.equal(cap.durability, "durable-object-sqlite");
+    assert.equal(Object.keys(cap.actions).length, 18); assert.equal(cap.durability, "durable-object-sqlite");
     assert.equal(cap.mode, "poa-domains-registry"); assert.equal(cap.livePoA, false);
   });
   const font = await fetch(base + "/XeroEmoji-COLRv1.woff2"), fontBytes = new Uint8Array(await font.arrayBuffer());
@@ -139,7 +139,7 @@ try {
     assert.ok(s.deeds[s.names.nexus.activeId].records.length>=2); assert.ok(s.sequence>=15); assert.equal(initial.durability,"durable-object-sqlite");
   });
   const browserResult=await browserSmoke(base,ev); save("browser-result.json",browserResult);
-  check("rendered browser: search/cart, 17-action handoff, idea strip, no errors/writes",()=>assert.equal(browserResult.actionOptions,17));
+  check("rendered browser: search/cart, 18-action handoff, idea strip, no errors/writes",()=>assert.equal(browserResult.actionOptions,18));
   const { privateKey } = generateKeyPairSync("ed25519"), signer = nativePrincipal(privateKey);
   const suffix = randomBytes(6).toString("hex"), now = Math.floor(Date.now()/1000);
   const unsigned = (name, requestId, nonce) => prepare({signer,coSigners:[],requestId,nonce,notBefore:0,deadline:now+3600,maxTotal:"1000",maxNetworkFee:"0",action:"announceAuction",params:{name,asset:"POA",reserve:"1000",openAt:now+60,expectedDeedId:null,expectedVersion:0,metadata:buildMetadataWitness(name)}},cap);

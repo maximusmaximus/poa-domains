@@ -1,8 +1,8 @@
-import { copyText } from "./ui-copy.js?v=004104527527";
-import { trapDialog } from "./ui-a11y.js?v=004104527527";
-import { ui } from "./ui-state.js?v=004104527527";
-import { el, endpointBase, ownershipView } from "./ui-core.js?v=004104527527";
-import { buildAgentTermsPrompt, buildListingPrompt, buildSubnameListingPrompt, hasAgreedToTerms, isPoaAddress, parsePublicJSON, resolveDomainView, saveTermsAgreement, shouldHoldTransactions } from "./shared.js?v=004104527527";
+import { copyText } from "./ui-copy.js?v=74b9108b49c1";
+import { trapDialog } from "./ui-a11y.js?v=74b9108b49c1";
+import { ui } from "./ui-state.js?v=74b9108b49c1";
+import { el, endpointBase, ownershipView } from "./ui-core.js?v=74b9108b49c1";
+import { buildAgentTermsPrompt, buildListingPrompt, buildSubnameListingPrompt, hasAgreedToTerms, isPoaAddress, parsePublicJSON, resolveDomainView, resolveOwnerInput, saveTermsAgreement, shouldHoldTransactions } from "./shared.js?v=74b9108b49c1";
 
 export function clearHandoff() {
     ui.generation++;
@@ -95,7 +95,10 @@ export function detectUserPoaAddress() {
     } catch {}
     for (const raw of candidates) {
         const s = typeof raw === "string" ? raw.trim() : "";
+        if (!s) continue;
         if (isPoaAddress(s)) return s;
+        const resolved = resolveOwnerInput(ui.latestState, s, ui.cap)?.owner;
+        if (isPoaAddress(resolved)) return resolved;
     }
     return "";
 }

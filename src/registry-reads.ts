@@ -137,6 +137,7 @@ export function quote(e: Engine, q:Record<string,string>) {
     case "transfer":params={...identity(),recipient:required("recipient")};break;
     case "setRecords":params={...identity(),records:required("records")};break;
     case "setMetadata":params={...identity(),metadata:required("metadata")};break;
+    case "setPrimaryName":params=identity();break;
     case "revokeChild": {
       params=identity();need(deed!.parentId,"NOT_CHILD_HOLDER");params.parentOwnerVersion=s.deeds[deed!.parentId]!.ownerVersion;break;
     }

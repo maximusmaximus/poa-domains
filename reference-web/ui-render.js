@@ -1,13 +1,13 @@
-import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, validPrincipal } from "./shared.js?v=004104527527";
-import { drawTicker } from "./ui-ticker.js?v=004104527527";
-import { actionLabel } from "./ui-copy.js?v=004104527527";
-import { returnFocus } from "./ui-a11y.js?v=004104527527";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=004104527527";
-import { ui } from "./ui-state.js?v=004104527527";
-import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=004104527527";
-import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=004104527527";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=004104527527";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=004104527527";
+import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, resolveOwnerInput, validPrincipal } from "./shared.js?v=74b9108b49c1";
+import { drawTicker } from "./ui-ticker.js?v=74b9108b49c1";
+import { actionLabel } from "./ui-copy.js?v=74b9108b49c1";
+import { returnFocus } from "./ui-a11y.js?v=74b9108b49c1";
+import { activeResaleOffers, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=74b9108b49c1";
+import { ui } from "./ui-state.js?v=74b9108b49c1";
+import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=74b9108b49c1";
+import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=74b9108b49c1";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=74b9108b49c1";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=74b9108b49c1";
 
 export function updateLiveAuctionsBadge(state = ui.latestState) {
     const badge = el("liveAuctionsBadge");
@@ -34,8 +34,9 @@ export function updateManagedDomainsBadge(state = ui.latestState) {
     if (!badge)
         return;
     const inputOwner = el("manageOwner")?.value.trim() ?? "";
-    const owner = validPrincipal(inputOwner)
-        ? inputOwner
+    const resolvedInput = inputOwner ? resolveOwnerInput(state, inputOwner, ui.cap)?.owner : "";
+    const owner = resolvedInput
+        ? resolvedInput
         : (validPrincipal(ui.knownOwner) ? ui.knownOwner : "");
     const count = owner && state ? countOwnedDomains(state, owner) : 0;
     badge.hidden = count <= 0;
@@ -225,7 +226,7 @@ function renderPoaAuctions(box) {
         const bidLine = add(card, "p", `Reserve ${poaShort(a.price)} POA · `);
         if (a.high) {
             bidLine.append(`High bid ${poaShort(a.high.amount)} POA by `);
-            appendPrincipal(bidLine, a.high.payer);
+            ownerLink(bidLine, a.high.payer, person(a.high.payer));
         } else {
             bidLine.append("No bids yet.");
         }
@@ -395,7 +396,7 @@ export function renderMarketplace(s) {
             domainHeader(h, item.name);
             add(card, "p", `🪙 ${poaShort(item.price)} POA`, "badge-ok");
             const sellerLine = add(card, "p", "Seller: ");
-            appendPrincipal(sellerLine, item.seller);
+            ownerLink(sellerLine, item.seller, person(item.seller));
             if (item.closes > 0)
                 add(card, "p", `Until ${formatClock(Math.floor(item.closes / 1000))}`);
             const go = add(card, "button", "🪙 Open My POA", "secondary small");

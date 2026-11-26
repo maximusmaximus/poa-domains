@@ -770,6 +770,10 @@ HTTP 400; retryable: false. Invariant lock. Check the documented inputs and curr
 
 HTTP 400; retryable: false. Invariant metadata. Check the documented inputs and current state.
 
+## INVARIANT_PRIMARY
+
+HTTP 400; retryable: false. Invariant primary. Check the documented inputs and current state.
+
 ## INVARIANT_RIGHTS
 
 HTTP 400; retryable: false. Invariant rights. Check the documented inputs and current state.

@@ -44,7 +44,7 @@ export async function verifyReferenceStaticPage(
     assert.equal(response?.status(), 200);
     await page.locator("#termsAgreeBtn").click();
     await page.waitForFunction(
-      () => document.querySelectorAll("#action option").length === 17,
+      () => document.querySelectorAll("#action option").length === 18,
     );
     await page.waitForFunction(
       () => document.querySelectorAll("#names article").length === 3,

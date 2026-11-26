@@ -9,7 +9,7 @@ Worker front door, https://poadomains.grok.me; Node/Docker are local development
 contracts from the **same** `PACKET_SCHEMA`, action definitions and tool profiles
 as MCP. The tool schema validates `tools/call` params; `$defs` also expose each
 input and structured result. `x-mcp-tools` records the corresponding OpenAPI
-catalog. Only the 15 enabled permanent-ownership actions are signing inputs;
+catalog. Only the 16 enabled permanent-ownership actions are signing inputs;
 legacy lease replay actions remain excluded, without changing replay or Engine.
 Body signatures are documented as `x-authentication`, not invented API-key
 headers. Escrow retains its separate `{command, signature}` protocol. Operator

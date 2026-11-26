@@ -242,7 +242,7 @@ test("Escrow seedInventoryAuctions + MCP POA auction tools: atomic 100-auction o
   // Verify tools/list exposes all 17 tools including all 4 POA auction/escrow tools + bid_on_poa_auction prompt.
   const toolsRes = await mcp.handle(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }));
   const toolNames = toolsRes.result.tools.map((t) => t.name);
-  assert.equal(toolNames.length, 17);
+  assert.equal(toolNames.length, 18);
   for (const t of ["get_escrow_capabilities", "list_poa_auctions", "get_escrow_intent", "submit_escrow_command"]) {
     assert.ok(toolNames.includes(t), t);
   }
