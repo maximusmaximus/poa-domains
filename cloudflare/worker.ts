@@ -213,7 +213,13 @@ const gateway = {
         if(String(env.POA_ESCROW_ENABLED)!=="true"&&["capabilities","market","domain","subnames","intent","withdraw","command","account"].includes(part)&&!(part==="capabilities"&&request.method==="GET"))
           return fail(503,{code:"ESCROW_DISABLED",accepted:false});
         dispatched = true;
-        return envelopeResponse(await escrowHttp(request,env,()=>env.REGISTRY.getByName(SINGLETON)),requestId);
+        const res = await envelopeResponse(await escrowHttp(request,env,()=>env.REGISTRY.getByName(SINGLETON)),requestId);
+        if (res.status >= 500) {
+          let code: string | null = null;
+          try { const body = await res.clone().json() as { code?: unknown }; if (typeof body?.code === "string") code = body.code; } catch {}
+          console.error(JSON.stringify({ event: "escrow-http-error", part, status: res.status, code, requestId }));
+        }
+        return res;
       }
       if (u.pathname.startsWith("/v1/admin/")) return envelopeResponse(await admin(request, env, u),requestId);
       if (request.method !== "GET" && !(request.method === "POST" && (u.pathname === "/v1/intents" || u.pathname === "/v1/intents/preview"))) return fail(405, { code: "METHOD_NOT_ALLOWED" });

@@ -12,8 +12,10 @@ const PEER_FINAL_ATTESTATIONS = 5;
 const PRIMARY_SLOW_TTL_MS = 300_000;
 /** Same cap readStatus uses on the uncached financial path before a fallback alias. */
 const PRIMARY_READ_TIMEOUT_MS = 3500;
-const RECEIPT_PRIMARY_TIMEOUT_MS = 6000;
-const CUT_BATCH_SIZE = 6;
+const RECEIPT_PRIMARY_TIMEOUT_MS = 3500;
+/** 3 txs × 2 reads (tx + receipt) stays within Cloudflare Workers' 6-connection concurrency limit
+ * and avoids overwhelming minepoa.com's Express receipt endpoint during cold-cache cuts. */
+const CUT_BATCH_SIZE = 3;
 export interface CoveredTxCache {
   get(wallet: string, ids: readonly string[]): Map<string, number>;
   set(wallet: string, entries: readonly [string, number][]): void;
@@ -22,10 +24,14 @@ export interface CoveredTxCache {
 function isTimeoutError(e: unknown): boolean {
   return e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
 }
+function isTransientCutError(e: unknown): boolean {
+  return isTimeoutError(e) || (e instanceof Error && e.message === "ESCROW_NODE_HTTP");
+}
 export class PoaHttpNetwork implements Network {
   private lastHeight?: number;
   private lastCutoff?: number;
   private primaryStatusSlowUntil = 0;
+  private primaryReceiptSlowUntil = 0;
   private readonly coveredMem = new Map<string, number>();
   constructor(private writesAllowed:()=>boolean, private request:typeof fetch=fetch,
     private pins:{engine:string;params:string}={engine:MAINNET_ENGINE_SHA256,params:MAINNET_PARAMS_SHA256},
@@ -71,7 +77,11 @@ export class PoaHttpNetwork implements Network {
     if(r.status>=300&&r.status<400){await r.body?.cancel();throw new Error("ESCROW_NODE_REDIRECT");}
     if(r.status===404)return null;
     if(r.status===401||r.status===403){await r.body?.cancel();throw new Error("ESCROW_NODE_AUTH");}
-    need(r.ok,"ESCROW_NODE_HTTP");
+    if(!r.ok){
+      await r.body?.cancel();
+      console.error(JSON.stringify({event:"escrow-node-http",path:path.slice(0,64),status:r.status}));
+      throw new Error("ESCROW_NODE_HTTP");
+    }
     const age=r.headers.get("age");if(age!==null)need(/^\d+$/.test(age)&&Number(age)<=120,"ESCROW_STALE");
     const reader=r.body!.getReader();let size=0;const chunks:Uint8Array[]=[];
     try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;
@@ -83,27 +93,30 @@ export class PoaHttpNetwork implements Network {
   private async getFirst(paths:string[], limit=2000000, displaySignal?:AbortSignal):Promise<any> {
     return (await this.getFirstTracked(paths,limit,displaySignal)).value;
   }
-  /** Receipt reads cap a hung /chain/.../api/receipt route at the same primary timeout as
-   * uncached status, then fall back to /api/receipt within the 12s financial budget.
+  /** Receipt reads cap a hung /chain/.../api/receipt route at RECEIPT_PRIMARY_TIMEOUT_MS,
+   * then fall back to /api/receipt within the 12s financial budget and cool down the hung primary.
    * Binding checks stay on the caller; 401/503 handling stays fail-closed in getFirstTracked. */
   private async getReceipt(id:string):Promise<any> {
-    return (await this.getFirstTracked(
-      [`/chain/${CHAIN}/api/receipt/${id}`,`/api/receipt/${id}`],
-      2000000,
-      undefined,
-      RECEIPT_PRIMARY_TIMEOUT_MS,
-      this.clock(),
-    )).value;
+    const started=this.clock();
+    const inCooldown=started<this.primaryReceiptSlowUntil;
+    const paths=inCooldown?[`/api/receipt/${id}`,`/chain/${CHAIN}/api/receipt/${id}`]:[`/chain/${CHAIN}/api/receipt/${id}`,`/api/receipt/${id}`];
+    const r=await this.getFirstTracked(paths,2000000,undefined,RECEIPT_PRIMARY_TIMEOUT_MS,started);
+    if(inCooldown){
+      if(r.timedOutFirst||r.httpFailedFirst)this.primaryReceiptSlowUntil=0;
+    }else if(r.timedOutFirst||r.httpFailedFirst){
+      this.primaryReceiptSlowUntil=this.clock()+PRIMARY_SLOW_TTL_MS;
+    }
+    return r.value;
   }
-  /** Same as getFirst, but also reports whether an earlier path was refused (401/403) or timed out before a fallback answered. */
+  /** Same as getFirst, but also reports whether an earlier path was refused (401/403), failed with HTTP 5xx/429, or timed out before a fallback answered. */
   private async getFirstTracked(
     paths:string[],
     limit=2000000,
     displaySignal?:AbortSignal,
     firstPathTimeoutMs?:number,
     startedAt?:number,
-  ):Promise<{value:any;refused:boolean;timedOutFirst:boolean}> {
-    let lastErr:unknown;let refused=false;let timedOutFirst=false;
+  ):Promise<{value:any;refused:boolean;timedOutFirst:boolean;httpFailedFirst:boolean}> {
+    let lastErr:unknown;let refused=false;let timedOutFirst=false;let httpFailedFirst=false;
     for(let i=0;i<paths.length;i++){
       const path=paths[i]!;
       const isFallbackCapable=i===0&&paths.length>1;
@@ -129,16 +142,16 @@ export class PoaHttpNetwork implements Network {
         }else{
           v=await this.get(path,limit,displaySignal);
         }
-        if(v!==null)return {value:v,refused,timedOutFirst};
+        if(v!==null)return {value:v,refused,timedOutFirst,httpFailedFirst};
       }catch(e){
         if(e instanceof Error&&e.message==="ESCROW_NODE_AUTH"){refused=true;lastErr=e;continue;}
-        if(e instanceof Error&&e.message==="ESCROW_NODE_HTTP"){lastErr=e;continue;}
+        if(e instanceof Error&&e.message==="ESCROW_NODE_HTTP"){if(isFallbackCapable)httpFailedFirst=true;lastErr=e;continue;}
         if(isFallbackCapable&&isTimeoutError(e)&&!displaySignal?.aborted){timedOutFirst=true;lastErr=e;continue;}
         throw e;
       }
     }
     if(lastErr)throw lastErr;
-    return {value:null,refused,timedOutFirst};
+    return {value:null,refused,timedOutFirst,httpFailedFirst};
   }
   async status():Promise<Status> { return this.readStatus(false); }
   /** Read-only observation using the SAME protocol and rollback checks.
@@ -274,75 +287,95 @@ export class PoaHttpNetwork implements Network {
     }
     return [...seen];
   }
+  private async retryTransient<T>(fn:()=>Promise<T>):Promise<T> {
+    try{return await fn();}
+    catch(error){
+      if(!isTransientCutError(error))throw error;
+      await new Promise(resolve=>setTimeout(resolve,200));
+      return await fn();
+    }
+  }
   async cut(wallet:string,ids:string[],status:Status):Promise<Cut> {
-    address(wallet);const b=await this.getFirst([`/api/explorer/address/${wallet}`,`/chain/${CHAIN}/api/explorer/address/${wallet}`]);
+    address(wallet);
+    const b=await this.retryTransient(()=>this.getFirst([`/api/explorer/address/${wallet}`,`/chain/${CHAIN}/api/explorer/address/${wallet}`]));
     need(b?.address===wallet&&b.balance_as_of?.checkpoint_height===status.height,"ESCROW_UNALIGNED_CUT");
     let cutoff=status.cutoff!==undefined?integer(status.cutoff):undefined;
     let cutoffTried=cutoff!==undefined;
     const cachedHeights=this.readCovered(wallet,ids);
-    const covered:string[]=[];
+    const coveredSet=new Set<string>();
     const uncachedIds:string[]=[];
+    const seenUncached=new Set<string>();
     for(const id of ids){
       const cachedHeight=cachedHeights.get(id);
-      if(cachedHeight!==undefined&&cachedHeight<=status.height)covered.push(id);
-      else uncachedIds.push(id);
+      if(cachedHeight!==undefined&&cachedHeight<=status.height)coveredSet.add(id);
+      else if(!seenUncached.has(id)){seenUncached.add(id);uncachedIds.push(id);}
     }
-    // Observe uncached transactions in bounded parallel batches, reusing the verified cut status
-    // instead of repeating status() and receipt() calls sequentially for every historical tx.
-    const observations:{id:string;seen:Awaited<ReturnType<PoaHttpNetwork["observe"]>>}[]=[];
+    // Observe uncached transactions in small parallel batches (3 txs = 6 connections), reusing the
+    // verified cut status and persisting each verified checkpoint-covered batch immediately so a
+    // transient upstream hiccup later in a cold cut never throws away already-verified work.
     for(let i=0;i<uncachedIds.length;i+=CUT_BATCH_SIZE){
       const batch=uncachedIds.slice(i,i+CUT_BATCH_SIZE);
-      const settled=await Promise.all(batch.map(async id=>({id,seen:await this.observe(id,status)})));
-      observations.push(...settled);
-    }
-    const newlyCovered:[string,number][]=[];
-    for(const {id,seen} of observations){
-      const o=seen?.o;
-      if(o?.checkpoint){
-        need(o.checkpoint.height<=status.height,"ESCROW_UNALIGNED_CUT");
-        covered.push(id);
-        newlyCovered.push([id,o.checkpoint.height]);
-      }
-      else if(seen&&!seen.legacy){
-        // Current receipt shape (no checkpoint_covered). Two coverage signals, either sufficient:
-        //  - PoA's explicit per-tx explorer field `checkpointed:{height}` ("covered by a 5/5-signed,
-        //    chain-anchored checkpoint") at or below the checkpoint this balance is as of;
-        //  - the pinned engine's own coverage predicate for that checkpoint: body.ts < cutoff.ts.
-        // Not covered only when body.ts > cutoff.ts (same-second ties need the cutoff tx's txCmp
-        // order, which we do not have). Covered money must also be peer-final (K=5) to count as
-        // baked. Contradictions and anything else hold; nothing is guessed.
-        const t=seen.explorer,ts=integer(o!.body.ts,1);
-        const cpHeight=t.checkpointed!==undefined&&t.checkpointed!==null?integer(t.checkpointed.height):undefined;
-        const byCheckpoint=cpHeight!==undefined&&cpHeight<=status.height;
-        if(!byCheckpoint&&!cutoffTried){
-          cutoffTried=true;
-          try{
-            const snap=await this.getFirst(["/api/snapshot",`/chain/${CHAIN}/api/snapshot`],8000000);
-            if(snap?.params?.chain_id===CHAIN&&snap.checkpoint&&integer(snap.checkpoint.height)===status.height&&snap.checkpoint.cutoff?.ts!==undefined)
-              cutoff=integer(snap.checkpoint.cutoff.ts);
-          }catch{/* No snapshot cutoff available; fail closed below as ESCROW_CHECKPOINT_DETAILS_REQUIRED. */}
+      const settled=await Promise.allSettled(batch.map(async id=>({id,seen:await this.retryTransient(()=>this.observe(id,status))})));
+      const batchNewlyCovered:[string,number][]=[];
+      let firstFailure:unknown;let failed=false;
+      try{
+        for(const item of settled){
+          if(item.status==="rejected"){
+            if(!failed){failed=true;firstFailure=item.reason;}
+            continue;
+          }
+          const {id,seen}=item.value;
+          const o=seen?.o;
+          if(o?.checkpoint){
+            need(o.checkpoint.height<=status.height,"ESCROW_UNALIGNED_CUT");
+            coveredSet.add(id);
+            batchNewlyCovered.push([id,o.checkpoint.height]);
+          }
+          else if(seen&&!seen.legacy){
+            // Current receipt shape (no checkpoint_covered). Two coverage signals, either sufficient:
+            //  - PoA's explicit per-tx explorer field `checkpointed:{height}` ("covered by a 5/5-signed,
+            //    chain-anchored checkpoint") at or below the checkpoint this balance is as of;
+            //  - the pinned engine's own coverage predicate for that checkpoint: body.ts < cutoff.ts.
+            // Not covered only when body.ts > cutoff.ts (same-second ties need the cutoff tx's txCmp
+            // order, which we do not have). Covered money must also be peer-final (K=5) to count as
+            // baked. Contradictions and anything else hold; nothing is guessed.
+            const t=seen.explorer,ts=integer(o!.body.ts,1);
+            const cpHeight=t.checkpointed!==undefined&&t.checkpointed!==null?integer(t.checkpointed.height):undefined;
+            const byCheckpoint=cpHeight!==undefined&&cpHeight<=status.height;
+            if(!byCheckpoint&&!cutoffTried){
+              cutoffTried=true;
+              try{
+                const snap=await this.getFirst(["/api/snapshot",`/chain/${CHAIN}/api/snapshot`],8000000);
+                if(snap?.params?.chain_id===CHAIN&&snap.checkpoint&&integer(snap.checkpoint.height)===status.height&&snap.checkpoint.cutoff?.ts!==undefined)
+                  cutoff=integer(snap.checkpoint.cutoff.ts);
+              }catch{/* No snapshot cutoff available; fail closed below as ESCROW_CHECKPOINT_DETAILS_REQUIRED. */}
+            }
+            const afterCutoff=cutoff!==undefined&&ts>cutoff;
+            const byCutoff=cutoff!==undefined&&ts<cutoff;
+            need(!(byCheckpoint&&afterCutoff),"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
+            if(byCheckpoint||byCutoff){
+              need(o!.valid===true&&o!.attestations>=PEER_FINAL_ATTESTATIONS,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
+              coveredSet.add(id);
+              batchNewlyCovered.push([id,byCheckpoint?cpHeight!:status.height]);
+              continue;
+            }
+            need(afterCutoff,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
+          }
+          else if(o&&o.attestations>=PEER_FINAL_ATTESTATIONS){
+            // Legacy receipt: peer-final open-window money is excluded from checkpoint-only
+            // reconciliation only on an explicit checkpoint_covered:false (already verified in seen.receipt).
+            const r=seen!.receipt;
+            need(r?.txid===id&&r.status==="included","ESCROW_TX_BINDING");
+            need(r.checkpoint_covered===false,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
+          }
         }
-        const afterCutoff=cutoff!==undefined&&ts>cutoff;
-        const byCutoff=cutoff!==undefined&&ts<cutoff;
-        need(!(byCheckpoint&&afterCutoff),"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
-        if(byCheckpoint||byCutoff){
-          need(o!.valid===true&&o!.attestations>=PEER_FINAL_ATTESTATIONS,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
-          covered.push(id);
-          newlyCovered.push([id,byCheckpoint?cpHeight!:status.height]);
-          continue;
-        }
-        need(afterCutoff,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
+      }finally{
+        this.writeCovered(wallet,batchNewlyCovered);
       }
-      else if(o&&o.attestations>=PEER_FINAL_ATTESTATIONS){
-        // Legacy receipt: peer-final open-window money is excluded from checkpoint-only
-        // reconciliation only on an explicit checkpoint_covered:false (already verified in seen.receipt).
-        const r=seen!.receipt;
-        need(r?.txid===id&&r.status==="included","ESCROW_TX_BINDING");
-        need(r.checkpoint_covered===false,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
-      }
+      if(failed)throw firstFailure;
     }
+    const covered=[...coveredSet];
     const after=await this.status();need(after.height===status.height&&after.root===status.root&&!after.stale,"ESCROW_UNALIGNED_CUT");
-    this.writeCovered(wallet,newlyCovered);
     return {chain:CHAIN,height:status.height,root:status.root,balance:b.balance,covered};
   }
   async context(wallet:string, knownTxid?:string):Promise<Context> {
