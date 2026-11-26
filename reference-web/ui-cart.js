@@ -1,13 +1,13 @@
-import { publicNameUnavailable } from "./shared.js?v=3035a7bd696b";
-import { registryUnit } from "./shared.js?v=3035a7bd696b";
-import { actionLabel } from "./ui-copy.js?v=3035a7bd696b";
-import { createInlineInfo } from "./ui-help.js?v=3035a7bd696b";
-import { trapDialog } from "./ui-a11y.js?v=3035a7bd696b";
-import { ui } from "./ui-state.js?v=3035a7bd696b";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=3035a7bd696b";
-import { add, el, endpointBase } from "./ui-core.js?v=3035a7bd696b";
-import { domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=3035a7bd696b";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=3035a7bd696b";
+import { publicNameUnavailable } from "./shared.js?v=f35b5bf67d18";
+import { registryUnit } from "./shared.js?v=f35b5bf67d18";
+import { actionLabel } from "./ui-copy.js?v=f35b5bf67d18";
+import { createInlineInfo } from "./ui-help.js?v=f35b5bf67d18";
+import { trapDialog } from "./ui-a11y.js?v=f35b5bf67d18";
+import { ui } from "./ui-state.js?v=f35b5bf67d18";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, cartSummary, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=f35b5bf67d18";
+import { add, el, endpointBase } from "./ui-core.js?v=f35b5bf67d18";
+import { domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=f35b5bf67d18";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=f35b5bf67d18";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
@@ -31,6 +31,53 @@ function resetCopyFeedback() {
     if (fp) { fp.hidden = true; fp.textContent = ""; }
 }
 
+function syncEscrowDepositCheckboxes(name, action, useDeposit) {
+    if (action !== "poaBid" && action !== "poaBuy") return;
+    const kind = action === "poaBuy" ? "fixed" : "auction";
+    ui.escrowUseDeposit?.set?.(`${kind}:${name}`, Boolean(useDeposit));
+    if (typeof document === "undefined") return;
+    for (const cb of document.querySelectorAll("input[data-escrow-use-deposit]")) {
+        if (cb.dataset.escrowUseDeposit === name && cb.dataset.escrowKind === kind) {
+            cb.checked = Boolean(useDeposit);
+        }
+    }
+}
+
+export function setCartItemUseDeposit(name, action, useDeposit) {
+    const flag = Boolean(useDeposit);
+    syncEscrowDepositCheckboxes(name, action, flag);
+    const target = ui.cart.find((x) => x.name === name && x.action === action);
+    if (!target) return false;
+    if (flag) target.useDeposit = true;
+    else delete target.useDeposit;
+    if (target.params && typeof target.params === "object") {
+        if (action === "poaBid" || action === "poaBuy") target.params.useDeposit = flag;
+        else if (flag) target.params.useDeposit = true;
+        else delete target.params.useDeposit;
+    }
+    target.summary = cartSummary(target);
+    resetCopyFeedback();
+    persistCart();
+    renderCart();
+    return true;
+}
+
+function appendCartUseDepositToggle(parent, item) {
+    const label = document.createElement("label");
+    label.className = "use-deposit-toggle cart-use-deposit";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = Boolean(item.useDeposit ?? item.params?.useDeposit);
+    cb.dataset.cartUseDeposit = item.name;
+    cb.dataset.cartAction = item.action;
+    cb.addEventListener("change", () => setCartItemUseDeposit(item.name, item.action, cb.checked));
+    const span = document.createElement("span");
+    span.textContent = "Use deposit";
+    label.append(cb, span);
+    parent.append(label);
+    return label;
+}
+
 export function addToCart(item) {
     item = buildCartItem(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now());
     const existingIdx = ui.cart.findIndex((x) => x.name === item.name && x.action === item.action);
@@ -38,6 +85,7 @@ export function addToCart(item) {
         ui.cart[existingIdx] = item;
     else
         ui.cart.push(item);
+    syncEscrowDepositCheckboxes(item.name, item.action, Boolean(item.useDeposit ?? item.params?.useDeposit));
     resetCopyFeedback();
     persistCart();
     renderCart();
@@ -281,19 +329,26 @@ export function renderCartExpectations() {
     if (show) {
         const total = poaCartTotalShort(ui.cart);
         const bidCount = ui.cart.filter((x) => x.action === "poaBid").length;
-        const newCount = ui.cart.length - bidCount;
+        const buyCount = ui.cart.filter((x) => x.action === "poaBuy").length;
+        const newCount = ui.cart.length - bidCount - buyCount;
+        const depCount = ui.cart.filter((x) => Boolean(x.useDeposit ?? x.params?.useDeposit)).length;
         const count = `${ui.cart.length} ${ui.cart.length === 1 ? "item" : "items"}`;
         if (lead) {
-            lead.textContent = bidCount > 0
+            const parts = [];
+            if (bidCount) parts.push(`${bidCount} ${bidCount === 1 ? "auction bid" : "auction bids"}`);
+            if (buyCount) parts.push(`${buyCount} ${buyCount === 1 ? "fixed buy" : "fixed buys"}`);
+            if (newCount) parts.push(`${newCount} new`);
+            const depSuffix = depCount ? ` · ${depCount} using deposit` : "";
+            lead.textContent = bidCount > 0 || buyCount > 0
                 ? (total
-                    ? `For ${count} (ceiling ${total} POA across ${bidCount} ${bidCount === 1 ? "auction bid" : "auction bids"}${newCount ? ` + ${newCount} new` : ""}) — nothing is paid or bid until you approve your agent.`
+                    ? `For ${count} (ceiling ${total} POA across ${parts.join(" + ")}${depSuffix}) — nothing is paid or bid until you approve your agent.`
                     : `For ${count} — nothing is paid or bid until you approve your agent.`)
                 : (total
-                    ? `For ${ui.cart.length} ${ui.cart.length === 1 ? "name" : "names"} (${total} POA total) — nothing is paid or minted until you approve your agent.`
+                    ? `For ${ui.cart.length} ${ui.cart.length === 1 ? "name" : "names"} (${total} POA total${depSuffix}) — nothing is paid or minted until you approve your agent.`
                     : `For ${ui.cart.length} ${ui.cart.length === 1 ? "name" : "names"} — nothing is paid or minted until you approve your agent.`);
         }
         if (list) {
-            const mode = bidCount > 0 ? (newCount > 0 ? "mixed" : "auction") : "new";
+            const mode = bidCount > 0 || buyCount > 0 ? (newCount > 0 ? "mixed" : "auction") : "new";
             if (list.dataset.expectMode !== mode) {
                 list.dataset.expectMode = mode;
                 list.replaceChildren();
@@ -333,7 +388,7 @@ function poaPurchaseTypeLabel(item) {
 export function inferOwnerFromPurchasedCart(state) {
     if (!state || !ui.cap || !ui.cart.length)
         return null;
-    if (ui.cart.some((x) => x.action === "poaBid"))
+    if (ui.cart.some((x) => x.action === "poaBid" || x.action === "poaBuy"))
         return null;
     const owners = [];
     for (const item of ui.cart) {
@@ -368,7 +423,7 @@ export function inferAnySettledCartOwner(state) {
             owners.push(deed.owner);
             continue;
         }
-        if (item.action === "poaBid") {
+        if (item.action === "poaBid" || item.action === "poaBuy") {
             const auction = Array.isArray(ui.escrowMarket)
                 ? ui.escrowMarket.find((a) => a && a.id === item.params?.auctionId)
                 : null;
@@ -473,10 +528,16 @@ export function renderFloatingCart() {
         domainHeader(h, item.name);
         if (item.action === "poaCheckout") {
             add(card, "p", `🪙 ${poaShort(item.amount)} POA · ${poaPurchaseTypeLabel(item)}`, "badge-ok");
+            appendCartUseDepositToggle(card, item);
+        }
+        else if (item.action === "poaBuy") {
+            add(card, "p", `🛍️ Fixed sale · ${poaShort(item.amount)} POA`, "badge-ok");
+            appendCartUseDepositToggle(card, item);
         }
         else if (item.action === "poaBid") {
             const p = item.params ?? {};
             add(card, "p", `${p.awaitingFirstBid ? "⏳ Starts auction" : "🔥 POA auction"} · Max ${poaShort(item.amount)} POA`, "badge-ok");
+            appendCartUseDepositToggle(card, item);
             if (item.outbid)
                 add(card, "p", "⚠️ Outbid — open Cart to review or raise your highest bid.", "auction-outbid-badge");
         }
@@ -527,6 +588,7 @@ export function renderCart() {
         domainHeader(h, item.name);
         if (item.action === "poaCheckout") {
             add(card, "p", `🪙 ${poaShort(item.amount)} POA · ${poaPurchaseTypeLabel(item)}`, "badge-ok");
+            appendCartUseDepositToggle(card, item);
             if (item.needsReview)
                 add(card, "p", "⚠️ " + item.reviewMessage, "badge-warn");
             const errorNode = add(card, "p", item.validationError || "", "badge-warn");
@@ -537,12 +599,26 @@ export function renderCart() {
             removePoa.addEventListener("click", () => removeCartAt(index));
             return;
         }
+        if (item.action === "poaBuy") {
+            add(card, "p", `🛍️ Fixed sale · ${poaShort(item.amount)} POA`, "badge-ok");
+            appendCartUseDepositToggle(card, item);
+            if (item.needsReview)
+                add(card, "p", "⚠️ " + item.reviewMessage, "badge-warn");
+            const errorNode = add(card, "p", item.validationError || "", "badge-warn");
+            errorNode.setAttribute("role", "alert");
+            const removeBuy = add(card, "button", "✖️", "secondary small cart-remove");
+            removeBuy.setAttribute("aria-label", "Remove " + item.name + " from cart");
+            removeBuy.type = "button";
+            removeBuy.addEventListener("click", () => removeCartAt(index));
+            return;
+        }
         if (item.action === "poaBid") {
             const p = item.params ?? {};
             const nowMs = ui.escrowMarketServerTime || Date.now();
             const review = cartReview(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, nowMs);
             const liveMin = review.minimum ?? item.latestMinimum ?? item.minimumAmount ?? item.amount;
             add(card, "p", `${p.awaitingFirstBid ? "⏳ Starts on 1st bid" : "🔥 Live auction"} · Min ${poaShort(liveMin)} POA`, "badge-ok");
+            appendCartUseDepositToggle(card, item);
             if (item.needsReview || item.outbid)
                 add(card, "p", "⚠️ " + (item.reviewMessage || "Auction changed — review your highest bid."), item.outbid ? "auction-outbid-badge" : "badge-warn");
             const actionBtns = add(card, "div", "", "button-row");

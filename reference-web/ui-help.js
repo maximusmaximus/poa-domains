@@ -1,4 +1,4 @@
-import { decorateEmojiButton } from "./ui-copy.js?v=3035a7bd696b";
+import { decorateEmojiButton } from "./ui-copy.js?v=f35b5bf67d18";
 // Native nonmodal popovers provide touch/keyboard dismissal and do not trap page focus.
 const watched=new WeakSet();
 export function decoratePoaFields(){
@@ -27,8 +27,9 @@ export function installHelp(){
    if(card.querySelector(":scope > .module-info"))continue;
    const action=card.dataset.cartAction||"";
    const isPoaBid=action==="poaBid";
-   const isPoaItem=!isPoaBid&&(action==="poaCheckout"||!card.querySelector(".amount-label"));
-   const helpText=isPoaBid?"This is an unsigned POA auction bid (not a fixed-price buy and not a payment). Queued auctions start their timer on the first bid; each higher bid must exceed the current high bid by >10%; late bids extend closing by the anti-sniping quiet window; outbid POA immediately credits back to your available escrow balance for instant re-bidding or withdrawal back only to your original wallet. Adjust your highest-bid ceiling anytime or remove with ✖️.":isPoaItem?"This is one unsigned POA checkout item, not a payment. Your agent checks live escrow status, pays the exact POA total after your approval, waits for PoA finality, and mints the permanent name to your address. Remove it with ✖️.":"This is one unsigned planning item, not a purchase. Edit its maximum registry-unit amount to update the request and totals. Remove it with ✖️; no signed action or payment is sent.";
+   const isPoaBuy=action==="poaBuy";
+   const isPoaItem=!isPoaBid&&!isPoaBuy&&(action==="poaCheckout"||!card.querySelector(".amount-label"));
+   const helpText=isPoaBid?"This is an unsigned POA auction bid (not a fixed-price buy and not a payment). Check Use deposit to fund strictly from your existing credited escrow balance. Queued auctions start their timer on the first bid; each higher bid must exceed the current high bid by >10%; late bids extend closing by the anti-sniping quiet window; outbid POA immediately credits back to your available escrow balance for instant re-bidding or withdrawal back only to your original wallet. Adjust your highest-bid ceiling anytime or remove with ✖️.":isPoaBuy?"This is an unsigned fixed-price POA resale purchase (not a payment). Check Use deposit to fund strictly from your existing credited escrow balance. Your agent verifies the live listing price and status, submits buy, and waits for the seller's signed handover. Remove it with ✖️.":isPoaItem?"This is one unsigned POA checkout item, not a payment. Check Use deposit to fund from your existing credited escrow balance. Your agent checks live escrow status, pays the exact POA total after your approval, waits for PoA finality, and mints the permanent name to your address. Remove it with ✖️.":"This is one unsigned planning item, not a purchase. Edit its maximum registry-unit amount to update the request and totals. Remove it with ✖️; no signed action or payment is sent.";
    addHelp(card,container.id+"-item-"+i,helpText,[...card.querySelectorAll(".amount-label > small")]);
   }
  }

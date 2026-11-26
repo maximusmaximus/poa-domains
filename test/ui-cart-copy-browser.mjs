@@ -2099,22 +2099,65 @@ try {
     await expect(nebulaCardG.locator(".profile-eth-fix")).toBeVisible();
     await auditUiGeometry(pageGeom, `${vp.name}:manage-and-escrow-market`);
 
-    // Explicitly verify the exact screenshot pair inside #escrowMarket: "🏷️ Bid with POA" vs "Use credited POA to bid"
-    const escrowCardBtns = await pageGeom.locator("#escrowMarket article.card").first().evaluate((card) =>
-      [...card.querySelectorAll(":scope > button")].map((b) => {
-        const r = b.getBoundingClientRect();
-        return { text: b.textContent.trim(), top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height };
+    // Explicitly verify #escrowMarket card actions: "🏷️ Bid" + "Use deposit" checkbox + handover (no "with POA", clean gap & matching heights)
+    const withPoaBtns = await pageGeom.evaluate(() =>
+      [...document.querySelectorAll("button")]
+        .filter((b) => !b.hidden && /with POA/i.test(b.textContent ?? ""))
+        .map((b) => b.textContent?.trim()),
+    );
+    assert.deepEqual(withPoaBtns, [], `No visible button should say "with POA": ${JSON.stringify(withPoaBtns)}`);
+    const escrowCardItems = await pageGeom.locator("#escrowMarket article.card").first().evaluate((card) =>
+      [...card.querySelectorAll(".escrow-card-actions > button, .escrow-card-actions > label.use-deposit-toggle")].map((el) => {
+        const r = el.getBoundingClientRect();
+        return { tag: el.tagName, text: el.textContent.trim(), top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height };
       }),
     );
-    assert.equal(escrowCardBtns.length, 3, `Expected 3 buttons on active bid escrow card, got ${JSON.stringify(escrowCardBtns)}`);
+    assert.equal(escrowCardItems.length, 3, `Expected Bid + Use deposit + handover on active bid escrow card, got ${JSON.stringify(escrowCardItems)}`);
+    assert.equal(escrowCardItems[0].text, "🏷️ Bid");
+    assert.equal(escrowCardItems[1].text, "Use deposit");
     assert.ok(
-      Math.abs(escrowCardBtns[0].height - escrowCardBtns[1].height) <= 2,
-      `Escrow buttons height mismatch: ${JSON.stringify(escrowCardBtns)}`,
+      Math.abs(escrowCardItems[0].height - escrowCardItems[1].height) <= 2,
+      `Escrow Bid vs Use deposit height mismatch: ${JSON.stringify(escrowCardItems)}`,
     );
+    if (Math.abs(escrowCardItems[0].top - escrowCardItems[1].top) < 10) {
+      assert.ok(
+        escrowCardItems[1].left - escrowCardItems[0].right >= 6,
+        `Escrow Bid and Use deposit too close together: ${JSON.stringify(escrowCardItems)}`,
+      );
+    }
 
-    // 6) Floating Cart modal + Bug / Feature modal
+    // Verify multi-item Bid / Buy + "Use deposit" checkbox updates both #escrowPrompt AND adds all items to Cart!
+    await pageGeom.locator("#escrowPayer").fill(mainOwner);
+    const starEscrowCard = pageGeom.locator("#escrowMarket article.card", { has: pageGeom.locator("h3", { hasText: "star" }) });
+    const vaultEscrowCard = pageGeom.locator("#escrowMarket article.card", { has: pageGeom.locator("h3", { hasText: "vault" }) });
+    // 1) Bid on "star" using deposit
+    await starEscrowCard.getByLabel("Use deposit").check();
+    await starEscrowCard.getByRole("button", { name: "🏷️ Bid", exact: true }).click();
+    await expect(pageGeom.locator("#escrowPrompt")).toContainText('"action": "bid"');
+    // 2) Buy fixed-price "vault" using deposit
+    await vaultEscrowCard.getByLabel("Use deposit").check();
+    await vaultEscrowCard.getByRole("button", { name: "🛍️ Buy", exact: true }).click();
+    await expect(pageGeom.locator("#escrowPrompt")).toContainText('"action": "buy"');
+    // 3) Uncheck "Use deposit" on "star" -> clicking Bid switches #escrowPrompt to funding intent AND updates Cart prompt
+    await starEscrowCard.getByLabel("Use deposit").uncheck();
+    await starEscrowCard.getByRole("button", { name: "🏷️ Bid", exact: true }).click();
+    await expect(pageGeom.locator("#escrowPrompt")).toContainText('"action": "intent"');
+
+    // 6) Floating Cart modal + Bug / Feature modal (verify multi-item cart with star + vault + Use deposit prompt!)
     await pageGeom.locator("#floatingCartBtn").click();
     await expect(pageGeom.locator("#floatingCartPanel")).toBeVisible();
+    await expect(pageGeom.locator("#floatingCartList")).toContainText("star");
+    await expect(pageGeom.locator("#floatingCartList")).toContainText("vault");
+    // Remove outbid nebula from earlier step so handoff builds cleanly and verify Use deposit prompt updates live
+    const nebulaRemove = pageGeom.locator('#floatingCartList button[aria-label="Remove nebula from cart"]');
+    if (await nebulaRemove.count()) await nebulaRemove.click();
+    await expect(pageGeom.locator("#floatingCartPrompt")).toContainText("[BUY LISTING · USE DEPOSIT] vault");
+    await expect(pageGeom.locator("#floatingCartPrompt")).toContainText("[AUCTION BID] star");
+    await expect(pageGeom.locator("#floatingCartPrompt")).toContainText("MIXED — existing deposit + new POA");
+    // Toggle "Use deposit" for star right inside Floating Cart -> prompt updates live AND syncs escrow card checkbox!
+    await pageGeom.locator('#floatingCartList input[data-cart-use-deposit="star"]').check();
+    await expect(pageGeom.locator("#floatingCartPrompt")).toContainText("[AUCTION BID · USE DEPOSIT] star");
+    assert.equal(await starEscrowCard.getByLabel("Use deposit").isChecked(), true);
     await auditUiGeometry(pageGeom, `${vp.name}:floating-cart-modal`);
     await pageGeom.locator("#floatingCartClose").click();
     await pageGeom.locator("#openFeedbackBtn").click();

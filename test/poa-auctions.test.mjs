@@ -228,6 +228,35 @@ test("POA auction cart supports highest bid ceiling, outbid detection without au
   assert.ok(multiTicker.some((x) => x.name === "star" && /High bid.*350 POA/.test(x.label)));
   assert.ok(multiTicker.some((x) => x.name === "done" && /Auction won.*120 POA/.test(x.label)));
 
+  // Fixed-price resale buy (poaBuy) + multi-item Use deposit funding modes (all-deposit & mixed)
+  const fullMarket = [...market, doneAuc, fixedListing];
+  const buyDeposit = buildCartItem({ name: "fixedname", action: "poaBuy", auctionId: fixedListing.id, useDeposit: true }, cap, state, fullMarket, "", nowMs);
+  assert.equal(buyDeposit.amount, "250.000000");
+  assert.equal(buyDeposit.useDeposit, true);
+  assert.equal(buyDeposit.needsReview, false);
+  const bidDeposit = buildCartItem({ name: "moon", action: "poaBid", auctionId: AUC_QUEUED, amount: "150", useDeposit: true }, cap, state, fullMarket, "", nowMs);
+  const allDepositHandoff = buildPoaCheckoutHandoff([bidDeposit, buyDeposit], cap, "https://poadomains.grok.me", payload, nowMs);
+  assert.equal(allDepositHandoff.useDepositCount, 2);
+  assert.equal(allDepositHandoff.depositOnlyTotal, "400.000000");
+  assert.equal(allDepositHandoff.newFundingTotal, "0.000000");
+  const allDepositPrompt = renderPoaCheckoutHandoff(allDepositHandoff);
+  assert.match(allDepositPrompt, /\[AUCTION BID · USE DEPOSIT\] moon/);
+  assert.match(allDepositPrompt, /\[BUY LISTING · USE DEPOSIT\] fixedname/);
+  assert.match(allDepositPrompt, /USE EXISTING DEPOSIT ONLY/);
+  assert.match(allDepositPrompt, /sign escrow buy/);
+
+  const mixedDepositHandoff = buildPoaCheckoutHandoff([bidDeposit, buyDeposit, newItem], cap, "https://poadomains.grok.me", payload, nowMs);
+  assert.equal(mixedDepositHandoff.useDepositCount, 2);
+  assert.equal(mixedDepositHandoff.depositOnlyTotal, "400.000000");
+  assert.equal(mixedDepositHandoff.newFundingTotal, "100.000000");
+  const mixedDepositPrompt = renderPoaCheckoutHandoff(mixedDepositHandoff);
+  assert.match(mixedDepositPrompt, /MIXED — existing deposit \+ new POA/);
+  assert.match(mixedDepositPrompt, /\[NEW NAME\] freshpoa/);
+  assert.match(mixedDepositPrompt, /issueFromTreasury/);
+  // Closed fixed listing is flagged on review
+  const soldFixed = [{ ...fixedListing, high: { payer: BIDDER_A, amount: "250.000000" } }];
+  assert.equal(cartReview(buyDeposit, cap, state, soldFixed, "", nowMs).canAcknowledge, false);
+
   // Bidder address storage helper round-trips valid poa1 addresses and clears empty values
   const mem = new Map();
   const storage = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v), removeItem: (k) => mem.delete(k) };
