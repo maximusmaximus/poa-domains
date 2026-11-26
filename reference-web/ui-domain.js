@@ -23,12 +23,12 @@ import {
   resolveDomainView,
   resolveOwnerInput,
   unavailableKey,
-} from "./shared.js?v=5f652b77e99b";
-import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=5f652b77e99b";
-import { ui } from "./ui-state.js?v=5f652b77e99b";
-import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=5f652b77e99b";
-import { domainHeader, nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=5f652b77e99b";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=5f652b77e99b";
+} from "./shared.js?v=009a41b2d270";
+import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=009a41b2d270";
+import { ui } from "./ui-state.js?v=009a41b2d270";
+import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=009a41b2d270";
+import { domainHeader, nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=009a41b2d270";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=009a41b2d270";
 
 function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) {
   const wrap = document.createElement("span");
