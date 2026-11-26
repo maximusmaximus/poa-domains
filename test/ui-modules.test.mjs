@@ -477,3 +477,283 @@ test('resolveDefaultAuctionTab defaults to upcoming when current is empty and re
   globalThis.document = prevDoc;
  }
 });
+
+test('owner profile, domain page, ownerLink primary rendering, and Manage main-domain + transfer flows work in Node DOM', async () => {
+ const revision = /app\.js\?v=([a-f0-9]{12})/.exec(readFileSync('reference-web/index.html', 'utf8'))[1];
+ const { ui } = await import(`../reference-web/ui-state.js?v=${revision}`);
+ const routerMod = await import(`../reference-web/ui-router.js?v=${revision}`);
+ const domainMod = await import(`../reference-web/ui-domain.js?v=${revision}`);
+ const manageMod = await import(`../reference-web/ui-manage.js?v=${revision}`);
+
+ const prevUi = { ...ui };
+ const prevDoc = globalThis.document;
+ const prevLoc = Object.getOwnPropertyDescriptor(globalThis, 'location');
+ const prevNav = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+ const prevStorage = globalThis.localStorage;
+
+ const allNodes = [];
+ const byId = new Map();
+ const makeNode = (tag) => {
+  const classes = new Set();
+  const attrs = new Map();
+  const listeners = new Map();
+  const node = {
+   tagName: String(tag).toUpperCase(),
+   _id: '',
+   get id() { return node._id; },
+   set id(v) { node._id = String(v); if (v) byId.set(node._id, node); },
+   value: '',
+   textContent: '',
+   hidden: false,
+   disabled: false,
+   open: false,
+   type: '',
+   placeholder: '',
+   title: '',
+   href: '',
+   src: '',
+   alt: '',
+   dataset: {},
+   children: [],
+   parentNode: null,
+   get className() { return [...classes].join(' '); },
+   set className(v) { classes.clear(); for (const c of String(v).split(/\s+/).filter(Boolean)) classes.add(c); },
+   classList: {
+    add: (...cs) => cs.forEach((c) => classes.add(c)),
+    remove: (...cs) => cs.forEach((c) => classes.delete(c)),
+    toggle: (c, f) => (f === undefined ? (classes.has(c) ? classes.delete(c) : classes.add(c)) : (f ? classes.add(c) : classes.delete(c))),
+    contains: (c) => classes.has(c),
+   },
+   setAttribute: (k, v) => attrs.set(k, String(v)),
+   getAttribute: (k) => attrs.get(k) ?? null,
+   removeAttribute: (k) => attrs.delete(k),
+   hasAttribute: (k) => attrs.has(k),
+   focus: () => { node.focused = true; },
+   scrollIntoView: () => {},
+   closest: () => null,
+   contains: () => false,
+   querySelector: (sel) => node.querySelectorAll(sel)[0] ?? null,
+   querySelectorAll: (sel) => {
+    const out = [];
+    const walk = (n) => {
+     for (const ch of n.children ?? []) {
+      if (!ch || typeof ch !== 'object') continue;
+      if (
+       (sel === 'article.card' && ch.tagName === 'ARTICLE' && ch.classList.contains('card')) ||
+       (sel.startsWith('#') && ch.id === sel.slice(1))
+      ) out.push(ch);
+      walk(ch);
+     }
+    };
+    walk(node);
+    return out;
+   },
+   append: (...xs) => {
+    for (const x of xs) {
+     if (x && typeof x === 'object') x.parentNode = node;
+     node.children.push(x);
+    }
+   },
+   replaceChildren: (...xs) => {
+    node.children = [];
+    node.append(...xs);
+   },
+   remove: () => { node.removed = true; },
+   addEventListener: (ev, fn) => { listeners.set(ev, [...(listeners.get(ev) ?? []), fn]); },
+   dispatchEvent: (ev) => { for (const fn of listeners.get(ev.type) ?? []) fn(ev); return true; },
+   click: async () => { for (const fn of listeners.get('click') ?? []) await fn({ preventDefault() {}, stopPropagation() {}, target: node }); },
+   _listeners: listeners,
+  };
+  allNodes.push(node);
+  return node;
+ };
+ const findAll = (root, pred, out = []) => {
+  for (const ch of root.children ?? []) {
+   if (!ch || typeof ch !== 'object') continue;
+   if (pred(ch)) out.push(ch);
+   findAll(ch, pred, out);
+  }
+  return out;
+ };
+ const collectText = (root) => {
+  if (typeof root === 'string') return root;
+  if (!root || typeof root !== 'object') return '';
+  return [root.textContent, ...(root.children ?? []).map(collectText)].filter(Boolean).join(' ');
+ };
+
+ try {
+  const copied = [];
+  const store = new Map();
+  globalThis.localStorage = {
+   getItem: (k) => (store.has(k) ? store.get(k) : null),
+   setItem: (k, v) => store.set(k, String(v)),
+   removeItem: (k) => store.delete(k),
+  };
+  Object.defineProperty(globalThis, 'location', { value: { origin: 'https://poadomains.grok.me', pathname: '/', search: '' }, configurable: true });
+  Object.defineProperty(globalThis, 'navigator', { value: { clipboard: { writeText: async (v) => copied.push(v) } }, configurable: true });
+  globalThis.document = {
+   activeElement: null,
+   body: makeNode('body'),
+   getElementById: (id) => byId.get(id) ?? null,
+   createElement: (tag) => makeNode(tag),
+   createElementNS: (_ns, tag) => makeNode(tag),
+   querySelectorAll: () => [],
+  };
+
+  for (const id of [
+   'ownerTitle', 'ownerPrincipal', 'ownerProfile', 'ownerNames', 'ownerListings',
+   'domainTitle', 'domainStatus', 'domainOwner', 'domainProfile', 'domainListing',
+   'domainActions', 'domainOwnerTools', 'poaSellTools', 'poaSellBtn', 'poaAuctionBtn',
+   'poaSubnameTools', 'unitSellTools', 'listingPromptStatus', 'listPriceInput',
+   'domainPreviousFields', 'domainHistory', 'domainCopyLink',
+   'manageOwnerLabelRow', 'manageOwner', 'manageLookup', 'manageOwnerNotice',
+   'manageNames', 'managePromptPanel', 'managePrompt', 'managePromptMeta',
+   'copyManagePrompt', 'downloadManageJSON', 'clearManagePrompt', 'managePromptStatus',
+   'managedDomainsBadge', 'managedDomainsSr', 'escrowPayer',
+  ]) {
+   const n = makeNode(id.includes('Input') || id === 'manageOwner' || id === 'escrowPayer' ? 'input' : id.includes('Btn') || id.includes('Lookup') ? 'button' : 'div');
+   n.id = id;
+  }
+
+  const ownerA = 'poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf';
+  const ownerB = 'poa1GHppB8pYZ43gK8yBzR1RJhzfWjzrJn29q96ykwngUP7N';
+  const hiddenOwner = 'poa1' + '1'.repeat(31) + '9';
+  const avatarCid = 'bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku';
+  const rightsHash = 'f'.repeat(64);
+  const d1 = 'a'.repeat(64), d2 = 'b'.repeat(64), d3 = 'c'.repeat(64);
+
+  ui.demo = false;
+  ui.base = 'https://poadomains.grok.me';
+  ui.registryReadFailed = false;
+  ui.details = { roles: {} };
+  ui.reservedSet = new Set();
+  ui.cart = [];
+  ui.escrowMarketServerTime = 500000;
+  ui.escrowMarket = [
+   { id: 's1', name: 'comet', seller: ownerA, kind: 'fixed', price: '50.000000', status: 'OPEN', closes: 900000, history: [] },
+  ];
+  ui.cap = {
+   poaOnly: { status: 'on' },
+   actions: { setPrimaryName: ['name', 'expectedDeedId', 'expectedVersion'], transfer: ['name', 'expectedDeedId', 'expectedVersion', 'recipient'], setMetadata: ['name', 'expectedDeedId', 'expectedVersion', 'metadata'] },
+   ownership: { disabledActions: ['renewLease', 'expireLease'] },
+   publicView: { unavailableNameKeys: [], unavailableAccountKeys: [] },
+  };
+  ui.latestState = {
+   time: 1000,
+   sequence: 5,
+   primaryNames: { [ownerA]: 'nebula', [ownerB]: 'peer' },
+   names: {
+    nebula: { name: 'nebula', activeId: d1, auctionId: null },
+    comet: { name: 'comet', activeId: d2, auctionId: null },
+    peer: { name: 'peer', activeId: d3, auctionId: null },
+   },
+   deeds: {
+    [d1]: {
+     id: d1, name: 'nebula', parentId: null, owner: ownerA, version: 3, ownerVersion: 1, retired: false,
+     rights: { kind: 'permanent' }, rightsHash,
+     records: [{ type: 'service', url: 'https://nebula.example' }, { type: 'wallet', chain: 'poa', address: ownerA }, { type: 'ipfs', cid: avatarCid }],
+     metadata: [{
+      cid: avatarCid,
+      document: { schema: 'poa-domains.profile.v1', version: 1, name: 'nebula', rightsHash, poa: ownerA, btc: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4', eth: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed', description: 'Main bio', image: `ipfs://${avatarCid}` },
+     }],
+     previousFields: [{ owner: ownerB, ownerVersion: 1, transferredAt: 900, records: [], profile: { cid: avatarCid, document: { schema: 'poa-domains.profile.v1', version: 1, name: 'nebula', rightsHash, poa: ownerB, btc: null, eth: null, description: 'Old bio', image: null } } }],
+    },
+    [d2]: { id: d2, name: 'comet', parentId: null, owner: ownerA, version: 1, ownerVersion: 1, retired: false, rights: { kind: 'permanent' }, rightsHash, records: [], metadata: [], profileResetAt: 1 },
+    [d3]: { id: d3, name: 'peer', parentId: null, owner: ownerB, version: 1, ownerVersion: 1, retired: false, rights: { kind: 'permanent' }, rightsHash, records: [], metadata: [] },
+   },
+   offers: {},
+   auctions: {},
+   bids: {},
+   receipts: {},
+  };
+
+  // 1. ownerLink renders main domain + avatar for ownerA, and falls back to address when no primary is set
+  const linkBox = makeNode('p');
+  routerMod.ownerLink(linkBox, ownerA);
+  assert.ok(collectText(linkBox).includes('nebula'));
+  const plainBox = makeNode('p');
+  routerMod.ownerLink(plainBox, hiddenOwner);
+  assert.ok(collectText(plainBox).includes('poa1...1119'));
+
+  // 2. renderOwnerPage via domain name & via address displays main domain + profile fields + held names + POA listings
+  domainMod.renderOwnerPage('comet');
+  assert.ok(collectText(byId.get('ownerTitle')).includes('nebula'));
+  assert.ok(collectText(byId.get('ownerProfile')).includes('Main bio'));
+  assert.equal(byId.get('ownerProfile').hidden, false);
+  assert.ok(collectText(byId.get('ownerNames')).includes('nebula'));
+  assert.ok(collectText(byId.get('ownerListings')).includes('comet'));
+
+  // renderOwnerPage without a primary name hides #ownerProfile
+  domainMod.renderOwnerPage(hiddenOwner);
+  assert.equal(byId.get('ownerTitle').textContent, '👤 Owner profile');
+  assert.equal(byId.get('ownerProfile').hidden, true);
+
+  // 3. renderDomainPage for unlisted primary domain and listed domain
+  domainMod.renderDomainPage('nebula');
+  assert.ok(collectText(byId.get('domainProfile')).includes('Main bio'));
+  assert.ok(collectText(byId.get('domainPreviousFields')).includes('Old bio'));
+  domainMod.renderDomainPage('comet');
+  assert.ok(collectText(byId.get('domainProfile')).includes('paused while listed'));
+
+  // 4. Manage domains: wireManagement, lookup by domain name, main domain buttons, and Transfer review/confirm/cancel
+  ui.escrowMarket = [];
+  manageMod.wireManagement();
+  byId.get('manageOwner').value = 'comet';
+  await byId.get('manageLookup').click();
+  assert.equal(byId.get('manageOwnerNotice').hidden, false);
+  assert.ok(collectText(byId.get('manageOwnerNotice')).includes('comet'));
+
+  const clearBtn = findAll(byId.get('manageNames'), (n) => n.dataset?.clearPrimaryDomain === 'nebula')[0];
+  assert.ok(clearBtn);
+  await clearBtn.click();
+  assert.ok(copied.at(-1).includes('"name": null'));
+
+  const setBtn = findAll(byId.get('manageNames'), (n) => n.dataset?.setPrimaryDomain === 'comet')[0];
+  assert.ok(setBtn);
+  await setBtn.click();
+  assert.ok(copied.at(-1).includes('setPrimaryName'));
+  assert.ok(copied.at(-1).includes('"name": "comet"'));
+
+  const toggleBtn = findAll(byId.get('manageNames'), (n) => n.dataset?.transferToggle === 'comet')[0];
+  const toInput = findAll(byId.get('manageNames'), (n) => n.dataset?.transferRecipient === 'comet')[0];
+  const reviewBtn = findAll(byId.get('manageNames'), (n) => n.dataset?.transferReview === 'comet')[0];
+  const confirmBtn = findAll(byId.get('manageNames'), (n) => n.dataset?.transferConfirm === 'comet')[0];
+  const backBtn = findAll(byId.get('manageNames'), (n) => n.dataset?.transferBack === 'comet')[0];
+  const cancelBtn = findAll(byId.get('manageNames'), (n) => n.dataset?.transferClose === 'comet')[0];
+  const errEl = findAll(byId.get('manageNames'), (n) => n.dataset?.transferError === 'comet')[0];
+  const confirmBox = findAll(byId.get('manageNames'), (n) => n.dataset?.transferConfirmBox === 'comet')[0];
+
+  await toggleBtn.click();
+  toInput.value = 'unknown-domain';
+  toInput.dispatchEvent({ type: 'input' });
+  await reviewBtn.click();
+  assert.ok(errEl.textContent.includes('valid poa1'));
+  assert.equal(confirmBox.hidden, true);
+
+  toInput.value = 'peer';
+  toInput.dispatchEvent({ type: 'input' });
+  await reviewBtn.click();
+  assert.equal(confirmBox.hidden, false);
+  await backBtn.click();
+  assert.equal(confirmBox.hidden, true);
+  await reviewBtn.click();
+  await confirmBtn.click();
+  assert.ok(copied.at(-1).includes('"recipient": "' + ownerB + '"'));
+  assert.ok(copied.at(-1).includes('resets all attached profile fields'));
+  await cancelBtn.click();
+
+  // Invalid owner lookup clears notice and displays warning
+  byId.get('manageOwner').value = 'not-a-valid-domain-or-key';
+  await byId.get('manageLookup').click();
+  assert.ok(collectText(byId.get('manageNames')).includes('never a private key'));
+  byId.get('manageOwner').value = '';
+  await byId.get('manageLookup').click();
+  assert.equal(byId.get('managePromptPanel').hidden, true);
+ } finally {
+  Object.assign(ui, prevUi);
+  globalThis.document = prevDoc;
+  globalThis.localStorage = prevStorage;
+  if (prevLoc) Object.defineProperty(globalThis, 'location', prevLoc); else delete globalThis.location;
+  if (prevNav) Object.defineProperty(globalThis, 'navigator', prevNav); else delete globalThis.navigator;
+ }
+});
