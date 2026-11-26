@@ -1,13 +1,13 @@
-import { publicNameUnavailable } from "./shared.js?v=009a41b2d270";
-import { registryUnit } from "./shared.js?v=009a41b2d270";
-import { actionLabel } from "./ui-copy.js?v=009a41b2d270";
-import { createInlineInfo } from "./ui-help.js?v=009a41b2d270";
-import { trapDialog } from "./ui-a11y.js?v=009a41b2d270";
-import { ui } from "./ui-state.js?v=009a41b2d270";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=009a41b2d270";
-import { add, el, endpointBase } from "./ui-core.js?v=009a41b2d270";
-import { domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=009a41b2d270";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=009a41b2d270";
+import { publicNameUnavailable } from "./shared.js?v=3035a7bd696b";
+import { registryUnit } from "./shared.js?v=3035a7bd696b";
+import { actionLabel } from "./ui-copy.js?v=3035a7bd696b";
+import { createInlineInfo } from "./ui-help.js?v=3035a7bd696b";
+import { trapDialog } from "./ui-a11y.js?v=3035a7bd696b";
+import { ui } from "./ui-state.js?v=3035a7bd696b";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=3035a7bd696b";
+import { add, el, endpointBase } from "./ui-core.js?v=3035a7bd696b";
+import { domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=3035a7bd696b";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=3035a7bd696b";
 
 export function cartCopyBlocked() {
     return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;

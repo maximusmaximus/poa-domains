@@ -1,12 +1,12 @@
-import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, primaryNameForOwner, profileImageMediaPath, readViewQuery, resolveOwnerInput, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=009a41b2d270";
-import { ui } from "./ui-state.js?v=009a41b2d270";
-import { createPoaCopyButton } from "./ui-copy.js?v=009a41b2d270";
-import { add, el } from "./ui-core.js?v=009a41b2d270";
-import { runSearch } from "./ui-search.js?v=009a41b2d270";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=009a41b2d270";
-import { updateTabDots } from "./ui-render.js?v=009a41b2d270";
-import { syncCartShortcutNow } from "./ui-cart.js?v=009a41b2d270";
-import { renderManagement } from "./ui-manage.js?v=009a41b2d270";
+import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, primaryNameForOwner, profileImageMediaPath, readViewQuery, resolveOwnerInput, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=3035a7bd696b";
+import { ui } from "./ui-state.js?v=3035a7bd696b";
+import { createPoaCopyButton } from "./ui-copy.js?v=3035a7bd696b";
+import { add, el } from "./ui-core.js?v=3035a7bd696b";
+import { runSearch } from "./ui-search.js?v=3035a7bd696b";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=3035a7bd696b";
+import { updateTabDots } from "./ui-render.js?v=3035a7bd696b";
+import { syncCartShortcutNow } from "./ui-cart.js?v=3035a7bd696b";
+import { renderManagement } from "./ui-manage.js?v=3035a7bd696b";
 
 const LAST_POA_KEY = "poadomains.lastPoaAddress.v1";
 
@@ -86,7 +86,7 @@ export function openPoa(name, opts = {}) {
         const root = el("escrowPayments");
         if (field) field.value = name;
         const buttons = root ? [...root.querySelectorAll('.escrow-step[data-step="1"] .button-row button, .button-row button')] : [];
-        const targetBtn = buttons.find((b) => (mode === "auction" ? /Open my POA auction/ : /List my name for POA/).test(b.textContent ?? ""));
+        const targetBtn = buttons.find((b) => (mode === "auction" ? /Open my POA auction/ : /List my name/).test(b.textContent ?? ""));
         if (root) {
             root.dataset.selectedAction = mode === "auction" ? "open" : "list";
             for (const b of buttons) b.classList.toggle("is-selected-action", b === targetBtn);
@@ -102,7 +102,7 @@ export function openPoa(name, opts = {}) {
         } else if (message) {
             message.textContent = mode === "auction"
                 ? `🔨 Auction for ${name}: enter your reserve POA amount, then tap ⏱️ Open my POA auction.`
-                : `🏷️ Sell ${name}: enter your POA price, then tap 🏷️ List my name for POA.`;
+                : `🏷️ Sell ${name}: enter your POA price, then tap 🏷️ List my name.`;
         }
         root?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
         if (amount) amount.focus?.({ preventScroll: true });

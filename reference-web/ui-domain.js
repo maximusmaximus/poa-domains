@@ -23,12 +23,13 @@ import {
   resolveDomainView,
   resolveOwnerInput,
   unavailableKey,
-} from "./shared.js?v=009a41b2d270";
-import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=009a41b2d270";
-import { ui } from "./ui-state.js?v=009a41b2d270";
-import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=009a41b2d270";
-import { domainHeader, nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=009a41b2d270";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=009a41b2d270";
+} from "./shared.js?v=3035a7bd696b";
+import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=3035a7bd696b";
+import { createInlineInfo } from "./ui-help.js?v=3035a7bd696b";
+import { ui } from "./ui-state.js?v=3035a7bd696b";
+import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=3035a7bd696b";
+import { domainHeader, nameLink, openManageDomain, openPoa, ownerLink } from "./ui-router.js?v=3035a7bd696b";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=3035a7bd696b";
 
 function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) {
   const wrap = document.createElement("span");
@@ -555,6 +556,21 @@ export function renderDomainPage(name) {
   if (el("poaSellTools")) el("poaSellTools").hidden = !poa;
   if (el("poaSellBtn")) el("poaSellBtn").hidden = !availableToList;
   if (el("poaAuctionBtn")) el("poaAuctionBtn").hidden = !availableToList;
+  const poaSellActions = el("poaSellActions");
+  if (poaSellActions) {
+    let sellInfo = el("poaSellSaleWarn");
+    if (!sellInfo) {
+      sellInfo = createInlineInfo(
+        "domain-sale-warn",
+        "About profile fields when selling or auctioning",
+        "Listing or auctioning pauses profile fields and drops them on transfer (archived as read-only history on the domain page).",
+      );
+      sellInfo.id = "poaSellSaleWarn";
+      poaSellActions.append(sellInfo);
+    }
+    poaSellActions.hidden = !availableToList;
+    sellInfo.hidden = !availableToList;
+  }
   if (el("poaSubnameTools")) el("poaSubnameTools").hidden = !poa || String(ui.currentDomainName ?? "").includes(".");
   if (el("unitSellTools")) el("unitSellTools").hidden = poa;
   el("listingPromptStatus").textContent = "";

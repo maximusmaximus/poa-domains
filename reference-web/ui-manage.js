@@ -1,9 +1,9 @@
-import { ui } from "./ui-state.js?v=009a41b2d270";
-import { add, el, endpointBase } from "./ui-core.js?v=009a41b2d270";
-import { createDomainAvatar, domainHeader, nameLink, openPoa, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=009a41b2d270";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=009a41b2d270";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=009a41b2d270";
-import { createInlineInfo } from "./ui-help.js?v=009a41b2d270";
+import { ui } from "./ui-state.js?v=3035a7bd696b";
+import { add, el, endpointBase } from "./ui-core.js?v=3035a7bd696b";
+import { createDomainAvatar, domainHeader, nameLink, openPoa, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=3035a7bd696b";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=3035a7bd696b";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=3035a7bd696b";
+import { createInlineInfo } from "./ui-help.js?v=3035a7bd696b";
 import {
   buildProfileUpdatePrompt,
   buildSetPrimaryPrompt,
@@ -27,7 +27,7 @@ import {
   saveKnownOwner,
   shortenPoaAddress,
   validPrincipal,
-} from "./shared.js?v=009a41b2d270";
+} from "./shared.js?v=3035a7bd696b";
 
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const IDLE_MANAGE_PROMPT = "Edit profile fields or choose an action above to preview the code for your agent.";
@@ -908,13 +908,13 @@ export function renderManagement({ force = false, focusDomain = null } = {}) {
     if (poa) {
       const poaRow = add(card, "div", "", "button-row manage-poa-actions");
       if (availableToList) {
-        const sell = add(poaRow, "button", "🏷️ Sell for POA", "secondary small");
+        const sell = add(poaRow, "button", "🏷️ Sell", "secondary small");
         sell.type = "button";
-        sell.setAttribute("aria-label", "Sell for POA: " + d.name);
+        sell.setAttribute("aria-label", "Sell: " + d.name);
         sell.addEventListener("click", () => openPoa(d.name, { mode: "sell", owner }));
-        const auction = add(poaRow, "button", "🔨 Auction for POA", "secondary small");
+        const auction = add(poaRow, "button", "🔨 Auction", "secondary small");
         auction.type = "button";
-        auction.setAttribute("aria-label", "Auction for POA: " + d.name);
+        auction.setAttribute("aria-label", "Auction: " + d.name);
         auction.addEventListener("click", () => openPoa(d.name, { mode: "auction", owner }));
         if (saleWarnInfo) poaRow.append(saleWarnInfo);
       } else {
