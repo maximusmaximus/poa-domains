@@ -196,11 +196,20 @@ export class PoaHttpNetwork implements Network {
         [s,f]=settled.map(v=>(v as PromiseFulfilledResult<any>).value);
       }else [s,f]=await Promise.all(pending);
       const observedAt=integer(this.clock());
+      if(primaryInCooldown){
+        if(timedOutFirst)this.primaryStatusSlowUntil=0;
+      }else if(timedOutFirst){
+        this.primaryStatusSlowUntil=observedAt+PRIMARY_SLOW_TTL_MS;
+      }
       need(observedAt>=started && (display || observedAt-started<=12000),"ESCROW_STALE");
     need(f?.chain_id===CHAIN&&s?.K===5&&(s.chain_id===undefined||s.chain_id===CHAIN),"ESCROW_NODE_CHAIN");
     if(f.economics?.K!==undefined)need(integer(f.economics.K)===5,"ESCROW_NODE_CHAIN");
     if(s.epochs_closed!==undefined&&f.open_epoch!==undefined)need(integer(s.epochs_closed)===integer(f.open_epoch),"ESCROW_UNALIGNED_CUT");
-    if(s.txs!==undefined&&s.final!==undefined)need(integer(s.final)<=integer(s.txs),"ESCROW_NODE_CHAIN");
+    // On live minepoa.com, checkpoint compaction resets `txs` to the current open window while
+    // `final` retains a wider finalized count (e.g. txs: 1177, final: 4285), so validate non-negative
+    // integer counters without assuming final <= txs.
+    if(s.txs!==undefined)integer(s.txs);
+    if(s.final!==undefined)integer(s.final);
     need(this.pins && /^[0-9a-f]{64}$/.test(this.pins.engine) && /^[0-9a-f]{64}$/.test(this.pins.params),"ESCROW_PROTOCOL_UNPINNED");
     need(f.engine_sha256===this.pins.engine && f.params_sha256===this.pins.params,"ESCROW_PROTOCOL_CHANGED");
     const cpHeight=s.checkpoint&&typeof s.checkpoint==="object"&&s.checkpoint.height!==undefined?integer(s.checkpoint.height):undefined;
@@ -225,11 +234,7 @@ export class PoaHttpNetwork implements Network {
     const stale=staleFlagBad || !Number.isSafeInteger(asOf) ||
       asOf>observedAt+5000 || observedAt-asOf>120000 || ageInvalid;
     need(!stale,"ESCROW_STALE");
-    if(primaryInCooldown){
-      if(timedOutFirst)this.primaryStatusSlowUntil=0;
-    }else{
-      this.primaryStatusSlowUntil=timedOutFirst?observedAt+PRIMARY_SLOW_TTL_MS:0;
-    }
+    if(!primaryInCooldown&&!timedOutFirst)this.primaryStatusSlowUntil=0;
     this.lastHeight=height;if(cutoff!==undefined)this.lastCutoff=cutoff;
     const root=hasStateRoot?s.state_root:(cutoff!==undefined?digest(["poa-checkpoint-cut/v1",CHAIN,height,cutoff]):"");
     return {chain:f.chain_id,asOf,stale,height,root, ...(cutoff!==undefined?{cutoff}:{}),
