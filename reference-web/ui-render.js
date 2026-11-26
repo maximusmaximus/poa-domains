@@ -1,13 +1,13 @@
-import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, resolveOwnerInput, validPrincipal } from "./shared.js?v=74b9108b49c1";
-import { drawTicker } from "./ui-ticker.js?v=74b9108b49c1";
-import { actionLabel } from "./ui-copy.js?v=74b9108b49c1";
-import { returnFocus } from "./ui-a11y.js?v=74b9108b49c1";
-import { activeResaleOffers, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=74b9108b49c1";
-import { ui } from "./ui-state.js?v=74b9108b49c1";
-import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=74b9108b49c1";
-import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=74b9108b49c1";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=74b9108b49c1";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=74b9108b49c1";
+import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, resolveOwnerInput, validPrincipal } from "./shared.js?v=2872969e794f";
+import { drawTicker } from "./ui-ticker.js?v=2872969e794f";
+import { actionLabel } from "./ui-copy.js?v=2872969e794f";
+import { returnFocus } from "./ui-a11y.js?v=2872969e794f";
+import { activeResaleOffers, buildCreativeSiteTitle, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=2872969e794f";
+import { ui } from "./ui-state.js?v=2872969e794f";
+import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=2872969e794f";
+import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=2872969e794f";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=2872969e794f";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=2872969e794f";
 
 export function updateLiveAuctionsBadge(state = ui.latestState) {
     const badge = el("liveAuctionsBadge");
@@ -66,21 +66,37 @@ export function updateTabDots(state) {
     }
 }
 
-export function applySiteTitle() {
-    const title = buildSiteTitle();
+export function applySiteTitle({ creative = false, random } = {}) {
     const h1 = el("siteTitle");
-    h1.replaceChildren();
+    if (!h1) return null;
+    const previous = h1.dataset.titleSig || "";
+    const title = creative ? buildCreativeSiteTitle({ previous, random }) : buildSiteTitle(random);
     h1.dataset.theme = title.theme;
     h1.dataset.tile = title.tile;
+    h1.dataset.titleSig = title.signature || `${title.text}|${title.theme}|${title.tile}`;
     h1.setAttribute("aria-label", "poadomains");
-    title.glyphs.forEach((g, i) => {
+    let btn = el("siteHomeBtn");
+    if (!btn || btn.parentNode !== h1) {
+        btn = document.createElement("button");
+        btn.type = "button";
+        btn.id = "siteHomeBtn";
+        btn.className = "site-home-btn";
+        btn.setAttribute("aria-label", "poadomains — Go home");
+        btn.title = "Go home & remix header icons";
+        h1.replaceChildren(btn);
+    } else {
+        btn.replaceChildren();
+    }
+    title.glyphs.forEach((g) => {
         const span = document.createElement("span");
         span.className = g.kind === "tile" ? "title-glyph title-tile" : "title-glyph";
+        if (g.kind === "tile" && g.tone) span.dataset.tone = g.tone;
         span.setAttribute("aria-hidden", "true");
         span.textContent = g.text;
-        h1.append(span);
+        btn.append(span);
     });
     document.title = "PoA domains";
+    return title;
 }
 
 export function renderTicker(state) { drawTicker(state, ui.escrowMarket ?? []); }

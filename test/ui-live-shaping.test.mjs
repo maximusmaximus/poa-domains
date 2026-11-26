@@ -5,6 +5,10 @@ import assert from "node:assert/strict";
 import {
   pickSiteTitle,
   buildSiteTitle,
+  buildCreativeSiteTitle,
+  CREATIVE_TITLE_OPTIONS,
+  CREATIVE_TITLE_THEMES,
+  CREATIVE_TITLE_TILE_COLORS,
   TITLE_LETTER_OPTIONS,
   buildIdeas,
   randomIdea,
@@ -53,6 +57,50 @@ test("emoji site title spells poadomains consistently without info/alert/currenc
   assert.ok(!/[ℹ❗💲]/u.test(buildSiteTitle().text));
   assert.equal(buildSiteTitle().theme, "flat");
   assert.equal(buildSiteTitle().tile, "blue");
+});
+
+test("creative header title regeneration produces varied legible poadomains icons with safe code points", () => {
+  const seen = new Set();
+  let prev = `${buildSiteTitle().text}|flat|blue`;
+  for (let k = 0; k < 30; k++) {
+    const t = buildCreativeSiteTitle({ previous: prev });
+    assert.equal(t.spelled, "poadomains");
+    assert.equal(t.glyphs.length, 10);
+    assert.notEqual(t.signature, prev, "each click must visually regenerate the header");
+    assert.ok(CREATIVE_TITLE_THEMES.includes(t.theme));
+    assert.ok(CREATIVE_TITLE_TILE_COLORS.includes(t.tile));
+    assert.ok(!/[ℹ❗💲]/u.test(t.text), `unsafe symbol in ${t.text}`);
+    for (const ch of t.text) {
+      const cp = ch.codePointAt(0);
+      assert.ok(cp < 0x1f1e6 || cp > 0x1f1ff, `regional indicator ${cp.toString(16)}`);
+    }
+    seen.add(t.signature);
+    prev = t.signature;
+  }
+  assert.ok(seen.size >= 15, `expected creative variety across regenerations, got ${seen.size}`);
+
+  // Deterministic constant RNG still forces a fresh signature via fallback when previous matches
+  const first = buildCreativeSiteTitle({ random: () => 0 });
+  const forced = buildCreativeSiteTitle({ previous: first.signature, random: () => 0 });
+  assert.notEqual(forced.signature, first.signature);
+  assert.equal(forced.glyphs.length, 10);
+
+  // Rainbow tile recipe assigns per-tile tone colors
+  const rainbow = buildCreativeSiteTitle({ random: seq([0.6, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]) });
+  assert.equal(rainbow.tile, "rainbow");
+  assert.ok(rainbow.glyphs.some((g) => g.kind === "tile" && typeof g.tone === "string"));
+
+  // All creative option pools avoid regional indicators and info/alert/currency icons
+  for (const [letter, opts] of Object.entries(CREATIVE_TITLE_OPTIONS)) {
+    for (const o of opts) {
+      if (o === null) continue;
+      assert.ok(!/[ℹ❗💲]/u.test(o), letter + " " + o);
+      for (const ch of o) {
+        const cp = ch.codePointAt(0);
+        assert.ok(cp < 0x1f1e6 || cp > 0x1f1ff, `regional ${cp.toString(16)}`);
+      }
+    }
+  }
 });
 
 test("partitionAuctions splits past current upcoming from real shapes", () => {
