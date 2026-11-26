@@ -1369,3 +1369,124 @@ test("multi-auction seller handover protection, active-settlement payout priorit
  assert.equal(e.hasActiveWork(who(5)),false);
  invariant(e.state());
 });
+
+test("cut() reuses cut status and receipt, batches uncached txs, caches verified checkpoint coverage, and clears cache on rollback",async()=>{
+ let now=NOW_V2,height=20;
+ const W=policy.wallet;
+ const coveredBodies=Array.from({length:12},(_,i)=>signedV2(3,W,"1.000000",`poadomains:hist-${i}`,i+1,CUTOFF_V2-100-i));
+ const openBody=signedV2(3,W,"2.000000","poadomains:open-win",99,CUTOFF_V2+30);
+ const allIds=[...coveredBodies.map(txid),txid(openBody)];
+ const bodyMap=new Map<string,any>([...coveredBodies,openBody].map(b=>[txid(b),b]));
+ const counts={status:0,tx:0,receipt:0};
+ const persisted=new Map<string,number>();
+ const cacheStore={
+  get:(wallet:string,ids:readonly string[])=>{const m=new Map<string,number>();for(const id of ids){const v=persisted.get(`${wallet}:${id}`);if(v!==undefined)m.set(id,v);}return m;},
+  set:(wallet:string,entries:readonly [string,number][])=>{for(const [id,h] of entries)persisted.set(`${wallet}:${id}`,h);},
+  clear:()=>{persisted.clear();},
+ };
+ const request=(async(input:any)=>{
+  const p=new URL(String(input)).pathname;
+  if(p===`/chain/${CHAIN}/api/status`){counts.status++;return Response.json({K:5,chain_id:CHAIN,checkpoint:{height,cutoff_ts:CUTOFF_V2},as_of:new Date(now).toISOString(),stale:false,state_root:root});}
+  if(p===`/chain/${CHAIN}/api/network-facts`)return Response.json({chain_id:CHAIN,engine_sha256:MAINNET_ENGINE_SHA256,params_sha256:MAINNET_PARAMS_SHA256});
+  if(p===`/api/explorer/address/${W}`)return Response.json({address:W,balance:"12.000000",balance_as_of:{checkpoint_height:height},txs:[]});
+  if(p.startsWith("/api/explorer/tx/")){
+   counts.tx++;const id=p.slice("/api/explorer/tx/".length);const b=bodyMap.get(id);
+   return Response.json({id,type:"transfer",from_addr:b.from,to_addr:b.to,amount:b.amount,ts:b.ts,memo:b.memo,atts:5,final:1,body:b,checkpoint_height:height});
+  }
+  if(p.startsWith(`/chain/${CHAIN}/api/receipt/`)){
+   counts.receipt++;const id=p.slice(`/chain/${CHAIN}/api/receipt/`.length);const b=bodyMap.get(id);
+   const isOpen=id===txid(openBody);
+   return Response.json({txid:id,status:"included",from:b.from,type:"transfer",valid_in_open_window:isOpen,checkpoint_covered:!isOpen});
+  }
+  return Response.json(null,{status:404});
+ }) as typeof fetch;
+
+ const n1=new PoaHttpNetwork(()=>false,request,undefined,()=>now,undefined,cacheStore);
+ const s1=await n1.status();
+ counts.status=0;counts.tx=0;counts.receipt=0;
+ const cut1=await n1.cut(W,allIds,s1);
+ assert.equal(cut1.covered.length,12);
+ assert.equal(counts.status,1,"cut() must not call status() inside per-tx observe() loop");
+ assert.equal(counts.tx,13,"first cut observes all 13 txs once");
+ assert.equal(counts.receipt,13,"open-window legacy tx must reuse seen.receipt, not re-fetch receipt");
+ assert.equal(persisted.size,12,"all 12 checkpoint-covered txs persisted to cache");
+
+ // Cold-restarted network instance backed by the same SQLite cache skips all 12 covered txs.
+ const n2=new PoaHttpNetwork(()=>false,request,undefined,()=>now,undefined,cacheStore);
+ height=21;
+ const s2=await n2.status();
+ counts.status=0;counts.tx=0;counts.receipt=0;
+ const cut2=await n2.cut(W,allIds,s2);
+ assert.equal(cut2.covered.length,12);
+ assert.equal(counts.tx,1,"warm cut only fetches the 1 open-window tx");
+ assert.equal(counts.receipt,1,"warm cut only fetches receipt for the 1 open-window tx");
+ assert.equal(counts.status,1);
+
+ // Checkpoint rollback clears the coverage cache and fails closed.
+ height=19;
+ await assert.rejects(n2.status(),/ESCROW_CHECKPOINT_ROLLBACK/);
+ assert.equal(persisted.size,0,"checkpoint rollback clears persisted coverage cache");
+});
+
+test("primary status timeout skips hung primary during cooldown and re-probes after expiry",async()=>{
+ let now=NOW_V2,primaryHung=true;
+ const primaryHits:number[]=[],fallbackHits:number[]=[];
+ const liveFresh=()=>({network:"PoA prototype",K:5,txs:5600,final:4800,invalid:0,epochs_closed:128,as_of:new Date(now-1000).toISOString(),checkpoint_height:100,state_root:root});
+ const facts={chain_id:CHAIN,open_epoch:128,engine_sha256:MAINNET_ENGINE_SHA256,params_sha256:MAINNET_PARAMS_SHA256,economics:{K:5}};
+ const request=(async(input:any)=>{
+  const p=new URL(String(input)).pathname;
+  if(p===`/chain/${CHAIN}/api/status`){primaryHits.push(now);if(primaryHung)throw new DOMException("hung","TimeoutError");return Response.json({...liveFresh(),chain_id:CHAIN});}
+  if(p==="/api/status"){fallbackHits.push(now);return Response.json(liveFresh());}
+  return Response.json(facts);
+ }) as typeof fetch;
+
+ const net=new PoaHttpNetwork(()=>false,request,undefined,()=>now);
+ // 1st call probes primary (times out), falls back to /api/status, enters 5-minute cooldown.
+ await net.status();
+ assert.equal(primaryHits.length,1);assert.equal(fallbackHits.length,1);
+ // Subsequent calls within cooldown skip hung primary completely.
+ now+=30_000;await net.status();
+ now+=60_000;await net.status();
+ assert.equal(primaryHits.length,1,"hung primary is skipped during cooldown");
+ assert.equal(fallbackHits.length,3);
+ // After 5-minute cooldown expires, primary is probed again and recovers cleanly.
+ primaryHung=false;now+=300_000;
+ await net.status();
+ assert.equal(primaryHits.length,2,"primary re-probed after cooldown");
+ now+=10_000;await net.status();
+ assert.equal(primaryHits.length,3,"recovered primary stays active");
+});
+
+test("transport failures in cut/lookup/context map cleanly to ESCROW_NETWORK_HELD and bid only fetches status once before reconcile",async()=>{
+ const f=fixture();await fund(f,3,"10.000000");
+ const o=await f.e.command(command(who(2),"open-net","open",{name:"nettest",reserve:"1.000000"})) as any;
+
+ // Count status() calls on a single bid: only 1 status() read before reconcileAt().
+ let statusCalls=0;
+ const origStatus=f.net.status.bind(f.net);
+ f.net.status=async()=>{statusCalls++;return origStatus();};
+ await f.e.command(command(who(3),"bid-once","bid",{auction:o.auction,amount:"2.000000"}));
+ assert.equal(statusCalls,1,"bid must not run redundant duplicate fresh() calls before reconcileAt()");
+
+ // Raw TimeoutError / TypeError / SyntaxError from cut() map to ESCROW_NETWORK_HELD (never unclassified DO abort).
+ const origCut=f.net.cut.bind(f.net);
+ for(const rawErr of [new DOMException("timeout","TimeoutError"),new TypeError("fetch failed"),new SyntaxError("Unexpected token <")]){
+  f.net.cut=async()=>{throw rawErr;};
+  await assert.rejects(f.e.command(command(who(4),"bid-fail","bid",{auction:o.auction,amount:"3.000000"})),/^Error: ESCROW_NETWORK_HELD$/);
+ }
+ f.net.cut=origCut;
+
+ // Raw transport error from lookup() in detect maps to ESCROW_NETWORK_HELD.
+ const r=await f.e.command(command(who(4),"i-net","intent",{amount:"1.000000"})) as any;
+ const origLookup=f.net.lookup.bind(f.net);
+ f.net.lookup=async()=>{throw new DOMException("timeout","TimeoutError");};
+ await assert.rejects(f.e.command(command(who(4),"d-net","detect",{intent:r.intent,txid:"a".repeat(64)})),/^Error: ESCROW_NETWORK_HELD$/);
+ f.net.lookup=origLookup;
+
+ // Raw transport error from context() in tick() maps to ESCROW_NETWORK_HELD.
+ await f.e.command(command(who(3),"w-net","withdraw",{amount:"1.000000"}));
+ const origContext=f.net.context.bind(f.net);
+ f.net.context=async()=>{throw new TypeError("socket hang up");};
+ await assert.rejects(f.e.tick(),/^Error: ESCROW_NETWORK_HELD$/);
+ f.net.context=origContext;
+});

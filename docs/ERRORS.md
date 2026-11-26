@@ -216,7 +216,7 @@ HTTP 400; retryable: false. Escrow checkpoint. Check the documented inputs and c
 
 ## ESCROW_CHECKPOINT_DETAILS_REQUIRED
 
-HTTP 400; retryable: false. Escrow checkpoint details required. Check the documented inputs and current state.
+HTTP 409; retryable: true. Escrow checkpoint details required. Check the documented inputs and current state.
 
 ## ESCROW_CHECKPOINT_ROLLBACK
 
@@ -294,6 +294,10 @@ HTTP 400; retryable: false. Escrow future checkpoint. Check the documented input
 
 HTTP 400; retryable: false. Escrow halted. Check the documented inputs and current state.
 
+## ESCROW_HELD
+
+HTTP 503; retryable: true. Escrow is held. Keep the exact signed request and check its account before another action.
+
 ## ESCROW_IDEMPOTENCY_CONFLICT
 
 HTTP 400; retryable: false. Escrow idempotency conflict. Check the documented inputs and current state.
@@ -356,7 +360,7 @@ HTTP 400; retryable: false. Escrow limits. Check the documented inputs and curre
 
 ## ESCROW_LOOKUP_HELD
 
-HTTP 400; retryable: false. Escrow lookup held. Check the documented inputs and current state.
+HTTP 503; retryable: true. Escrow lookup held. Check the documented inputs and current state.
 
 ## ESCROW_MARKET_KIND
 
@@ -384,7 +388,7 @@ HTTP 400; retryable: false. Escrow new names off. Check the documented inputs an
 
 ## ESCROW_NODE_AUTH
 
-HTTP 400; retryable: false. Escrow node auth. Check the documented inputs and current state.
+HTTP 503; retryable: true. Escrow node auth. Check the documented inputs and current state.
 
 ## ESCROW_NODE_CHAIN
 
@@ -392,15 +396,15 @@ HTTP 400; retryable: false. Escrow node chain. Check the documented inputs and c
 
 ## ESCROW_NODE_HTTP
 
-HTTP 400; retryable: false. Escrow node http. Check the documented inputs and current state.
+HTTP 503; retryable: true. Escrow node http. Check the documented inputs and current state.
 
 ## ESCROW_NODE_REDIRECT
 
-HTTP 400; retryable: false. Escrow node redirect. Check the documented inputs and current state.
+HTTP 503; retryable: true. Escrow node redirect. Check the documented inputs and current state.
 
 ## ESCROW_NODE_RESPONSE_LIMIT
 
-HTTP 400; retryable: false. Escrow node response limit. Check the documented inputs and current state.
+HTTP 503; retryable: true. Escrow node response limit. Check the documented inputs and current state.
 
 ## ESCROW_NONCE_CONTEXT
 
@@ -612,7 +616,7 @@ HTTP 400; retryable: false. Escrow tx binding. Check the documented inputs and c
 
 ## ESCROW_UNALIGNED_CUT
 
-HTTP 400; retryable: false. Escrow unaligned cut. Check the documented inputs and current state.
+HTTP 409; retryable: true. Escrow unaligned cut. Check the documented inputs and current state.
 
 ## ESCROW_UNAVAILABLE
 

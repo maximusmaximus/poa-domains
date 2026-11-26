@@ -8,7 +8,7 @@ import { DurableObject } from "cloudflare:workers";
 import { createPrivateKey, generateKeyPairSync, KeyObject } from "node:crypto";
 import { Escrow, Policy, SQLiteEscrowJournal, EscrowArchive, exportEscrow, restoreEscrow, reviewedCredit, replay as replayEscrow } from "./escrow.js";
 import { CHAIN, WorkerSecretSigner, verifyCommand, digest } from "./escrow-codec.js";
-import { PoaHttpNetwork, MAINNET_ENGINE_SHA256, MAINNET_PARAMS_SHA256, PILOT_PER_TX, PILOT_DAILY } from "./escrow-network.js";
+import { PoaHttpNetwork, MAINNET_ENGINE_SHA256, MAINNET_PARAMS_SHA256, PILOT_PER_TX, PILOT_DAILY, type CoveredTxCache } from "./escrow-network.js";
 import { nativePrincipal } from "../src/auth.js";
 import { mainnetConfig, Config } from "../src/config.js";
 import { POA_NEW_NAME_PRICE_RULE, POA_NEW_NAME_PRICES } from "../src/new-name-prices.js";
@@ -386,6 +386,7 @@ export class PoaRegistry extends DurableObject<Env> {
     if (escrow) replayEscrow(escrow.rows, escrow.policy);
     this.ctx.storage.transactionSync(() => {
       sql.exec("DELETE FROM journal"); sql.exec("DELETE FROM bootstrap");
+      sql.exec("DROP TABLE IF EXISTS escrow_covered_tx_cache");
       sql.exec("INSERT INTO bootstrap(id, value) VALUES (1, ?)", JSON.stringify(bootstrap));
       for (const row of b.journal) sql.exec("INSERT INTO journal(sequence, record) VALUES (?, ?)", row.sequence, row.record);
       restoreEscrow(this.ctx.storage, escrow);
@@ -404,6 +405,40 @@ export class PoaRegistry extends DurableObject<Env> {
       perTx: this.env.POA_ESCROW_PER_TX ?? PILOT_PER_TX, daily: this.env.POA_ESCROW_DAILY ?? PILOT_DAILY,
       feeBps: this.engine.config.feeBps, maxAgeMs: 90000 };
   }
+  /** Isolated cache of cryptographically verified checkpoint-covered tx heights (never journal/backup state). */
+  private coveredTxCache(): CoveredTxCache {
+    const sql = this.ctx.storage.sql;
+    const ensure = () => {
+      sql.exec("CREATE TABLE IF NOT EXISTS escrow_covered_tx_cache (wallet TEXT NOT NULL, txid TEXT NOT NULL, height INTEGER NOT NULL, PRIMARY KEY (wallet, txid))");
+    };
+    return {
+      get: (wallet, ids) => {
+        const out = new Map<string, number>();
+        if (!ids.length) return out;
+        ensure();
+        const rows = sql.exec<{ txid: string; height: number }>("SELECT txid, height FROM escrow_covered_tx_cache WHERE wallet = ?", wallet).toArray();
+        const wanted = new Set(ids);
+        for (const r of rows) {
+          if (wanted.has(r.txid) && Number.isSafeInteger(Number(r.height)) && Number(r.height) >= 0) {
+            out.set(r.txid, Number(r.height));
+          }
+        }
+        return out;
+      },
+      set: (wallet, entries) => {
+        if (!entries.length) return;
+        ensure();
+        for (const [id, height] of entries) {
+          if (/^[0-9a-f]{64}$/.test(id) && Number.isSafeInteger(height) && height >= 0) {
+            sql.exec("INSERT INTO escrow_covered_tx_cache(wallet, txid, height) VALUES (?, ?, ?) ON CONFLICT(wallet, txid) DO UPDATE SET height = MIN(height, excluded.height)", wallet, id, height);
+          }
+        }
+      },
+      clear: () => {
+        sql.exec("DROP TABLE IF EXISTS escrow_covered_tx_cache");
+      },
+    };
+  }
   private escrow(): Escrow {
     if (this.escrowService) return this.escrowService;
     const policy = this.escrowPolicy();
@@ -411,7 +446,7 @@ export class PoaRegistry extends DurableObject<Env> {
     const signing = () => enabled() && String(this.env.POA_ESCROW_NETWORK_WRITES) === "approved-v1";
     const e = this.engine;
     const titles = registryTitles(e);
-    this.escrowService = new Escrow(new SQLiteEscrowJournal(this.ctx.storage, policy), new PoaHttpNetwork(signing, fetch, { engine: this.env.POA_ESCROW_ENGINE_SHA256 ?? MAINNET_ENGINE_SHA256, params: this.env.POA_ESCROW_PARAMS_SHA256 ?? MAINNET_PARAMS_SHA256 }, Date.now, this.env.POA_API_TOKEN),
+    this.escrowService = new Escrow(new SQLiteEscrowJournal(this.ctx.storage, policy), new PoaHttpNetwork(signing, fetch, { engine: this.env.POA_ESCROW_ENGINE_SHA256 ?? MAINNET_ENGINE_SHA256, params: this.env.POA_ESCROW_PARAMS_SHA256 ?? MAINNET_PARAMS_SHA256 }, Date.now, this.env.POA_API_TOKEN, this.coveredTxCache()),
       new WorkerSecretSigner(policy.wallet, () => this.env.POA_ESCROW_KEY, signing), titles, policy, () => Date.now(), enabled,
       undefined, () => newNameCheckout(this.env).status === "on", () => subnameSales(this.env).status === "on");
     return this.escrowService;
@@ -434,7 +469,13 @@ export class PoaRegistry extends DurableObject<Env> {
     need(String(this.env.POA_ESCROW_ENABLED)==="true","ESCROW_DISABLED");
     try{
       const result=await publicCommand(()=>this.escrow(),packet,this.engine.registryId,endpoint,Date.now(),String(this.env.POA_ESCROW_NETWORK_WRITES)==="approved-v1"&&!!this.env.POA_ESCROW_KEY&&(this.env.ESCROW_ADMIN_TOKEN?.length??0)>=32);
-      if(result.action!=="view"&&String(this.env.POA_ESCROW_NETWORK_WRITES)==="approved-v1")await this.ctx.storage.setAlarm(Date.now()+1000);
+      if(result.action!=="view"&&String(this.env.POA_ESCROW_NETWORK_WRITES)==="approved-v1"){
+        if(this.escrow().hasActiveWork(this.engine.config.treasury))await this.ctx.storage.setAlarm(Date.now()+1000);
+        else{
+          const existingAlarm=await this.ctx.storage.getAlarm();
+          if(existingAlarm===null||existingAlarm>Date.now()+60000)await this.ctx.storage.setAlarm(Date.now()+60000);
+        }
+      }
       return result;
     }catch(e){if(e instanceof Fault||e instanceof Error&&/^ESCROW_[A-Z_]+$/.test(e.message))throw e;
       this.ctx.abort("Escrow public command storage failure");throw new Error("ESCROW_UNAVAILABLE");}

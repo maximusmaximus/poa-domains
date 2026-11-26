@@ -309,9 +309,9 @@
     },
     {
       "code": "ESCROW_CHECKPOINT_DETAILS_REQUIRED",
-      "httpStatus": 400,
+      "httpStatus": 409,
       "message": "Escrow checkpoint details required. Check the documented inputs and current state.",
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "ESCROW_CHECKPOINT_ROLLBACK",
@@ -428,6 +428,12 @@
       "retryable": false
     },
     {
+      "code": "ESCROW_HELD",
+      "httpStatus": 503,
+      "message": "Escrow is held. Keep the exact signed request and check its account before another action.",
+      "retryable": true
+    },
+    {
       "code": "ESCROW_IDEMPOTENCY_CONFLICT",
       "httpStatus": 400,
       "message": "Escrow idempotency conflict. Check the documented inputs and current state.",
@@ -519,9 +525,9 @@
     },
     {
       "code": "ESCROW_LOOKUP_HELD",
-      "httpStatus": 400,
+      "httpStatus": 503,
       "message": "Escrow lookup held. Check the documented inputs and current state.",
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "ESCROW_MARKET_KIND",
@@ -561,9 +567,9 @@
     },
     {
       "code": "ESCROW_NODE_AUTH",
-      "httpStatus": 400,
+      "httpStatus": 503,
       "message": "Escrow node auth. Check the documented inputs and current state.",
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "ESCROW_NODE_CHAIN",
@@ -573,21 +579,21 @@
     },
     {
       "code": "ESCROW_NODE_HTTP",
-      "httpStatus": 400,
+      "httpStatus": 503,
       "message": "Escrow node http. Check the documented inputs and current state.",
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "ESCROW_NODE_REDIRECT",
-      "httpStatus": 400,
+      "httpStatus": 503,
       "message": "Escrow node redirect. Check the documented inputs and current state.",
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "ESCROW_NODE_RESPONSE_LIMIT",
-      "httpStatus": 400,
+      "httpStatus": 503,
       "message": "Escrow node response limit. Check the documented inputs and current state.",
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "ESCROW_NONCE_CONTEXT",
@@ -903,9 +909,9 @@
     },
     {
       "code": "ESCROW_UNALIGNED_CUT",
-      "httpStatus": 400,
+      "httpStatus": 409,
       "message": "Escrow unaligned cut. Check the documented inputs and current state.",
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "ESCROW_UNAVAILABLE",

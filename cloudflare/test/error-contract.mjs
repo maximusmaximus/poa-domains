@@ -27,8 +27,13 @@ for(const enabled of ['true','false']){
   }
   if(enabled==='false')assert.equal(JSON.parse((await call(mf,'/__audit')).text).dispatches,0,'off mode initialized RPC');
   else {
-   for(const [fault,status,accepted]of [['ESCROW_PAUSED',409,false],['ESCROW_UNAVAILABLE',503,'unknown']]){
-    const r=await call(mf,'/v1/escrow/command',{method:'POST',headers:{'content-type':'application/json','x-fixture-fault':fault},body:'{"command":{},"signature":"local"}'}),b=JSON.parse(r.text);assert.equal(r.status,status);assert.equal(b.code,fault);assert.equal(b.accepted,accepted);schema(b);
+   for(const [fault,expectedCode,status,accepted]of [
+    ['ESCROW_PAUSED','ESCROW_PAUSED',409,false],
+    ['ESCROW_UNAVAILABLE','ESCROW_UNAVAILABLE',503,'unknown'],
+    ['ESCROW_HELD','ESCROW_HELD',503,'unknown'],
+    ['Durable Object reset during RPC','ESCROW_HELD',503,'unknown'],
+   ]){
+    const r=await call(mf,'/v1/escrow/command',{method:'POST',headers:{'content-type':'application/json','x-fixture-fault':fault},body:'{"command":{},"signature":"local"}'}),b=JSON.parse(r.text);assert.equal(r.status,status);assert.equal(b.code,expectedCode);assert.equal(b.accepted,accepted);schema(b);
    }
    const bad=await call(mf,'/v1/escrow/command',{method:'POST',headers:{'content-type':'text/plain'},body:'{}'});assert.equal(bad.status,400);schema(JSON.parse(bad.text));
    const admin=await call(mf,'/v1/admin/escrow',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:'{"action":"status"}'});assert.equal(admin.status,200);assert.deepEqual(JSON.parse(admin.text),{paused:false,address:wallet,packet:'{"action":"status"}'});assertions++;

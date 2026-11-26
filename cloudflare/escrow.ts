@@ -1,5 +1,5 @@
 import { DisplayReadError, displayCode, displayReason, type DisplayReadiness, type ReadTiming } from "./display-freshness.js";
-import { canonical, exact, integer, need, obj, text } from "../src/core.js";
+import { Fault, canonical, exact, integer, need, obj, text } from "../src/core.js";
 import { Packet, authenticate } from "../src/auth.js";
 import { CHAIN, Command, Signer, Transfer, address, decimal, digest, micros, txid, verifyTransfer } from "./escrow-codec.js";
 
@@ -353,6 +353,15 @@ export class Escrow {
     catch { throw new Error("ESCROW_NETWORK_HELD"); }
     return this.verifyFresh(status);
   }
+  /** Classify raw transport/subrequest/parse errors from external node reads as retryable network holds
+   * instead of unclassified storage failures that would abort the Durable Object. */
+  private async networkRead<T>(fn: () => Promise<T>): Promise<T> {
+    try { return await fn(); }
+    catch (error) {
+      if (error instanceof Fault || (error instanceof Error && /^ESCROW_[A-Z_]+$/.test(error.message))) throw error;
+      throw new Error("ESCROW_NETWORK_HELD");
+    }
+  }
   private verifyFresh(status: Status): Status {
     need(status.chain===CHAIN,"ESCROW_CHAIN");
     need(status.stale===false && Number.isSafeInteger(status.asOf) && status.asOf<=this.now()+5000 && this.now()-status.asOf<=this.policy.maxAgeMs,"ESCROW_STALE");
@@ -411,7 +420,7 @@ export class Escrow {
   private async reconcileAt(status:Status): Promise<void> {
     await this.sweepPendingDeposits();
     const s=this.state(), ids=[...Object.keys(s.credited),...Object.values(s.payments).flatMap(p=>p.txid?[p.txid]:[])];
-    const cut=await this.network.cut(this.policy.wallet,ids,status);
+    const cut=await this.networkRead(()=>this.network.cut(this.policy.wallet,ids,status));
     need(cut.chain===CHAIN && cut.height===status.height && cut.root===status.root,"ESCROW_UNALIGNED_CUT");
     need(new Set(cut.covered).size===cut.covered.length && cut.covered.every(id=>ids.includes(id)),"ESCROW_CUT");
     let expected=0n;
@@ -442,13 +451,13 @@ export class Escrow {
     };
     check(this.state());
     const status=await this.fresh();
-    const o=await this.network.lookup(r.txid); need(o,"ESCROW_UNKNOWN_DEPOSIT"); this.final(o,r.txid);
+    const o=await this.networkRead(()=>this.network.lookup(r.txid)); need(o,"ESCROW_UNKNOWN_DEPOSIT"); this.final(o,r.txid);
     need(o.body.to===this.policy.wallet && o.body.from===r.from && o.body.amount===r.amount && o.body.memo===`poadomains:${r.intent}`,"ESCROW_DEPOSIT_BINDING");
     const s=this.state(); check(s);
     need(!Object.values(s.credited).some(b=>(b.from===o.body.from&&b.nonce===o.body.nonce)||b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
     // Reconcile as if this one deposit were credited. Anything else unexplained keeps the halt.
     const ids=[...Object.keys(s.credited),r.txid,...Object.values(s.payments).flatMap(p=>p.txid?[p.txid]:[])];
-    const cut=await this.network.cut(this.policy.wallet,ids,status);
+    const cut=await this.networkRead(()=>this.network.cut(this.policy.wallet,ids,status));
     need(cut.chain===CHAIN && cut.height===status.height && cut.root===status.root,"ESCROW_UNALIGNED_CUT");
     need(new Set(cut.covered).size===cut.covered.length && cut.covered.every(id=>ids.includes(id)) && cut.covered.includes(r.txid),"ESCROW_CUT");
     let expected=micros(r.amount);
@@ -512,14 +521,15 @@ export class Escrow {
     this.validateCommand(c);
     // Cancel/expiry only reclassify obligations; no money leaves during pause/holds.
     const local=c.action==="cancel"||c.action==="expire"||c.action==="cancel-sub";
-    if(!local) { this.gate(); await this.fresh(); this.gate(); }
+    let status:Status|undefined;
+    if(!local) { this.gate(); status=await this.fresh(); this.gate(); }
     const p=c.params; let result:unknown={ok:true};
     if(c.action==="detect") {
       exact(p,["intent","txid"]); const id=text(p.txid,64); need(/^[0-9a-f]{64}$/.test(id),"ESCROW_TXID");
       const s=this.state(),dep=s.deposits[text(p.intent,80)]; need(dep && dep.payer===c.actor,"ESCROW_DEPOSIT_INTENT");
       if(dep.tx===id && dep.auto===true && s.credited[id]) return {ok:true,alreadyCredited:true};
       need(!dep.tx && !s.credited[id],"ESCROW_DEPOSIT_DUPLICATE");
-      const o=await this.network.lookup(id); need(o,"ESCROW_UNKNOWN_DEPOSIT"); this.final(o,id);
+      const o=await this.networkRead(()=>this.network.lookup(id)); need(o,"ESCROW_UNKNOWN_DEPOSIT"); this.final(o,id);
       need(o.body.to===this.policy.wallet && o.body.from===dep.payer && o.body.amount===dep.amount && o.body.memo===`poadomains:${p.intent}`,"ESCROW_DEPOSIT_BINDING");
       need(!Object.values(s.credited).some(b=>(b.from===o.body.from&&b.nonce===o.body.nonce)||b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
       this.gate(); await this.fresh(); this.gate();
@@ -533,7 +543,7 @@ export class Escrow {
         s.requests[rk]={fingerprint,result};
       }); return result;
     }
-    if(!local) { await this.reconcileAt(await this.fresh()); this.gate(); }
+    if(!local) { await this.reconcileAt(status!); this.gate(); }
     this.journal.append(c.action,{rk,fingerprint,params:p},s=>{
       need(this.enabled(),"ESCROW_DISABLED");
       if(!local) { need(!s.paused,"ESCROW_PAUSED"); need(!s.halt,"ESCROW_HALTED"); }
@@ -791,7 +801,7 @@ export class Escrow {
     if(!p)return this.state();
     const day=new Date(this.now()).toISOString().slice(0,10);
     const lastOut=Object.values(this.state().payments).filter(x=>x.status==="FINAL"&&x.txid&&x.body).sort((a,b)=>b.body!.nonce-a.body!.nonce)[0]?.txid??undefined;
-    const ctx=await this.network.context(this.policy.wallet,lastOut);this.gate();await this.fresh();this.gate();
+    const ctx=await this.networkRead(()=>this.network.context(this.policy.wallet,lastOut));this.gate();await this.fresh();this.gate();
     integer(ctx.nextNonce,1);integer(ctx.cutoff);need(ctx.parents.length===2 && new Set(ctx.parents).size===2,"ESCROW_PARENTS");
     const state=this.state();need(state.nonce===null||state.nonce===ctx.nextNonce,"ESCROW_NONCE_GAP");
     // All unresolved payments, even reserved on an earlier day, count against today's cap.
@@ -825,7 +835,7 @@ export class Escrow {
     try{o=await this.network.lookup(p.txid);}catch{throw new Error("ESCROW_LOOKUP_HELD");}
     if(o)return this.state();
     const lastOut=Object.values(this.state().payments).filter(x=>x.status==="FINAL"&&x.txid&&x.body).sort((a,b)=>b.body!.nonce-a.body!.nonce)[0]?.txid??undefined;
-    const ctx=await this.network.context(this.policy.wallet,lastOut);this.gate();await this.fresh();this.gate();
+    const ctx=await this.networkRead(()=>this.network.context(this.policy.wallet,lastOut));this.gate();await this.fresh();this.gate();
     need(ctx.nextNonce===p.body.nonce,"ESCROW_NONCE_GAP");
     await this.reconcileAt(status);await this.fresh();this.gate();
     if(p.status==="SIGNED")this.journal.append("outgoing-unknown",{id:p.id},s=>{
