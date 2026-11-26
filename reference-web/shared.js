@@ -494,7 +494,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=74b9108b49c1";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=5f652b77e99b";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -721,6 +721,107 @@ export function buildSiteTitle(random = Math.random) {
 
 export function pickSiteTitle(random = Math.random) {
   return buildSiteTitle(random).text;
+}
+
+export const CREATIVE_TITLE_THEMES = ["flat", "tilt", "wave", "glow", "pop"];
+export const CREATIVE_TITLE_TILE_COLORS = ["blue", "green", "gold", "violet", "coral", "rainbow"];
+const TILE_TONES = ["blue", "green", "gold", "violet", "coral"];
+const SHAPE_PUN_OPTIONS = {
+  p: ["\u{1F17F}\uFE0F", null, "\u{1F355}", "\u{1FA90}"],
+  o: ["\u{1FA99}", "\u{1F369}", "\u2B55", "\u{1F315}", "\u{1F310}", "\u{1F17E}\uFE0F", null],
+  a: ["\u{1F170}\uFE0F", "\u{1F53A}", "\u26FA", "\u{1F3D4}\uFE0F", null],
+  d: [null, "\u{1F319}", "\u{1F48E}"],
+  m: ["\u24C2\uFE0F", "\u26F0\uFE0F", "\u{1F451}", null],
+  i: [null, "\u{1F56F}\uFE0F", "\u{1F5FC}", "\u{1FA84}", "\u{1F335}"],
+  n: [null, "\u26A1", "\u{1F30A}"],
+  s: [null, "\u{1F40D}", "\u{1F300}", "\u26A1", "\u2728"],
+};
+export const CREATIVE_TITLE_OPTIONS = {
+  p: ["\u{1F17F}\uFE0F", null, "\u{1F355}", "\u{1FA90}", "\u{1F334}", "\u{1F427}"],
+  o: ["\u{1F17E}\uFE0F", "\u2B55", "\u{1FA99}", "\u{1F369}", "\u{1F315}", "\u{1F310}", "\u{1F9FF}", "\u{1F52E}", null],
+  a: ["\u{1F170}\uFE0F", "\u{1F53A}", "\u26FA", "\u{1F3D4}\uFE0F", "\u{1F680}", null],
+  d: [null, "\u{1F319}", "\u{1F48E}", "\u{1F3B2}", "\u{1F409}"],
+  m: ["\u24C2\uFE0F", "\u26F0\uFE0F", "\u{1F451}", "\u{1F98B}", null],
+  i: [null, "\u{1F56F}\uFE0F", "\u{1F5FC}", "\u{1FA84}", "\u{1F335}"],
+  n: [null, "\u26A1", "\u{1F9F2}", "\u{1F30A}", "\u{1F30C}"],
+  s: [null, "\u{1F40D}", "\u26A1", "\u{1F300}", "\u2728"],
+};
+const CRYPTO_ACCENT_OPTIONS = {
+  p: [null, "\u{1F17F}\uFE0F", "\u{1FA90}"],
+  o: ["\u{1FA99}", "\u{1F310}", "\u{1F315}", null],
+  a: [null, "\u{1F680}", "\u{1F170}\uFE0F"],
+  d: [null, "\u{1F48E}", "\u{1F319}"],
+  m: [null, "\u24C2\uFE0F", "\u{1F451}"],
+  i: [null, "\u{1FA84}"],
+  n: [null, "\u26A1", "\u{1F30C}"],
+  s: [null, "\u2728", "\u26A1"],
+};
+
+function makeCreativeCandidate(random) {
+  const recipe = Math.floor(random() * 4) % 4;
+  const theme = pick(CREATIVE_TITLE_THEMES, random);
+  const tile = recipe === 2 ? "rainbow" : pick(CREATIVE_TITLE_TILE_COLORS, random);
+  const letters = [..."poadomains"];
+  const toneOffset = Math.floor(random() * TILE_TONES.length) % TILE_TONES.length;
+  const glyphs = letters.map((letter, idx) => {
+    let choice;
+    if (recipe === 0) {
+      // Classic Remix: familiar letter buttons + 2-4 playful emoji swaps
+      const base = TITLE_LETTER_OPTIONS[letter][0];
+      choice = random() < 0.55 ? base : pick(SHAPE_PUN_OPTIONS[letter], random);
+    } else if (recipe === 1) {
+      // Shape-Pun Rebus: recognizable visual puns paired with clean colored tiles
+      choice = random() < 0.4 ? null : pick(SHAPE_PUN_OPTIONS[letter], random);
+    } else if (recipe === 2) {
+      // Rainbow / Neon Tiles + Crypto Accents
+      choice = random() < 0.62 ? null : pick(CRYPTO_ACCENT_OPTIONS[letter], random);
+    } else {
+      // Wild Collage: full creative pool while keeping letter readability
+      choice = random() < 0.35 ? null : pick(CREATIVE_TITLE_OPTIONS[letter], random);
+    }
+    if (choice === null) {
+      const tone = tile === "rainbow" ? TILE_TONES[(toneOffset + idx) % TILE_TONES.length] : null;
+      return tone ? { kind: "tile", letter, text: letter.toUpperCase(), tone } : { kind: "tile", letter, text: letter.toUpperCase() };
+    }
+    return { kind: "emoji", letter, text: choice };
+  });
+  // Ensure at least 3 clear letter tiles or classic button glyphs so "poadomains" stays legible
+  const classicSet = new Set(["\u{1F17F}\uFE0F", "\u{1F17E}\uFE0F", "\u{1F170}\uFE0F", "\u24C2\uFE0F"]);
+  let legibleCount = glyphs.filter((g) => g.kind === "tile" || classicSet.has(g.text)).length;
+  for (let i = 0; i < glyphs.length && legibleCount < 3; i++) {
+    const idx = (toneOffset * 3 + i) % glyphs.length;
+    if (glyphs[idx].kind !== "tile" && !classicSet.has(glyphs[idx].text)) {
+      const letter = letters[idx];
+      const tone = tile === "rainbow" ? TILE_TONES[(toneOffset + idx) % TILE_TONES.length] : null;
+      glyphs[idx] = tone ? { kind: "tile", letter, text: letter.toUpperCase(), tone } : { kind: "tile", letter, text: letter.toUpperCase() };
+      legibleCount++;
+    }
+  }
+  const text = glyphs.map((g) => g.text).join("");
+  const signature = `${text}|${theme}|${tile}`;
+  return { theme, tile, glyphs, text, spelled: "poadomains", signature };
+}
+
+/** Generate a fresh, creative, legible variation of the poadomains header icons. */
+export function buildCreativeSiteTitle({ previous = "", random = Math.random } = {}) {
+  let candidate = makeCreativeCandidate(random);
+  for (let tries = 0; tries < 10 && previous && candidate.signature === previous; tries++) {
+    candidate = makeCreativeCandidate(random);
+  }
+  if (previous && candidate.signature === previous) {
+    const nextTheme = CREATIVE_TITLE_THEMES[(CREATIVE_TITLE_THEMES.indexOf(candidate.theme) + 1) % CREATIVE_TITLE_THEMES.length];
+    const nextTile = CREATIVE_TITLE_TILE_COLORS[(CREATIVE_TITLE_TILE_COLORS.indexOf(candidate.tile) + 1) % CREATIVE_TITLE_TILE_COLORS.length];
+    const glyphs = candidate.glyphs.map((g, idx) =>
+      idx === 1
+        ? { kind: "emoji", letter: "o", text: g.text === "\u{1FA99}" ? "\u{1F369}" : "\u{1FA99}" }
+        : g.kind === "tile" && nextTile === "rainbow"
+          ? { ...g, tone: TILE_TONES[idx % TILE_TONES.length] }
+          : g,
+    );
+    const text = glyphs.map((g) => g.text).join("");
+    return { theme: nextTheme, tile: nextTile, glyphs, text, spelled: "poadomains", signature: `${text}|${nextTheme}|${nextTile}` };
+  }
+  return candidate;
 }
 
 export function titleCodePointsOk(title) {

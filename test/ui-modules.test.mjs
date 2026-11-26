@@ -484,6 +484,7 @@ test('owner profile, domain page, ownerLink primary rendering, and Manage main-d
  const routerMod = await import(`../reference-web/ui-router.js?v=${revision}`);
  const domainMod = await import(`../reference-web/ui-domain.js?v=${revision}`);
  const manageMod = await import(`../reference-web/ui-manage.js?v=${revision}`);
+ const renderMod = await import(`../reference-web/ui-render.js?v=${revision}`);
 
  const prevUi = { ...ui };
  const prevDoc = globalThis.document;
@@ -609,7 +610,7 @@ test('owner profile, domain page, ownerLink primary rendering, and Manage main-d
    'manageOwnerLabelRow', 'manageOwner', 'manageLookup', 'manageOwnerNotice',
    'manageNames', 'managePromptPanel', 'managePrompt', 'managePromptMeta',
    'copyManagePrompt', 'downloadManageJSON', 'clearManagePrompt', 'managePromptStatus',
-   'managedDomainsBadge', 'managedDomainsSr', 'escrowPayer',
+   'managedDomainsBadge', 'managedDomainsSr', 'escrowPayer', 'siteTitle',
   ]) {
    const n = makeNode(id.includes('Input') || id === 'manageOwner' || id === 'escrowPayer' ? 'input' : id.includes('Btn') || id.includes('Lookup') ? 'button' : 'div');
    n.id = id;
@@ -667,7 +668,22 @@ test('owner profile, domain page, ownerLink primary rendering, and Manage main-d
    receipts: {},
   };
 
-  // 1. ownerLink renders main domain + avatar for ownerA, and falls back to address when no primary is set
+  // 1. applySiteTitle initial + creative remix preserves #siteHomeBtn and updates signature
+  const headerHost = makeNode('header');
+  headerHost.append(byId.get('siteTitle'));
+  const initTitle = renderMod.applySiteTitle();
+  assert.equal(initTitle.text, '🅿️🅾️🅰️D🅾️Ⓜ️🅰️INS');
+  const homeBtn = byId.get('siteHomeBtn');
+  assert.ok(homeBtn && homeBtn.parentNode === headerHost);
+  assert.equal(byId.get('siteTitle').children.length, 10);
+  const remix1 = renderMod.applySiteTitle({ creative: true });
+  assert.equal(byId.get('siteHomeBtn'), homeBtn);
+  assert.equal(byId.get('siteTitle').children.length, 10);
+  assert.notEqual(byId.get('siteTitle').dataset.titleSig, `${initTitle.text}|flat|blue`);
+  const remix2 = renderMod.applySiteTitle({ creative: true });
+  assert.notEqual(remix2.signature, remix1.signature);
+
+  // 2. ownerLink renders main domain + avatar for ownerA, and falls back to address when no primary is set
   const linkBox = makeNode('p');
   routerMod.ownerLink(linkBox, ownerA);
   assert.ok(collectText(linkBox).includes('nebula'));

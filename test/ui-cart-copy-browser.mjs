@@ -1722,6 +1722,30 @@ try {
   assert.ok(mainXferClip.includes(`"recipient": "${peerOwner}"`));
   assert.ok(mainXferClip.includes('clears "nebula" as my default/main domain address'));
 
+  // 12. Clicking header navigates Home (from /d/<name>, /p/<owner>, or another tab) AND regenerates creative header icons
+  const initialSig = await pagePrimary.locator("#siteTitle").getAttribute("data-title-sig");
+  assert.equal(await pagePrimary.locator("#siteTitle").textContent(), "🅿️🅾️🅰️D🅾️Ⓜ️🅰️INS");
+  assert.equal(await pagePrimary.locator("#siteTitle .title-glyph").count(), 10);
+  await pagePrimary.goto(`${h.url}/d/nebula`);
+  await pagePrimary.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  await expect(pagePrimary.locator("#domainMain")).toBeVisible();
+  await pagePrimary.locator("#siteHomeBtn").click();
+  await expect(pagePrimary.locator("#homeMain")).toBeVisible();
+  await expect(pagePrimary.locator("#domainMain")).toBeHidden();
+  await expect(pagePrimary.locator("#tabFind")).toHaveAttribute("aria-selected", "true");
+  const remixSig1 = await pagePrimary.locator("#siteTitle").getAttribute("data-title-sig");
+  assert.notEqual(remixSig1, initialSig, "clicking header must regenerate creative title icons");
+  assert.equal(await pagePrimary.locator("#siteTitle .title-glyph").count(), 10);
+
+  // From another tab (Auctions), clicking header returns to Home Find tab and regenerates again
+  await pagePrimary.locator("#tabAuctions").click();
+  await expect(pagePrimary.locator("#tabAuctions")).toHaveAttribute("aria-selected", "true");
+  await pagePrimary.locator("header").click();
+  await expect(pagePrimary.locator("#tabFind")).toHaveAttribute("aria-selected", "true");
+  const remixSig2 = await pagePrimary.locator("#siteTitle").getAttribute("data-title-sig");
+  assert.notEqual(remixSig2, remixSig1, "subsequent header click must regenerate a different creative header");
+  assert.equal(await pagePrimary.locator("#siteTitle .title-glyph").count(), 10);
+
   assert.deepEqual(errorsPrimary, []);
   await ctxPrimary.close();
 
