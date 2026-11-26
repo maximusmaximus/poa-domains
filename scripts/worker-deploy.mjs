@@ -244,25 +244,34 @@ export function assertProductionEnvironment(data) {
       data.deployment_branch_policy?.custom_branch_policies !== false)
     fail("PRODUCTION_REQUIRES_PROTECTED_MAIN");
 }
-export async function assertLiveEscrowFresh(publicUrl, fetchImpl = fetch, delayMs = 2000) {
+export async function assertLiveEscrowFresh(publicUrl, fetchImpl = fetch, delayMs = 2000, protocolAttempts = 20) {
   const url = `${String(publicUrl).replace(/\/+$/, "")}/v1/escrow/capabilities`;
-  for (let attempt = 1; ; attempt++) {
+  // A repin updates Worker bindings immediately in the API, but the live Durable Object isolate
+  // can serve the previous env + 10s display cache for a few minutes during rollout propagation.
+  const protocolDelayMs = delayMs === 0 ? 0 : Math.max(delayMs, 15000);
+  let transportErrors = 0;
+  let protocolMismatches = 0;
+  for (;;) {
     let response;
     try {
       response = await fetchImpl(url, { method: "GET", redirect: "error", signal: AbortSignal.timeout(15000),
         headers: { Accept: "application/json" } });
     } catch {
-      if (attempt >= 3) fail("ESCROW_CAPABILITIES_UNAVAILABLE");
+      if (++transportErrors >= 3) fail("ESCROW_CAPABILITIES_UNAVAILABLE");
       await new Promise(r => setTimeout(r, delayMs));
       continue;
     }
     if (!response.ok) {
-      if (attempt >= 3) fail("ESCROW_CAPABILITIES_HTTP_ERROR");
+      if (++transportErrors >= 3) fail("ESCROW_CAPABILITIES_HTTP_ERROR");
       await new Promise(r => setTimeout(r, delayMs));
       continue;
     }
     const data = await response.json();
-    if (data?.freshness?.code === "ESCROW_PROTOCOL_CHANGED") fail("ESCROW_PROTOCOL_CHANGED");
+    if (data?.freshness?.code === "ESCROW_PROTOCOL_CHANGED") {
+      if (++protocolMismatches >= protocolAttempts) fail("ESCROW_PROTOCOL_CHANGED");
+      await new Promise(r => setTimeout(r, protocolDelayMs));
+      continue;
+    }
     return data;
   }
 }
