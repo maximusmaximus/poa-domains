@@ -1665,17 +1665,32 @@ try {
   const clearClip = await pagePrimary.evaluate(() => navigator.clipboard.readText());
   assert.ok(clearClip.includes('"name": null'));
 
-  // /d/comet shows owner as main domain "nebula" with avatar icon, linking to /p/nebula
+  // /d/comet shows owner as main domain "nebula" (linking to /d/nebula) + abbreviated address (linking to /p/nebula) + copy POA icon
   await pagePrimary.goto(`${h.url}/d/comet`);
   await pagePrimary.waitForFunction(() => document.body.dataset.registryStatus === "ready");
   const ownerPrimaryLink = pagePrimary.locator("#domainOwner a.owner-primary-link");
+  const ownerAddrLink = pagePrimary.locator("#domainOwner a.owner-addr-link");
   await expect(ownerPrimaryLink).toBeVisible();
   await expect(ownerPrimaryLink).toContainText("nebula");
+  await expect(ownerPrimaryLink).toHaveAttribute("href", "/d/nebula");
   await expect(ownerPrimaryLink.locator(".domain-header-avatar")).toBeVisible();
+  await expect(ownerAddrLink).toBeVisible();
+  await expect(ownerAddrLink).toHaveText("poa1...1115");
+  await expect(ownerAddrLink).toHaveAttribute("href", "/p/nebula");
+  // Copy button still copies the full POA address
+  await pagePrimary.locator("#domainOwner .poa-copy-btn").click();
+  assert.equal(await pagePrimary.evaluate(() => navigator.clipboard.readText()), mainOwner);
+  // Clicking the domain name navigates to /d/nebula (domain page)
   await ownerPrimaryLink.click();
+  await expect(pagePrimary.locator("#domainMain")).toBeVisible();
+  assert.equal(new URL(pagePrimary.url()).pathname, "/d/nebula", pagePrimary.url());
+  await expect(pagePrimary.locator("#domainTitle")).toContainText("nebula");
+  // Clicking the abbreviated address next to the main domain navigates to /p/nebula (Owner Profile)
+  await pagePrimary.locator("#domainOwner a.owner-addr-link").click();
 
   // Owner Profile (/p/nebula) displays domain name, avatar icon, main badge, profile fields, and all held names
   await expect(pagePrimary.locator("#ownerMain")).toBeVisible();
+  assert.equal(new URL(pagePrimary.url()).pathname, "/p/nebula", pagePrimary.url());
   await expect(pagePrimary.locator("#ownerTitle")).toContainText("nebula");
   await expect(pagePrimary.locator("#ownerTitle")).toContainText("⭐ Main domain");
   await expect(pagePrimary.locator("#ownerTitle .domain-header-avatar img")).toBeVisible();
@@ -2210,6 +2225,8 @@ try {
     await expect(pageGeom.locator("#domainHomeLink")).toHaveCount(0);
     await expect(pageGeom.locator("#domainSection > #domainCopyLink")).toBeVisible();
     await expect(pageGeom.locator("#escrowDomain article.card")).toHaveCount(1);
+    await expect(pageGeom.locator("#domainListing a.owner-primary-link").first()).toHaveAttribute("href", "/d/peer");
+    await expect(pageGeom.locator("#domainListing a.owner-addr-link").first()).toHaveAttribute("href", "/p/peer");
     await expect(pageGeom.locator("#domainListing .self-bid-notice")).toBeVisible();
     await expect(pageGeom.locator("#escrowDomain .self-bid-notice")).toBeVisible();
     await auditUiGeometry(pageGeom, `${vp.name}:domain-page-with-escrow`);

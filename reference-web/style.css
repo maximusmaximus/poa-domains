@@ -556,8 +556,9 @@ body.terms-gate-open{overflow:hidden;}
 .domain-header-avatar-xs{width:1.3rem;height:1.3rem;font-size:.7rem;border-radius:.28rem;}
 .domain-header-avatar-sm{width:2.05rem;height:2.05rem;font-size:1rem;}
 .domain-header-avatar-lg{width:3.25rem;height:3.25rem;font-size:1.5rem;border-radius:.55rem;}
-.owner-primary-inline{display:inline-flex;align-items:center;gap:.35rem;max-width:100%;vertical-align:middle;}
-.owner-primary-link{display:inline-flex;align-items:center;gap:.32rem;vertical-align:middle;font-weight:600;}
+.owner-primary-inline{display:inline-flex;align-items:center;flex-wrap:wrap;gap:.35rem;max-width:100%;vertical-align:middle;}
+.owner-primary-link{display:inline-flex;align-items:center;gap:.32rem;vertical-align:middle;font-weight:700;}
+.owner-addr-link{font-size:.86em;font-weight:500;}
 .owner-primary-badge{font-size:.82rem;font-weight:700;padding:.15rem .55rem;border-radius:999px;background:#103227;border:1px solid #45d897;}
 .manage-card-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.25rem;}
 .manage-card-top h3,.manage-primary-btn,.agent-prompt-header h3,.inline-controls label{margin:0;}

@@ -24,13 +24,13 @@ import {
  resolveDomainView,
  resolveOwnerInput,
  unavailableKey,
-} from "./shared.js?v=297d0c9f759c";
-import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=297d0c9f759c";
-import { createInlineInfo } from "./ui-help.js?v=297d0c9f759c";
-import { ui } from "./ui-state.js?v=297d0c9f759c";
-import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=297d0c9f759c";
-import { activeUserAddress, domainHeader, nameLink, openManageDomain, openPoa, ownerLink, renderSelfBidNotice } from "./ui-router.js?v=297d0c9f759c";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=297d0c9f759c";
+} from "./shared.js?v=e822e8d11185";
+import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=e822e8d11185";
+import { createInlineInfo } from "./ui-help.js?v=e822e8d11185";
+import { ui } from "./ui-state.js?v=e822e8d11185";
+import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=e822e8d11185";
+import { activeUserAddress, domainHeader, nameLink, openManageDomain, openPoa, ownerLink, renderSelfBidNotice } from "./ui-router.js?v=e822e8d11185";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=e822e8d11185";
 
 function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) {
  const wrap = document.createElement("span");
@@ -255,7 +255,7 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
   const minNext = poaMinimumNextBid(a);
   const cartItem = ui.cart.find((x) => x.action === "poaBid" && x.params?.auctionId === a.id) ?? null;
   const isOwn = isOwnDomainOrListing({ name, seller: a.seller, deed: view.deed, state: ui.latestState, userAddress: userAddr });
-  const outbidInfo = poaAuctionOutbidStatus(a, { bidderAddress: ui.bidderAddress || userAddr, cartItem });
+  const outbidInfo = poaAuctionOutbidStatus(a, { bidderAddress: ui.bidderAddress || userAddr, cartItem, state: ui.latestState });
 
   if (a.status === "SETTLING") {
    add(item, "p", "⏳ Settling", "badge");
@@ -623,7 +623,7 @@ export function renderOwnerPage(rawOwnerId) {
   nameLink(principalNode, resolved.viaDomain);
   principalNode.append(" · ");
  }
- appendPoaAddress(principalNode, ownerId, { code: true });
+ appendPoaAddress(principalNode, ownerId, { code: true, resolvePrimary: false, linkOwner: false });
 
  const nowMs = ui.escrowMarketServerTime || Date.now();
  if (profileBox) {

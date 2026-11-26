@@ -1,6 +1,11 @@
-import { createPoaCopyButton, decorateEmojiButton } from "./ui-copy.js?v=297d0c9f759c";
-import { buildOwnershipIndex, isPoaAddress, ownershipConflict, safeObject, shortenPoaAddress } from "./shared.js?v=297d0c9f759c";
-import { ui } from "./ui-state.js?v=297d0c9f759c";
+import { createPoaCopyButton, decorateEmojiButton } from "./ui-copy.js?v=e822e8d11185";
+import { buildOwnershipIndex, domainPath, isPoaAddress, ownershipConflict, primaryNameForOwner, safeObject, shortenPoaAddress } from "./shared.js?v=e822e8d11185";
+import { ui } from "./ui-state.js?v=e822e8d11185";
+
+let addressNav = null;
+export function registerAddressNav(nav) {
+ addressNav = nav;
+}
 
 export const el = (id) => document.getElementById(id);
 
@@ -47,21 +52,72 @@ export function person(id) {
     return isPoaAddress(id) ? shortenPoaAddress(id) : id.slice(0, 18) + "…";
 }
 
-export function appendPoaAddress(parent, value, { code = false, ariaLabel, onCopy } = {}) {
+function populatePoaAddressWrap(wrap, value, { code = false, ariaLabel, onCopy, resolvePrimary = true, linkOwner = true, row = false } = {}) {
+    const short = shortenPoaAddress(value);
+    const primary = resolvePrimary ? primaryNameForOwner(ui.latestState, value) : null;
+    wrap.replaceChildren();
+    wrap.dataset.poaAddr = value;
+    wrap.dataset.poaPrimary = primary || "";
+    wrap.dataset.poaCode = code ? "1" : "0";
+    wrap.dataset.poaRow = row ? "1" : "0";
+    wrap.dataset.poaResolve = resolvePrimary ? "1" : "0";
+    wrap.dataset.poaLink = linkOwner ? "1" : "0";
+    wrap.className = "poa-addr-inline" + (primary ? " owner-primary-inline" : "") + (row ? " poa-addr-row" : "");
+    if (primary) {
+        const domLink = document.createElement("a");
+        domLink.href = domainPath(primary);
+        domLink.className = "domain-link owner-primary-link";
+        domLink.title = `Open ${primary} domain page`;
+        if (addressNav?.createDomainAvatar)
+            domLink.append(addressNav.createDomainAvatar(primary, { size: "xs" }));
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "domain-name";
+        nameSpan.textContent = primary;
+        domLink.append(nameSpan);
+        domLink.addEventListener("click", (event) => {
+            if (addressNav?.navigateDomain) {
+                event.preventDefault();
+                addressNav.navigateDomain(primary);
+            }
+        });
+        wrap.append(domLink);
+    }
+    if (linkOwner) {
+        const target = primary || value;
+        const addrLink = document.createElement("a");
+        addrLink.href = "/p/" + encodeURIComponent(target);
+        addrLink.className = "domain-link poa-addr-text" + (primary ? " owner-addr-link" : "");
+        addrLink.textContent = short;
+        addrLink.title = primary ? `Owner profile (${value})` : value;
+        addrLink.setAttribute("aria-label", primary ? `Owner profile for ${primary} (${short})` : `Owner profile ${short}`);
+        addrLink.addEventListener("click", (event) => {
+            if (addressNav?.navigateOwner) {
+                event.preventDefault();
+                addressNav.navigateOwner(target);
+            }
+        });
+        wrap.append(addrLink);
+    } else {
+        const text = document.createElement(code ? "code" : "span");
+        text.className = "poa-addr-text";
+        text.textContent = short;
+        text.title = value;
+        wrap.append(text);
+    }
+    wrap.append(createPoaCopyButton(value, { ariaLabel, onCopy }));
+    return wrap;
+}
+
+export function appendPoaAddress(parent, value, opts = {}) {
     if (!isPoaAddress(value)) {
-        if (code)
+        if (opts.code)
             add(parent, "code", String(value ?? ""));
         else
             parent.append(String(value ?? ""));
         return parent;
     }
     const wrap = document.createElement("span");
-    wrap.className = "poa-addr-inline";
-    const text = document.createElement(code ? "code" : "span");
-    text.className = "poa-addr-text";
-    text.textContent = shortenPoaAddress(value);
-    text.title = value;
-    wrap.append(text, createPoaCopyButton(value, { ariaLabel, onCopy }));
+    populatePoaAddressWrap(wrap, value, opts);
     parent.append(wrap);
     return wrap;
 }
@@ -74,6 +130,41 @@ export function appendPrincipal(parent, id, opts = {}) {
     }
     if (isPoaAddress(id))
         return appendPoaAddress(parent, id, opts);
+    const primary = opts.resolvePrimary !== false ? primaryNameForOwner(ui.latestState, id) : null;
+    if (primary) {
+        const wrap = document.createElement("span");
+        wrap.className = "poa-addr-inline owner-primary-inline";
+        const domLink = document.createElement("a");
+        domLink.href = domainPath(primary);
+        domLink.className = "domain-link owner-primary-link";
+        domLink.title = `Open ${primary} domain page`;
+        if (addressNav?.createDomainAvatar)
+            domLink.append(addressNav.createDomainAvatar(primary, { size: "xs" }));
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "domain-name";
+        nameSpan.textContent = primary;
+        domLink.append(nameSpan);
+        domLink.addEventListener("click", (event) => {
+            if (addressNav?.navigateDomain) {
+                event.preventDefault();
+                addressNav.navigateDomain(primary);
+            }
+        });
+        const addrLink = document.createElement("a");
+        addrLink.href = "/p/" + encodeURIComponent(primary);
+        addrLink.className = "domain-link poa-addr-text owner-addr-link";
+        addrLink.textContent = String(id ?? "").slice(0, 18) + "…";
+        addrLink.title = `Owner profile (${id})`;
+        addrLink.addEventListener("click", (event) => {
+            if (addressNav?.navigateOwner) {
+                event.preventDefault();
+                addressNav.navigateOwner(primary);
+            }
+        });
+        wrap.append(domLink, addrLink);
+        parent.append(wrap);
+        return wrap;
+    }
     parent.append(String(id ?? "").slice(0, 18) + "…");
     return parent;
 }
@@ -84,22 +175,35 @@ const SKIP_ADDR_TAGS = new Set(["PRE", "INPUT", "TEXTAREA", "BUTTON", "SCRIPT", 
 export function enhancePoaAddressesIn(root, { onCopy } = {}) {
     if (!root || typeof document === "undefined")
         return;
+    for (const wrap of [...root.querySelectorAll(".poa-addr-inline[data-poa-addr]")]) {
+        if (wrap.dataset.poaResolve === "0")
+            continue;
+        const raw = wrap.dataset.poaAddr;
+        if (!isPoaAddress(raw))
+            continue;
+        const nextPrimary = primaryNameForOwner(ui.latestState, raw) || "";
+        if (wrap.dataset.poaPrimary !== nextPrimary) {
+            populatePoaAddressWrap(wrap, raw, {
+                code: wrap.dataset.poaCode === "1",
+                row: wrap.dataset.poaRow === "1",
+                resolvePrimary: true,
+                linkOwner: wrap.dataset.poaLink !== "0",
+                onCopy,
+            });
+        }
+    }
     for (const codeNode of [...root.querySelectorAll("code")]) {
         if (codeNode.closest(".poa-addr-inline, pre, button"))
             continue;
         const raw = codeNode.textContent?.trim() ?? "";
         if (!isPoaAddress(raw))
             continue;
-        const wrap = document.createElement("span");
-        wrap.className = "poa-addr-inline poa-addr-row";
-        codeNode.textContent = shortenPoaAddress(raw);
-        codeNode.title = raw;
-        codeNode.classList.add("poa-addr-text");
         const next = codeNode.nextElementSibling;
         if (next && next.tagName === "BUTTON" && next.textContent?.trim() === "📋 Copy to")
             next.remove();
+        const wrap = document.createElement("span");
+        populatePoaAddressWrap(wrap, raw, { code: true, row: true, onCopy });
         codeNode.replaceWith(wrap);
-        wrap.append(codeNode, createPoaCopyButton(raw, { onCopy }));
     }
     const walker = document.createTreeWalker(root, 4);
     const matches = [];
