@@ -426,8 +426,22 @@ test("compat self-verified evidence, automatic pin sync from wrangler.jsonc, and
     await runDeployment({ dryRun: false, env: { ...env, DEPLOY_POSTCHECK_DELAY_MS: "0" }, fetchImpl: syncedP.fetchImpl, run, root: dir });
     assert.deepEqual(plans, [[], []]);
 
-    // Post-deploy check fails when live escrow reports ESCROW_PROTOCOL_CHANGED, HTTP error, or network error.
-    await assert.rejects(assertLiveEscrowFresh("https://poadomains.grok.me", async () => ({ ok: true, json: async () => ({ freshness: { code: "ESCROW_PROTOCOL_CHANGED" } }) }), 0), /ESCROW_PROTOCOL_CHANGED/);
+    // Post-deploy check retries transient ESCROW_PROTOCOL_CHANGED during DO rollout, then fails closed if persistent.
+    let staleProbes = 0;
+    const recovered = await assertLiveEscrowFresh("https://poadomains.grok.me", async () => ({
+      ok: true,
+      json: async () => (++staleProbes < 3
+        ? { held: true, freshness: { code: "ESCROW_PROTOCOL_CHANGED" } }
+        : { held: false, freshness: { code: null } }),
+    }), 0, 5);
+    assert.equal(staleProbes, 3);
+    assert.equal(recovered.held, false);
+    let persistentProbes = 0;
+    await assert.rejects(assertLiveEscrowFresh("https://poadomains.grok.me", async () => ({
+      ok: true,
+      json: async () => { persistentProbes++; return { freshness: { code: "ESCROW_PROTOCOL_CHANGED" } }; },
+    }), 0, 4), /ESCROW_PROTOCOL_CHANGED/);
+    assert.equal(persistentProbes, 4);
     await assert.rejects(assertLiveEscrowFresh("https://poadomains.grok.me", async () => ({ ok: false, status: 502 }), 0), /ESCROW_CAPABILITIES_HTTP_ERROR/);
     await assert.rejects(assertLiveEscrowFresh("https://poadomains.grok.me", async () => { throw new Error("down"); }, 0), /ESCROW_CAPABILITIES_UNAVAILABLE/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
