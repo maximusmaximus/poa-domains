@@ -1622,3 +1622,100 @@ test("readStatus accepts compacted-window live status where final > txs while re
  await assert.rejects(makeNet({network:"PoA prototype",K:5,txs:-1,final:10,epochs_closed:128,as_of:new Date(now-1000).toISOString(),checkpoint_height:1776874,state_root:root}).status(),/INTEGER/);
  await assert.rejects(makeNet({network:"PoA prototype",K:5,txs:10,final:-1,epochs_closed:128,as_of:new Date(now-1000).toISOString(),checkpoint_height:1776874,state_root:root}).status(),/INTEGER/);
 });
+
+test("cut() caches verified open-window txs at the current height, clears on height advance, and reuses cutoff without snapshot",async()=>{
+ let now=1_800_000_200_000;
+ const root="e".repeat(64);
+ const openBody=depositBody(3,policy.wallet,"1.000000","open-win",1); // ts = 1_800_000_000
+ const openId=txid(openBody);
+ let height=100, cutoff=1_799_999_900; // openBody.ts (1_800_000_000) > cutoff -> open window
+ let primaryStatusUp=true;
+ let txCalls=0, receiptCalls=0, snapshotCalls=0;
+ const request=(async(input:any)=>{
+  const p=new URL(typeof input==="string"?input:input.url).pathname;
+  if(p===`/chain/${CHAIN}/api/network-facts`)return Response.json({chain_id:CHAIN,engine_sha256:root,params_sha256:root,open_epoch:130,economics:{K:5}});
+  if(p===`/chain/${CHAIN}/api/status`){
+   if(!primaryStatusUp)throw new DOMException("timed out","TimeoutError");
+   return Response.json({K:5,as_of:new Date(now).toISOString(),stale:false,checkpoint:{height,cutoff_ts:cutoff},state_root:root,epochs_closed:130});
+  }
+  if(p==="/api/status"){
+   return Response.json({K:5,as_of:new Date(now).toISOString(),checkpoint_height:height,state_root:root,epochs_closed:130});
+  }
+  if(p==="/api/snapshot"||p===`/chain/${CHAIN}/api/snapshot`){
+   snapshotCalls++;
+   return Response.json({params:{chain_id:CHAIN},checkpoint:{height,cutoff:{ts:cutoff}}});
+  }
+  if(p===`/api/explorer/address/${policy.wallet}`){
+   const bal=openBody.ts<cutoff?"1.000000":"0.000000";
+   return Response.json({address:policy.wallet,balance:bal,balance_as_of:{checkpoint_height:height},txs:[]});
+  }
+  if(p===`/api/explorer/tx/${openId}`){
+   txCalls++;
+   const cp=openBody.ts<cutoff?{checkpointed:{height}}:{};
+   return Response.json({id:openId,type:"transfer",from_addr:openBody.from,to_addr:openBody.to,amount:openBody.amount,memo:openBody.memo,body:openBody,atts:5,final:1,...cp});
+  }
+  if(p===`/chain/${CHAIN}/api/receipt/${openId}`||p===`/api/receipt/${openId}`){
+   receiptCalls++;
+   return Response.json({txid:openId,ts:1,status:"included",height:806});
+  }
+  return new Response("not found",{status:404});
+ }) as typeof fetch;
+
+ const net=new PoaHttpNetwork(()=>false,request,{engine:root,params:root},()=>now);
+ const s1=await net.status();
+ assert.equal(s1.cutoff,cutoff);
+
+ // First cut at height 100 verifies openId is open-window (not covered).
+ const c1=await net.cut(policy.wallet,[openId],s1);
+ assert.deepEqual(c1.covered,[]);
+ assert.equal(txCalls,1);assert.equal(receiptCalls,1);
+
+ // Second cut at the SAME height 100 (even after /api/status fallback omits cutoff) skips re-fetching openId and never downloads /api/snapshot.
+ primaryStatusUp=false;
+ const s1Fallback=await net.status();
+ assert.equal(s1Fallback.cutoff,cutoff,"reuses cached cutoff for same height when /api/status omits it");
+ txCalls=0;receiptCalls=0;
+ const c2=await net.cut(policy.wallet,[openId],s1Fallback);
+ assert.deepEqual(c2.covered,[]);
+ assert.equal(txCalls,0,"open-window tx not re-fetched at unchanged checkpoint height");
+ assert.equal(receiptCalls,0);
+ assert.equal(snapshotCalls,0,"never downloads multi-MB /api/snapshot when cutoff is already known for height");
+
+ // Once checkpoint height advances to 101 (with cutoff past openBody.ts), openWindow cache clears and openId is re-checked and promoted to covered.
+ primaryStatusUp=true;
+ height=101;cutoff=1_800_000_100;
+ now+=305_000;
+ const s2=await net.status();
+ const c3=await net.cut(policy.wallet,[openId],s2);
+ assert.deepEqual(c3.covered,[openId]);
+ assert.equal(txCalls,1,"height advance clears open-window cache and promotes tx to covered");
+});
+
+test("reconcileAt skips unsubmitted SIGNED and post-cutoff UNKNOWN payouts so unindexed broadcasts never cause 503s",async()=>{
+ const f=fixture();
+ await fund(f,3,"5.000000");
+ await f.e.command(command(who(3),"w-unidx","withdraw",{amount:"1.000000"}));
+ // Intercept cut() to record which ids Escrow passes.
+ let lastCutIds:string[]=[];
+ const origCut=f.net.cut.bind(f.net);
+ const origStatus=f.net.status.bind(f.net);
+ let cutoff=Math.floor(f.net.now/1000)-60; // payout ts will be >= cutoff + 1
+ f.net.status=async()=>({...(await origStatus()),cutoff});
+ f.net.cut=async(w,ids,s)=>{lastCutIds=[...ids];return origCut(w,ids,s);};
+
+ // Broadcast payout -> transitions to UNKNOWN with body.ts > cutoff (simulating unindexed tx on minepoa.com).
+ f.net.mode="before-timeout";
+ await f.e.tick();
+ const pay=Object.values(f.e.state().payments)[0]!;
+ assert.equal(pay.status,"UNKNOWN");
+ assert(pay.body!.ts>cutoff);
+
+ // While UNKNOWN and body.ts > cutoff, a subsequent command's reconcileAt must NOT pass pay.txid to cut().
+ await f.e.command(command(who(2),"open-during-unknown","open",{name:"unidx",reserve:"1.000000"}));
+ assert.equal(lastCutIds.includes(pay.txid!),false,"post-cutoff UNKNOWN payout excluded from cut()");
+
+ // Once checkpoint cutoff advances past pay.body.ts, reconcileAt MUST include pay.txid in cut() again.
+ cutoff=pay.body!.ts+10;
+ await f.e.command(command(who(3),"bid-after-cutoff","bid",{auction:Object.keys(f.e.state().auctions)[0]!,amount:"1.000000"}));
+ assert.equal(lastCutIds.includes(pay.txid!),true,"at-or-before-cutoff UNKNOWN payout included in cut()");
+});

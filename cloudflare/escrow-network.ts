@@ -30,8 +30,11 @@ function isTransientCutError(e: unknown): boolean {
 export class PoaHttpNetwork implements Network {
   private lastHeight?: number;
   private lastCutoff?: number;
+  private lastCutoffHeight?: number;
   private primaryStatusSlowUntil = 0;
   private primaryReceiptSlowUntil = 0;
+  private openWindowHeight?: number;
+  private readonly openWindowAtHeight = new Set<string>();
   private readonly coveredMem = new Map<string, number>();
   constructor(private writesAllowed:()=>boolean, private request:typeof fetch=fetch,
     private pins:{engine:string;params:string}={engine:MAINNET_ENGINE_SHA256,params:MAINNET_PARAMS_SHA256},
@@ -64,6 +67,9 @@ export class PoaHttpNetwork implements Network {
   }
   private clearCovered():void {
     this.coveredMem.clear();
+    this.openWindowAtHeight.clear();
+    this.openWindowHeight=undefined;
+    this.lastCutoffHeight=undefined;
     this.coveredStore?.clear?.();
   }
   /** PoA now requires an account token on most chain routes. Sent only as a header to the fixed
@@ -235,9 +241,11 @@ export class PoaHttpNetwork implements Network {
       asOf>observedAt+5000 || observedAt-asOf>120000 || ageInvalid;
     need(!stale,"ESCROW_STALE");
     if(!primaryInCooldown&&!timedOutFirst)this.primaryStatusSlowUntil=0;
-    this.lastHeight=height;if(cutoff!==undefined)this.lastCutoff=cutoff;
+    this.lastHeight=height;
+    if(cutoff!==undefined){this.lastCutoff=cutoff;this.lastCutoffHeight=height;}
+    const effectiveCutoff=cutoff!==undefined?cutoff:(this.lastCutoffHeight===height?this.lastCutoff:undefined);
     const root=hasStateRoot?s.state_root:(cutoff!==undefined?digest(["poa-checkpoint-cut/v1",CHAIN,height,cutoff]):"");
-    return {chain:f.chain_id,asOf,stale,height,root, ...(cutoff!==undefined?{cutoff}:{}),
+    return {chain:f.chain_id,asOf,stale,height,root, ...(effectiveCutoff!==undefined?{cutoff:effectiveCutoff}:{}),
       // Native transfers are documented fee-free; if exposed, a contrary node fee fails closed.
       fee:s.transfer_fee ?? "0.000000", ...(display?{readTiming:{...timing,totalMs:Math.max(0,this.clock()-started)}}:{})};
     } catch(error) {
@@ -304,8 +312,12 @@ export class PoaHttpNetwork implements Network {
     address(wallet);
     const b=await this.retryTransient(()=>this.getFirst([`/api/explorer/address/${wallet}`,`/chain/${CHAIN}/api/explorer/address/${wallet}`]));
     need(b?.address===wallet&&b.balance_as_of?.checkpoint_height===status.height,"ESCROW_UNALIGNED_CUT");
-    let cutoff=status.cutoff!==undefined?integer(status.cutoff):undefined;
+    let cutoff=status.cutoff!==undefined?integer(status.cutoff):(this.lastCutoffHeight===status.height?this.lastCutoff:undefined);
     let cutoffTried=cutoff!==undefined;
+    if(this.openWindowHeight!==status.height){
+      this.openWindowAtHeight.clear();
+      this.openWindowHeight=status.height;
+    }
     const cachedHeights=this.readCovered(wallet,ids);
     const coveredSet=new Set<string>();
     const uncachedIds:string[]=[];
@@ -313,6 +325,7 @@ export class PoaHttpNetwork implements Network {
     for(const id of ids){
       const cachedHeight=cachedHeights.get(id);
       if(cachedHeight!==undefined&&cachedHeight<=status.height)coveredSet.add(id);
+      else if(this.openWindowAtHeight.has(`${wallet}:${id}`))continue;
       else if(!seenUncached.has(id)){seenUncached.add(id);uncachedIds.push(id);}
     }
     // Observe uncached transactions in small parallel batches (3 txs = 6 connections), reusing the
@@ -351,8 +364,10 @@ export class PoaHttpNetwork implements Network {
               cutoffTried=true;
               try{
                 const snap=await this.getFirst(["/api/snapshot",`/chain/${CHAIN}/api/snapshot`],8000000);
-                if(snap?.params?.chain_id===CHAIN&&snap.checkpoint&&integer(snap.checkpoint.height)===status.height&&snap.checkpoint.cutoff?.ts!==undefined)
+                if(snap?.params?.chain_id===CHAIN&&snap.checkpoint&&integer(snap.checkpoint.height)===status.height&&snap.checkpoint.cutoff?.ts!==undefined){
                   cutoff=integer(snap.checkpoint.cutoff.ts);
+                  this.lastCutoff=cutoff;this.lastCutoffHeight=status.height;
+                }
               }catch{/* No snapshot cutoff available; fail closed below as ESCROW_CHECKPOINT_DETAILS_REQUIRED. */}
             }
             const afterCutoff=cutoff!==undefined&&ts>cutoff;
@@ -365,6 +380,7 @@ export class PoaHttpNetwork implements Network {
               continue;
             }
             need(afterCutoff,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
+            this.openWindowAtHeight.add(`${wallet}:${id}`);
           }
           else if(o&&o.attestations>=PEER_FINAL_ATTESTATIONS){
             // Legacy receipt: peer-final open-window money is excluded from checkpoint-only
@@ -372,6 +388,7 @@ export class PoaHttpNetwork implements Network {
             const r=seen!.receipt;
             need(r?.txid===id&&r.status==="included","ESCROW_TX_BINDING");
             need(r.checkpoint_covered===false,"ESCROW_CHECKPOINT_DETAILS_REQUIRED");
+            this.openWindowAtHeight.add(`${wallet}:${id}`);
           }
         }
       }finally{
@@ -386,12 +403,15 @@ export class PoaHttpNetwork implements Network {
   async context(wallet:string, knownTxid?:string):Promise<Context> {
     address(wallet);
     const s=await this.status();
-    let cutoff=s.cutoff;
+    let cutoff=s.cutoff??(this.lastCutoffHeight===s.height?this.lastCutoff:undefined);
     if(cutoff===undefined){
       // Bounded snapshot fallback when status does not include checkpoint.cutoff_ts.
       const snap=await this.getFirst([`/chain/${CHAIN}/api/snapshot`,"/api/snapshot"],8000000);
       need(snap?.params?.chain_id===CHAIN&&snap.checkpoint,"ESCROW_CONTEXT_UNAVAILABLE");
       cutoff=integer(snap.checkpoint.cutoff?.ts);
+      if(snap.checkpoint.height!==undefined&&integer(snap.checkpoint.height)===s.height){
+        this.lastCutoff=cutoff;this.lastCutoffHeight=s.height;
+      }
     }
     const own=await this.getFirst([`/api/explorer/address/${wallet}`,`/chain/${CHAIN}/api/explorer/address/${wallet}`]);
     need(own?.address===wallet&&Array.isArray(own.txs),"ESCROW_NONCE_CONTEXT");
