@@ -1,4 +1,4 @@
-import { decorateEmojiButton } from "./ui-copy.js?v=c84ee23eb13e";
+import { decorateEmojiButton } from "./ui-copy.js?v=5349a6f92d4b";
 // Native nonmodal popovers provide touch/keyboard dismissal and do not trap page focus.
 const watched=new WeakSet();
 export function decoratePoaFields(){
@@ -52,9 +52,11 @@ export function installHelp(){
  close.type="button";close.textContent="❌";close.className="info-close";close.setAttribute("aria-label","Close information");close.title="Close information";close.addEventListener("click",()=>{p.hidePopover();b.focus();});
  p.append(text,...extra,close);b.setAttribute("popovertarget",p.id);b.setAttribute("aria-controls",p.id);p.addEventListener("toggle",e=>b.setAttribute("aria-expanded",String(e.newState==="open")));
  const dismiss=module.querySelector("#networkStatusDismiss,#detailClose,#floatingCartClose,:scope > .cart-remove");
+ const copy=id==="domainSection"?module.querySelector(":scope > #domainCopyLink"):null;
  module.classList.add("help-box");
  if(id==="searchSection")document.getElementById("searchHelp").append(b);
  else if(dismiss){module.classList.add("has-close");dismiss.classList.add("box-close");dismiss.after(b);}
+ else if(copy)copy.after(b);
  else module.prepend(b);
  // Keep help inside its owning box: modal focus containment and removed-card cleanup stay correct.
  module.append(p);
