@@ -374,6 +374,50 @@
       "files": [
         ".poa-compat/surface.json"
       ]
+    },
+    {
+      "at": "2026-11-26T01:20:48.926Z",
+      "classification": "breaking",
+      "reasons": [
+        "pinned engine and params no longer match the network, and this project refuses to run on unpinned values"
+      ],
+      "from": {
+        "engine": "50464775560a94f49bbe4dae92b932c8fa7cf2c9239f2abdd31020d24c107511",
+        "params": "552ccbddc8671c390dd3dfd1774e4e7d64345775f8c47ec2c7e5191738a98f71",
+        "client": "50464775560a94f49bbe4dae92b932c8fa7cf2c9239f2abdd31020d24c107511",
+        "release": "v0.134.2-cutover-flags"
+      },
+      "to": {
+        "engine": "746671f800a25ec365912e887bdb78251bae4be52453d6bd0ae505e7287f14ed",
+        "params": "b6c2f50e33d07ac87897e18e7dc9c7737664f66044be83a7aa3cc92c83183c21",
+        "client": "746671f800a25ec365912e887bdb78251bae4be52453d6bd0ae505e7287f14ed",
+        "clientSize": 486269,
+        "clientLastModified": "Wed, 25 Nov 2026 23:58:57 GMT",
+        "release": "v0.135-t21",
+        "releaseTxid": "50e86d962124887e297c1c5f4f6946a1ab93348a4c1be28a0f5c768dae676970"
+      },
+      "sources": {
+        "facts": "https://minepoa.com/chain/poa-mainnet-1/api/network-facts",
+        "release": "https://minepoa.com/api/release",
+        "client": "https://minepoa.com/chain/poa-mainnet-1/client/poa.mjs"
+      },
+      "surface": {
+        "counts": {
+          "breaking": 0,
+          "review": 0,
+          "info": 1
+        },
+        "breaking": []
+      },
+      "files": [
+        "wrangler.jsonc",
+        "cloudflare/escrow-network.ts",
+        "worker-configuration.d.ts",
+        "docs/worker-deploy.md",
+        "cloudflare/test/display-freshness-runtime.mjs",
+        "cloudflare/test/escrow-admin-runtime.mjs",
+        ".poa-compat/surface.json"
+      ]
     }
   ],
   "selftestAt": "2026-11-21T23:44:00.280Z"

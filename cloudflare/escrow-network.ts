@@ -3,8 +3,8 @@ import { DisplayReadError, type ReadTiming } from "./display-freshness.js";
 import { integer, need } from "../src/core.js";
 import { CHAIN, Transfer, address, digest, micros, txid, verifyTransfer } from "./escrow-codec.js";
 import { Context, Cut, Network, Observation, Status } from "./escrow.js";
-export const MAINNET_ENGINE_SHA256 = "50464775560a94f49bbe4dae92b932c8fa7cf2c9239f2abdd31020d24c107511";
-export const MAINNET_PARAMS_SHA256 = "552ccbddc8671c390dd3dfd1774e4e7d64345775f8c47ec2c7e5191738a98f71";
+export const MAINNET_ENGINE_SHA256 = "746671f800a25ec365912e887bdb78251bae4be52453d6bd0ae505e7287f14ed";
+export const MAINNET_PARAMS_SHA256 = "b6c2f50e33d07ac87897e18e7dc9c7737664f66044be83a7aa3cc92c83183c21";
 export const PILOT_PER_TX = "250000.000000";
 export const PILOT_DAILY = "1000000.000000";
 /** K=5 peer attestations: the same threshold Escrow.final() requires for open-window money. */
