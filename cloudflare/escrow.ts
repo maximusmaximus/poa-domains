@@ -156,10 +156,17 @@ export function replay(rows: Entry[], policy: Policy): State {
   }
   return structuredClone(s);
 }
+const ESCROW_REPLAY_PAGE_SIZE = 16;
 export class SQLiteEscrowJournal implements Journal {
   private cached?: { sequence: number; checksum: string; state: State };
+  private readonly policyHash: string;
   constructor(private storage: DurableObjectStorage, private policy: Policy) {
-    storage.sql.exec("CREATE TABLE IF NOT EXISTS escrow_journal (sequence INTEGER PRIMARY KEY, record TEXT NOT NULL); CREATE TABLE IF NOT EXISTS escrow_policy (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL)");
+    this.policyHash = digest(policy);
+    storage.sql.exec(
+      "CREATE TABLE IF NOT EXISTS escrow_journal (sequence INTEGER PRIMARY KEY, record TEXT NOT NULL); " +
+      "CREATE TABLE IF NOT EXISTS escrow_policy (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL); " +
+      "CREATE TABLE IF NOT EXISTS escrow_verified_head (id INTEGER PRIMARY KEY CHECK(id=1), policy TEXT NOT NULL, sequence INTEGER NOT NULL, checksum TEXT NOT NULL)",
+    );
     const saved = storage.sql.exec<{value:string}>("SELECT value FROM escrow_policy WHERE id=1").toArray()[0];
     const hasLedger = storage.sql.exec<{n:number}>("SELECT COUNT(*) AS n FROM escrow_journal").one().n > 0;
     if(saved && hasLedger) need(saved.value === canonical(policy),"ESCROW_POLICY_CHANGED");
@@ -169,13 +176,79 @@ export class SQLiteEscrowJournal implements Journal {
     const r = this.storage.sql.exec<{seq:number|null}>("SELECT MAX(sequence) AS seq FROM escrow_journal").one();
     return r.seq === null ? 0 : Number(r.seq);
   }
+  private readVerifiedHead(): { policy: string; sequence: number; checksum: string } | null {
+    const r = this.storage.sql.exec<{policy:string;sequence:number;checksum:string}>(
+      "SELECT policy, sequence, checksum FROM escrow_verified_head WHERE id=1",
+    ).toArray()[0];
+    return r ? { policy: String(r.policy), sequence: Number(r.sequence), checksum: String(r.checksum) } : null;
+  }
+  private saveVerifiedHead(sequence: number, checksum: string): void {
+    this.storage.sql.exec(
+      "INSERT OR REPLACE INTO escrow_verified_head(id,policy,sequence,checksum) VALUES (1,?,?,?)",
+      this.policyHash,
+      sequence,
+      checksum,
+    );
+  }
+  /** Load the latest state in O(1) memory: fast-path via verified tip checksum when intact,
+   * otherwise page-replay from genesis without materializing the entire journal in RAM. */
+  private loadLatest(): { state: State; checksum: string } {
+    const seq = this.latestSeq();
+    if (seq === 0) {
+      const s = initial(this.policy);
+      return { state: s, checksum: digest(["escrow-genesis/v1", s.policy]) };
+    }
+    const head = this.readVerifiedHead();
+    if (head && head.policy === this.policyHash && head.sequence === seq) {
+      const raw = this.storage.sql.exec<{record:string}>("SELECT record FROM escrow_journal WHERE sequence = ?", seq).toArray()[0];
+      need(!!raw, "ESCROW_JOURNAL_CORRUPT");
+      const row = JSON.parse(raw.record) as Entry;
+      const { checksum, ...v } = row;
+      need(
+        row.sequence === seq &&
+        checksum === head.checksum &&
+        checksum === digest(v) &&
+        row.state.policy === this.policyHash,
+        "ESCROW_JOURNAL_CORRUPT",
+      );
+      invariant(row.state);
+      return { state: row.state, checksum };
+    }
+    let s = initial(this.policy), previous = digest(["escrow-genesis/v1", s.policy]);
+    let cursorSeq = 0;
+    while (true) {
+      let pageCount = 0;
+      for (const raw of this.storage.sql.exec<{sequence:number;record:string}>(
+        "SELECT sequence, record FROM escrow_journal WHERE sequence > ? ORDER BY sequence LIMIT ?",
+        cursorSeq,
+        ESCROW_REPLAY_PAGE_SIZE,
+      )) {
+        pageCount++;
+        cursorSeq = Number(raw.sequence);
+        const row = JSON.parse(raw.record) as Entry;
+        const { checksum, ...v } = row;
+        need(
+          row.sequence === s.sequence + 1 &&
+          row.previous === previous &&
+          checksum === digest(v) &&
+          row.state.policy === s.policy,
+          "ESCROW_JOURNAL_CORRUPT",
+        );
+        invariant(row.state);
+        s = row.state;
+        previous = checksum;
+      }
+      if (pageCount < ESCROW_REPLAY_PAGE_SIZE) break;
+    }
+    need(s.sequence === seq, "ESCROW_JOURNAL_CORRUPT");
+    this.saveVerifiedHead(s.sequence, previous);
+    return { state: s, checksum: previous };
+  }
   rows(): Entry[] { return this.storage.sql.exec<{record:string}>("SELECT record FROM escrow_journal ORDER BY sequence").toArray().map(r=>JSON.parse(r.record) as Entry); }
   load(): State {
     const seq = this.latestSeq();
     if(this.cached && this.cached.sequence === seq) return structuredClone(this.cached.state);
-    const rows = this.rows();
-    const state = replay(rows, this.policy);
-    const checksum = rows.at(-1)?.checksum ?? digest(["escrow-genesis/v1", state.policy]);
+    const { state, checksum } = this.loadLatest();
     this.cached = { sequence: state.sequence, checksum, state: structuredClone(state) };
     return state;
   }
@@ -188,13 +261,14 @@ export class SQLiteEscrowJournal implements Journal {
           s = structuredClone(this.cached.state);
           prev = this.cached.checksum;
         } else {
-          const rows = this.rows();
-          s = replay(rows, this.policy);
-          prev = rows.at(-1)?.checksum ?? digest(["escrow-genesis/v1", s.policy]);
+          const loaded = this.loadLatest();
+          s = loaded.state;
+          prev = loaded.checksum;
         }
         // Admission budgets include recovery; legacy financial drains may exceed the old cap.
         const e=nextEntry(s,prev,event,payload,change,this.policy);
         this.storage.sql.exec("INSERT INTO escrow_journal(sequence,record) VALUES (?,?)",e.sequence,canonical(e));
+        this.saveVerifiedHead(e.sequence, e.checksum);
         this.cached = { sequence: e.sequence, checksum: e.checksum, state: structuredClone(e.state) };
         return e.state;
       });
@@ -878,7 +952,7 @@ export function restoreEscrow(storage: DurableObjectStorage, archive?: EscrowArc
     replay(a.rows as Entry[],a.policy as Policy);
   }
   storage.transactionSync(()=>{
-    storage.sql.exec("DROP TABLE IF EXISTS escrow_journal; DROP TABLE IF EXISTS escrow_policy");
+    storage.sql.exec("DROP TABLE IF EXISTS escrow_journal; DROP TABLE IF EXISTS escrow_policy; DROP TABLE IF EXISTS escrow_verified_head");
     if(archive){const j=new SQLiteEscrowJournal(storage,archive.policy);
       for(const row of archive.rows)storage.sql.exec("INSERT INTO escrow_journal(sequence,record) VALUES(?,?)",row.sequence,canonical(row));
       j.append("restore-paused",{},s=>{s.paused=true;s.halt="RESTORED_ARCHIVE_READ_ONLY";});
