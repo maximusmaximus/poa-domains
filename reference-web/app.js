@@ -1,17 +1,17 @@
-import { installHelp } from "./ui-help.js?v=f35b5bf67d18";
-import { wireManagement } from "./ui-manage.js?v=f35b5bf67d18";
-import { bindTabKeys } from "./ui-a11y.js?v=f35b5bf67d18";
-import { applySiteTitle, closeDetail, renderAuctions, setAuctionTab } from "./ui-render.js?v=f35b5bf67d18";
-import { ui } from "./ui-state.js?v=f35b5bf67d18";
-import { canonical, digest, dismissNetworkBanner, instructions, isPoaAddress, loadBidderAddress, loadCart, loadKnownOwner, loadTabSeen, makeBody, parsePublicJSON, recheckCartItem, resolveOwnerInput, saveBidderAddress, shouldHoldTransactions } from "./shared.js?v=f35b5bf67d18";
-import { navigateHome, openAdvanced, openPoa, restoreViewFromURL, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=f35b5bf67d18";
-import { el, endpointBase } from "./ui-core.js?v=f35b5bf67d18";
-import { clearHandoff, copyDomainListingPrompt, copySubnameListing, isTermsGateOpen, setFeedbackModalOpen, wireFeedbackModal, wireTermsGate } from "./ui-handoff.js?v=f35b5bf67d18";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=f35b5bf67d18";
-import { submitSearchQuery, wireSearchAutocomplete } from "./ui-search.js?v=f35b5bf67d18";
-import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=f35b5bf67d18";
-import { copyText, flashCopied, selectElementText } from "./ui-copy.js?v=f35b5bf67d18";
-import { cartCopyBlocked, downloadCartJSON, clearAllCart, persistCart, renderCart, renderCurrentCartHandoff, setFloatingCartOpen } from "./ui-cart.js?v=f35b5bf67d18";
+import { installHelp } from "./ui-help.js?v=c84ee23eb13e";
+import { wireManagement } from "./ui-manage.js?v=c84ee23eb13e";
+import { bindTabKeys } from "./ui-a11y.js?v=c84ee23eb13e";
+import { applySiteTitle, closeDetail, renderAuctions, setAuctionTab } from "./ui-render.js?v=c84ee23eb13e";
+import { ui } from "./ui-state.js?v=c84ee23eb13e";
+import { canonical, digest, dismissNetworkBanner, instructions, isPoaAddress, loadBidderAddress, loadCart, loadKnownOwner, loadTabSeen, makeBody, parsePublicJSON, recheckCartItem, resolveOwnerInput, saveBidderAddress, shouldHoldTransactions } from "./shared.js?v=c84ee23eb13e";
+import { activeUserAddress, navigateHome, notifyOwnerChanged, openAdvanced, openPoa, restoreViewFromURL, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=c84ee23eb13e";
+import { el, endpointBase } from "./ui-core.js?v=c84ee23eb13e";
+import { clearHandoff, copyDomainListingPrompt, copySubnameListing, isTermsGateOpen, setFeedbackModalOpen, wireFeedbackModal, wireTermsGate } from "./ui-handoff.js?v=c84ee23eb13e";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=c84ee23eb13e";
+import { submitSearchQuery, wireSearchAutocomplete } from "./ui-search.js?v=c84ee23eb13e";
+import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=c84ee23eb13e";
+import { copyText, flashCopied, selectElementText } from "./ui-copy.js?v=c84ee23eb13e";
+import { cartCopyBlocked, downloadCartJSON, clearAllCart, persistCart, renderCart, renderCurrentCartHandoff, setFloatingCartOpen } from "./ui-cart.js?v=c84ee23eb13e";
 
 try {
     ui.statusPanelDismissed = false; // New page visits show status; closing lasts for this page only.
@@ -37,14 +37,7 @@ try {
             ui.bidderAddress = isPoaAddress(resolved) ? resolved : "";
             saveBidderAddress(globalThis.localStorage, ui.bidderAddress);
             if (ui.bidderAddress) syncEscrowPayerAddress(ui.bidderAddress);
-            if (ui.latestState && ui.cap) {
-                ui.cart = ui.cart.map((item) =>
-                    recheckCartItem(item, ui.cap, ui.latestState, ui.escrowMarket, ui.bidderAddress, ui.escrowMarketServerTime || Date.now()),
-                );
-                persistCart();
-                renderAuctions(ui.latestState);
-                renderCart();
-            }
+            notifyOwnerChanged();
         };
         bidderInput.addEventListener("input", onBidderChange);
         bidderInput.addEventListener("change", onBidderChange);

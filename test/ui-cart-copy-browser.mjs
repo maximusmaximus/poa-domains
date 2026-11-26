@@ -2099,20 +2099,30 @@ try {
     await expect(nebulaCardG.locator(".profile-eth-fix")).toBeVisible();
     await auditUiGeometry(pageGeom, `${vp.name}:manage-and-escrow-market`);
 
-    // Explicitly verify #escrowMarket card actions: "🏷️ Bid" + "Use deposit" checkbox + handover (no "with POA", clean gap & matching heights)
+    // Explicitly verify #escrowMarket card actions:
+    // - "nebula" is owned/listed by mainOwner (currently in Public owner address), so bidding on it is BLOCKED with guidance to update Public owner address (while seller handover stays visible!)
+    // - "star" & "vault" are listed by peerOwner, so they show "🏷️ Bid"/"🛍️ Buy" + "Use deposit" checkbox with clean gap & matching heights (no "with POA")
     const withPoaBtns = await pageGeom.evaluate(() =>
       [...document.querySelectorAll("button")]
         .filter((b) => !b.hidden && /with POA/i.test(b.textContent ?? ""))
         .map((b) => b.textContent?.trim()),
     );
     assert.deepEqual(withPoaBtns, [], `No visible button should say "with POA": ${JSON.stringify(withPoaBtns)}`);
-    const escrowCardItems = await pageGeom.locator("#escrowMarket article.card").first().evaluate((card) =>
+    const nebulaEscrowCard = pageGeom.locator("#escrowMarket article.card", { has: pageGeom.locator("h3", { hasText: "nebula" }) });
+    await expect(nebulaEscrowCard.locator(".self-bid-notice")).toBeVisible();
+    await expect(nebulaEscrowCard.locator(".self-bid-notice")).toContainText(/can't bid on your own domain.*Public owner address/i);
+    await expect(nebulaEscrowCard.getByRole("button", { name: "🏷️ Bid", exact: true })).toBeHidden();
+    await expect(nebulaEscrowCard.getByRole("button", { name: /finish handover/ })).toBeVisible();
+
+    const starEscrowCard = pageGeom.locator("#escrowMarket article.card", { has: pageGeom.locator("h3", { hasText: "star" }) });
+    const vaultEscrowCard = pageGeom.locator("#escrowMarket article.card", { has: pageGeom.locator("h3", { hasText: "vault" }) });
+    const escrowCardItems = await starEscrowCard.evaluate((card) =>
       [...card.querySelectorAll(".escrow-card-actions > button, .escrow-card-actions > label.use-deposit-toggle")].map((el) => {
         const r = el.getBoundingClientRect();
         return { tag: el.tagName, text: el.textContent.trim(), top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height };
       }),
     );
-    assert.equal(escrowCardItems.length, 3, `Expected Bid + Use deposit + handover on active bid escrow card, got ${JSON.stringify(escrowCardItems)}`);
+    assert.equal(escrowCardItems.length, 2, `Expected Bid + Use deposit on peer auction escrow card, got ${JSON.stringify(escrowCardItems)}`);
     assert.equal(escrowCardItems[0].text, "🏷️ Bid");
     assert.equal(escrowCardItems[1].text, "Use deposit");
     assert.ok(
@@ -2128,8 +2138,6 @@ try {
 
     // Verify multi-item Bid / Buy + "Use deposit" checkbox updates both #escrowPrompt AND adds all items to Cart!
     await pageGeom.locator("#escrowPayer").fill(mainOwner);
-    const starEscrowCard = pageGeom.locator("#escrowMarket article.card", { has: pageGeom.locator("h3", { hasText: "star" }) });
-    const vaultEscrowCard = pageGeom.locator("#escrowMarket article.card", { has: pageGeom.locator("h3", { hasText: "vault" }) });
     // 1) Bid on "star" using deposit
     await starEscrowCard.getByLabel("Use deposit").check();
     await starEscrowCard.getByRole("button", { name: "🏷️ Bid", exact: true }).click();
@@ -2143,12 +2151,22 @@ try {
     await starEscrowCard.getByRole("button", { name: "🏷️ Bid", exact: true }).click();
     await expect(pageGeom.locator("#escrowPrompt")).toContainText('"action": "intent"');
 
+    // Also verify Auctions tab blocks self-bidding on mainOwner's own "nebula" and links back to Public owner address!
+    await pageGeom.locator("#tabAuctions").click();
+    await pageGeom.locator("#auctionTabCurrent").click();
+    const nebulaAucCard = pageGeom.locator("#auctions article.card", { has: pageGeom.locator("h4", { hasText: "nebula" }) });
+    await expect(nebulaAucCard.locator(".self-bid-notice")).toBeVisible();
+    await expect(nebulaAucCard.locator(".self-bid-notice")).toContainText(/Public owner address/i);
+    await expect(nebulaAucCard.locator(".auction-bid-controls")).toHaveCount(0);
+    await nebulaAucCard.locator(".self-bid-notice button").click();
+    await expect(pageGeom.locator("#manageOwner")).toBeFocused();
+
     // 6) Floating Cart modal + Bug / Feature modal (verify multi-item cart with star + vault + Use deposit prompt!)
     await pageGeom.locator("#floatingCartBtn").click();
     await expect(pageGeom.locator("#floatingCartPanel")).toBeVisible();
     await expect(pageGeom.locator("#floatingCartList")).toContainText("star");
     await expect(pageGeom.locator("#floatingCartList")).toContainText("vault");
-    // Remove outbid nebula from earlier step so handoff builds cleanly and verify Use deposit prompt updates live
+    // Remove own/outbid nebula from earlier step so handoff builds cleanly and verify Use deposit prompt updates live
     const nebulaRemove = pageGeom.locator('#floatingCartList button[aria-label="Remove nebula from cart"]');
     if (await nebulaRemove.count()) await nebulaRemove.click();
     await expect(pageGeom.locator("#floatingCartPrompt")).toContainText("[BUY LISTING · USE DEPOSIT] vault");
@@ -2169,6 +2187,8 @@ try {
     await pageGeom.goto(`${h.url}/d/nebula`);
     await pageGeom.waitForFunction(() => document.body.dataset.registryStatus === "ready");
     await expect(pageGeom.locator("#escrowDomain article.card")).toHaveCount(1);
+    await expect(pageGeom.locator("#domainListing .self-bid-notice")).toBeVisible();
+    await expect(pageGeom.locator("#escrowDomain .self-bid-notice")).toBeVisible();
     await auditUiGeometry(pageGeom, `${vp.name}:domain-page-with-escrow`);
 
     // 8) Owner Profile page (/p/nebula)
