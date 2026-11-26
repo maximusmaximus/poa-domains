@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { sign, verify, createPublicKey, createPrivateKey } from "node:crypto";
 import { base58 } from "../../src/native-crypto.js";
 import { canonical } from "../../src/core.js";
-import { Escrow, PILOT_ADMISSION_LIMIT, PILOT_JOURNAL_LIMIT, REVIEWED_CREDITS, invariant, nextEntry, recoveryReserve, replay, reviewedCredit } from "../escrow.js";
+import { Escrow, PILOT_ADMISSION_LIMIT, PILOT_JOURNAL_LIMIT, REVIEWED_CREDITS, SQLiteEscrowJournal, invariant, nextEntry, recoveryReserve, replay, restoreEscrow, reviewedCredit } from "../escrow.js";
 import { CHAIN, WorkerSecretSigner, digest, micros, decimal, txid, verifyCommand, verifyTransfer } from "../escrow-codec.js";
 import { PoaHttpNetwork, MAINNET_ENGINE_SHA256, MAINNET_PARAMS_SHA256, PILOT_PER_TX, PILOT_DAILY, type CoveredTxCache } from "../escrow-network.js";
 import { MockNetwork, MemoryJournal, policy, who, key, seed, signer, command, depositBody, root, parents } from "./escrow-fixture.js";
@@ -1718,4 +1718,98 @@ test("reconcileAt skips unsubmitted SIGNED and post-cutoff UNKNOWN payouts so un
  cutoff=pay.body!.ts+10;
  await f.e.command(command(who(3),"bid-after-cutoff","bid",{auction:Object.keys(f.e.state().auctions)[0]!,amount:"1.000000"}));
  assert.equal(lastCutIds.includes(pay.txid!),true,"at-or-before-cutoff UNKNOWN payout included in cut()");
+});
+
+test("SQLiteEscrowJournal uses verified tip fast-path, paged streaming replay on upgrade/restore, and fails closed on tampering",()=>{
+ const journalRows=new Map<number,string>();
+ let policyRow:string|undefined;
+ let headRow:{policy:string;sequence:number;checksum:string}|undefined;
+ const getHead=()=>headRow;
+ let singleRowReads=0,pageReads=0,fullScans=0;
+ const cursor=<T,>(items:T[])=>({
+  toArray:()=>items,
+  one:()=>{if(!items.length)throw new Error("EMPTY");return items[0]!;},
+  [Symbol.iterator]:()=>items[Symbol.iterator](),
+ });
+ const storage={
+  transactionSync:<T,>(fn:()=>T)=>fn(),
+  sql:{
+   exec:(q:string,...args:any[])=>{
+    if(q.startsWith("CREATE TABLE"))return cursor([]);
+    if(q.startsWith("DROP TABLE")){journalRows.clear();policyRow=undefined;headRow=undefined;return cursor([]);}
+    if(q.includes("FROM escrow_policy"))return cursor(policyRow?[{value:policyRow}]:[]);
+    if(q.includes("INSERT OR REPLACE INTO escrow_policy")){policyRow=String(args[0]);return cursor([]);}
+    if(q.includes("COUNT(*) AS n FROM escrow_journal"))return cursor([{n:journalRows.size}]);
+    if(q.includes("MAX(sequence) AS seq FROM escrow_journal")){
+     const max=journalRows.size?Math.max(...journalRows.keys()):null;
+     return cursor([{seq:max}]);
+    }
+    if(q.includes("FROM escrow_verified_head"))return cursor(headRow?[headRow]:[]);
+    if(q.includes("INSERT OR REPLACE INTO escrow_verified_head")){
+     headRow={policy:String(args[0]),sequence:Number(args[1]),checksum:String(args[2])};
+     return cursor([]);
+    }
+    if(q.includes("WHERE sequence = ?")){
+     singleRowReads++;
+     const rec=journalRows.get(Number(args[0]));
+     return cursor(rec?[{record:rec}]:[]);
+    }
+    if(q.includes("WHERE sequence > ?")){
+     pageReads++;
+     const after=Number(args[0]),lim=Number(args[1]);
+     const items=[...journalRows.entries()].filter(([seq])=>seq>after).sort((a,b)=>a[0]-b[0]).slice(0,lim).map(([sequence,record])=>({sequence,record}));
+     return cursor(items);
+    }
+    if(q.includes("SELECT record FROM escrow_journal ORDER BY sequence")){
+     fullScans++;
+     const items=[...journalRows.entries()].sort((a,b)=>a[0]-b[0]).map(([,record])=>({record}));
+     return cursor(items);
+    }
+    if(q.includes("INSERT INTO escrow_journal")){
+     journalRows.set(Number(args[0]),String(args[1]));
+     return cursor([]);
+    }
+    throw new Error(`Unexpected SQL: ${q}`);
+   },
+  },
+ } as unknown as DurableObjectStorage;
+
+ // Append 20 entries (> page size 16) via SQLiteEscrowJournal.
+ const j1=new SQLiteEscrowJournal(storage,policy);
+ assert.equal(j1.load().sequence,0);
+ for(let i=0;i<20;i++)j1.append("pause",{paused:i%2===0},s=>{s.paused=i%2===0;});
+ assert.equal(journalRows.size,20);
+ assert.equal(getHead()?.sequence,20);
+
+ // Cold boot with verified head intact reads ONLY 1 row (no full scan, no pagination).
+ singleRowReads=0;pageReads=0;fullScans=0;
+ const j2=new SQLiteEscrowJournal(storage,policy);
+ const loadedFast=j2.load();
+ assert.equal(loadedFast.sequence,20);
+ assert.equal(singleRowReads,1,"cold boot fast-path reads only the latest row");
+ assert.equal(pageReads,0);assert.equal(fullScans,0);
+
+ // Upgrade path (missing verified head): streams in pages of 16 (2 pages for 20 rows) and populates verified head.
+ headRow=undefined;
+ singleRowReads=0;pageReads=0;fullScans=0;
+ const j3=new SQLiteEscrowJournal(storage,policy);
+ assert.equal(j3.load().sequence,20);
+ assert.equal(pageReads,2,"20 rows stream across 2 pages of 16 without full-table toArray()");
+ assert.equal(fullScans,0);
+ assert.equal(getHead()?.sequence,20,"verified head saved after streaming replay");
+
+ // Tampering with tip row fails closed even when verified head matches sequence.
+ const origTip=journalRows.get(20)!;
+ const parsed=JSON.parse(origTip);
+ parsed.state.paused=!parsed.state.paused;
+ journalRows.set(20,JSON.stringify(parsed));
+ assert.throws(()=>new SQLiteEscrowJournal(storage,policy).load(),/ESCROW_JOURNAL_CORRUPT/);
+ journalRows.set(20,origTip);
+
+ // Restore drops verified head, replays all rows, and records restore-paused atomically.
+ const archive={policy,rows:j3.rows()};
+ restoreEscrow(storage,archive);
+ assert.equal(journalRows.size,21);
+ assert.equal(getHead()?.sequence,21);
+ assert.equal(new SQLiteEscrowJournal(storage,policy).load().halt,"RESTORED_ARCHIVE_READ_ONLY");
 });
