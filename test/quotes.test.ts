@@ -53,6 +53,7 @@ test("quoted params and gross caps match actual signed submissions for every adm
     submitQuote(t,"cancelOffer","alpha",{offerId:id});
     submitQuote(t,"setRecords","alpha",{records:[{type:"service",url:"https://example.com/"}]});
     submitQuote(t,"setMetadata","alpha",{metadata:witness("alpha",{kind:"permanent"},null,"A new description")});
+    submitQuote(t,"setPrimaryName","alpha",{});
     const sell=submitQuote(t,"sellFixed","alpha",{price:"350",validUntil:t.clock.now()+86400});
     const buy=submitQuote(t,"buyFixed","alpha",{offerId:sell.receipt.result.offerId},t.bob);
     assert.equal(buy.q.fee,"3");assert.equal(buy.q.requiredMaxTotal,"350");
