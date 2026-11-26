@@ -432,6 +432,11 @@ export function cartMinimum(item, cap, state, escrowMarket = null) {
     if (a) return poaMinimumNextBid(a);
     return item.latestMinimum ?? item.minimumAmount ?? item.params?.minimumNextBid ?? item.amount;
   }
+  if (item.action === "poaBuy") {
+    const l = Array.isArray(escrowMarket) ? escrowMarket.find((x) => x && x.id === item.params?.auctionId && x.kind === "fixed") : null;
+    if (l?.price) return poaAmount(l.price);
+    return item.minimumAmount ?? item.params?.price ?? item.amount;
+  }
   if (item.action === "announceAuction+bid") return rootAuctionPolicy(cap, inspectName(item.name, cap.emojiManifest), item.asset).reserve;
   if (item.action === "bid") {
     const auction = state?.auctions?.[item.params.auctionId];
@@ -441,12 +446,15 @@ export function cartMinimum(item, cap, state, escrowMarket = null) {
 }
 export function cartSummary(item) {
   const p = item.params;
+  const depNote = item.useDeposit || p?.useDeposit ? " (use deposit)" : "";
   if (item.action === "poaCheckout")
-    return `🪙 Buy "${item.name}" for ${poaShort(item.amount)} POA with POA checkout.`;
+    return `🪙 Buy "${item.name}" for ${poaShort(item.amount)} POA with POA checkout${depNote}.`;
+  if (item.action === "poaBuy")
+    return `🛍️ Buy "${item.name}" for ${poaShort(item.amount)} POA${depNote}.`;
   if (item.action === "poaBid")
     return p?.awaitingFirstBid
-      ? `🏷️ Start POA auction for "${item.name}" — highest bid up to ${poaShort(item.amount)} POA (reserve ${poaShort(item.minimumAmount ?? p.reserve ?? item.amount)} POA).`
-      : `🔥 Bid on "${item.name}" up to ${poaShort(item.amount)} POA (min next ${poaShort(item.minimumAmount ?? item.amount)} POA).`;
+      ? `🏷️ Start POA auction for "${item.name}" — highest bid up to ${poaShort(item.amount)} POA (reserve ${poaShort(item.minimumAmount ?? p.reserve ?? item.amount)} POA)${depNote}.`
+      : `🔥 Bid on "${item.name}" up to ${poaShort(item.amount)} POA (min next ${poaShort(item.minimumAmount ?? item.amount)} POA)${depNote}.`;
   if (item.action === "announceAuction+bid")
     return `Request root auction announcement for "${item.name}" (reserve=${p.reserve} ${registryUnit(item.asset)}) and place opening bid up to maxTotal=${item.amount} ${registryUnit(item.asset)}.`;
   if (item.action === "bid")
@@ -459,7 +467,7 @@ export function cartSummary(item) {
 }
 export function editCartAmount(item, raw, cap, state, escrowMarket = null) {
   const amount = String(raw).trim();
-  if (item.action === "poaCheckout") { if (amount !== item.amount) throw Error(`⚠️ Fixed price is ${poaShort(item.amount)} POA.`); return { ...item }; }
+  if (item.action === "poaCheckout" || item.action === "poaBuy") { if (amount !== item.amount) throw Error(`⚠️ Fixed price is ${poaShort(item.amount)} POA.`); return { ...item }; }
   if (item.action === "poaBid") {
     const exact = poaAmount(amount);
     const minimum = cartMinimum(item, cap, state, escrowMarket);
@@ -494,7 +502,7 @@ export function cartParamsForSigner(item, signer) {
   return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
-  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=3035a7bd696b";
+  validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=f35b5bf67d18";
 const b58Alphabet =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -1632,6 +1640,29 @@ export function cartReview(item, cap, state, escrowMarket = null, bidderAddress 
       facts = { auctionId: p.auctionId ?? null, minimum, pendingMarket: true };
       return { signature: JSON.stringify(facts), issues, minimum, params: proposed, canAcknowledge: !blocked && !item.validationError, outbid: false };
     }
+    if (item.action === "poaBuy") {
+      if (!poaOnlyMode(cap)) stop("POA resale purchases require POA checkout mode.");
+      if (Array.isArray(escrowMarket)) {
+        const l = escrowMarket.find((x) => x && x.id === p.auctionId);
+        if (!l || l.status !== "OPEN" || l.kind !== "fixed" || l.high || l.name !== item.name || (l.closes > 0 && nowMs >= l.closes)) {
+          stop("This POA listing is no longer open. Remove it from your cart.");
+          facts = { auctionId: p.auctionId ?? null, open: false };
+          return { signature: JSON.stringify(facts), issues, minimum, params: proposed, canAcknowledge: false, outbid: false };
+        }
+        const livePrice = poaAmount(l.price);
+        minimum = livePrice;
+        proposed.price = livePrice;
+        proposed.seller = l.seller;
+        proposed.closes = l.closes ?? 0;
+        if (livePrice !== item.amount)
+          stop(`The listing price is now ${poaShort(livePrice)} POA. Remove it and add it again only if you agree.`);
+        facts = { auctionId: l.id, status: l.status, price: livePrice, closes: l.closes ?? 0 };
+        return { signature: JSON.stringify(facts), issues, minimum: livePrice, params: proposed, canAcknowledge: !blocked && !item.validationError, outbid: false };
+      }
+      const exactAmt = poaAmount(item.amount);
+      facts = { auctionId: p.auctionId ?? null, price: exactAmt, pendingMarket: true };
+      return { signature: JSON.stringify(facts), issues, minimum: exactAmt, params: proposed, canAcknowledge: !blocked && !item.validationError, outbid: false };
+    }
     if (item.action === "announceAuction+bid") {
       const policy = rootAuctionPolicy(cap, info, item.asset);
       minimum = policy.reserve; proposed.reserve = minimum; proposed.maxBid = item.amount;
@@ -1702,9 +1733,10 @@ export function buildCartItem(input, cap, state, escrowMarket = null, bidderAddr
   if (!state) throw Error("Refresh registry data before adding an item.");
   const info = inspectName(input.name, cap.emojiManifest), name = info.canonical, action = input.action;
   let asset, amount, params;
+  const useDeposit = Boolean(input.useDeposit);
   if (action === "poaCheckout") {
     if (!poaOnlyMode(cap) || !info.isRoot) throw Error("Check this name in Find again.");
-    asset = "POA"; amount = poaNewNamePrice(cap, info); params = { name, price: amount };
+    asset = "POA"; amount = poaNewNamePrice(cap, info); params = { name, price: amount, ...(useDeposit ? { useDeposit: true } : {}) };
   } else if (action === "poaBid") {
     if (!poaOnlyMode(cap)) throw Error("POA auction bids require POA checkout mode.");
     const a = Array.isArray(escrowMarket)
@@ -1728,6 +1760,22 @@ export function buildCartItem(input, cap, state, escrowMarket = null, bidderAddr
       closes: a.closes ?? 0,
       window: a.window ?? a.quiet ?? 3600000,
       quiet: a.quiet ?? 3600000,
+      useDeposit,
+    };
+  } else if (action === "poaBuy") {
+    if (!poaOnlyMode(cap)) throw Error("POA resale purchases require POA checkout mode.");
+    const l = Array.isArray(escrowMarket)
+      ? (escrowMarket.find((x) => x && x.id === input.auctionId && x.name === name && x.kind === "fixed" && x.status === "OPEN" && !x.high) ??
+        activePoaFixedListings(escrowMarket, nowMs).find((x) => x.name === name))
+      : null;
+    if (!l) throw Error("Check the current POA listing again.");
+    asset = "POA"; amount = poaAmount(l.price);
+    params = {
+      auctionId: l.id,
+      seller: l.seller,
+      price: amount,
+      closes: l.closes ?? 0,
+      useDeposit,
     };
   } else if (action === "announceAuction+bid") {
     asset = "POA"; const reserve = rootAuctionPolicy(cap, info).reserve;
@@ -1749,7 +1797,7 @@ export function buildCartItem(input, cap, state, escrowMarket = null, bidderAddr
         rightsHash: "<PARENT_OFFER_RIGHTS_HASH>", description: `Child domain ${name}` } },
     });
   } else throw Error("Unknown cart action");
-  const item = { name, tier: info.tier, isRoot: info.isRoot, action, asset, amount: String(amount), params };
+  const item = { name, tier: info.tier, isRoot: info.isRoot, action, asset, amount: String(amount), params, ...(useDeposit ? { useDeposit: true } : {}) };
   item.minimumAmount = cartMinimum(item, cap, state, escrowMarket); item.summary = cartSummary(item);
   return recheckCartItem(item, cap, state, escrowMarket, bidderAddress, nowMs);
 }

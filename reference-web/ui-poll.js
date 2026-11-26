@@ -1,18 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=3035a7bd696b";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=3035a7bd696b";
-import { renderManagement } from "./ui-manage.js?v=3035a7bd696b";
-import { actionLabel } from "./ui-copy.js?v=3035a7bd696b";
-import { poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=3035a7bd696b";
-import { ui } from "./ui-state.js?v=3035a7bd696b";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=3035a7bd696b";
-import { createPoaCopyButton } from "./ui-copy.js?v=3035a7bd696b";
-import { persistCart, renderCart, renderCartEscrowStatus, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=3035a7bd696b";
-import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=3035a7bd696b";
-import { renderDomainPage } from "./ui-domain.js?v=3035a7bd696b";
-import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=3035a7bd696b";
-import { renderIdeas } from "./ui-ideas.js?v=3035a7bd696b";
-import { mountEscrow } from "./escrow.js?v=3035a7bd696b";
-import { applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=3035a7bd696b";
+import { publicNameUnavailable } from "./shared.js?v=f35b5bf67d18";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=f35b5bf67d18";
+import { renderManagement } from "./ui-manage.js?v=f35b5bf67d18";
+import { actionLabel } from "./ui-copy.js?v=f35b5bf67d18";
+import { activePoaFixedListings, findOpenPoaAuctionByName, poaMinimumNextBid, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=f35b5bf67d18";
+import { ui } from "./ui-state.js?v=f35b5bf67d18";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=f35b5bf67d18";
+import { createPoaCopyButton } from "./ui-copy.js?v=f35b5bf67d18";
+import { addToCart, persistCart, renderCart, renderCartEscrowStatus, setCartItemUseDeposit, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=f35b5bf67d18";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=f35b5bf67d18";
+import { renderDomainPage } from "./ui-domain.js?v=f35b5bf67d18";
+import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=f35b5bf67d18";
+import { renderIdeas } from "./ui-ideas.js?v=f35b5bf67d18";
+import { mountEscrow } from "./escrow.js?v=f35b5bf67d18";
+import { applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=f35b5bf67d18";
 
 export function updateFreshness() {
     updateHandoffAge();
@@ -217,8 +217,8 @@ function enhanceEscrowSignedRequestUx(root) {
                 view: "Read escrow account",
                 withdraw: "Request POA refund",
                 detect: "Check deposit",
-                buy: "Buy with credited POA",
-                bid: "Bid with credited POA",
+                buy: "Buy using deposit",
+                bid: "Bid using deposit",
             }[cmd.action] || cmd.action;
             lead2.textContent = `Live preview · ${actName}${target}${amtLabel}`;
         } else {
@@ -366,6 +366,116 @@ function enhanceEscrowSignedRequestUx(root) {
     syncEscrowPayerAddress();
 }
 
+function queueEscrowListingInCart(domainName, kind, useDeposit) {
+    if (!ui.cap || !ui.latestState || !poaOnlyMode(ui.cap) || !Array.isArray(ui.escrowMarket))
+        return false;
+    const nowMs = ui.escrowMarketServerTime || Date.now();
+    if (kind === "fixed") {
+        const listing = activePoaFixedListings(ui.escrowMarket, nowMs).find((x) => x.name === domainName);
+        if (!listing) return false;
+        addToCart({ name: domainName, action: "poaBuy", auctionId: listing.id, useDeposit });
+        return true;
+    }
+    const auction = findOpenPoaAuctionByName(ui.escrowMarket, domainName, nowMs);
+    if (!auction) return false;
+    const minNext = poaMinimumNextBid(auction);
+    const existing = ui.cart.find((x) => x.action === "poaBid" && x.params?.auctionId === auction.id);
+    let chosen = existing && poaToMicros(existing.amount) >= poaToMicros(minNext) ? existing.amount : minNext;
+    const amtInput = el("escrowAmount");
+    const rawAmt = amtInput?.value?.trim() ?? "";
+    let validInput = false;
+    if (rawAmt) {
+        try {
+            const parsed = poaAmount(rawAmt);
+            if (poaToMicros(parsed) >= poaToMicros(minNext)) {
+                chosen = parsed;
+                validInput = true;
+            }
+        } catch {}
+    }
+    if (amtInput && !validInput) amtInput.value = chosen;
+    addToCart({ name: domainName, action: "poaBid", auctionId: auction.id, amount: chosen, useDeposit });
+    return true;
+}
+
+function enhanceEscrowListingCard(card, domainName) {
+    if (!card || card.dataset.escrowCardEnhanced === "1") return;
+    const directBtns = [...card.querySelectorAll(":scope > button")];
+    const primaryBtn = directBtns.find((b) => /(?:Bid|Pay) with POA/i.test(b.textContent ?? ""));
+    const useBtn = directBtns.find((b) => /Use credited POA to (?:bid|buy)/i.test(b.textContent ?? ""));
+    const finishBtn = directBtns.find((b) => /finish handover/i.test(b.textContent ?? ""));
+    if (!primaryBtn && !useBtn && !finishBtn) return;
+    card.dataset.escrowCardEnhanced = "1";
+    const kind = /Pay with POA|to buy/i.test(`${primaryBtn?.textContent ?? ""} ${useBtn?.textContent ?? ""}`) ? "fixed" : "auction";
+    const cartAction = kind === "fixed" ? "poaBuy" : "poaBid";
+    const prefKey = `${kind}:${domainName}`;
+    const actionsRow = document.createElement("div");
+    actionsRow.className = "button-row escrow-card-actions";
+    const anchor = primaryBtn || useBtn || finishBtn;
+    anchor.before(actionsRow);
+
+    let depCb = null;
+    if (primaryBtn && useBtn) {
+        primaryBtn.textContent = kind === "fixed" ? "🛍️ Buy" : "🏷️ Bid";
+        useBtn.hidden = true;
+        useBtn.setAttribute("aria-hidden", "true");
+        useBtn.tabIndex = -1;
+
+        const depLabel = document.createElement("label");
+        depLabel.className = "use-deposit-toggle";
+        depCb = document.createElement("input");
+        depCb.type = "checkbox";
+        depCb.dataset.escrowUseDeposit = domainName;
+        depCb.dataset.escrowKind = kind;
+        depCb.disabled = primaryBtn.disabled;
+        const cartMatch = ui.cart.find((x) => x.name === domainName && x.action === cartAction);
+        depCb.checked = cartMatch
+            ? Boolean(cartMatch.useDeposit ?? cartMatch.params?.useDeposit)
+            : Boolean(ui.escrowUseDeposit?.get?.(prefKey));
+        depCb.addEventListener("change", () => {
+            const checked = depCb.checked;
+            ui.escrowUseDeposit?.set?.(prefKey, checked);
+            for (const other of document.querySelectorAll("input[data-escrow-use-deposit]")) {
+                if (other !== depCb && other.dataset.escrowUseDeposit === domainName && other.dataset.escrowKind === kind) {
+                    other.checked = checked;
+                }
+            }
+            setCartItemUseDeposit(domainName, cartAction, checked);
+        });
+        const depSpan = document.createElement("span");
+        depSpan.textContent = "Use deposit";
+        depLabel.append(depCb, depSpan);
+
+        primaryBtn.addEventListener("click", (ev) => {
+            const useDeposit = Boolean(depCb?.checked);
+            ui.escrowUseDeposit?.set?.(prefKey, useDeposit);
+            let added = false;
+            try { added = queueEscrowListingInCart(domainName, kind, useDeposit); } catch {}
+            if (useDeposit) {
+                ev.stopImmediatePropagation();
+                useBtn.click();
+            }
+            if (added) {
+                queueMicrotask(() => {
+                    const msg = el("escrowMessage");
+                    if (msg && !msg.textContent.includes("Added")) {
+                        const suffix = `🛒 Added ${domainName} to cart${useDeposit ? " (use deposit)" : ""}.`;
+                        msg.textContent = msg.textContent ? `${msg.textContent} · ${suffix}` : suffix;
+                    }
+                });
+            }
+        }, true);
+
+        actionsRow.append(primaryBtn, depLabel);
+    } else if (primaryBtn) {
+        primaryBtn.textContent = kind === "fixed" ? "🛍️ Buy" : "🏷️ Bid";
+        actionsRow.append(primaryBtn);
+    } else if (useBtn) {
+        actionsRow.append(useBtn);
+    }
+    if (finishBtn) actionsRow.append(finishBtn);
+}
+
 function observeEscrowAddresses(root) {
     if (!root || typeof MutationObserver === "undefined" || root.dataset.poaAddrObserved === "1")
         return;
@@ -421,12 +531,15 @@ function observeEscrowAddresses(root) {
                 ? root.querySelectorAll("article.card > h3")
                 : root.querySelectorAll("#escrowMarket article.card > h3");
             for (const h3 of domainHeaders) {
-                if (h3.dataset.avatarDecorated === "1") continue;
-                const domainName = h3.textContent?.trim();
+                const domainName = h3.dataset.domainName || h3.textContent?.trim();
                 if (!domainName) continue;
-                h3.dataset.avatarDecorated = "1";
-                h3.classList.add("domain-heading");
-                h3.prepend(createDomainAvatar(domainName, { size: "sm" }));
+                h3.dataset.domainName = domainName;
+                if (h3.dataset.avatarDecorated !== "1") {
+                    h3.dataset.avatarDecorated = "1";
+                    h3.classList.add("domain-heading");
+                    h3.prepend(createDomainAvatar(domainName, { size: "sm" }));
+                }
+                enhanceEscrowListingCard(h3.closest("article.card"), domainName);
             }
         }
         finally {
@@ -885,12 +998,24 @@ export async function loadRegistry() {
         // Keep stored cart data; omit withheld entries from this public session.
         ui.cart=ui.cart.filter(item=>!publicNameUnavailable(item.name,ui.cap));
         // Production is POA-only: saved registry-unit plans can't be completed there, so they are left out.
-        ui.cart=ui.cart.filter(item=>poaOnlyMode(ui.cap)?(item.action==="poaCheckout"||item.action==="poaBid"):(item.action!=="poaCheckout"&&item.action!=="poaBid"));
+        ui.cart=ui.cart.filter(item=>poaOnlyMode(ui.cap)?(item.action==="poaCheckout"||item.action==="poaBid"||item.action==="poaBuy"):(item.action!=="poaCheckout"&&item.action!=="poaBid"&&item.action!=="poaBuy"));
         for (const item of ui.cart) {
             if (item.action === "poaCheckout") {
                 try { item.minimumAmount = cartMinimum(item, ui.cap, null); item.summary = cartSummary(item);
                     if (item.minimumAmount !== item.amount) throw Error("⚠️ The POA price changed. Remove it and add it again."); }
                 catch (error) { item.validationError = error.message; }
+                continue;
+            }
+            if (item.action === "poaBuy") {
+                try {
+                    if (!item.params || !/^[0-9a-f]{64}$/.test(item.params.auctionId ?? ""))
+                        throw Error("⚠️ Remove this invalid saved listing.");
+                    item.amount = poaAmount(item.amount);
+                    item.minimumAmount = cartMinimum(item, ui.cap, null, ui.escrowMarket);
+                    if (item.minimumAmount !== item.amount)
+                        throw Error("⚠️ The listing price changed. Remove it and add it again.");
+                    item.summary = cartSummary(item);
+                } catch (error) { item.validationError = error.message; }
                 continue;
             }
             if (item.action === "poaBid") {
