@@ -1,13 +1,13 @@
-import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, resolveOwnerInput, validPrincipal } from "./shared.js?v=5f652b77e99b";
-import { drawTicker } from "./ui-ticker.js?v=5f652b77e99b";
-import { actionLabel } from "./ui-copy.js?v=5f652b77e99b";
-import { returnFocus } from "./ui-a11y.js?v=5f652b77e99b";
-import { activeResaleOffers, buildCreativeSiteTitle, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=5f652b77e99b";
-import { ui } from "./ui-state.js?v=5f652b77e99b";
-import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=5f652b77e99b";
-import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=5f652b77e99b";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=5f652b77e99b";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=5f652b77e99b";
+import { isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, resolveOwnerInput, validPrincipal } from "./shared.js?v=009a41b2d270";
+import { drawTicker } from "./ui-ticker.js?v=009a41b2d270";
+import { actionLabel } from "./ui-copy.js?v=009a41b2d270";
+import { returnFocus } from "./ui-a11y.js?v=009a41b2d270";
+import { activeResaleOffers, buildCreativeSiteTitle, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=009a41b2d270";
+import { ui } from "./ui-state.js?v=009a41b2d270";
+import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=009a41b2d270";
+import { domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa } from "./ui-router.js?v=009a41b2d270";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=009a41b2d270";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=009a41b2d270";
 
 export function updateLiveAuctionsBadge(state = ui.latestState) {
     const badge = el("liveAuctionsBadge");
@@ -176,8 +176,9 @@ export function setAuctionTab(tabId, { user = false, render = false } = {}) {
 }
 
 function poaPointer(box, text) {
-    add(box, "p", text, "muted");
-    const go = add(box, "button", "🪙 Open My POA", "secondary small");
+    const wrap = add(box, "div", "", "cards-empty");
+    add(wrap, "p", text, "muted");
+    const go = add(wrap, "button", "🪙 Open My POA", "secondary small");
     go.type = "button";
     go.addEventListener("click", () => openPoa());
 }
@@ -204,8 +205,9 @@ function renderPoaAuctions(box) {
     const list = groups[ui.auctionTab] ?? [];
     if (!list.length) {
         if (ui.auctionTab === "current" && groups.upcoming.length > 0) {
-            add(box, "p", `No live auctions yet. ${groups.upcoming.length} queued in Upcoming — first bid starts the timer.`, "muted");
-            const jump = add(box, "button", `⏳ View Upcoming (${groups.upcoming.length})`, "secondary small");
+            const wrap = add(box, "div", "", "cards-empty");
+            add(wrap, "p", `No live auctions yet. ${groups.upcoming.length} queued in Upcoming — first bid starts the timer.`, "muted");
+            const jump = add(wrap, "button", `⏳ View Upcoming (${groups.upcoming.length})`, "secondary small");
             jump.type = "button";
             jump.addEventListener("click", () => el("auctionTabUpcoming")?.click());
             return;
@@ -369,12 +371,14 @@ export function renderAuctions(s) {
             bidLine.append("No active high bid.");
         }
         add(card, "p", `Window ${formatDuration(a.window)} + quiet ${formatDuration(a.quiet)} · closes ${formatClock(close)}`);
+        const actions = add(card, "div", "", "button-row");
         if (a.status === "live" && !(typeof s.time === "number" && s.time < a.openAt)) {
             const nextMin = a.high
                 ? minimumNextBid(a.high.amount, ui.cap.increment)
                 : a.reserve;
             add(card, "p", `Minimum next bid: ${nextMin} ${registryUnit(a.asset)} (version ${a.version})`, "badge-ok");
-            const btn = add(card, "button", `Add to cart`, "small");
+            card.append(actions);
+            const btn = add(actions, "button", `Add to cart`, "small");
             btn.type = "button";
             btn.addEventListener("click", () => {
                 addToCart({
@@ -385,7 +389,7 @@ export function renderAuctions(s) {
                 });
             });
         }
-        const openBtn = add(card, "button", "History", "secondary small");
+        const openBtn = add(actions, "button", "History", "secondary small");
         openBtn.type = "button";
         openBtn.addEventListener("click", () => openDetail({
             id: `auction:${a.id}`,

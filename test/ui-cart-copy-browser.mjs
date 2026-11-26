@@ -1749,7 +1749,376 @@ try {
   assert.deepEqual(errorsPrimary, []);
   await ctxPrimary.close();
 
-  console.log("PASS Cart copy regression: POA-only clipboard, execCommand fallback, manual selection, modal link navigation, handoff feedback, checkout expectations, escrow readiness banner, shortened PoA address copy, search autofill/dropdown, clean cart cards, cart-owned prefill, Manage this domain, Profile v1 editor, reorganized escrow signed request, treasury footer, domains served counter, bug/feature feedback modal, non-dismissible Terms gate, POA first-bid auctions/outbid cart, sale/auction field-drop info popovers + archived previous fields, default/main domain address & Owner Profile, and Manage domain Transfer confirm flow");
+  // 13. Full-site UI spacing & alignment geometry audit across all tabs, cards, modals, and immutable escrow cards
+  const auditUiGeometry = async (page, label) => {
+    const issues = await page.evaluate(() => {
+      const problems = [];
+      const vis = (n) => {
+        if (!n || !(n instanceof Element)) return false;
+        if (n.closest("[hidden]")) return false;
+        const det = n.closest("details");
+        if (det && !det.open && !n.closest("summary")) return false;
+        const s = getComputedStyle(n);
+        if (s.display === "none" || s.visibility === "hidden" || parseFloat(s.opacity) === 0) return false;
+        const r = n.getBoundingClientRect();
+        return r.width > 1 && r.height > 1;
+      };
+      const tag = (n) =>
+        `${n.tagName.toLowerCase()}${n.id ? "#" + n.id : ""}${n.className && typeof n.className === "string" ? "." + n.className.trim().split(/\s+/).slice(0, 2).join(".") : ""}("${(n.textContent || n.getAttribute("aria-label") || "").trim().slice(0, 28)}")`;
+      const sameRow = (a, b) => Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 4;
+      const hGap = (a, b) => (a.left <= b.left ? b.left - a.right : a.left - b.right);
+      const isUtilityIcon = (b) =>
+        b.classList.contains("inline-info") ||
+        b.classList.contains("module-info") ||
+        b.classList.contains("box-close") ||
+        b.classList.contains("cart-remove") ||
+        b.classList.contains("poa-copy-btn") ||
+        b.classList.contains("site-home-btn") ||
+        b.classList.contains("floating-cart-btn");
+
+      // A. No two visible buttons anywhere on screen may touch (< 3.5px gap) or overlap horizontally on the same row
+      const allBtns = [...document.querySelectorAll("button")].filter(
+        (b) => vis(b) && !b.classList.contains("site-home-btn") && !b.closest("[hidden]"),
+      );
+      for (let i = 0; i < allBtns.length; i++) {
+        const ra = allBtns[i].getBoundingClientRect();
+        for (let j = i + 1; j < allBtns.length; j++) {
+          if (allBtns[i].contains(allBtns[j]) || allBtns[j].contains(allBtns[i])) continue;
+          const rb = allBtns[j].getBoundingClientRect();
+          if (!sameRow(ra, rb)) continue;
+          // Ignore fixed overlay cart button vs page content behind it
+          if (allBtns[i].id === "floatingCartBtn" || allBtns[j].id === "floatingCartBtn") continue;
+          // Ignore sticky section-navigation tabs overlapping scrolled page content underneath
+          if (Boolean(allBtns[i].closest(".section-navigation")) !== Boolean(allBtns[j].closest(".section-navigation"))) continue;
+          // Ignore modal dialog buttons vs underlying inert page buttons
+          if (Boolean(allBtns[i].closest('[role="dialog"]')) !== Boolean(allBtns[j].closest('[role="dialog"]'))) continue;
+          const gap = hGap(ra, rb);
+          if (gap < 3.5) {
+            problems.push(`TOUCHING_BUTTONS gap=${gap.toFixed(1)}px: ${tag(allBtns[i])} vs ${tag(allBtns[j])}`);
+          }
+        }
+      }
+
+      // B. Same-container same-row action buttons must match height (<=2px) and vertical center (<=2px)
+      const groups = [
+        ...document.querySelectorAll(
+          ".button-row, .escrow-screen article.card, .card, .search-alt-row, .manage-primary-controls, .auction-tabs",
+        ),
+      ].filter(vis);
+      for (const g of groups) {
+        const btns = [...g.querySelectorAll(":scope > button")].filter((b) => vis(b) && !isUtilityIcon(b));
+        for (let i = 0; i < btns.length; i++) {
+          const ra = btns[i].getBoundingClientRect();
+          for (let j = i + 1; j < btns.length; j++) {
+            const rb = btns[j].getBoundingClientRect();
+            if (!sameRow(ra, rb)) continue;
+            const hDiff = Math.abs(ra.height - rb.height);
+            const cyDiff = Math.abs((ra.top + ra.bottom) / 2 - (rb.top + rb.bottom) / 2);
+            if (hDiff > 2.5) {
+              problems.push(`HEIGHT_MISMATCH diff=${hDiff.toFixed(1)}px (${ra.height.toFixed(1)} vs ${rb.height.toFixed(1)}): ${tag(btns[i])} vs ${tag(btns[j])}`);
+            }
+            if (cyDiff > 2.5) {
+              problems.push(`VALIGN_MISMATCH diff=${cyDiff.toFixed(1)}px: ${tag(btns[i])} vs ${tag(btns[j])}`);
+            }
+          }
+        }
+        // Check inline-info (ℹ️) vertical centering with sibling buttons in the same row
+        const infos = [...g.querySelectorAll(":scope > .inline-info-wrap > button.inline-info")].filter(vis);
+        for (const info of infos) {
+          const ri = info.getBoundingClientRect();
+          for (const b of btns) {
+            const rb = b.getBoundingClientRect();
+            if (!sameRow(ri, rb)) continue;
+            const cyDiff = Math.abs((ri.top + ri.bottom) / 2 - (rb.top + rb.bottom) / 2);
+            if (cyDiff > 3) {
+              problems.push(`INFO_VALIGN_MISMATCH diff=${cyDiff.toFixed(1)}px: ${tag(b)} vs ${tag(info)}`);
+            }
+          }
+        }
+      }
+
+      // C. Footer links + Bug/Feature button share identical height & vertical alignment on the same row
+      const footerItems = [...document.querySelectorAll(".footer-links > a, .footer-links > button")].filter(vis);
+      for (let i = 0; i < footerItems.length; i++) {
+        const ra = footerItems[i].getBoundingClientRect();
+        for (let j = i + 1; j < footerItems.length; j++) {
+          const rb = footerItems[j].getBoundingClientRect();
+          if (!sameRow(ra, rb)) continue;
+          const hDiff = Math.abs(ra.height - rb.height);
+          const cyDiff = Math.abs((ra.top + ra.bottom) / 2 - (rb.top + rb.bottom) / 2);
+          if (hDiff > 2.5) problems.push(`FOOTER_HEIGHT diff=${hDiff.toFixed(1)}px: ${tag(footerItems[i])} vs ${tag(footerItems[j])}`);
+          if (cyDiff > 2.5) problems.push(`FOOTER_VALIGN diff=${cyDiff.toFixed(1)}px: ${tag(footerItems[i])} vs ${tag(footerItems[j])}`);
+        }
+      }
+
+      // D. Input + action button alignment in .inline-controls and .auction-bid-controls
+      for (const row of [...document.querySelectorAll(".inline-controls, .auction-bid-controls")].filter(vis)) {
+        const inp = row.querySelector("input");
+        const btn = row.querySelector("button");
+        if (!vis(inp) || !vis(btn)) continue;
+        const ri = inp.getBoundingClientRect(), rb = btn.getBoundingClientRect();
+        if (!sameRow(ri, rb)) continue;
+        const bDiff = Math.abs(ri.bottom - rb.bottom);
+        const hDiff = Math.abs(ri.height - rb.height);
+        const gap = hGap(ri, rb);
+        if (bDiff > 2.5) problems.push(`CONTROL_BOTTOM diff=${bDiff.toFixed(1)}px in ${row.className}`);
+        if (hDiff > 2.5) problems.push(`CONTROL_HEIGHT diff=${hDiff.toFixed(1)}px (${ri.height.toFixed(1)} vs ${rb.height.toFixed(1)}) in ${row.className}`);
+        if (gap < 4) problems.push(`CONTROL_GAP gap=${gap.toFixed(1)}px in ${row.className}`);
+      }
+
+      // E. Escrow Step 1 .escrow-grid inputs align along same bottom baseline when on same row
+      for (const grid of [...document.querySelectorAll(".escrow-grid")].filter(vis)) {
+        const inputs = [...grid.querySelectorAll("input")].filter(vis);
+        for (let i = 0; i < inputs.length; i++) {
+          const ra = inputs[i].getBoundingClientRect();
+          for (let j = i + 1; j < inputs.length; j++) {
+            const rb = inputs[j].getBoundingClientRect();
+            if (!sameRow(ra, rb)) continue;
+            const bDiff = Math.abs(ra.bottom - rb.bottom);
+            if (bDiff > 2.5) problems.push(`ESCROW_GRID_INPUT_BOTTOM diff=${bDiff.toFixed(1)}px: ${tag(inputs[i])} vs ${tag(inputs[j])}`);
+          }
+        }
+      }
+
+      // F. Consecutive escrow cards have visible vertical separation (never touching 0px)
+      for (const box of [...document.querySelectorAll("#escrowMarket, #escrowDomain")].filter(vis)) {
+        const cards = [...box.querySelectorAll(":scope > article.card")].filter(vis);
+        for (let i = 0; i + 1 < cards.length; i++) {
+          const vGap = cards[i + 1].getBoundingClientRect().top - cards[i].getBoundingClientRect().bottom;
+          if (vGap < 6) problems.push(`ESCROW_CARD_GAP vGap=${vGap.toFixed(1)}px in #${box.id}`);
+        }
+      }
+
+      // G. Domain top bar alignment (← Home vs 🔗 Copy link)
+      const topBar = document.querySelector(".domain-top-bar");
+      if (vis(topBar)) {
+        const home = topBar.querySelector("#domainHomeLink");
+        const copy = topBar.querySelector("#domainCopyLink");
+        if (vis(home) && vis(copy)) {
+          const rh = home.getBoundingClientRect(), rc = copy.getBoundingClientRect();
+          if (sameRow(rh, rc)) {
+            const cyDiff = Math.abs((rh.top + rh.bottom) / 2 - (rc.top + rc.bottom) / 2);
+            if (cyDiff > 3) problems.push(`DOMAIN_TOPBAR_VALIGN diff=${cyDiff.toFixed(1)}px`);
+          }
+        }
+      }
+
+      // H. No horizontal overflow
+      if (document.documentElement.scrollWidth > innerWidth + 1) {
+        problems.push(`OVERFLOW scrollWidth=${document.documentElement.scrollWidth} innerWidth=${innerWidth}`);
+      }
+      return problems;
+    });
+    assert.deepEqual(issues, [], `UI geometry issues on ${label}: ${JSON.stringify(issues, null, 2)}`);
+  };
+
+  const nowAudit = Date.now();
+  const auditMarketItems = [
+    {
+      id: "e".repeat(64),
+      kind: "auction",
+      name: "nebula",
+      seller: mainOwner,
+      price: "100.000000",
+      status: "OPEN",
+      high: { payer: peerOwner, amount: "120.000000" },
+      closes: nowAudit + 3600000,
+      window: 3600000,
+      quiet: 3600000,
+      history: [{ event: "bid", amount: "120.000000", at: nowAudit - 600000, payer: peerOwner }],
+    },
+    {
+      id: "f".repeat(64),
+      kind: "auction",
+      name: "star",
+      seller: peerOwner,
+      price: "50.000000",
+      status: "OPEN",
+      high: null,
+      closes: 0,
+      window: 86400000,
+      quiet: 3600000,
+      history: [{ event: "opened", amount: "50.000000", at: nowAudit - 1200000 }],
+    },
+    {
+      id: "d".repeat(64),
+      kind: "fixed",
+      name: "vault",
+      seller: peerOwner,
+      price: "250.000000",
+      status: "OPEN",
+      high: null,
+      closes: nowAudit + 86400000,
+      history: [{ event: "listed", amount: "250.000000", at: nowAudit - 1800000 }],
+    },
+  ];
+  h.cap = { ...h.cap, escrow: { ...(h.cap.escrow ?? {}), enabled: true } };
+
+  for (const vp of [
+    { name: "desktop-1280", width: 1280, height: 900 },
+    { name: "mobile-390", width: 390, height: 844 },
+  ]) {
+    let marketHigh = "120.000000";
+    const currentAuditItems = () => [
+      { ...auditMarketItems[0], high: { payer: peerOwner, amount: marketHigh } },
+      auditMarketItems[1],
+      auditMarketItems[2],
+    ];
+    const ctxGeom = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
+    const pageGeom = await ctxGeom.newPage();
+    const geomErrors = [];
+    pageGeom.on("pageerror", (e) => geomErrors.push(e.message));
+    await pageGeom.route("https://**", (r) => r.abort());
+    await pageGeom.route("**/v1/escrow/capabilities", (r) =>
+      r.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          enabled: true,
+          held: false,
+          mock: false,
+          address: mainOwner,
+          registryId: h.cap.registryId,
+          serverTime: nowAudit,
+          limits: { perTransaction: "10000.000000", daily: "50000.000000" },
+        }),
+      }),
+    );
+    await pageGeom.route("**/v1/escrow/market", (r) =>
+      r.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ items: currentAuditItems(), serverTime: nowAudit }),
+      }),
+    );
+    await pageGeom.route("**/v1/escrow/domain*", (r) => {
+      const u = new URL(r.request().url());
+      const nm = u.searchParams.get("name") || "";
+      return r.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: currentAuditItems().filter((it) => it.name === nm),
+          serverTime: nowAudit,
+        }),
+      });
+    });
+    await pageGeom.route("**/v1/feedback/challenge", (r) =>
+      r.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          enabled: true,
+          challengeId: "geom1",
+          captchaUrl: "/v1/feedback/captcha/geom1",
+          powSalt: "salt",
+          powBits: 0,
+          minDwellMs: 0,
+        }),
+      }),
+    );
+    await pageGeom.route("**/v1/feedback/captcha/*", (r) =>
+      r.fulfill({
+        status: 200,
+        contentType: "image/svg+xml",
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="180" height="56"><rect width="180" height="56" fill="#09131a"/></svg>',
+      }),
+    );
+
+    // 1) Find tab: add an available POA name AND a POA auction bid, then simulate an outbid so reviewBtn + raiseBtn render side-by-side
+    await pageGeom.goto(`${h.url}/?q=freshgeom`);
+    await pageGeom.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await pageGeom.locator("#termsAgreeBtn").click();
+    await pageGeom.locator("#addToCartBtn").click();
+    await pageGeom.locator("#searchInput").fill("nebula");
+    await pageGeom.locator("#searchBtn").click();
+    await expect(pageGeom.locator("#searchResult .inline-controls")).toBeVisible();
+    await pageGeom.locator("#addToCartBtn").click();
+    // Simulate higher bid on nebula and reload to trigger outbid reviewBtn + raiseBtn in cart
+    marketHigh = "150.000000";
+    await pageGeom.goto(`${h.url}/?q=nebula`);
+    await pageGeom.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await expect(pageGeom.locator("#searchResult .inline-controls")).toBeVisible();
+    await expect(pageGeom.locator("#cartList")).toContainText("Raise max bid");
+    await auditUiGeometry(pageGeom, `${vp.name}:find-auction-and-cart`);
+
+    // 2) Auctions tab (Current live auction + Upcoming queued auction)
+    await pageGeom.locator("#tabAuctions").click();
+    await expect(pageGeom.locator("#auctions .auction-bid-controls").first()).toBeVisible();
+    await auditUiGeometry(pageGeom, `${vp.name}:auctions-current`);
+    await pageGeom.locator("#auctionTabUpcoming").click();
+    await expect(pageGeom.locator("#auctions .auction-bid-controls").first()).toBeVisible();
+    await auditUiGeometry(pageGeom, `${vp.name}:auctions-upcoming`);
+
+    // 3) For sale tab
+    await pageGeom.locator("#tabMarket").click();
+    await expect(pageGeom.locator("#marketplace article.card").first()).toBeVisible();
+    await auditUiGeometry(pageGeom, `${vp.name}:market`);
+
+    // 4) Explore tab
+    await pageGeom.locator("#tabExplore").click();
+    await expect(pageGeom.locator("#names article.card").first()).toBeVisible();
+    await auditUiGeometry(pageGeom, `${vp.name}:explore`);
+
+    // 5) Manage domains + 🪙 My POA (including #escrowMarket cards with Bid with POA + Use credited POA to bid + Ask my agent to finish handover!)
+    await pageGeom.locator("#tabEscrow").click();
+    await pageGeom.locator("#manageOwner").fill(mainOwner);
+    await pageGeom.locator("#manageLookup").click();
+    await expect(pageGeom.locator('#manageNames article[data-domain-name="nebula"]')).toBeVisible();
+    await expect(pageGeom.locator("#escrowMarket article.card")).toHaveCount(3);
+    // Open Transfer & confirm on comet card AND open profile editor with ETH checksum hint on nebula card
+    const cometCardG = pageGeom.locator('#manageNames article[data-domain-name="comet"]');
+    await cometCardG.locator('button[data-transfer-toggle="comet"]').click();
+    await cometCardG.locator('input[data-transfer-recipient="comet"]').fill(peerOwner);
+    await cometCardG.locator('button[data-transfer-review="comet"]').click();
+    await expect(cometCardG.locator('[data-transfer-confirm-box="comet"]')).toBeVisible();
+    // Trigger ETH checksum mismatch button on nebula profile
+    const nebulaCardG = pageGeom.locator('#manageNames article[data-domain-name="nebula"]');
+    await nebulaCardG.locator(".profile-editor summary").click();
+    await nebulaCardG.locator('input[data-profile-field="eth"]').fill("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed");
+    await expect(nebulaCardG.locator(".profile-eth-fix")).toBeVisible();
+    await auditUiGeometry(pageGeom, `${vp.name}:manage-and-escrow-market`);
+
+    // Explicitly verify the exact screenshot pair inside #escrowMarket: "🏷️ Bid with POA" vs "Use credited POA to bid"
+    const escrowCardBtns = await pageGeom.locator("#escrowMarket article.card").first().evaluate((card) =>
+      [...card.querySelectorAll(":scope > button")].map((b) => {
+        const r = b.getBoundingClientRect();
+        return { text: b.textContent.trim(), top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height };
+      }),
+    );
+    assert.equal(escrowCardBtns.length, 3, `Expected 3 buttons on active bid escrow card, got ${JSON.stringify(escrowCardBtns)}`);
+    assert.ok(
+      Math.abs(escrowCardBtns[0].height - escrowCardBtns[1].height) <= 2,
+      `Escrow buttons height mismatch: ${JSON.stringify(escrowCardBtns)}`,
+    );
+
+    // 6) Floating Cart modal + Bug / Feature modal
+    await pageGeom.locator("#floatingCartBtn").click();
+    await expect(pageGeom.locator("#floatingCartPanel")).toBeVisible();
+    await auditUiGeometry(pageGeom, `${vp.name}:floating-cart-modal`);
+    await pageGeom.locator("#floatingCartClose").click();
+    await pageGeom.locator("#openFeedbackBtn").click();
+    await expect(pageGeom.locator("#feedbackModal")).toBeVisible();
+    await auditUiGeometry(pageGeom, `${vp.name}:feedback-modal`);
+    await pageGeom.locator("#feedbackClose").click();
+
+    // 7) Domain page (/d/nebula with #escrowDomain active auction card + .domain-top-bar + #domainListing)
+    await pageGeom.goto(`${h.url}/d/nebula`);
+    await pageGeom.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await expect(pageGeom.locator("#escrowDomain article.card")).toHaveCount(1);
+    await auditUiGeometry(pageGeom, `${vp.name}:domain-page-with-escrow`);
+
+    // 8) Owner Profile page (/p/nebula)
+    await pageGeom.goto(`${h.url}/p/nebula`);
+    await pageGeom.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await expect(pageGeom.locator("#ownerMain")).toBeVisible();
+    await auditUiGeometry(pageGeom, `${vp.name}:owner-profile-page`);
+
+    assert.deepEqual(geomErrors, [], `Page errors on ${vp.name}: ${JSON.stringify(geomErrors)}`);
+    await ctxGeom.close();
+  }
+
+  console.log("PASS Cart copy regression + full-site UI spacing & alignment audit across desktop (1280) and mobile (390)");
 } finally {
   await h.close();
   await browser.close();
