@@ -1,12 +1,11 @@
-import { publicNameUnavailable } from "./shared.js?v=2ca7cef90cec";
-import { ui } from "./ui-state.js?v=2ca7cef90cec";
-import { inspectName } from "./shared.js?v=2ca7cef90cec";
-import { createIdeaGenerator } from "./ideas-generator.js?v=2ca7cef90cec";
-import { autoScroll } from "./ui-motion.js?v=2ca7cef90cec";
-import { add, el, variantOwner } from "./ui-core.js?v=2ca7cef90cec";
-import { runSearch } from "./ui-search.js?v=2ca7cef90cec";
-import { logSubmittedSearch } from "./ui-search-log.js?v=2ca7cef90cec";
-export function ideaAccepted(q) {
+import { publicNameUnavailable, inspectName } from "./shared.js?v=0ce678e72942";
+import { ui } from "./ui-state.js?v=0ce678e72942";
+import { createIdeaGenerator } from "./ideas-generator.js?v=0ce678e72942";
+import { autoScroll, itemStep } from "./ui-motion.js?v=0ce678e72942";
+import { add, el, variantOwner } from "./ui-core.js?v=0ce678e72942";
+import { runSearch } from "./ui-search.js?v=0ce678e72942";
+import { logSubmittedSearch } from "./ui-search-log.js?v=0ce678e72942";
+export function ideaAccepted(q){
  if(!ui.cap||!ui.latestState)return false;
  try{const n=inspectName(q,ui.cap.emojiManifest),entry=ui.latestState.names?.[n.canonical];return !publicNameUnavailable(n.canonical,ui.cap)&&n.isRoot&&!ui.reservedSet.has(n.canonical)&&!variantOwner(n.canonical)&&!entry?.activeId&&!entry?.auctionId&&!ui.cart.some(x=>x.name===n.canonical)&&!Object.values(ui.latestState.auctions??{}).some(a=>a.name===n.canonical&&a.status==="live");}catch{return false;}
 }
@@ -17,35 +16,19 @@ export function renderIdeas(force=false){const strip=el("ideasStrip");if(!strip|
  const query=el("searchInput").value.trim();if(!force&&strip.children.length&&context===query)return;context=query;
  generator=createIdeaGenerator({query,manifest:ui.cap.emojiManifest,accept:ideaAccepted});strip.replaceChildren();
  const row=add(strip,"div","","ideas-row ideas-masonry");row.setAttribute("role","group");row.setAttribute("aria-label","Scrolling word and emoji ideas");row.tabIndex=0;let columnNumber=0;
- const column=()=>{const col=add(row,"div","","idea-column idea-offset-"+(columnNumber%4));const lanes=["words","double","single"];for(let i=0;i<3;i++)idea(col,lanes[(i+columnNumber)%3]);columnNumber++;if(!col.children.length){col.remove();return false;}return true;};
- for(let i=0;i<12;i++)if(!column())break;
+ const makeCol=()=>{const col=document.createElement("div");col.className="idea-column idea-offset-"+(columnNumber%4);const lanes=["words","double","single"];for(let i=0;i<3;i++)idea(col,lanes[(i+columnNumber)%3]);columnNumber++;return col.children.length?col:null;};
+ for(let i=0;i<12;i++){const c=makeCol();if(!c)break;row.append(c);}
  if(!row.children.length)add(row,"span","No matching available ideas in the current registry view.","muted");
- const stepWidth=first=>{const next=first.nextElementSibling;return next?next.getBoundingClientRect().left-first.getBoundingClientRect().left:first.getBoundingClientRect().width+12;};
- const recycle=(node,position,maxSteps=1)=>{
-  if(node.contains(document.activeElement))return position;
-  for(let step=0;step<maxSteps;step++){
-   const first=node.firstElementChild;
-   if(!first?.classList.contains("idea-column"))break;
-   const width=stepWidth(first);
-   if(!(width>0)||position<=width)break;
-   if(!column())break;
-   first.remove();
-   position-=width;
-   node.scrollLeft=position;
-  }
-  return position;
- };
+ const locked=n=>Boolean(n.contains(document.activeElement)&&document.activeElement?.matches?.(":focus-visible"));
+ const recL=(n,pos,steps=1)=>{if(locked(n))return pos;for(let s=0;s<steps;s++){const f=n.firstElementChild,l=n.lastElementChild;if(!f?.classList.contains("idea-column")||f===l)break;const max=n.scrollWidth-n.clientWidth;if(max<=4)break;if(pos>Math.min(36,Math.max(12,max-itemStep(l)-4)))break;const c=makeCol();if(!c)break;n.prepend(c);pos+=itemStep(c);n.scrollLeft=pos;if(n.children.length>12)l.remove();}return pos;};
+ const recR=(n,pos,steps=1)=>{if(locked(n))return pos;for(let s=0;s<steps;s++){const f=n.firstElementChild;if(!f?.classList.contains("idea-column"))break;const max=n.scrollWidth-n.clientWidth;if(max<=4)break;const fw=itemStep(f);if(max-pos>Math.min(36,Math.max(12,max-fw-4))||pos<=fw)break;const c=makeCol();if(!c)break;n.append(c);f.remove();pos-=fw;n.scrollLeft=pos;}return pos;};
+ let init=false;const initStart=n=>{if(init)return false;const max=n.scrollWidth-n.clientWidth;if(max<=4)return false;init=true;n.scrollLeft=Math.round(max*0.6);return true;};
+ initStart(row);
  autoScroll(row,{
-  speed:12,
-  advance(node,position){
-   position=recycle(node,position,2);
-   return position>=node.scrollWidth-node.clientWidth&&node.scrollWidth>node.clientWidth?(node.scrollLeft=0):position;
-  },
-  onScrollSettle(node,position){
-   const remaining=node.scrollWidth-(position+node.clientWidth);
-   if(remaining<Math.max(260,node.clientWidth*0.75))return recycle(node,position,4);
-   return position;
-  },
+  speed:12,direction:-1,
+  advance(n,pos){if(!init&&initStart(n))return n.scrollLeft;pos=recL(n,pos,2);const max=n.scrollWidth-n.clientWidth;return max>0&&pos<=0?max:pos;},
+  onScroll(n,pos,dir){return dir<0?recL(n,pos,4):dir>0?recR(n,pos,4):pos;},
+  onScrollSettle(n,pos){const max=n.scrollWidth-n.clientWidth;if(max<=4)return pos;if(pos<36)return recL(n,pos,4);if(max-pos<36)return recR(n,pos,4);return pos;},
  });
  el("ideasContext").textContent=generator.related?"Related ideas use your text and local word patterns. Emoji ideas follow known topics or the local catalogue. Availability can change.":"Browse a local word and emoji catalogue. Availability can change.";
 }

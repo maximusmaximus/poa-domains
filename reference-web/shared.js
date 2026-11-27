@@ -319,9 +319,9 @@ export function resolveDefaultAuctionTab(groups, { currentTab = "current", userS
  if (currentCount > 0 && (!keepActiveTab || currentTab === "current")) return "current";
  return currentTab;
 }
-export function activePoaFixedListings(items, nowMs = Date.now()) {
+export function activePoaFixedListings(items) {
  return (Array.isArray(items) ? items : [])
-  .filter((a) => a && a.kind === "fixed" && a.status === "OPEN" && !a.high && (!a.closes || nowMs < a.closes))
+  .filter((a) => a && a.kind === "fixed" && a.status === "OPEN" && !a.high)
   .sort((x, y) => String(x.name).localeCompare(String(y.name)));
 }
 export function findOpenPoaAuctionByName(escrowMarket, name, nowMs = Date.now()) {
@@ -520,7 +520,7 @@ export function cartParamsForSigner(item, signer) {
  return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
- validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=2ca7cef90cec";
+ validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=0ce678e72942";
 const b58Alphabet =
  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -1679,7 +1679,7 @@ export function cartReview(item, cap, state, escrowMarket = null, bidderAddress 
    if (!poaOnlyMode(cap)) stop("POA resale purchases require POA checkout mode.");
    if (Array.isArray(escrowMarket)) {
     const l = escrowMarket.find((x) => x && x.id === p.auctionId);
-    if (!l || l.status !== "OPEN" || l.kind !== "fixed" || l.high || l.name !== item.name || (l.closes > 0 && nowMs >= l.closes)) {
+    if (!l || l.status !== "OPEN" || l.kind !== "fixed" || l.high || l.name !== item.name) {
      stop("This POA listing is no longer open. Remove it from your cart.");
      facts = { auctionId: p.auctionId ?? null, open: false };
      return { signature: JSON.stringify(facts), issues, minimum, params: proposed, canAcknowledge: false, outbid: false };

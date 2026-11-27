@@ -149,15 +149,15 @@ try {
     await scan(page, `cart dialog ${width}`);
     await page.keyboard.press("Escape");
     await page.locator("#tabFind").click();
-    // Motion is controlled by interaction, not refresh/play buttons. Focus and reduced motion stop it.
+    // Motion is controlled by interaction, not refresh/play buttons. Focus stops it; gentle motion resumes off focus even with OS reduced motion.
     assert.equal(await page.locator("#ideasPause,#ideasShuffle").count(),0);
     const row=page.locator('#ideasStrip .ideas-row').first();await row.focus();
     await expect(row).toHaveAttribute('data-motion','paused');
     const before=await row.evaluate(n=>n.scrollLeft);await page.waitForTimeout(100);
     assert.equal(await row.evaluate(n=>n.scrollLeft),before);
-    await page.emulateMedia({reducedMotion:'reduce'});await expect(row).toHaveAttribute('data-motion','reduced');
-    await page.emulateMedia({reducedMotion:'no-preference'});await page.locator('#searchInput').focus();await page.mouse.move(0,0);
+    await page.emulateMedia({reducedMotion:'reduce'});await page.locator('#searchInput').focus();await page.mouse.move(0,0);
     await expect(row).toHaveAttribute('data-motion','running',{timeout:4000});
+    await page.emulateMedia({reducedMotion:'no-preference'});await expect(row).toHaveAttribute('data-motion','running',{timeout:4000});
     await context.close();
   }
   await browser.close();

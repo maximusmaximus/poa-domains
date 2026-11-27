@@ -490,7 +490,7 @@ test("short-deadline seller consent is rejected before payout begins",async()=>{
  assert.equal(f.e.state().auctions[a]!.status,"OPEN");
 });
 
-test("queued auctions wait for first bid to start timer; abandoned fixed listings and bid-started auctions auto-expire in tick",async()=>{
+test("queued auctions wait for first bid; fixed listings do not expire until bought; abandoned handovers still auto-expire in tick",async()=>{
  const f=fixture();await fund(f,3,"10.000000","a");await fund(f,4,"10.000000","b");
  // Queued auction: closes === 0 and startedAt === null until first bid lands.
  const o1=await f.e.command(command(who(2),"open1","open",{name:"queued",reserve:"1.000000"})) as any;
@@ -522,11 +522,24 @@ test("queued auctions wait for first bid to start timer; abandoned fixed listing
  await f.e.command(command(who(2),"cancel1","cancel",{auction:o1.auction}));
  assert.equal(f.e.state().auctions[o1.auction]!.status,"CANCELLED");
  assert.equal(f.e.titleLocked(),false);
- // Abandoned fixed-price listing still auto-expires after closes.
- const l1=await f.e.command(command(who(2),"list1","list",{name:"fixed-empty",price:"1.000000"})) as any;
- f.net.now+=1001;
+ // Fixed-price listing has no expiration (closes === 0), survives past window, rejects outsider expire, and stays buyable.
+ const l1=await f.e.command(command(who(2),"list1","list",{name:"fixed-open",price:"1.000000"})) as any;
+ assert.equal(f.e.state().auctions[l1.auction]!.closes,0);
+ f.net.now+=50000;
  await f.e.tick();
+ assert.equal(f.e.state().auctions[l1.auction]!.status,"OPEN");
+ await assert.rejects(f.e.command(command(who(4),"fixed-exp","expire",{auction:l1.auction})),/CANCEL_NOT_ALLOWED/);
+ // Seller can still cancel anytime; a second listing bought well after window still enforces handover timeout refund.
+ await f.e.command(command(who(2),"cancel-l1","cancel",{auction:l1.auction}));
  assert.equal(f.e.state().auctions[l1.auction]!.status,"CANCELLED");
+ const l2=await f.e.command(command(who(2),"list2","list",{name:"fixed-bought",price:"1.000000"})) as any;
+ f.net.now+=50000;
+ await f.e.command(command(who(3),"buy-l2","buy",{auction:l2.auction,amount:"1.000000"}));
+ assert.equal(f.e.state().auctions[l2.auction]!.closes,f.net.now);
+ f.net.now+=1001; // seller abandons handover past closes + quiet -> buyer still refunded
+ await f.e.tick();
+ assert.equal(f.e.state().auctions[l2.auction]!.status,"CANCELLED");
+ assert.ok(f.e.state().payments[`cancel-${l2.auction}`]);
  assert.equal(f.e.titleLocked(),false);
  // Bid-started auction abandoned past closes + quiet auto-expires and refunds high bidder.
  const o2=await f.e.command(command(who(2),"open2","open",{name:"bid-abandoned",reserve:"1.000000"})) as any;

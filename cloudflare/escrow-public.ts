@@ -11,13 +11,14 @@ export function marketView(s: State, name?: string) {
     const effectiveMin=minNext>reserveMicros?minNext:reserveMicros;
     const kind=a.kind??"auction";
     const awaitingFirstBid=a.status==="OPEN"&&kind!=="fixed"&&a.high===null&&a.closes===0;
+    const openFixed=a.status==="OPEN"&&kind==="fixed"&&a.high===null;
     const bidders=[...new Set((a.history??[]).map(h=>h.payer).filter((x):x is string=>typeof x==="string"&&x.length>0))];
     if(a.high?.payer&&!bidders.includes(a.high.payer))bidders.push(a.high.payer);
     const startedAt=a.startedAt??(kind!=="fixed"&&a.high!==null?(a.history?.find(h=>h.amount)?.at??a.createdAt??null):null);
     return {
       id:a.id,name:a.name,seller:a.seller,kind,price:decimal(reserveMicros),
       minimumNextBid:decimal(effectiveMin),
-      status:a.status,closes:a.closes,window:a.window??a.quiet,quiet:a.quiet,
+      status:a.status,closes:openFixed?0:a.closes,window:a.window??a.quiet,quiet:a.quiet,
       createdAt:a.createdAt??null,startedAt,awaitingFirstBid,
       high:a.high?{payer:a.high.payer,amount:decimal(highMicros!)}:null,
       bidders,
