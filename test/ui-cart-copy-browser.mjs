@@ -2106,6 +2106,9 @@ try {
         body: '<svg xmlns="http://www.w3.org/2000/svg" width="180" height="56"><rect width="180" height="56" fill="#09131a"/></svg>',
       }),
     );
+    await pageGeom.route(`**/v1/media/${mockAvatarCid}`, (r) =>
+      r.fulfill({ status: 200, contentType: "image/png", body: samplePng }),
+    );
 
     // 1) Find tab: add an available POA name AND a POA auction bid, then simulate an outbid so reviewBtn + raiseBtn render side-by-side
     await pageGeom.goto(`${h.url}/?q=freshgeom`);
@@ -2262,7 +2265,7 @@ try {
     await expect(pageGeom.locator("#footerCreditOwner a.owner-primary-link .domain-name")).toHaveText("army");
     await expect(pageGeom.locator("#footerCreditOwner a.owner-primary-link .domain-header-avatar-xs img")).toHaveAttribute("src", `/v1/media/${mockAvatarCid}`);
     await expect(pageGeom.locator("#footerCreditOwner a.owner-addr-link")).toHaveAttribute("href", "/p/army");
-    await expect(pageGeom.locator("#footerCreditOwner a.owner-addr-link")).toHaveText("poa12X...rQ5U");
+    await expect(pageGeom.locator("#footerCreditOwner a.owner-addr-link")).toHaveText("poa1...rQ5U");
     await expect(pageGeom.locator("#footerCreditOwner button.poa-copy-btn")).toHaveAttribute("data-copy-address", footerArmyOwner);
     await auditUiGeometry(pageGeom, `${vp.name}:domain-page-with-escrow`);
 
