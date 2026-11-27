@@ -1,6 +1,6 @@
-import { createPoaCopyButton, decorateEmojiButton } from "./ui-copy.js?v=326fa0f6eee9";
-import { buildOwnershipIndex, domainPath, isPoaAddress, ownershipConflict, primaryNameForOwner, safeObject, shortenPoaAddress } from "./shared.js?v=326fa0f6eee9";
-import { ui } from "./ui-state.js?v=326fa0f6eee9";
+import { createPoaCopyButton, decorateEmojiButton } from "./ui-copy.js?v=3d4aed61982b";
+import { buildOwnershipIndex, domainPath, isPoaAddress, ownershipConflict, primaryNameForOwner, safeObject, shortenPoaAddress } from "./shared.js?v=3d4aed61982b";
+import { ui } from "./ui-state.js?v=3d4aed61982b";
 
 let addressNav = null;
 export function registerAddressNav(nav) {
@@ -9,12 +9,13 @@ export function registerAddressNav(nav) {
 
 export const el = (id) => document.getElementById(id);
 
-export async function json(url) {
+export async function json(url, { timeoutMs = 20000 } = {}) {
     const response = await fetch(url, {
         method: "GET",
         credentials: "omit",
         redirect: "error",
         cache: "no-store",
+        signal: timeoutMs > 0 && globalThis.AbortSignal?.timeout ? AbortSignal.timeout(timeoutMs) : undefined,
     });
     if (!response.ok)
         throw Error("Read failed");

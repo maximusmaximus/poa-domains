@@ -1,5 +1,5 @@
-import { autoScroll } from "./ui-motion.js?v=326fa0f6eee9";
-import { isPoaAuctionAwaitingFirstBid, poaShort, shapeLiveActions } from "./shared.js?v=326fa0f6eee9";
+import { autoScroll } from "./ui-motion.js?v=3d4aed61982b";
+import { isPoaAuctionAwaitingFirstBid, poaShort, shapeLiveActions } from "./shared.js?v=3d4aed61982b";
 
 export const MAX_RECENT_ACTIONS = 100;
 
@@ -154,7 +154,9 @@ export function drawTicker(state, escrowMarket = []) {
     track = document.getElementById("liveTickerTrack"),
     items = recentActions(state, escrowMarket),
     key = JSON.stringify(items);
-  if (!strip || !track || key === signature || track.contains(document.activeElement)) return;
+  const active = document.activeElement;
+  const keyboardFocusedInTrack = Boolean(active && track?.contains(active) && active.matches?.(":focus-visible"));
+  if (!strip || !track || key === signature || keyboardFocusedInTrack) return;
   const nextTopId = items[0]?.id ?? "";
   const hasNewTop = Boolean(topActionId && nextTopId && nextTopId !== topActionId);
   signature = key;
@@ -188,5 +190,5 @@ export function drawTicker(state, escrowMarket = []) {
     track.append(chip);
   }
   const ctrl = autoScroll(strip, { speed: 18 });
-  if (hasNewTop && ctrl && !ctrl.paused()) ctrl.reset(0);
+  if (hasNewTop && ctrl && !(ctrl.interacting ? ctrl.interacting() : ctrl.paused())) ctrl.reset(0);
 }

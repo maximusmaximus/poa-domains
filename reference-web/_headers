@@ -6,9 +6,9 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), clipboard-write=(self)
   Cross-Origin-Opener-Policy: same-origin
 /
-  Cache-Control: no-cache, must-revalidate
+  Cache-Control: no-cache, must-revalidate, no-store
 /*.html
-  Cache-Control: no-cache, must-revalidate
+  Cache-Control: no-cache, must-revalidate, no-store
 /domain-emoji.a5ec1ef950064a71.woff2
   Content-Type: font/woff2
   Cache-Control: public, max-age=31536000, immutable
