@@ -1,18 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=51ff8692aecf";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=51ff8692aecf";
-import { renderManagement } from "./ui-manage.js?v=51ff8692aecf";
-import { actionLabel } from "./ui-copy.js?v=51ff8692aecf";
-import { activePoaFixedListings, findOpenPoaAuctionByName, isOwnDomainOrListing, poaMinimumNextBid, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, SELF_BID_MESSAGE, SELF_BUY_MESSAGE, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=51ff8692aecf";
-import { ui } from "./ui-state.js?v=51ff8692aecf";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=51ff8692aecf";
-import { createPoaCopyButton } from "./ui-copy.js?v=51ff8692aecf";
-import { addToCart, persistCart, renderCart, renderCartEscrowStatus, setCartItemUseDeposit, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=51ff8692aecf";
-import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=51ff8692aecf";
-import { renderDomainPage } from "./ui-domain.js?v=51ff8692aecf";
-import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=51ff8692aecf";
-import { renderIdeas } from "./ui-ideas.js?v=51ff8692aecf";
-import { mountEscrow } from "./escrow.js?v=51ff8692aecf";
-import { activeUserAddress, applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, renderSelfBidNotice, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=51ff8692aecf";
+import { publicNameUnavailable } from "./shared.js?v=326fa0f6eee9";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=326fa0f6eee9";
+import { renderManagement } from "./ui-manage.js?v=326fa0f6eee9";
+import { actionLabel } from "./ui-copy.js?v=326fa0f6eee9";
+import { activePoaFixedListings, findOpenPoaAuctionByName, isOwnDomainOrListing, poaMinimumNextBid, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, SELF_BID_MESSAGE, SELF_BUY_MESSAGE, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=326fa0f6eee9";
+import { ui } from "./ui-state.js?v=326fa0f6eee9";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=326fa0f6eee9";
+import { createPoaCopyButton } from "./ui-copy.js?v=326fa0f6eee9";
+import { addToCart, persistCart, renderCart, renderCartEscrowStatus, setCartItemUseDeposit, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=326fa0f6eee9";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=326fa0f6eee9";
+import { renderDomainPage } from "./ui-domain.js?v=326fa0f6eee9";
+import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=326fa0f6eee9";
+import { renderIdeas } from "./ui-ideas.js?v=326fa0f6eee9";
+import { mountEscrow } from "./escrow.js?v=326fa0f6eee9";
+import { activeUserAddress, applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, renderSelfBidNotice, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=326fa0f6eee9";
 
 if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
  document.addEventListener("poa:owner-changed", () => {
@@ -704,33 +704,68 @@ async function fetchEscrowMarketData() {
  }
 }
 
-export async function refreshRegistry() {
+function snapshotRenderSig(payload, viewState, escrowMarket, marketServerTime) {
+ const nowMs = marketServerTime || Date.now();
+ const offerFlags = Object.values(viewState?.offers ?? {}).map((o) => [
+  o.id,
+  !o.cancelled && o.uses < o.maxUses && viewState.time < o.validUntil,
+ ]);
+ const auctionFlags = Object.values(viewState?.auctions ?? {}).map((a) => [
+  a.id,
+  a.status,
+  viewState.time >= (a.openAt ?? 0),
+  viewState.time >= (a.closeAt ?? (a.openAt ?? 0) + (a.window ?? 0)),
+ ]);
+ const escrowFlags = (Array.isArray(escrowMarket) ? escrowMarket : []).map((a) => [
+  a.id,
+  a.status,
+  Boolean(a.closes && nowMs >= a.closes),
+ ]);
+ return JSON.stringify([
+  payload?.sequence ?? null,
+  payload?.stateHash ?? null,
+  payload?.state ?? null,
+  escrowMarket ?? null,
+  offerFlags,
+  auctionFlags,
+  escrowFlags,
+ ]);
+}
+
+export async function refreshRegistry({ background = false, force = !background } = {}) {
  if (ui.refreshing || !ui.readState)
   return;
  ui.refreshing = true;
- pageStatus("", true);
+ const wasFailed = ui.registryReadFailed;
+ if (!background || wasFailed || !ui.latestState)
+  pageStatus("", true);
  try {
   const [payload] = await Promise.all([ui.readState(), fetchEscrowMarketData()]);
   const viewState = registryViewState(payload);
+  const dataSig = snapshotRenderSig(payload, viewState, ui.escrowMarket, ui.escrowMarketServerTime);
+  const changed = force || wasFailed || !ui.latestState || dataSig !== ui.lastSnapshotSig;
   ui.registryReadFailed = false;
   ui.refreshing = false;
   ui.lastLoadedAt = Date.now();
-  preserveInputs(() => {
-   ui.cart = ui.cart.map(item => recheckCartItem(item, ui.cap, viewState, ui.escrowMarket, activeUserAddress(), ui.escrowMarketServerTime || Date.now()));
-   persistCart();
-   render(payload);
-   renderTreasuryFooter();
-   renderCart();
-   runSearch(ui.lastSearch, false);
-   if (!el("searchSuggestions")?.hidden)
-    updateSearchSuggestions();
-   renderManagement();
-   refreshEscrowAddresses();
-   syncEscrowCardSelfBidGuards();
-   installHelp();
-   if (!el("ideasStrip").children.length)
-    renderIdeas();
-  });
+  if (changed) {
+   ui.lastSnapshotSig = dataSig;
+   preserveInputs(() => {
+    ui.cart = ui.cart.map(item => recheckCartItem(item, ui.cap, viewState, ui.escrowMarket, activeUserAddress(), ui.escrowMarketServerTime || Date.now()));
+    persistCart();
+    render(payload);
+    renderTreasuryFooter();
+    renderCart();
+    runSearch(ui.lastSearch, false);
+    if (!el("searchSuggestions")?.hidden)
+     updateSearchSuggestions();
+    renderManagement();
+    refreshEscrowAddresses();
+    syncEscrowCardSelfBidGuards();
+    installHelp();
+    if (!el("ideasStrip").children.length)
+     renderIdeas();
+   });
+  }
   updateFreshness();
   pageStatus();
  }
@@ -808,9 +843,15 @@ export async function refreshEscrowCaps() {
  renderCartEscrowStatus();
 }
 
-export async function refreshEscrowMarket() {
+export async function refreshEscrowMarket({ background = false } = {}) {
+ const prevSig = JSON.stringify(ui.escrowMarket ?? null);
  if (!(await fetchEscrowMarketData()))
   return;
+ const nextSig = JSON.stringify(ui.escrowMarket ?? null);
+ if (background && nextSig === prevSig)
+  return;
+ if (ui.rawSnapshot && ui.latestState)
+  ui.lastSnapshotSig = snapshotRenderSig(ui.rawSnapshot, ui.latestState, ui.escrowMarket, ui.escrowMarketServerTime);
  if (ui.latestState) {
   preserveInputs(() => {
    ui.cart = ui.cart.map((item) =>
@@ -1167,10 +1208,26 @@ export async function loadRegistry() {
   applyRoute();
   renderCart();
   if (!ui.demo && !ui.tickerTimer) {
-   ui.tickerTimer = setInterval(refreshRegistry, ui.TICKER_MS);
+   ui.tickerTimer = setInterval(() => {
+    if (!document.hidden)
+     void refreshRegistry({ background: true });
+   }, ui.TICKER_MS);
+   if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+    document.addEventListener("visibilitychange", () => {
+     if (!document.hidden && !ui.demo && ui.readState)
+      void refreshRegistry({ background: true });
+    });
+   }
    refreshNetworkStatus();
    refreshEscrowCaps();
-   ui.networkTimer = setInterval(() => { refreshNetworkStatus(); refreshEscrowCaps(); refreshEscrowMarket(); refreshTreasury(); }, ui.NETWORK_MS);
+   ui.networkTimer = setInterval(() => {
+    if (document.hidden)
+     return;
+    refreshNetworkStatus();
+    refreshEscrowCaps();
+    refreshEscrowMarket({ background: true });
+    refreshTreasury();
+   }, ui.NETWORK_MS);
   }
   else if (ui.demo)
    renderNetworkStatus();

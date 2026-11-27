@@ -28,6 +28,10 @@ export function autoScroll(node, { speed = 20, advance, onScrollSettle } = {}) {
       performance.now() < until ||
       !!media?.matches ||
       document.hidden,
+    reset(next = 0) {
+      const target = typeof next === "number" && Number.isFinite(next) ? Math.max(0, next) : 0;
+      position = expectedScroll = node.scrollLeft = target;
+    },
   };
   const pause = () => {
     until = performance.now() + 1800;

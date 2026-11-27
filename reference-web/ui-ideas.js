@@ -1,11 +1,11 @@
-import { publicNameUnavailable } from "./shared.js?v=51ff8692aecf";
-import { ui } from "./ui-state.js?v=51ff8692aecf";
-import { inspectName } from "./shared.js?v=51ff8692aecf";
-import { createIdeaGenerator } from "./ideas-generator.js?v=51ff8692aecf";
-import { autoScroll } from "./ui-motion.js?v=51ff8692aecf";
-import { add, el, variantOwner } from "./ui-core.js?v=51ff8692aecf";
-import { runSearch } from "./ui-search.js?v=51ff8692aecf";
-import { logSubmittedSearch } from "./ui-search-log.js?v=51ff8692aecf";
+import { publicNameUnavailable } from "./shared.js?v=326fa0f6eee9";
+import { ui } from "./ui-state.js?v=326fa0f6eee9";
+import { inspectName } from "./shared.js?v=326fa0f6eee9";
+import { createIdeaGenerator } from "./ideas-generator.js?v=326fa0f6eee9";
+import { autoScroll } from "./ui-motion.js?v=326fa0f6eee9";
+import { add, el, variantOwner } from "./ui-core.js?v=326fa0f6eee9";
+import { runSearch } from "./ui-search.js?v=326fa0f6eee9";
+import { logSubmittedSearch } from "./ui-search-log.js?v=326fa0f6eee9";
 export function ideaAccepted(q) {
  if(!ui.cap||!ui.latestState)return false;
  try{const n=inspectName(q,ui.cap.emojiManifest),entry=ui.latestState.names?.[n.canonical];return !publicNameUnavailable(n.canonical,ui.cap)&&n.isRoot&&!ui.reservedSet.has(n.canonical)&&!variantOwner(n.canonical)&&!entry?.activeId&&!entry?.auctionId&&!ui.cart.some(x=>x.name===n.canonical)&&!Object.values(ui.latestState.auctions??{}).some(a=>a.name===n.canonical&&a.status==="live");}catch{return false;}

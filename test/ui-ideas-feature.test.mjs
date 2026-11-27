@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {createIdeaGenerator,ideaPools} from "../reference-web/ideas-generator.js";
-import {recentActions} from "../reference-web/ui-ticker.js";
+import {MAX_RECENT_ACTIONS,recentActions} from "../reference-web/ui-ticker.js";
+import {ui} from "../reference-web/ui-state.js";
 import {actionLabel,buttonIcon,decorateEmojiButton} from "../reference-web/ui-copy.js";
 import {managedNames,managementPlan} from "../reference-web/ui-manage.js";
 import {CRYPTO_IDEA_WORDS,IDEA_WORDS,inspectName} from "../reference-web/shared.js";
@@ -26,6 +27,41 @@ test('UI uses human actions, actual info, footer-only project links and no Ideas
 test('management includes owned children and honest retirement co-signing, without state mutation',()=>{const root={id:'root',name:'garden',owner:'owner',version:3,ownerVersion:2},child={id:'child',name:'seed.garden',owner:'owner',version:4,parentId:'root'},state={time:100,names:{garden:{activeId:'root'},'seed.garden':{activeId:'child'}},deeds:{root,child}};const before=JSON.stringify(state);assert.equal(managedNames(state,'owner').length,2);const offer=managementPlan('createChildOffer',root,state,'owner','250');assert.equal(offer.params.rights.kind,'permanent');assert.equal(offer.params.maxUses,1);assert.equal(managementPlan('revokeChild',child,state,'owner').coSigners[0],'owner');assert.throws(()=>managementPlan('createChildOffer',child,state,'owner'));assert.throws(()=>managementPlan('sellFixed',child,state,'other'));assert.throws(()=>managementPlan('sellFixed',child,state,'owner','-1'));assert.equal(JSON.stringify(state),before);});
 
 test('the ticker includes every committed receipt, including rejected actions and names missing from legacy projection',()=>{const state={time:1,names:{},deeds:{},receipts:{a:{intentId:'a',sequence:1,status:'rejected',result:{name:'garden'}},b:{intentId:'b',sequence:2,status:'succeeded',result:{}},c:{intentId:'c',sequence:3,status:'succeeded',result:{name:'ocean'}}}};const items=recentActions(state);assert.equal(items.length,3);assert.deepEqual(items.map(x=>x.sequence),[3,2,1]);assert.ok(items.find(x=>x.name==='garden').label.includes('garden'));});
+
+test('the ticker merges registry seconds and escrow milliseconds newest-first, labels profile/main-domain receipts, ignores future offer expiry, and caps strictly at 100 actions',()=>{
+ assert.equal(MAX_RECENT_ACTIONS,100);
+ assert.ok(ui.TICKER_MS<=5000,'near-real-time poll interval must be <=5s');
+ const baseSec=1_795_746_000;
+ const receipts={},deeds={};
+ for(let i=1;i<=125;i++){
+  const id=`deed-${i}`,name=`n${i}`;
+  deeds[id]={id,name,owner:'poa1Owner',retired:false};
+  receipts[`r-${i}`]={intentId:`r-${i}`,sequence:i,time:baseSec+i*10,status:'succeeded',result:{deedId:id,owner:'poa1Owner'}};
+ }
+ receipts['r-126']={intentId:'r-126',sequence:126,time:baseSec+1260,status:'succeeded',result:{signer:'poa1Owner',primaryName:'army',deedId:'deed-125'}};
+ receipts['r-127']={intentId:'r-127',sequence:127,time:baseSec+1270,status:'succeeded',result:{metadataVersion:2}};
+ const offers={old:{id:'offer-old',kind:'resale',parentId:'deed-1',price:'100',asset:'POA',sequence:1,validUntil:baseSec+9999999,cancelled:false,uses:0,maxUses:1}};
+ const market=[
+  {id:'a'.repeat(64),kind:'auction',name:'oldwon',status:'COMPLETE',awaitingFirstBid:false,price:'100.000000',high:{payer:'poa1B',amount:'100.000000'},closes:(baseSec-5000)*1000,history:[{event:'Payment and title complete',at:(baseSec-5000)*1000,amount:'100.000000'}]},
+  {id:'b'.repeat(64),kind:'auction',name:'freshbid',status:'OPEN',awaitingFirstBid:false,price:'100.000000',high:{payer:'poa1B',amount:'150.000000'},startedAt:(baseSec+1265)*1000,closes:(baseSec+4865)*1000,history:[{event:'Auction started (first bid)',at:(baseSec+1265)*1000,amount:'100.000000'},{event:'Bid placed',at:(baseSec+1275)*1000,amount:'150.000000'}]},
+  {id:'c'.repeat(64),kind:'fixed',name:'listednow',status:'OPEN',price:'250.000000',high:null,createdAt:(baseSec+1268)*1000,history:[{event:'listed',at:(baseSec+1268)*1000,amount:'250.000000'}]},
+ ];
+ const items=recentActions({time:baseSec+1280,names:{},deeds,receipts,offers},market);
+ assert.equal(items.length,100);
+ // Exact newest-first ordering across ms escrow events and sec registry receipts
+ assert.equal(items[0].id,`escrow-bid:${'b'.repeat(64)}:150.000000`);
+ assert.equal(items[1].id,'receipt:r-127');
+ assert.match(items[1].label,/Profile updated · #127/);
+ assert.equal(items[2].id,`escrow-listed:${'c'.repeat(64)}`);
+ assert.match(items[2].label,/Listed · listednow · 250 POA/);
+ assert.equal(items[3].id,`escrow-started:${'b'.repeat(64)}`);
+ assert.equal(items[4].id,'receipt:r-126');
+ assert.match(items[4].label,/Main domain · army/);
+ assert.equal(items[5].id,'receipt:r-125');
+ // Stale 18h-old auction and ancient future-expiring offer must NOT jump to front (and drop past 100)
+ assert.ok(!items.some(x=>x.name==='oldwon'),'stale auction beyond last 100 must be dropped');
+ assert.ok(!items.some(x=>x.id==='offer:offer-old'),'old offer with future validUntil must not pin to top');
+});
 
 test('v3 keeps headerless masonry, flat closable status and always-visible corner help',()=>{
  const html=readFileSync('reference-web/index.html','utf8'),css=readFileSync('reference-web/style.css','utf8'),help=readFileSync('reference-web/ui-help.js','utf8'),ideas=readFileSync('reference-web/ui-ideas.js','utf8');
