@@ -631,11 +631,13 @@ try {
   await pageUx.locator("#tabFind").click();
   await expect(pageUx.locator("#managedDomainsBadge")).toHaveText("🌱2");
 
-  // (d) "Manage this domain" button on sold search result navigates to Manage domains & opens profile editor
+  // (d) Gear-only manage icon button on sold search result navigates to Manage domains & opens profile editor
   await pageUx.locator("#searchInput").fill("agent");
   await pageUx.locator("#searchBtn").click();
-  await expect(pageUx.locator("#searchResult")).toContainText("Manage this domain");
-  await pageUx.locator('#searchResult button[aria-label="Manage agent"]').click();
+  await expect(pageUx.locator("#searchResult")).not.toContainText("Manage this domain");
+  const searchManageGear = pageUx.locator('#searchResult button.manage-domain-gear[aria-label="Manage agent"]');
+  await expect(searchManageGear).toHaveText("⚙️");
+  await searchManageGear.click();
   await expect(pageUx.locator("#escrowSection")).toBeVisible();
   await expect(pageUx.locator("#manageOwnerNotice")).toBeVisible();
   const agentCard = pageUx.locator('#manageNames article[data-domain-name="agent"]');
@@ -1147,8 +1149,8 @@ try {
   await expect(pageAuc.locator("#liveAuctionsBadge")).toHaveText("🔥1");
   // Top scroll bar announces "comet" started and does NOT announce queued "vault"
   const tickerInitial = await pageAuc.locator("#liveTickerTrack").innerText();
-  assert.ok(tickerInitial.includes("Auction started") && tickerInitial.includes("comet"), tickerInitial);
-  assert.equal(tickerInitial.includes("vault"), false, tickerInitial);
+  assert.ok(tickerInitial.includes("Auction started") && tickerInitial.includes("COMET"), tickerInitial);
+  assert.equal(tickerInitial.includes("VAULT"), false, tickerInitial);
 
   // Search for a POA auction domain ("comet") -> auto-adds to cart, clearly warns it's Live Auction,
   // and explains all auction nuances inside both the Search card ℹ️ icon and Cart item ℹ️ icon!
@@ -1249,7 +1251,7 @@ try {
   // Top badge now shows 2 live auctions, and top scroll bar announces "vault" auction started!
   await expect(pageAuc.locator("#liveAuctionsBadge")).toHaveText("🔥2");
   const tickerUpdated = await pageAuc.locator("#liveTickerTrack").innerText();
-  assert.ok(tickerUpdated.includes("Auction started") && tickerUpdated.includes("vault"), tickerUpdated);
+  assert.ok(tickerUpdated.includes("Auction started") && tickerUpdated.includes("VAULT"), tickerUpdated);
 
   // Cart shows Outbid warning on "comet", blocks Copy prompt, and NEVER auto-raises the 300 POA cap
   await expect(pageAuc.locator("#cartList")).toContainText("Outbid!");
@@ -1860,6 +1862,7 @@ try {
         b.classList.contains("box-close") ||
         b.classList.contains("cart-remove") ||
         b.classList.contains("poa-copy-btn") ||
+        b.classList.contains("manage-domain-gear") ||
         b.classList.contains("site-home-btn") ||
         b.classList.contains("floating-cart-btn");
 
@@ -2377,7 +2380,71 @@ try {
     await pageTicker.locator("#termsAgreeBtn").click();
     await expect(pageTicker.locator("#liveTickerTrack .ticker-chip")).toHaveCount(100);
     await expect(pageTicker.locator("#liveTickerTrack .ticker-chip").first()).toContainText("tick115");
-    assert.equal((await pageTicker.locator("#liveTickerTrack").innerText()).includes("ancientwon"), false);
+    assert.equal((await pageTicker.locator("#liveTickerTrack").innerText()).includes("ANCIENTWON"), false);
+    assert.ok((await pageTicker.locator("#liveTickerTrack .ticker-chip").first().innerText()).includes("TICK115"), "Ticker domain name must render uppercase");
+    // Desktop hover scales ticker chip & proposed domain idea by 10%, returns to normal size off-hover,
+    // and recovers scrolling after hover+window-blur or mouse-click focus on .ideas-row.
+    const firstChip = pageTicker.locator("#liveTickerTrack .ticker-chip").first();
+    const chipBase = await firstChip.boundingBox();
+    await firstChip.hover();
+    await pageTicker.waitForTimeout(240);
+    const chipHover = await firstChip.boundingBox();
+    assert.ok(chipHover.width / chipBase.width > 1.07 && chipHover.width / chipBase.width < 1.13, `Expected ~10% ticker chip hover scale, got ${(chipHover.width / chipBase.width).toFixed(3)}`);
+    await pageTicker.evaluate(() => window.dispatchEvent(new Event("blur")));
+    await pageTicker.mouse.move(0, 0);
+    await pageTicker.waitForTimeout(240);
+    const chipAfter = await firstChip.boundingBox();
+    assert.ok(Math.abs(chipAfter.width - chipBase.width) < 1.5, "Ticker chip must return to normal size off-hover");
+    await expect(pageTicker.locator("#liveTicker")).toHaveAttribute("data-motion", "running", { timeout: 3000 });
+    const firstIdea = pageTicker.locator("#ideasStrip .ideas-row .idea").first();
+    const ideaBase = await firstIdea.boundingBox();
+    await firstIdea.hover();
+    await pageTicker.waitForTimeout(240);
+    const ideaHover = await firstIdea.boundingBox();
+    assert.ok(ideaHover.width / ideaBase.width > 1.07 && ideaHover.width / ideaBase.width < 1.13, `Expected ~10% idea hover scale, got ${(ideaHover.width / ideaBase.width).toFixed(3)}`);
+    await pageTicker.evaluate(() => {
+      const row = document.querySelector("#ideasStrip .ideas-row");
+      row.dispatchEvent(new PointerEvent("pointerdown", { pointerType: "mouse", bubbles: true }));
+      row.focus();
+    });
+    await pageTicker.mouse.move(0, 0);
+    await pageTicker.waitForTimeout(240);
+    const ideaAfter = await firstIdea.boundingBox();
+    assert.ok(Math.abs(ideaAfter.width - ideaBase.width) < 1.5, "Idea chip must return to normal size off-hover");
+    await expect(pageTicker.locator("#ideasStrip .ideas-row")).toHaveAttribute("data-motion", "running", { timeout: 3000 });
+    // Uppercase search input + domain drop shadow + top-right gear-only manage button check
+    const domainCss = await pageTicker.evaluate(() => {
+      const inp = document.getElementById("searchInput");
+      const tile = document.querySelector(".domain-tile, .domain-tile-inline");
+      const idea = document.querySelector("#ideasStrip .idea");
+      return {
+        inputTransform: getComputedStyle(inp).textTransform,
+        tileTransform: tile ? getComputedStyle(tile).textTransform : null,
+        tileShadow: tile ? getComputedStyle(tile).boxShadow : null,
+        tileTextShadow: tile ? getComputedStyle(tile).textShadow : null,
+        ideaShadow: idea ? getComputedStyle(idea).boxShadow : null,
+      };
+    });
+    assert.equal(domainCss.inputTransform, "uppercase");
+    assert.equal(domainCss.tileTransform, "uppercase");
+    assert.ok(domainCss.tileShadow && domainCss.tileShadow !== "none");
+    assert.ok(domainCss.tileTextShadow && domainCss.tileTextShadow !== "none");
+    assert.ok(domainCss.ideaShadow && domainCss.ideaShadow !== "none");
+    // Top-right gear-only manage icon on domain page, owner page, and explore cards (no "Manage this domain" text)
+    await pageTicker.goto(`${h.url}/d/tick115`);
+    await pageTicker.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    assert.equal((await pageTicker.locator("body").innerText()).includes("Manage this domain"), false);
+    const domGear = pageTicker.locator('#domainActions button.manage-domain-gear[aria-label="Manage tick115"]');
+    await expect(domGear).toHaveText("⚙️");
+    const domCorner = await pageTicker.evaluate(() => {
+      const sec = document.getElementById("domainSection").getBoundingClientRect();
+      const gear = document.querySelector("#domainActions .manage-domain-gear").getBoundingClientRect();
+      const copy = document.getElementById("domainCopyLink").getBoundingClientRect();
+      return { gearTopDelta: gear.top - sec.top, gearRightOfCenter: gear.left > sec.left + sec.width / 2, gapToCopy: copy.left - gear.right };
+    });
+    assert.ok(domCorner.gearTopDelta >= 0 && domCorner.gearTopDelta < 25 && domCorner.gearRightOfCenter && domCorner.gapToCopy >= 3.5, JSON.stringify(domCorner));
+    await pageTicker.goto(h.url);
+    await pageTicker.waitForFunction(() => document.body.dataset.registryStatus === "ready");
     // Let ticker scroll away from x=0, then land a brand-new action and verify near-real-time auto-poll brings it to front
     await pageTicker.mouse.move(0, 0);
     await pageTicker.waitForFunction(() => document.querySelector("#liveTicker").scrollLeft > 10, { timeout: 5000 });

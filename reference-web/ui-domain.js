@@ -25,13 +25,13 @@ import {
  resolveDomainView,
  resolveOwnerInput,
  unavailableKey,
-} from "./shared.js?v=7b4d1403d6f1";
-import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=7b4d1403d6f1";
-import { createInlineInfo } from "./ui-help.js?v=7b4d1403d6f1";
-import { ui } from "./ui-state.js?v=7b4d1403d6f1";
-import { add, appendPoaAddress, appendPrincipal, appendTextWithPoaAddress, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=7b4d1403d6f1";
-import { activeUserAddress, domainHeader, nameLink, openManageDomain, openPoa, ownerLink, renderSelfBidNotice } from "./ui-router.js?v=7b4d1403d6f1";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=7b4d1403d6f1";
+} from "./shared.js?v=bc6ae7df7f28";
+import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=bc6ae7df7f28";
+import { createInlineInfo } from "./ui-help.js?v=bc6ae7df7f28";
+import { ui } from "./ui-state.js?v=bc6ae7df7f28";
+import { add, appendPoaAddress, appendPrincipal, appendTextWithPoaAddress, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=bc6ae7df7f28";
+import { activeUserAddress, domainHeader, nameLink, openManageDomain, openPoa, ownerLink, renderSelfBidNotice } from "./ui-router.js?v=bc6ae7df7f28";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=bc6ae7df7f28";
 
 function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) {
  const wrap = document.createElement("span");
@@ -512,9 +512,10 @@ export function renderDomainPage(name) {
  const actions = el("domainActions");
  actions.replaceChildren();
  if (view.deed && !view.deed.retired) {
-  const manageBtn = add(actions, "button", "⚙️ Manage this domain", "secondary");
+  const manageBtn = add(actions, "button", "⚙️", "secondary small manage-domain-gear");
   manageBtn.type = "button";
   manageBtn.setAttribute("aria-label", `Manage ${name}`);
+  manageBtn.title = `Manage ${name}`;
   manageBtn.addEventListener("click", () => openManageDomain(name, view.deed.owner));
  }
  if (!poa && view.auction && view.auction.status === "live" && view.auctionBucket === "current" &&
@@ -668,14 +669,15 @@ export function renderOwnerPage(rawOwnerId) {
  if (!owned.length) add(namesBox, "p", "No names", "muted");
  for (const n of owned) {
   const d = ui.latestState.deeds[n.activeId];
-  const card = add(namesBox, "article", "", "card");
+  const card = add(namesBox, "article", "", "card has-manage-gear");
   const h = add(card, "h4", "");
   domainHeader(h, n.name);
   if (primary && n.name === primary) add(card, "p", "⭐ Main domain", "badge-ok");
   if (d.rights.kind === "lease") add(card, "p", "📜 Legacy lease", "badge");
-  const manageBtn = add(card, "button", "⚙️ Manage this domain", "secondary small");
+  const manageBtn = add(card, "button", "⚙️", "secondary small manage-domain-gear");
   manageBtn.type = "button";
   manageBtn.setAttribute("aria-label", `Manage ${n.name}`);
+  manageBtn.title = `Manage ${n.name}`;
   manageBtn.addEventListener("click", () => openManageDomain(n.name, d.owner));
  }
  if (poaOnlyMode(ui.cap)) {

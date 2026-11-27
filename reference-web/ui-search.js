@@ -1,13 +1,13 @@
-import { copyText } from "./ui-copy.js?v=7b4d1403d6f1";
-import { publicNameUnavailable } from "./shared.js?v=7b4d1403d6f1";
-import { isOwnDomainOrListing, registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, activePoaFixedListings, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=7b4d1403d6f1";
-import { ui } from "./ui-state.js?v=7b4d1403d6f1";
-import { activeUserAddress, domainHeader, nameLink, navigateDomain, openManageDomain, openPoa, ownerLink, renderSelfBidNotice, writeViewURL } from "./ui-router.js?v=7b4d1403d6f1";
-import { add, appendPrincipal, appendTextWithPoaAddress, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=7b4d1403d6f1";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=7b4d1403d6f1";
-import { addToCart } from "./ui-cart.js?v=7b4d1403d6f1";
-import { suggestNames } from "./ideas-generator.js?v=7b4d1403d6f1";
-import { logSubmittedSearch } from "./ui-search-log.js?v=7b4d1403d6f1";
+import { copyText } from "./ui-copy.js?v=bc6ae7df7f28";
+import { publicNameUnavailable } from "./shared.js?v=bc6ae7df7f28";
+import { isOwnDomainOrListing, registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, activePoaFixedListings, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=bc6ae7df7f28";
+import { ui } from "./ui-state.js?v=bc6ae7df7f28";
+import { activeUserAddress, domainHeader, nameLink, navigateDomain, openManageDomain, openPoa, ownerLink, renderSelfBidNotice, writeViewURL } from "./ui-router.js?v=bc6ae7df7f28";
+import { add, appendPrincipal, appendTextWithPoaAddress, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=bc6ae7df7f28";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=bc6ae7df7f28";
+import { addToCart } from "./ui-cart.js?v=bc6ae7df7f28";
+import { suggestNames } from "./ideas-generator.js?v=bc6ae7df7f28";
+import { logSubmittedSearch } from "./ui-search-log.js?v=bc6ae7df7f28";
 
 let activeSuggestionIdx = -1;
 let currentSuggestions = [];
@@ -463,7 +463,7 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
  }
  catch (error) {
   const card = add(container, "div", "", "card");
-  add(card, "h4", q);
+  add(card, "h4", q, "domain-name");
   add(card, "p", nameErrorReason(error), "badge-warn");
   return;
  }
@@ -669,9 +669,11 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
   const ownerInfo = add(card, "p", "Owner: ");
   ownerLink(ownerInfo, d.owner, person(d.owner));
   add(card, "p", `Deed: ${d.rights.kind} · Generation ${d.generation} · Owner v${d.ownerVersion} · Deed v${d.version}`).setAttribute("data-info-description", "");
-  const manageBtn = add(card, "button", "⚙️ Manage this domain", "secondary small");
+  card.classList.add("has-manage-gear");
+  const manageBtn = add(card, "button", "⚙️", "secondary small manage-domain-gear");
   manageBtn.type = "button";
   manageBtn.setAttribute("aria-label", `Manage ${name}`);
+  manageBtn.title = `Manage ${name}`;
   manageBtn.addEventListener("click", () => openManageDomain(name, d.owner));
   const resaleOffer = Object.values(s.offers).find((o) => o.kind === "resale" &&
    o.parentId === d.id &&

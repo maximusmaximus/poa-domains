@@ -340,7 +340,7 @@ export function countLiveAuctions({ cap, state, escrowMarket = [], nowMs = Date.
 export function formatAddressWithPrimary(state, value) {
  const short = shortenPoaAddress(value);
  const primary = state && value ? primaryNameForOwner(state, value) : null;
- return primary ? `${primary} (${short})` : short;
+ return primary ? `${primary.toUpperCase()} (${short})` : short;
 }
 export function poaAuctionOutbidStatus(auction, { bidderAddress = "", cartItem = null, state = null } = {}) {
  const minNext = poaMinimumNextBid(auction);
@@ -520,7 +520,7 @@ export function cartParamsForSigner(item, signer) {
  return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
- validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=7b4d1403d6f1";
+ validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=bc6ae7df7f28";
 const b58Alphabet =
  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
