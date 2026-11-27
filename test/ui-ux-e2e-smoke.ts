@@ -136,6 +136,11 @@ async function assertResponsiveGeometry(
       await page.locator("#advancedLink").click();
       await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>r(true))));
     }
+    const explorePanel=await page.evaluate(id=>document.getElementById(id)?.closest("[data-explore-panel]")?.getAttribute("data-explore-panel"),id);
+    if(explorePanel&&await page.locator(`.explore-tab[data-explore-tab="${explorePanel}"]`).count()){
+      await page.locator(`.explore-tab[data-explore-tab="${explorePanel}"]`).click();
+      await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>r(true))));
+    }
     const metric=await page.evaluate(id=>{
       const node=document.getElementById(id),rect=node?.getBoundingClientRect(),doc=document.documentElement;
       return {box:{id,missing:!node,width:Math.round(rect?.width??0),height:Math.round(rect?.height??0),
@@ -225,6 +230,7 @@ async function runFullUiUxFlowsOnRegistryApp(
         "searchBtn",
         "cartAnchor",
         "names",
+        "exploreActions",
         "auctions",
         "offers",
         "history",
