@@ -1,13 +1,13 @@
-import { isOwnDomainOrListing, isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, resolveOwnerInput, validPrincipal } from "./shared.js?v=7b4d1403d6f1";
-import { drawTicker } from "./ui-ticker.js?v=7b4d1403d6f1";
-import { actionLabel } from "./ui-copy.js?v=7b4d1403d6f1";
-import { returnFocus } from "./ui-a11y.js?v=7b4d1403d6f1";
-import { activeResaleOffers, buildCreativeSiteTitle, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=7b4d1403d6f1";
-import { ui } from "./ui-state.js?v=7b4d1403d6f1";
-import { add, appendPoaAddress, appendPrincipal, appendTextWithPoaAddress, el, person, namedText } from "./ui-core.js?v=7b4d1403d6f1";
-import { activeUserAddress, domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa, renderSelfBidNotice } from "./ui-router.js?v=7b4d1403d6f1";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=7b4d1403d6f1";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=7b4d1403d6f1";
+import { isOwnDomainOrListing, isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, resolveOwnerInput, validPrincipal } from "./shared.js?v=bc6ae7df7f28";
+import { drawTicker } from "./ui-ticker.js?v=bc6ae7df7f28";
+import { actionLabel } from "./ui-copy.js?v=bc6ae7df7f28";
+import { returnFocus } from "./ui-a11y.js?v=bc6ae7df7f28";
+import { activeResaleOffers, buildCreativeSiteTitle, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=bc6ae7df7f28";
+import { ui } from "./ui-state.js?v=bc6ae7df7f28";
+import { add, appendPoaAddress, appendPrincipal, appendTextWithPoaAddress, el, person, namedText } from "./ui-core.js?v=bc6ae7df7f28";
+import { activeUserAddress, domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa, renderSelfBidNotice } from "./ui-router.js?v=bc6ae7df7f28";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=bc6ae7df7f28";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=bc6ae7df7f28";
 
 export function updateLiveAuctionsBadge(state = ui.latestState) {
  const badge = el("liveAuctionsBadge");
@@ -542,7 +542,7 @@ export function render(payload) {
  }
  el("names").replaceChildren();
  for (const n of names) {
-  const d = s.deeds[n.activeId], card = add(el("names"), "article", "", "card");
+  const d = s.deeds[n.activeId], card = add(el("names"), "article", "", "card has-manage-gear");
   const nh = add(card, "h4", "");
   domainHeader(nh, n.name);
   const ownerLine = add(card, "p", ui.demo ? "Synthetic · Owner: " : "Owner: ", "muted");
@@ -569,9 +569,10 @@ export function render(payload) {
    add(cidRow, "code", lastCid);
   }
   card.append(more);
-  const manageBtn = add(card, "button", "⚙️ Manage this domain", "secondary small");
+  const manageBtn = add(card, "button", "⚙️", "secondary small manage-domain-gear");
   manageBtn.type = "button";
   manageBtn.setAttribute("aria-label", `Manage ${n.name}`);
+  manageBtn.title = `Manage ${n.name}`;
   manageBtn.addEventListener("click", () => openManageDomain(n.name, d.owner));
  }
  if (!names.length)

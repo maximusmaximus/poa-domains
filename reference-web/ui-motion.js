@@ -13,14 +13,14 @@ export function autoScroll(node, { speed = 20, advance, onScrollSettle } = {}) {
   const noHoverMedia = globalThis.matchMedia?.("(hover: none)");
   let hovered = false,
     touching = false,
-    focusFromTouch = false,
+    focusFromPointer = false,
     lastTouchAt = -Infinity,
     until = 0,
     settleTimer = null,
     last = performance.now(),
     position = node.scrollLeft,
     expectedScroll = node.scrollLeft;
-  const hasKeyboardFocus = () => node.contains(document.activeElement) && !focusFromTouch;
+  const hasKeyboardFocus = () => node.contains(document.activeElement) && !focusFromPointer;
   const state = {
     speed,
     advance,
@@ -58,7 +58,7 @@ export function autoScroll(node, { speed = 20, advance, onScrollSettle } = {}) {
   const beginTouch = () => {
     touching = true;
     hovered = false;
-    focusFromTouch = true;
+    focusFromPointer = true;
     lastTouchAt = performance.now();
     clearTimeout(settleTimer);
     pause();
@@ -80,9 +80,10 @@ export function autoScroll(node, { speed = 20, advance, onScrollSettle } = {}) {
     endTouch();
   };
   const onGlobalKeyDown = () => {
-    focusFromTouch = false;
+    focusFromPointer = false;
   };
   const onGlobalReset = () => {
+    hovered = false;
     endTouch();
   };
   node.addEventListener("pointerenter", (e) => {
@@ -90,16 +91,12 @@ export function autoScroll(node, { speed = 20, advance, onScrollSettle } = {}) {
     hovered = true;
   });
   node.addEventListener("pointerleave", (e) => {
-    if (hovered) {
-      hovered = false;
-      pause();
-    } else if (e.pointerType === "mouse") {
-      hovered = false;
-    }
+    if (hovered || e.pointerType === "mouse") hovered = false;
   });
   node.addEventListener("touchstart", beginTouch, { passive: true });
   node.addEventListener("touchmove", beginTouch, { passive: true });
   node.addEventListener("pointerdown", (e) => {
+    focusFromPointer = true;
     if (e.pointerType === "touch") beginTouch();
     else pause();
   }, { passive: true });
@@ -112,9 +109,10 @@ export function autoScroll(node, { speed = 20, advance, onScrollSettle } = {}) {
   globalThis.addEventListener?.("keydown", onGlobalKeyDown, { passive: true });
   globalThis.addEventListener?.("blur", onGlobalReset, { passive: true });
   document.addEventListener?.("visibilitychange", onGlobalReset, { passive: true });
+  document.documentElement?.addEventListener?.("mouseleave", onGlobalReset, { passive: true });
   for (const type of ["wheel", "keydown", "focusout"]) {
     node.addEventListener(type, () => {
-      if (type === "focusout" && !node.contains(document.activeElement)) focusFromTouch = false;
+      if (type === "focusout" && !node.contains(document.activeElement)) focusFromPointer = false;
       pause();
       if (type === "wheel") scheduleSettle();
     }, { passive: true });
@@ -133,6 +131,7 @@ export function autoScroll(node, { speed = 20, advance, onScrollSettle } = {}) {
       globalThis.removeEventListener?.("keydown", onGlobalKeyDown);
       globalThis.removeEventListener?.("blur", onGlobalReset);
       document.removeEventListener?.("visibilitychange", onGlobalReset);
+      document.documentElement?.removeEventListener?.("mouseleave", onGlobalReset);
       controllers.delete(node);
       return;
     }

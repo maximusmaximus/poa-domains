@@ -614,8 +614,8 @@ async function runAgentRoundtripVerification(
     document.querySelector("#names")?.textContent?.includes("builder.nexus"),
   );
 
-  // Verify #names now includes builder.nexus
-  assert.match(await page.locator("#names").innerText(), /builder\.nexus/);
+  // Verify #names now includes BUILDER.NEXUS (domains render uppercase)
+  assert.match(await page.locator("#names").innerText(), /BUILDER\.NEXUS/);
 
   // Verify searching builder.nexus now reports simple Unavailable
   await page.locator("#tabFind").click();
@@ -635,7 +635,7 @@ async function runAgentRoundtripVerification(
   await page.locator("#tabExplore").click();
   // Verify #history shows the new child purchase and carol's displaced bid as OUTBID
   const historyText = await page.locator("#history").innerText();
-  assert.match(historyText, /Child purchase: builder\.nexus/);
+  assert.match(historyText, /Child purchase: BUILDER\.NEXUS/);
   assert.match(historyText, /agent-e2e-fill-builder-nexus/);
   assert.match(historyText, /OUTBID/);
 

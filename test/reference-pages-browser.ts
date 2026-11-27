@@ -55,11 +55,11 @@ export async function verifyReferenceStaticPage(
     checks.push(
       "HTTP 200 and null-backend bootstrap renders clearly labeled synthetic demo",
     );
-    assert.match(await page.locator("#names").innerText(), /agent.alpha/);
-    assert.match(await page.locator("#names").innerText(), /rental.alpha/);
+    assert.match(await page.locator("#names").innerText(), /agent.alpha/i);
+    assert.match(await page.locator("#names").innerText(), /rental.alpha/i);
     assert.match(await page.locator("#names").innerText(), /Protected child/);
     assert.match(await page.locator("#names").innerText(), /example.invalid/);
-    assert.match(await page.locator("#auctions").innerText(), /orbit/);
+    assert.match(await page.locator("#auctions").innerText(), /orbit/i);
     assert.match(await page.locator("#auctions").innerText(), /funded/);
     assert.match(
       await page.locator("#freshness").innerText(),

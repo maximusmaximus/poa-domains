@@ -1,9 +1,9 @@
-import { ui } from "./ui-state.js?v=7b4d1403d6f1";
-import { add, appendTextWithPoaAddress, el, endpointBase, person } from "./ui-core.js?v=7b4d1403d6f1";
-import { createDomainAvatar, domainHeader, nameLink, notifyOwnerChanged, openPoa, ownerLink, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=7b4d1403d6f1";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=7b4d1403d6f1";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=7b4d1403d6f1";
-import { createInlineInfo } from "./ui-help.js?v=7b4d1403d6f1";
+import { ui } from "./ui-state.js?v=bc6ae7df7f28";
+import { add, appendTextWithPoaAddress, el, endpointBase, person } from "./ui-core.js?v=bc6ae7df7f28";
+import { createDomainAvatar, domainHeader, nameLink, notifyOwnerChanged, openPoa, ownerLink, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=bc6ae7df7f28";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=bc6ae7df7f28";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=bc6ae7df7f28";
+import { createInlineInfo } from "./ui-help.js?v=bc6ae7df7f28";
 import {
  buildProfileUpdatePrompt,
  buildSetPrimaryPrompt,
@@ -27,7 +27,7 @@ import {
  saveKnownOwner,
  shortenPoaAddress,
  validPrincipal,
-} from "./shared.js?v=7b4d1403d6f1";
+} from "./shared.js?v=bc6ae7df7f28";
 
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const IDLE_MANAGE_PROMPT = "Edit profile fields or choose an action above to preview the code for your agent.";
@@ -651,10 +651,10 @@ function buildTransferSection(card, deed, owner, { isPrimary = false } = {}) {
    const recPrimary = res.source === "address" ? primaryNameForOwner(ui.latestState, res.recipient) : null;
    const text =
     res.source === "address"
-     ? (recPrimary ? `✅ Recipient: ${recPrimary} (${shortenPoaAddress(res.recipient)})` : `✅ Recipient address: ${shortenPoaAddress(res.recipient)}`)
+     ? (recPrimary ? `✅ Recipient: ${recPrimary.toUpperCase()} (${shortenPoaAddress(res.recipient)})` : `✅ Recipient address: ${shortenPoaAddress(res.recipient)}`)
      : res.source === "default-domain"
-      ? `✅ Default domain "${res.domainName}" → ${shortenPoaAddress(res.recipient)}`
-      : `✅ Domain "${res.domainName}" POA address → ${shortenPoaAddress(res.recipient)}`;
+      ? `✅ Default domain "${res.domainName.toUpperCase()}" → ${shortenPoaAddress(res.recipient)}`
+      : `✅ Domain "${res.domainName.toUpperCase()}" POA address → ${shortenPoaAddress(res.recipient)}`;
    previewNode.replaceChildren();
    appendTextWithPoaAddress(previewNode, text, res.recipient);
   } else {
@@ -679,8 +679,8 @@ function buildTransferSection(card, deed, owner, { isPrimary = false } = {}) {
   toInput.removeAttribute("aria-invalid");
   pending = res;
   confirmSummary.textContent = res.domainName
-   ? `Transfer "${deed.name}" to ${res.domainName} (${res.recipient})?`
-   : `Transfer "${deed.name}" to ${res.recipient}?`;
+   ? `Transfer "${deed.name.toUpperCase()}" to ${res.domainName.toUpperCase()} (${res.recipient})?`
+   : `Transfer "${deed.name.toUpperCase()}" to ${res.recipient}?`;
   confirmWarn.textContent = isPrimary
    ? `⚠️ Attached profile fields and records reset on transfer (archived on the domain page), and "${deed.name}" will be cleared as your main domain.`
    : "⚠️ Attached profile fields and records reset on transfer (archived on the domain page).";
@@ -733,7 +733,7 @@ function buildTransferSection(card, deed, owner, { isPrimary = false } = {}) {
    },
   };
   showManagePrompt(promptText, {
-   meta: `↪️ Generated · Transfer "${fresh.name}" to ${shortenPoaAddress(pending.recipient)}`,
+   meta: `↪️ Generated · Transfer "${fresh.name.toUpperCase()}" to ${shortenPoaAddress(pending.recipient)}`,
    metaAddress: pending.recipient,
    payload,
    filename: `poa-domains-${safeSlug(fresh.name)}-transfer.json`,
