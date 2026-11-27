@@ -398,7 +398,7 @@ export class Escrow {
     this.publicInflight = probe().then(value => {
       // Never serve a successful display beyond the same financial age boundary.
       // Respect minepoa.com's 15s retry backoff on stale/HTTP holds; commands still call uncached fresh().
-      const ttlMs = value.held && (value.code === "ESCROW_STALE" || value.code === "ESCROW_NODE_HTTP") ? 15000 : 10000;
+      const ttlMs = value.held && (value.code === "ESCROW_STALE" || value.code === "ESCROW_NODE_HTTP" || value.code === "ESCROW_PROTOCOL_CHANGED") ? 15000 : 10000;
       this.publicFresh = { until: Math.min(this.now() + ttlMs,
         value.asOf === null ? Infinity : value.asOf + this.policy.maxAgeMs), value };
       return value;

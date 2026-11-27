@@ -91,9 +91,9 @@ test('expired, malformed, and bad-base58 commands throw deterministic ESCROW_* v
   const b=await r.json() as any;assert.equal(b.code,code);assert.equal(b.accepted,false);
  }
 });
-test('display readiness backs off 15s on ESCROW_STALE / ESCROW_NODE_HTTP while financial commands stay uncached',async()=>{
- const e=fixture();await e.escrow.pause(false);let probes=0;let mode:'stale'|'http'|'ok'='stale';
- Object.assign(e.net,{displayStatus:async()=>{probes++;if(mode==='http')throw Error('ESCROW_NODE_HTTP');return {...await e.net.status(),stale:mode==='stale'};}});
+test('display readiness backs off 15s on ESCROW_STALE / ESCROW_NODE_HTTP / ESCROW_PROTOCOL_CHANGED while financial commands stay uncached',async()=>{
+ const e=fixture();await e.escrow.pause(false);let probes=0;let mode:'stale'|'http'|'proto'|'ok'='stale';
+ Object.assign(e.net,{displayStatus:async()=>{probes++;if(mode==='http')throw Error('ESCROW_NODE_HTTP');if(mode==='proto')throw Error('ESCROW_PROTOCOL_CHANGED');return {...await e.net.status(),stale:mode==='stale'};}});
  const h1=await e.escrow.readiness();assert.equal(h1.held,true);assert.equal(h1.code,'ESCROW_STALE');assert.equal(probes,1);
  e.net.now+=12000;
  assert.equal((await e.escrow.readiness()).code,'ESCROW_STALE');assert.equal(probes,1,'stale hold stays cached for 15s');
@@ -107,5 +107,8 @@ test('display readiness backs off 15s on ESCROW_STALE / ESCROW_NODE_HTTP while f
  e.net.now+=10001;mode='http';
  const h2=await e.escrow.readiness();assert.equal(h2.held,true);assert.equal(h2.code,'ESCROW_NODE_HTTP');assert.equal(probes,3);
  e.net.now+=14999;assert.equal((await e.escrow.readiness()).code,'ESCROW_NODE_HTTP');assert.equal(probes,3);
- e.net.now+=2;mode='ok';assert.equal((await e.escrow.readiness()).held,false);assert.equal(probes,4);
+ e.net.now+=2;mode='proto';
+ const h3=await e.escrow.readiness();assert.equal(h3.held,true);assert.equal(h3.code,'ESCROW_PROTOCOL_CHANGED');assert.equal(probes,4);
+ e.net.now+=14999;assert.equal((await e.escrow.readiness()).code,'ESCROW_PROTOCOL_CHANGED');assert.equal(probes,4);
+ e.net.now+=2;mode='ok';assert.equal((await e.escrow.readiness()).held,false);assert.equal(probes,5);
 });
