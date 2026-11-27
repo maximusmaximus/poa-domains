@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="referrer" content="no-referrer" />
     <title>PoA domains — emoji names and agent tools</title>
-    <meta name="description" content="Explore emoji names and build a clear request for your agent. Open the PoA Domains Explorer for listings, agent tools and Manage domains escrow." />
+    <meta name="description" content="Permanent text and emoji domains with public profiles, POA auctions, and zero-key agent handoffs. First implementation live at poadomains.link." />
     <link rel="canonical" href="https://maximusmaximus.github.io/poa-domains/" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="PoA domains — emoji names and agent tools" />
-    <meta property="og:description" content="Explore emoji names and build a clear request for your agent. Open the Explorer for listings, agent tools and Manage domains escrow." />
+    <meta property="og:description" content="Permanent text and emoji domains with public profiles, POA auctions, and zero-key agent handoffs. First implementation live at poadomains.link." />
     <meta property="og:url" content="https://maximusmaximus.github.io/poa-domains/" />
     <meta property="og:image" content="https://maximusmaximus.github.io/poa-domains/icon.svg" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
@@ -23,103 +23,133 @@
       <nav class="top-nav" aria-label="Page sections">
         <a class="brand-pill" href="#landing-title">PoA Domains</a>
         <div class="top-nav-links">
-          <a href="#stats-overview">Stats</a>
+          <a href="#stats-overview">Rules</a>
           <a href="#features">Features</a>
           <a href="#how-it-works">How it works</a>
-          <a href="#observationSection">Network</a>
+          <a href="#operations">Live status</a>
+          <a href="#observationSection">Tools</a>
           <a href="#faq">FAQ</a>
         </div>
       </nav>
 
       <header class="hero">
-        <p class="label">Emoji &amp; text names · Agent-first · POA checkout</p>
+        <div class="banner-header" aria-hidden="true">
+          <span class="banner-tile tone-green">P</span>
+          <span class="banner-tile tone-blue">O</span>
+          <span class="banner-tile tone-coral">A</span>
+          <span class="banner-tile tone-blue">D</span>
+          <span class="banner-tile tone-violet">O</span>
+          <span class="banner-tile tone-blue">M</span>
+          <span class="banner-tile tone-gold">A</span>
+          <span class="banner-tile tone-coral">I</span>
+          <span class="banner-tile tone-blue">N</span>
+          <span class="banner-tile tone-green">S</span>
+        </div>
         <h1 id="landing-title">PoA domains</h1>
-        <p class="value">Permanent human- and emoji-readable names with public profiles, POA auctions, and zero-key agent handoffs.</p>
+        <p class="label">First implementation live at <a href="https://poadomains.link" rel="noreferrer">poadomains.link</a></p>
+        <p class="value">Permanent text &amp; emoji names with public profiles, POA auctions, and zero-key agent handoffs.</p>
         <div class="hero-actions">
-          <a class="hero-cta" href="https://poadomains.link" rel="noreferrer"><span aria-hidden="true">🌐</span> Open the Explorer</a>
+          <a class="hero-cta" href="https://poadomains.link" rel="noreferrer"><span aria-hidden="true">🌐</span> Open poadomains.link</a>
           <div class="hero-sublinks">
             <a href="https://poadomains.link/llms.txt" rel="noreferrer">🤖 Agent docs (llms.txt)</a>
-            <a href="#faq">❓ Read the FAQ</a>
+            <a href="#observationSection">📡 Network check</a>
+            <a href="#spelling-section">🔤 Spelling check</a>
+            <a href="#faq">❓ FAQ</a>
           </div>
         </div>
-        <p class="hero-note">Search names, browse live auctions, and copy an unsigned request for your agent — never paste private keys.</p>
-        <p class="notice-bar">💡 Everything on the live registry is priced and paid in POA 🪙. New names: <strong>100 POA</strong> (common) or <strong>1,000 POA</strong> (premium); check live POA checkout status before any payment. Some stored names stay reserved even when hidden from public lists. This static mirror holds no registry records.</p>
+        <div class="hero-facts" aria-label="Quick overview">
+          <div class="hero-fact">
+            <strong>Live implementation</strong>
+            <span>Hosted Explorer, Remote MCP &amp; POA checkout run at <a href="https://poadomains.link" rel="noreferrer">poadomains.link</a>.</span>
+          </div>
+          <div class="hero-fact">
+            <strong>One-time POA pricing</strong>
+            <span><strong>100 POA</strong> standard roots · <strong>1,000 POA</strong> single emoji · permanent, no renewals.</span>
+          </div>
+          <div class="hero-fact">
+            <strong>Static read-only mirror</strong>
+            <span>No keys, writes, or registry records live here. Check live checkout status before paying.</span>
+          </div>
+        </div>
       </header>
 
       <section id="stats-overview" aria-labelledby="stats-heading">
         <div class="section-head">
+          <span class="section-kicker">Protocol rules</span>
           <h2 id="stats-heading"><span aria-hidden="true">📊</span> Key stats &amp; rules</h2>
-          <p class="section-lead">Simple, predictable pricing and clear security boundaries at a glance.</p>
+          <p class="section-lead">Predictable pricing, permanent ownership, and strict security boundaries.</p>
         </div>
         <div class="stats-grid">
           <article class="stat-card">
             <p class="stat-value">100 POA</p>
-            <h3 class="stat-label">Standard root name</h3>
-            <p class="stat-desc">One-time checkout for text or multi-emoji root domains.</p>
+            <h3 class="stat-label">Standard root</h3>
+            <p class="stat-desc">One-time checkout for text or multi-emoji root names.</p>
           </article>
           <article class="stat-card">
             <p class="stat-value">1,000 POA</p>
-            <h3 class="stat-label">Premium single emoji</h3>
+            <h3 class="stat-label">Single emoji</h3>
             <p class="stat-desc">One holder per canonical emoji across skin tones and styles.</p>
           </article>
           <article class="stat-card">
             <p class="stat-value">♾️ Permanent</p>
-            <h3 class="stat-label">No renewals or expiry</h3>
-            <p class="stat-desc">Hold forever, edit your profile, or resell and auction anytime.</p>
+            <h3 class="stat-label">No expiry</h3>
+            <p class="stat-desc">Hold forever, update your profile, or resell and auction anytime.</p>
           </article>
           <article class="stat-card">
             <p class="stat-value">0 Keys</p>
-            <h3 class="stat-label">Zero keys on site</h3>
-            <p class="stat-desc">The browser never signs. Your agent signs locally in your wallet.</p>
+            <h3 class="stat-label">Unsigned browser</h3>
+            <p class="stat-desc">The site never signs; your agent or wallet signs locally.</p>
           </article>
           <article class="stat-card">
             <p class="stat-value">K = 5</p>
-            <h3 class="stat-label">Finality required</h3>
-            <p class="stat-desc">Escrow credits only after PoA attestations or checkpoint finality.</p>
+            <h3 class="stat-label">PoA finality</h3>
+            <p class="stat-desc">Escrow credits only after attestations or checkpoint finality.</p>
           </article>
           <article class="stat-card">
             <p class="stat-value">&gt; 10%</p>
-            <h3 class="stat-label">Auction increment</h3>
-            <p class="stat-desc">First bid starts the timer; outbid funds return to available balance.</p>
+            <h3 class="stat-label">Auction step</h3>
+            <p class="stat-desc">First bid starts the clock; outbid POA returns immediately.</p>
           </article>
         </div>
       </section>
 
       <section id="features" aria-labelledby="features-heading">
         <div class="section-head">
-          <h2 id="features-heading"><span aria-hidden="true">✨</span> Features</h2>
-          <p class="section-lead">Built for humans to browse and AI agents to verify and execute safely.</p>
+          <span class="section-kicker">Capabilities</span>
+          <h2 id="features-heading"><span aria-hidden="true">✨</span> Core features</h2>
+          <p class="section-lead">Designed for humans to explore and AI agents to verify and execute safely.</p>
         </div>
         <div class="feature-grid">
           <article class="feature-card">
-            <h3><span aria-hidden="true">🎨</span> Text &amp; emoji domains</h3>
-            <p>Register clean root words, multi-emoji names, canonical single-emoji names, and subdomains like <code>shop.yourname</code> with built-in lookalike protection.</p>
+            <h3><span aria-hidden="true">🎨</span> Text &amp; emoji names</h3>
+            <p>Register root words, multi-emoji names, canonical single emojis, and direct subdomains like <code>shop.yourname</code> with lookalike protection.</p>
           </article>
           <article class="feature-card">
-            <h3><span aria-hidden="true">🪪</span> Public profiles &amp; square avatars</h3>
-            <p>Attach POA, BTC, and EIP-55 ETH/Base receiving addresses, a plain-text bio, and a square avatar displayed beside your domain across the Explorer.</p>
+            <h3><span aria-hidden="true">🪪</span> Profiles &amp; square avatars</h3>
+            <p>Attach POA, BTC, and ETH/Base addresses, a plain-text bio, and a square avatar shown across the Explorer.</p>
           </article>
           <article class="feature-card">
             <h3><span aria-hidden="true">🔨</span> First-bid POA auctions</h3>
-            <p>Queued auctions stay open with no ticking clock until the first bid lands, with anti-snipe quiet extensions, cart bid caps, and instant outbid credit for re-bidding.</p>
+            <p>Queued auctions start their timer on the first bid, extend on late bids, and credit outbid funds immediately for re-bidding.</p>
           </article>
           <article class="feature-card">
             <h3><span aria-hidden="true">🤖</span> Agent cart &amp; Remote MCP</h3>
-            <p>Generate unsigned prompts and JSON from your cart or Manage domains, or connect agents directly over Streamable HTTP MCP at <code>/mcp</code>.</p>
+            <p>Copy unsigned prompts or JSON from the cart, or connect agents over Streamable HTTP MCP at <code>https://poadomains.link/mcp</code>.</p>
           </article>
           <article class="feature-card">
-            <h3><span aria-hidden="true">🧩</span> Subdomain marketplace</h3>
-            <p>Root holders can set a fixed POA price for direct subdomains. Buyers pay through POA checkout and holder proceeds settle from escrow.</p>
+            <h3><span aria-hidden="true">🧩</span> Subdomain market</h3>
+            <p>Root holders set fixed POA prices for direct subdomains; buyers settle through POA escrow with automatic holder payout.</p>
           </article>
           <article class="feature-card">
-            <h3><span aria-hidden="true">🛡️</span> Clean transfers &amp; safety holds</h3>
-            <p>Listing pauses profile fields and ownership transfers reset them cleanly for the next holder (archiving history on the domain page). Stale network readings automatically hold payments.</p>
+            <h3><span aria-hidden="true">🛡️</span> Clean transfers &amp; holds</h3>
+            <p>Listing pauses profile fields and transfers reset them cleanly (archived on the domain page). Stale network reads automatically hold checkout.</p>
           </article>
         </div>
       </section>
 
       <section id="how-it-works" aria-labelledby="steps-heading">
         <div class="section-head">
+          <span class="section-kicker">Workflow</span>
           <h2 id="steps-heading"><span aria-hidden="true">🧭</span> How it works</h2>
           <p class="section-lead">Three steps from finding a name to owning it permanently.</p>
         </div>
@@ -127,47 +157,49 @@
           <li class="step-card">
             <span class="step-num" aria-hidden="true">1</span>
             <h3>Find &amp; plan</h3>
-            <p>Open the Explorer to search available names, browse live Auctions or For sale listings, and add items to your planning cart. Nothing is paid in the browser.</p>
+            <p>Search available names, live auctions, or fixed-price listings at <a href="https://poadomains.link" rel="noreferrer">poadomains.link</a> and queue them in your planning cart.</p>
           </li>
           <li class="step-card">
             <span class="step-num" aria-hidden="true">2</span>
-            <h3>Hand off to your agent</h3>
-            <p>Copy the unsigned prompt or download JSON. Your agent re-checks live prices, ownership, and escrow status, previews the action, and asks for your approval.</p>
+            <h3>Agent handoff</h3>
+            <p>Copy the unsigned prompt or download JSON. Your agent checks live prices and escrow status, previews the action, and waits for your approval.</p>
           </li>
           <li class="step-card">
             <span class="step-num" aria-hidden="true">3</span>
             <h3>Finalize &amp; manage</h3>
-            <p>After PoA finality (<code>K=5</code> attestations or checkpoint), your agent mints or bids. Manage profiles, square avatars, subdomains, and sales anytime in Manage domains.</p>
+            <p>After PoA finality (<code>K=5</code> or checkpoint), your agent mints or bids. Update profiles, avatars, subdomains, and sales anytime in Manage domains.</p>
           </li>
         </ol>
       </section>
 
       <section aria-labelledby="operations">
         <div class="section-head">
-          <h2 id="operations"><span aria-hidden="true">🔎</span> What is available now</h2>
-          <p class="section-lead">Clear status of every live capability and current protocol limit.</p>
+          <span class="section-kicker">Availability</span>
+          <h2 id="operations"><span aria-hidden="true">🔎</span> Live status &amp; boundaries</h2>
+          <p class="section-lead">Where the first implementation runs and what this static mirror does.</p>
         </div>
         <div class="table-wrap">
           <table id="live-tools" class="availability-table">
-            <caption>Live tools and their limits</caption>
-            <thead><tr><th scope="col">Feature</th><th scope="col">Now</th></tr></thead>
+            <caption>Live surfaces and current scope</caption>
+            <thead><tr><th scope="col">Surface</th><th scope="col">Status</th></tr></thead>
             <tbody>
-              <tr><th scope="row">Explorer and agent cart</th><td><span aria-hidden="true">✅</span> Live. Browse names, profiles, auctions, and prepare unsigned agent handoffs.</td></tr>
+              <tr><th scope="row">First implementation (Explorer)</th><td><span aria-hidden="true">✅</span> Live at <a href="https://poadomains.link" rel="noreferrer"><code>https://poadomains.link</code></a>. Search names, browse auctions and profiles, and build unsigned agent handoffs.</td></tr>
               <tr><th scope="row">Remote MCP</th><td><span aria-hidden="true">✅</span> Live at <code>https://poadomains.link/mcp</code>. <a href="https://poadomains.link/llms.txt" rel="noreferrer">Agent connection details</a>.</td></tr>
               <tr><th scope="row">POA escrow</th><td><span aria-hidden="true">🪙</span> Enabled in the Explorer. Check Manage domains for current payment availability. Safety checks can hold payments when network readings are stale.</td></tr>
-              <tr><th scope="row">Static mirror page</th><td><span aria-hidden="true">ℹ️</span> <strong id="availability">Read-only mirror</strong>. This static page does not accept writes or payments; open the Explorer for live domains and checkout.</td></tr>
+              <tr><th scope="row">GitHub Pages mirror</th><td><span aria-hidden="true">ℹ️</span> <strong id="availability">Read-only mirror</strong>. This static page does not accept writes or payments; open <a href="https://poadomains.link" rel="noreferrer">poadomains.link</a> for live domains and checkout.</td></tr>
             </tbody>
           </table>
         </div>
-        <p id="explanation" class="muted">This is a static landing page. It never signs, accepts a key or signed packet, or sends a payment. Use the Explorer for its current tools and safety checks.</p>
-        <p id="source" class="muted">The optional checks below are not a registry or proof of ownership.</p>
+        <p id="explanation" class="muted">This is a static landing page. It never signs, accepts keys or signed packets, or sends payments.</p>
+        <p id="source" class="muted">The optional browser checks below are read-only utilities, not a registry or proof of ownership.</p>
       </section>
 
       <section id="observationSection" aria-labelledby="network-title" aria-busy="true">
         <div class="network-head">
           <div>
+            <span class="section-kicker">Read-only tool</span>
             <h2 id="network-title"><span aria-hidden="true">📡</span> Public network check</h2>
-            <p class="section-lead">Reads live PoA network status on open or when you refresh.</p>
+            <p class="section-lead">Reads live PoA mainnet status directly from the public node on load or refresh.</p>
           </div>
           <button id="refresh" type="button" disabled>Refresh network</button>
         </div>
@@ -177,55 +209,53 @@
           <p id="error"></p>
         </div>
         <dl id="network-details"></dl>
-        <p class="muted">Readings expire after 15 minutes. Failed or inconsistent checks clear all values. Refresh network takes a fresh pair of read-only requests; it never uses an old snapshot.</p>
+        <p class="muted">Readings expire after 15 minutes; failed or inconsistent checks clear all displayed values without snapshot fallback.</p>
       </section>
 
       <section id="spelling-section" aria-labelledby="spelling-title">
         <div class="section-head">
+          <span class="section-kicker">Local browser tool</span>
           <h2 id="spelling-title"><span aria-hidden="true">🔤</span> Local spelling check</h2>
-          <p class="section-lead">This optional tool checks emoji spelling in your browser, not name availability or ownership. No naming or payment action runs on this page. For POA escrow, open Manage domains in the Explorer.</p>
+          <p class="section-lead">Validates Unicode 17 emoji-only spellings locally in your browser (format only — does not check availability, ownership, or pricing).</p>
         </div>
         <div id="emoji-format-checker"></div>
-        <noscript>The optional spelling and network checks need JavaScript. The Explorer link above still works.</noscript>
+        <noscript>The optional spelling and network checks require JavaScript. The poadomains.link Explorer link above works without it.</noscript>
       </section>
 
       <section id="faq" aria-labelledby="faq-heading">
         <div class="section-head">
+          <span class="section-kicker">Answers</span>
           <h2 id="faq-heading"><span aria-hidden="true">❓</span> Frequently asked questions</h2>
-          <p class="section-lead">Quick answers on pricing, security, auctions, profiles, and agents.</p>
+          <p class="section-lead">Concise answers on the live implementation, pricing, auctions, profiles, and agents.</p>
         </div>
         <div class="faq-list">
           <details open>
-            <summary>What is PoA Domains?</summary>
-            <p>PoA Domains provides permanent text and emoji names, subdomains, and public profiles settled through POA escrow. See the <a href="./terms.html" target="_blank" rel="noopener noreferrer">Terms</a> for full details.</p>
+            <summary>Where is the first live implementation of PoA Domains?</summary>
+            <p>The first live implementation runs at <a href="https://poadomains.link" rel="noreferrer"><strong>poadomains.link</strong></a> (Web Explorer, Remote MCP, and POA escrow). This GitHub Pages site is its static, read-only mirror and local tool companion. See the <a href="./terms.html" target="_blank" rel="noopener noreferrer">Terms</a> for full boundaries.</p>
           </details>
           <details>
-            <summary>How much does a name cost, and do domains expire?</summary>
-            <p>New standard root names cost <strong>100 POA</strong> and premium single-emoji names cost <strong>1,000 POA</strong> (one-time checkout). Domains are permanent with no renewals or expiry; you can keep, update, transfer, sell, or auction them anytime.</p>
+            <summary>How much does a domain cost, and do names expire?</summary>
+            <p>New standard roots cost <strong>100 POA</strong> and premium single-emoji roots cost <strong>1,000 POA</strong> (one-time checkout). Names are permanent with no renewals or expiry; you can hold, update, transfer, list, or auction them anytime.</p>
           </details>
           <details>
-            <summary>Why doesn’t this site connect a wallet or ask for private keys?</summary>
-            <p>Private keys, seed phrases, and passwords never belong in a website. PoA Domains only builds unsigned public instructions and JSON. Your AI agent or local CLI verifies current prices, ownership, and escrow status, signs locally in your own wallet, and submits only after your approval.</p>
+            <summary>Why doesn’t the site connect a wallet or ask for private keys?</summary>
+            <p>Private keys and seed phrases never belong in a website. PoA Domains only produces unsigned public requests and JSON; your agent or local CLI verifies live state and signs locally only after your approval.</p>
           </details>
           <details>
-            <summary>How do POA auctions, timers, and outbid refunds work?</summary>
-            <p>Queued inventory auctions start their countdown timer only when the first bid lands. Each new bid must beat the current high bid by more than 10%, and late bids extend the close time by the quiet window. If another bidder outbids you, your POA returns immediately to your available escrow balance so you can re-bid right away or request a withdrawal back to your original sending address.</p>
+            <summary>How do POA auctions and outbid refunds work?</summary>
+            <p>Queued auctions start their timer only when the first bid arrives. Each bid must beat the current high bid by more than 10%, late bids extend closing by the quiet window, and outbid funds credit back immediately for re-bidding or withdrawal to your original sending address.</p>
           </details>
           <details>
-            <summary>What happens to my profile fields and avatar if I list or sell my domain?</summary>
-            <p>While a domain is listed for sale or in an active auction, attached profile fields and records pause so buyers see a clean listing. When ownership transfers to a new holder, previous profile fields and records are dropped for a clean slate and preserved as read-only history on the domain’s page.</p>
+            <summary>What happens to profile fields when a domain is listed or sold?</summary>
+            <p>Listing or auctioning pauses attached profile fields and records. Ownership transfers reset them cleanly for the new holder while preserving prior entries as read-only history on the domain page.</p>
           </details>
           <details>
-            <summary>How do AI agents connect to PoA Domains?</summary>
-            <p>Agents can connect over Streamable HTTP MCP at <code>https://poadomains.link/mcp</code>, inspect discovery docs at <a href="https://poadomains.link/llms.txt" rel="noreferrer"><code>llms.txt</code></a>, or accept copied prompts and downloaded JSON from the Explorer’s Cart and Manage domains views.</p>
+            <summary>How do AI agents connect?</summary>
+            <p>Connect over Streamable HTTP MCP at <code>https://poadomains.link/mcp</code>, read discovery metadata at <a href="https://poadomains.link/llms.txt" rel="noreferrer"><code>llms.txt</code></a>, or paste copied Cart / Manage domains prompts from the Explorer.</p>
           </details>
           <details>
-            <summary>Why can POA payments show as held or paused?</summary>
-            <p>Safety checks automatically pause escrow payments whenever upstream PoA network readings are slow, stale, unreachable, or awaiting reconciliation. Holds never erase balances or refund obligations — your agent simply stops before sending funds until checkout reopens.</p>
-          </details>
-          <details>
-            <summary>What is the difference between this Mirror Site and the Explorer?</summary>
-            <p>This GitHub Pages Mirror Site is a static, read-only overview, public-node telemetry viewer, and local Unicode emoji spelling checker. Open the live <a href="https://poadomains.link" rel="noreferrer">PoA Domains Explorer</a> to search names, view domain profiles, join auctions, or manage domains.</p>
+            <summary>Why can POA checkout show as paused or held?</summary>
+            <p>Safety checks automatically hold escrow payments when upstream PoA network readings are stale, unreachable, or reconciling. Holds protect funds and never erase balances or refund obligations.</p>
           </details>
         </div>
       </section>
