@@ -1,4 +1,4 @@
-import { decorateEmojiButton } from "./ui-copy.js?v=d26e4a6a2f9f";
+import { decorateEmojiButton } from "./ui-copy.js?v=51ff8692aecf";
 // Native nonmodal popovers provide touch/keyboard dismissal and do not trap page focus.
 const watched=new WeakSet();
 export function decoratePoaFields(){
