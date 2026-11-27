@@ -345,6 +345,7 @@ html{scroll-padding-top:6rem;}
 #searchSection .idea-offset-3{padding-top:18px;}
 
 #networkStatusBar .status-network{padding-right:0;height:100%;display:flex;align-items:center;justify-content:flex-end;min-width:0;overflow:hidden;}
+@media(max-width:899px) and (orientation:portrait){#networkStatusBar{width:100%;margin-left:0;}#networkStatusBar .status-network{justify-content:flex-start;}}
 #networkStatusBar .network-status-text{font-weight:700;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25;}
 #networkStatusBar[data-stale="true"] .network-status-text{opacity:.75;}
 #networkStatusBar .network-status-icon{display:none;}
