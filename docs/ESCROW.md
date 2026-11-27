@@ -64,6 +64,19 @@ return 404. Never put the bearer value in a URL. Actions:
 - `{"action":"rebroadcast"}`: re-transmit the exact retained signed bytes of an
   `UNKNOWN` outgoing transfer if and only if it is unseen on-chain and the wallet's
   ledger `next_nonce` still matches the transfer's nonce.
+- `{"action":"uncredited"}`: read-only inspection of up to 25 recent incoming wallet
+  transfers not yet recorded in `credited` or `uncredited` (classified as `no_intent`,
+  `wrong_sender`, `wrong_amount`, `intent_already_used`, or `matches_open_intent`),
+  alongside the current unexplained-surplus watermark.
+- `{"action":"refund-uncredited","txid":"<64-hex>"}`: strictly sender-bound bounce-back
+  for a finalized incoming transfer that cannot satisfy any open deposit intent (e.g.
+  unsolicited dust or a wrong-sender/third-party funding mistake). Accepts only `txid`
+  (no `to` or `amount` parameters): verifies the on-chain transfer independently,
+  refuses transfers that match an open intent (`ESCROW_DEPOSIT_MATCHES_INTENT`), records
+  the transfer in `uncredited`, and queues chunked `READY` `refund` payments strictly
+  back to the verified on-chain `body.from` on the Worker's managed nonce lane. If the
+  escrow was halted with `ASSET_LIABILITY_MISMATCH` and the current checkpoint covers
+  that transfer with reconciled balance, it clears that halt without altering `paused`.
 - `{"action":"command","packet":{"command":...,"signature":...}}`: a separately
   actor-signed request. The admin credential alone cannot create seller/bidder consent.
 
@@ -91,8 +104,8 @@ Command parameter schemas (all fields required; no extras):
 
 | Action | Parameters |
 |---|---|
-| `intent` | `amount` (returns unique intent, exact memo, public recipient) |
-| `detect` | `intent`, `txid` |
+| `intent` | `amount` (returns unique intent, exact memo, public recipient, and required `payer` sender address; on-chain funding must come from `payer`) |
+| `detect` | `intent`, `txid` (requires `body.from === intent.payer`, exact recipient, amount, and memo) |
 | `list` | `name`, `price` (fixed-price escrow listing) |
 | `buy` | `auction`, `amount` (exact fixed price; reserves credited funds) |
 | `view` | no parameters (public signed account read only) |
@@ -106,9 +119,18 @@ Command parameter schemas (all fields required; no extras):
 Outbid/cancel/expiry create original-payer refund obligations. Pausing or a network
 hold does not erase liabilities. Expiry without executable seller consent refunds
 instead of assuming a sale. New commands other than cancel/expire require fresh
-network status and reconciliation. Reconciliation mismatches persist a halt and
-quarantine observation without crediting unexplained funds; there is no generic
-remote "clear halt" endpoint.
+network status and reconciliation. Reconciliation checks checkpoint-aligned wallet
+balance against covered `credited` + `uncredited` incoming transfers minus covered
+finalized outgoing transfers: any deficit (`actual < expected`) or unexplained drop
+in previously observed surplus (`unexplained < watermark`) immediately persists an
+`ASSET_LIABILITY_MISMATCH` halt without crediting unexplained funds. New unexplained
+on-chain surplus (such as unsolicited dust or a wrong-sender transfer) is logged and
+tracked in a monotonic SQLite watermark (`escrow_surplus_watermark`) outside the
+2,000-record journal so unsolicited dust cannot DoS escrow operations or exhaust
+journal capacity, while still catching any subsequent outflow from that surplus.
+There is no generic remote "clear halt" endpoint; only verified `refund-uncredited`
+(strictly back to on-chain `body.from`) or reviewed-credit recovery can resolve
+quarantined funds.
 
 ## Native transport and finality
 
@@ -150,8 +172,10 @@ reserved across restart/day change; transaction and daily caps include reservati
 ## Persistence and tests
 
 Escrow records are append-only, payload-bound, checksummed and replayed; no mutable
-snapshot is independently trusted. Ledger invariants require credited assets to equal
-available balances + bid holds + non-final payout/refund liabilities. Outbox nonces
+snapshot is independently trusted. Ledger invariants require credited + recorded
+uncredited incoming assets to equal available balances + bid holds + non-final
+payout/refund liabilities (with `(from, nonce)` unique across both `credited` and
+`uncredited`, and deposit memos unique across `credited`). Outbox nonces
 cannot be reused. New work atomically reserves its worst-case recovery records
 within the 2,000-record admission budget, including pending deposits and capped
 withdrawal chunks. A finite drain-only lane may exceed this budget for legacy
@@ -204,7 +228,10 @@ and admin credentials on public writes are refused. Admin routes remain token-on
 
 The **My POA** tab supplies copy-prompts for an agent to sign requests externally;
 the browser never signs, asks for keys, or saves signed requests to disk/storage. A
-payment intent returns the exact recipient, amount and unique `poadomains:<intent>` memo.
+payment intent returns the required sender (`payer`), exact recipient, amount, and
+unique `poadomains:<intent>` memo; on-chain funding must be sent from `payer`
+(third-party or treasury transfers fail `ESCROW_DEPOSIT_BINDING` and display a
+`mismatch` diagnostic on `GET /v1/escrow/intent?id=...&txid=...`).
 Funding an account is not a bid, reservation, purchase, or title transfer. After final
 credit, the payer separately signs `bid` or `buy`. Seller consent is a separately signed
 registry transfer inside `settle`, never a direct transfer submitted ahead of payment.

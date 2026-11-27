@@ -82,7 +82,7 @@ export function mountEscrow({ base = "", capability, registryId, section, domain
     catch (e) {
         message.textContent = e.message;
     } }); return b; };
-    const fund = btn("➕ Add POA", "intent", () => ({ amount: poaAmount(amount.value) }), "This creates an intent, not a payment. Only use the exact recipient, amount and unique memo returned by that intent. After final credit, bid/buy needs a separate signed request.");
+    const fund = btn("➕ Add POA", "intent", () => ({ amount: poaAmount(amount.value) }), "This creates an intent, not a payment. Send from this exact poa1 address only, using the exact recipient, amount and unique memo returned by that intent. After final credit, bid/buy needs a separate signed request.");
     fund.id = "escrowIntentPrompt";
     btn("👀 Read my escrow", "view", () => ({}), "Read only. This signature lets this page refresh only your account until it expires.");
     const fixedList = btn("🏷️ List my name for POA", "list", () => ({ name: listingName.value.trim(), price: poaAmount(amount.value) }), "Only an existing permanent, unencumbered name you own can be listed. Registry-only offers must be cancelled first.");
@@ -98,8 +98,8 @@ export function mountEscrow({ base = "", capability, registryId, section, domain
         }
         deposit.hidden = false;
         append(deposit, "h3", `📥 Deposit: ${intent.status}`);
-        append(deposit, "p", intent.status === "final" ? "✅ Final and credited. Now sign your bid, purchase or refund request." : intent.status === "seen" ? "👀 Seen. Not credited yet. Ask your agent to retry detect when final." : "⏳ Waiting. Send only after checking this intent.");
-        for (const [label, value] of [["To", intent.to], ["Exact amount", intent.amount + " POA"], ["Unique memo", intent.memo]]) {
+        append(deposit, "p", intent.status === "final" ? "✅ Final and credited. Now sign your bid, purchase or refund request." : intent.status === "seen" ? "👀 Seen. Not credited yet. Ask your agent to retry detect when final." : intent.status === "mismatch" ? `⚠️ Transfer mismatch (${intent.mismatch || "binding"}). Must be sent from ${intent.payer} to ${intent.to} for the exact amount and memo.` : "⏳ Waiting. Send only from the exact address below after checking this intent.");
+        for (const [label, value] of [["Send from (must match)", intent.payer], ["To", intent.to], ["Exact amount", intent.amount + " POA"], ["Unique memo", intent.memo]]) {
             append(deposit, "p", label);
             append(deposit, "code", value, "escrow-value");
             copyButton(deposit, "📋 Copy " + label.toLowerCase(), () => value);

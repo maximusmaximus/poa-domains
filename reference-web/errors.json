@@ -358,7 +358,7 @@
     {
       "code": "ESCROW_DEPOSIT_BINDING",
       "httpStatus": 400,
-      "message": "Escrow deposit binding. Check the documented inputs and current state.",
+      "message": "The on-chain transfer does not match the deposit intent (sender, recipient, exact amount, and memo must all match). Deposits must be sent from the exact poa1 address that signed intent; third-party or treasury transfers cannot be credited.",
       "retryable": false
     },
     {
@@ -371,6 +371,12 @@
       "code": "ESCROW_DEPOSIT_INTENT",
       "httpStatus": 400,
       "message": "Escrow deposit intent. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_DEPOSIT_MATCHES_INTENT",
+      "httpStatus": 409,
+      "message": "This transfer already satisfies an open deposit intent and must be credited via detect instead of bounced back.",
       "retryable": false
     },
     {

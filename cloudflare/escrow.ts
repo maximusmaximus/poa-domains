@@ -88,6 +88,8 @@ export interface State {
   reviews?: Record<string,{ txid: string; intent: string; height: number; root: string; observed: string; at: number }>;
   /** POA subname listings set by a parent holder (absent in older journals). */
   subListings?: Record<string,SubListing>;
+  /** Unsolicited or mismatched incoming transfers booked solely for sender-bound bounce-back refunds (absent in older journals). */
+  uncredited?: Record<string,Transfer>;
 }
 export interface SubListing {
   id: string; parent: string; parentDeedId: string; ownerVersion: number; seller: string; price: string;
@@ -95,6 +97,10 @@ export interface SubListing {
 }
 export interface Entry { sequence: number; previous: string; event: string; payload: unknown; state: State; checksum: string; }
 export interface Journal { load(): State; append(event: string, payload: unknown, change: (s: State) => void): State; }
+/** Non-journal reconciliation watermark so dust/surplus alerts consume zero journal entries while still halting on any unexplained surplus drop. */
+export interface SurplusWatermark { height: number; root: string; unexplainedMicros: string; cutoff?: number; observedAt: number; }
+export interface SurplusStore { read(wallet: string): SurplusWatermark | null; write(wallet: string, mark: SurplusWatermark): void; clear?(wallet: string): void; }
+const defaultSurplusStores = new WeakMap<Journal, Map<string, SurplusWatermark>>();
 export function initial(policy: Policy): State {
   address(policy.wallet); address(policy.treasury); need(policy.wallet!==policy.treasury,"ESCROW_DISTINCT_WALLET"); need(micros(policy.perTx)>0n && micros(policy.daily)>=micros(policy.perTx), "ESCROW_LIMITS");
   integer(policy.feeBps,0,10000); integer(policy.maxAgeMs,1,300000);
@@ -110,7 +116,9 @@ export function invariant(s: State): void {
   need(liabilities === BigInt(s.assets) && liabilities >= 0n,"ESCROW_ACCOUNTING");
   const nonces = Object.values(s.payments).filter(p=>p.body).map(p=>p.body!.nonce);
   need(new Set(nonces).size === nonces.length,"ESCROW_NONCE_REUSE");
-  const depNonces = Object.values(s.credited).map(b=>`${b.from}:${b.nonce}`);
+  const uncredited = s.uncredited ?? {};
+  for(const id of Object.keys(uncredited)) need(!s.credited[id],"ESCROW_DEPOSIT_DUPLICATE");
+  const depNonces = [...Object.values(s.credited), ...Object.values(uncredited)].map(b=>`${b.from}:${b.nonce}`);
   const depMemos = Object.values(s.credited).map(b=>b.memo);
   need(new Set(depNonces).size === depNonces.length && new Set(depMemos).size === depMemos.length,"ESCROW_DEPOSIT_DUPLICATE");
   for(const p of Object.values(s.payments)) if(p.body) need(p.txid === txid(p.body) &&
@@ -281,8 +289,33 @@ export class SQLiteEscrowJournal implements Journal {
 export class Escrow {
   constructor(readonly journal: Journal, private network: Network, private signer: Signer,
     private titles: TitleStore, readonly policy: Policy, private now=()=>Date.now(), private enabled=()=>false,
-    private crash: (point:string)=>void=()=>{}, private newNames: ()=>boolean=()=>false, private subnames: ()=>boolean=()=>false) {
+    private crash: (point:string)=>void=()=>{}, private newNames: ()=>boolean=()=>false, private subnames: ()=>boolean=()=>false,
+    private surplusStore?: SurplusStore) {
     need(journal.load().policy===digest(policy) && signer.address===policy.wallet,"ESCROW_POLICY_CHANGED");
+  }
+  private readSurplus(): SurplusWatermark | null {
+    if (this.surplusStore) return this.surplusStore.read(this.policy.wallet);
+    return defaultSurplusStores.get(this.journal)?.get(this.policy.wallet) ?? null;
+  }
+  private writeSurplus(mark: SurplusWatermark): void {
+    if (this.surplusStore) { this.surplusStore.write(this.policy.wallet, mark); return; }
+    let map = defaultSurplusStores.get(this.journal);
+    if (!map) { map = new Map(); defaultSurplusStores.set(this.journal, map); }
+    map.set(this.policy.wallet, mark);
+  }
+  /** Decrement the unexplained-surplus floor when a deposit that was already covered at or before prev.height is legitimately booked. */
+  private acknowledgeSurplus(o: Observation, amountMicros: bigint, coveredAtHeight?: number): void {
+    const prev = this.readSurplus();
+    if (!prev) return;
+    const prevAmt = BigInt(prev.unexplainedMicros);
+    if (prevAmt <= 0n) return;
+    const alreadyInPrev =
+      (o.checkpoint !== null && o.checkpoint.height <= prev.height) ||
+      (prev.cutoff !== undefined && o.body.ts < prev.cutoff) ||
+      (coveredAtHeight !== undefined && coveredAtHeight <= prev.height);
+    if (!alreadyInPrev) return;
+    const nextAmt = prevAmt > amountMicros ? prevAmt - amountMicros : 0n;
+    this.writeSurplus({ ...prev, unexplainedMicros: String(nextAmt), observedAt: this.now() });
   }
   private serial<T>(fn:()=>Promise<T>): Promise<T> {
     const prev=journalQueues.get(this.journal) ?? Promise.resolve();
@@ -409,19 +442,23 @@ export class Escrow {
   async depositView(id: string, candidate?: string): Promise<unknown> {
     need(/^[0-9a-f]{64}$/.test(id),"ESCROW_DEPOSIT_INTENT");
     const s=this.state(),d=s.deposits[id];need(d,"ESCROW_DEPOSIT_INTENT");
-    let status="waiting",seenAt:number|null=null;
+    let status="waiting",seenAt:number|null=null,mismatch:string|undefined;
     const tx=d.tx??candidate??null;
     if(d.tx) status="final";
     else if(tx){
       need(/^[0-9a-f]{64}$/.test(tx),"ESCROW_TXID");
       try { const o=await this.network.lookup(tx);
         if(o && o.id===tx && o.chain===CHAIN && o.valid===true){
-          verifyTransfer(o.body);need(txid(o.body)===tx && o.body.to===this.policy.wallet && o.body.from===d.payer && o.body.amount===d.amount && o.body.memo===`poadomains:${id}`,"ESCROW_DEPOSIT_BINDING");
-          status="seen";seenAt=o.body.ts*1000;
+          verifyTransfer(o.body);need(txid(o.body)===tx,"ESCROW_TX_BINDING");
+          if(o.body.to!==this.policy.wallet){status="mismatch";mismatch="recipient";}
+          else if(o.body.from!==d.payer){status="mismatch";mismatch="sender";}
+          else if(o.body.amount!==d.amount){status="mismatch";mismatch="amount";}
+          else if(o.body.memo!==`poadomains:${id}`){status="mismatch";mismatch="memo";}
+          else{status="seen";seenAt=o.body.ts*1000;}
         }
       }catch { /* Unknown or invalid observations never imply a credit. */ }
     }
-    return {intent:id,payer:d.payer,to:this.policy.wallet,amount:d.amount,memo:`poadomains:${id}`,status,txid:tx,createdAt:d.createdAt??null,seenAt,finalAt:d.tx?(s.credited[d.tx]?.ts??0)*1000:null};
+    return {intent:id,payer:d.payer,to:this.policy.wallet,amount:d.amount,memo:`poadomains:${id}`,status,txid:tx,createdAt:d.createdAt??null,seenAt,finalAt:d.tx?(s.credited[d.tx]?.ts??0)*1000:null,...(mismatch?{mismatch}:{})};
   }
   private async fresh(): Promise<Status> {
     let status:Status;
@@ -469,7 +506,7 @@ export class Escrow {
     for(const id of txids) {
       const cur=this.state();
       if(!this.enabled()||cur.paused||pendingPauses.has(this.journal)||cur.halt)return;
-      if(!/^[0-9a-f]{64}$/.test(id)||cur.credited[id])continue;
+      if(!/^[0-9a-f]{64}$/.test(id)||cur.credited[id]||cur.uncredited?.[id])continue;
       let o:Observation|null;
       try { o=await this.network.lookup(id); } catch { continue; }
       if(!o)continue;
@@ -479,46 +516,60 @@ export class Escrow {
       const {intent,d}=match;
       if(o.body.to!==this.policy.wallet||o.body.from!==d.payer||o.body.amount!==d.amount)continue;
       if(cur.deposits[intent]?.tx)continue;
-      if(Object.values(cur.credited).some(b=>(b.from===o.body.from&&b.nonce===o.body.nonce)||b.memo===o.body.memo))continue;
+      const allCur=[...Object.values(cur.credited),...Object.values(cur.uncredited??{})];
+      if(allCur.some(b=>b.from===o.body.from&&b.nonce===o.body.nonce)||Object.values(cur.credited).some(b=>b.memo===o.body.memo))continue;
       this.journal.append("deposit",{auto:true,intent,id},next=>{
         need(this.enabled(),"ESCROW_DISABLED");need(!next.paused,"ESCROW_PAUSED");need(!next.halt,"ESCROW_HALTED");
         const target=next.deposits[intent];
-        need(!!target&&!target.tx&&!next.credited[id],"ESCROW_DEPOSIT_DUPLICATE");
-        need(!Object.values(next.credited).some(b=>(b.from===o.body.from&&b.nonce===o.body.nonce)||b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
+        need(!!target&&!target.tx&&!next.credited[id]&&!next.uncredited?.[id],"ESCROW_DEPOSIT_DUPLICATE");
+        const allNext=[...Object.values(next.credited),...Object.values(next.uncredited??{})];
+        need(!allNext.some(b=>b.from===o.body.from&&b.nonce===o.body.nonce)&&!Object.values(next.credited).some(b=>b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
         target.tx=id;target.auto=true;next.credited[id]=o.body;
         next.assets=String(BigInt(next.assets)+micros(target.amount));
         next.available[target.payer]=String(BigInt(next.available[target.payer]??"0")+micros(target.amount));
       });
+      this.acknowledgeSurplus(o,micros(d.amount));
       byMemo.delete(o.body.memo);
       if(!byMemo.size)break;
     }
   }
+  private activePaymentTxids(s:State,status:Status): string[] {
+    return Object.values(s.payments).flatMap(p=>{
+      if(!p.txid)return [];
+      // SIGNED payouts are provably pre-I/O (never transmitted); UNKNOWN payouts signed strictly
+      // after this checkpoint's cutoff cannot be baked into checkpoint `status.height` and may
+      // not yet be indexed by minepoa.com's read node (which returns 503 origin busy on misses).
+      if(p.status==="SIGNED")return [];
+      if(p.status==="UNKNOWN"&&status.cutoff!==undefined&&p.body&&p.body.ts>status.cutoff)return [];
+      return [p.txid];
+    });
+  }
   private async reconcileAt(status:Status): Promise<void> {
     await this.sweepPendingDeposits();
     const s=this.state();
-    const ids=[
-      ...Object.keys(s.credited),
-      ...Object.values(s.payments).flatMap(p=>{
-        if(!p.txid)return [];
-        // SIGNED payouts are provably pre-I/O (never transmitted); UNKNOWN payouts signed strictly
-        // after this checkpoint's cutoff cannot be baked into checkpoint `status.height` and may
-        // not yet be indexed by minepoa.com's read node (which returns 503 origin busy on misses).
-        if(p.status==="SIGNED")return [];
-        if(p.status==="UNKNOWN"&&status.cutoff!==undefined&&p.body&&p.body.ts>status.cutoff)return [];
-        return [p.txid];
-      }),
-    ];
+    const ids=[...Object.keys(s.credited),...Object.keys(s.uncredited??{}),...this.activePaymentTxids(s,status)];
     const cut=await this.networkRead(()=>this.network.cut(this.policy.wallet,ids,status));
     need(cut.chain===CHAIN && cut.height===status.height && cut.root===status.root,"ESCROW_UNALIGNED_CUT");
     need(new Set(cut.covered).size===cut.covered.length && cut.covered.every(id=>ids.includes(id)),"ESCROW_CUT");
     let expected=0n;
     for(const [id,b] of Object.entries(s.credited)) if(cut.covered.includes(id)) expected+=micros(b.amount);
+    for(const [id,b] of Object.entries(s.uncredited??{})) if(cut.covered.includes(id)) expected+=micros(b.amount);
     for(const p of Object.values(s.payments)) if(p.txid && cut.covered.includes(p.txid)) expected-=BigInt(p.amount);
-    if(expected!==micros(cut.balance)) {
+    const observed=micros(cut.balance), unexplained=observed-expected;
+    const prev=this.readSurplus(), prevFloor=prev?BigInt(prev.unexplainedMicros):0n;
+    // Halt strictly on deficit OR any unexplained drop in previously observed surplus (prevents surplus masking theft/outflow).
+    // New surplus (e.g., unsolicited dust or mistaken third-party deposits) is tracked outside the journal without halting escrow.
+    if(unexplained<0n || (prev!==null && cut.height>=prev.height && unexplained<prevFloor)) {
       this.journal.append("reconciliation-quarantine",{height:cut.height,root:cut.root},s=>{
         s.halt="ASSET_LIABILITY_MISMATCH";s.quarantine[`${cut.height}:${cut.root}`]={observed:cut.balance,expectedMicros:String(expected)};
       });
       throw new Error("ESCROW_RECONCILIATION_MISMATCH");
+    }
+    if(unexplained>prevFloor){
+      console.error(JSON.stringify({event:"escrow-unexplained-surplus",wallet:this.policy.wallet,height:cut.height,unexplainedMicros:String(unexplained),deltaMicros:String(unexplained-prevFloor)}));
+    }
+    if(!prev || cut.height>=prev.height){
+      this.writeSurplus({height:cut.height,root:cut.root,unexplainedMicros:String(unexplained),...(status.cutoff!==undefined?{cutoff:status.cutoff}:{}),observedAt:this.now()});
     }
     invariant(s);
   }
@@ -535,21 +586,23 @@ export class Escrow {
       need(s.halt===r.halt,"ESCROW_REVIEW_STATE");
       const dep=s.deposits[r.intent];
       need(!!dep && dep.payer===r.from && dep.amount===r.amount && !dep.tx,"ESCROW_REVIEW_INTENT");
-      need(!s.credited[r.txid],"ESCROW_DEPOSIT_DUPLICATE");
+      need(!s.credited[r.txid] && !s.uncredited?.[r.txid],"ESCROW_DEPOSIT_DUPLICATE");
     };
     check(this.state());
     const status=await this.fresh();
     const o=await this.networkRead(()=>this.network.lookup(r.txid)); need(o,"ESCROW_UNKNOWN_DEPOSIT"); this.final(o,r.txid);
     need(o.body.to===this.policy.wallet && o.body.from===r.from && o.body.amount===r.amount && o.body.memo===`poadomains:${r.intent}`,"ESCROW_DEPOSIT_BINDING");
     const s=this.state(); check(s);
-    need(!Object.values(s.credited).some(b=>(b.from===o.body.from&&b.nonce===o.body.nonce)||b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
+    const allIn=[...Object.values(s.credited),...Object.values(s.uncredited??{})];
+    need(!allIn.some(b=>b.from===o.body.from&&b.nonce===o.body.nonce)&&!Object.values(s.credited).some(b=>b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
     // Reconcile as if this one deposit were credited. Anything else unexplained keeps the halt.
-    const ids=[...Object.keys(s.credited),r.txid,...Object.values(s.payments).flatMap(p=>p.txid?[p.txid]:[])];
+    const ids=[...Object.keys(s.credited),...Object.keys(s.uncredited??{}),r.txid,...Object.values(s.payments).flatMap(p=>p.txid?[p.txid]:[])];
     const cut=await this.networkRead(()=>this.network.cut(this.policy.wallet,ids,status));
     need(cut.chain===CHAIN && cut.height===status.height && cut.root===status.root,"ESCROW_UNALIGNED_CUT");
     need(new Set(cut.covered).size===cut.covered.length && cut.covered.every(id=>ids.includes(id)) && cut.covered.includes(r.txid),"ESCROW_CUT");
     let expected=micros(r.amount);
     for(const [id,b] of Object.entries(s.credited)) if(cut.covered.includes(id)) expected+=micros(b.amount);
+    for(const [id,b] of Object.entries(s.uncredited??{})) if(cut.covered.includes(id)) expected+=micros(b.amount);
     for(const p of Object.values(s.payments)) if(p.txid && cut.covered.includes(p.txid)) expected-=BigInt(p.amount);
     need(expected===micros(cut.balance),"ESCROW_RECONCILIATION_MISMATCH");
     this.journal.append("reviewed-credit",{review:r.id,txid:r.txid,intent:r.intent,height:cut.height,root:cut.root,observed:cut.balance},next=>{
@@ -560,8 +613,113 @@ export class Escrow {
       (next.reviews??={})[r.id]={txid:r.txid,intent:r.intent,height:cut.height,root:cut.root,observed:cut.balance,at:this.now()};
       next.halt=null;
     });
+    this.writeSurplus({height:cut.height,root:cut.root,unexplainedMicros:"0",...(status.cutoff!==undefined?{cutoff:status.cutoff}:{}),observedAt:this.now()});
     return this.state();
   }); }
+  /** Operator bounce-back for a finalized uncredited/mismatched incoming transfer.
+   * Strictly sender-bound: takes only txid (never destination or amount); returns funds solely to o.body.from
+   * through the Worker's managed nonce lane, never credits spendable escrow balance, and clears
+   * ASSET_LIABILITY_MISMATCH only if this transfer is covered and post-admission reconciliation succeeds. */
+  refundUncredited(id: string): Promise<State> { return this.serial(async()=>{
+    need(this.enabled(),"ESCROW_DISABLED");
+    const tx=text(id,64); need(/^[0-9a-f]{64}$/.test(tx),"ESCROW_TXID");
+    const checkState=(s:State)=>{
+      need(s.halt===null || s.halt==="ASSET_LIABILITY_MISMATCH","ESCROW_HALTED");
+      need(!s.credited[tx] && !s.uncredited?.[tx],"ESCROW_DEPOSIT_DUPLICATE");
+    };
+    checkState(this.state());
+    const status=await this.fresh();
+    const o=await this.networkRead(()=>this.network.lookup(tx)); need(o,"ESCROW_UNKNOWN_DEPOSIT"); this.final(o,tx);
+    need(o.body.to===this.policy.wallet,"ESCROW_DEPOSIT_BINDING");
+    need(o.body.from!==this.policy.wallet,"ESCROW_SELF_DEPOSIT");
+    const total=micros(o.body.amount), cap=micros(this.policy.perTx);
+    const chunks:bigint[]=[];
+    for(let rem=total;rem>0n;){const part=rem>cap?cap:rem;chunks.push(part);rem-=part;}
+    const checkWithBody=(s:State)=>{
+      checkState(s);
+      const matchesOpen=Object.entries(s.deposits).some(([intent,d])=>!d.tx && d.payer===o.body.from && d.amount===o.body.amount && o.body.memo===`poadomains:${intent}`);
+      need(!matchesOpen,"ESCROW_DEPOSIT_MATCHES_INTENT");
+      const allIn=[...Object.values(s.credited),...Object.values(s.uncredited??{})];
+      need(!allIn.some(b=>b.from===o.body.from&&b.nonce===o.body.nonce),"ESCROW_DEPOSIT_DUPLICATE");
+      for(let i=0;i<chunks.length;i++){
+        const pid=chunks.length===1?`bounce-${tx}`:`bounce-${tx}-${i}`;
+        need(!s.payments[pid],"ESCROW_REFUND_DUPLICATE");
+      }
+    };
+    const s=this.state(); checkWithBody(s);
+    const ids=[...Object.keys(s.credited),...Object.keys(s.uncredited??{}),tx,...this.activePaymentTxids(s,status)];
+    const cut=await this.networkRead(()=>this.network.cut(this.policy.wallet,ids,status));
+    need(cut.chain===CHAIN && cut.height===status.height && cut.root===status.root,"ESCROW_UNALIGNED_CUT");
+    need(new Set(cut.covered).size===cut.covered.length && cut.covered.every(x=>ids.includes(x)),"ESCROW_CUT");
+    const txCovered=cut.covered.includes(tx);
+    let expected=txCovered?total:0n;
+    for(const [cid,b] of Object.entries(s.credited)) if(cut.covered.includes(cid)) expected+=micros(b.amount);
+    for(const [uid,b] of Object.entries(s.uncredited??{})) if(cut.covered.includes(uid)) expected+=micros(b.amount);
+    for(const p of Object.values(s.payments)) if(p.txid && cut.covered.includes(p.txid)) expected-=BigInt(p.amount);
+    const observed=micros(cut.balance), unexplained=observed-expected;
+    need(unexplained>=0n,"ESCROW_RECONCILIATION_MISMATCH");
+    const prev=this.readSurplus();
+    if(prev!==null && cut.height>=prev.height){
+      const wasInPrev=txCovered && ((o.checkpoint!==null && o.checkpoint.height<=prev.height) || (prev.cutoff!==undefined && o.body.ts<prev.cutoff) || cut.height===prev.height);
+      const prevAmt=BigInt(prev.unexplainedMicros);
+      const floor=wasInPrev?(prevAmt>total?prevAmt-total:0n):prevAmt;
+      need(unexplained>=floor,"ESCROW_RECONCILIATION_MISMATCH");
+    }
+    this.journal.append("uncredited-refund",{txid:tx,from:o.body.from,amount:o.body.amount,chunks:chunks.length,covered:txCovered,height:cut.height,root:cut.root},next=>{
+      need(this.enabled(),"ESCROW_DISABLED"); checkWithBody(next);
+      (next.uncredited??={})[tx]=o.body;
+      next.assets=String(BigInt(next.assets)+total);
+      for(let i=0;i<chunks.length;i++){
+        const pid=chunks.length===1?`bounce-${tx}`:`bounce-${tx}-${i}`;
+        this.refund(next,pid,o.body.from,String(chunks[i]!));
+      }
+      if(next.halt==="ASSET_LIABILITY_MISMATCH" && txCovered) next.halt=null;
+    });
+    if(!prev || cut.height>=prev.height){
+      this.writeSurplus({height:cut.height,root:cut.root,unexplainedMicros:String(unexplained),...(status.cutoff!==undefined?{cutoff:status.cutoff}:{}),observedAt:this.now()});
+    }
+    return this.state();
+  }); }
+  /** Read-only operator inspection of recent incoming wallet transfers not yet booked in s.credited or s.uncredited. */
+  async uncreditedIncoming(): Promise<unknown> {
+    need(this.enabled(),"ESCROW_DISABLED");
+    const s=this.state();
+    let txids:string[]=[];
+    if(this.network.incoming){
+      try{ txids=await this.network.incoming(this.policy.wallet); }
+      catch{ txids=[]; }
+    }
+    const candidates=txids.filter(id=>/^[0-9a-f]{64}$/.test(id) && !s.credited[id] && !s.uncredited?.[id]).slice(0,25);
+    const incoming:unknown[]=[];
+    for(const id of candidates){
+      let o:Observation|null=null;
+      try{ o=await this.network.lookup(id); }catch{ continue; }
+      if(!o || o.body.to!==this.policy.wallet) continue;
+      let isFinal=false;
+      try{ this.final(o,id); isFinal=true; }catch{}
+      let reason="no_intent", intentId:string|null=null;
+      const m=/^poadomains:([0-9a-f]{64})$/.exec(o.body.memo);
+      if(m){
+        intentId=m[1]!;
+        const d=s.deposits[intentId];
+        if(d){
+          if(d.tx) reason="intent_already_used";
+          else if(o.body.from!==d.payer) reason="wrong_sender";
+          else if(o.body.amount!==d.amount) reason="wrong_amount";
+          else reason="matches_open_intent";
+        }
+      }
+      incoming.push({txid:id,from:o.body.from,amount:o.body.amount,memo:o.body.memo,ts:o.body.ts,valid:o.valid,final:isFinal,attestations:o.attestations,checkpointed:Boolean(o.checkpoint),intent:intentId,reason});
+    }
+    return {
+      wallet:this.policy.wallet,
+      halt:s.halt,
+      paused:s.paused,
+      surplus:this.readSurplus(),
+      trackedUncredited:Object.keys(s.uncredited??{}),
+      incoming,
+    };
+  }
   private validateCommand(c:Command): void {
     const p=obj(c.params);
     switch(c.action){
@@ -616,20 +774,24 @@ export class Escrow {
       exact(p,["intent","txid"]); const id=text(p.txid,64); need(/^[0-9a-f]{64}$/.test(id),"ESCROW_TXID");
       const s=this.state(),dep=s.deposits[text(p.intent,80)]; need(dep && dep.payer===c.actor,"ESCROW_DEPOSIT_INTENT");
       if(dep.tx===id && dep.auto===true && s.credited[id]) return {ok:true,alreadyCredited:true};
-      need(!dep.tx && !s.credited[id],"ESCROW_DEPOSIT_DUPLICATE");
+      need(!dep.tx && !s.credited[id] && !s.uncredited?.[id],"ESCROW_DEPOSIT_DUPLICATE");
       const o=await this.networkRead(()=>this.network.lookup(id)); need(o,"ESCROW_UNKNOWN_DEPOSIT"); this.final(o,id);
       need(o.body.to===this.policy.wallet && o.body.from===dep.payer && o.body.amount===dep.amount && o.body.memo===`poadomains:${p.intent}`,"ESCROW_DEPOSIT_BINDING");
-      need(!Object.values(s.credited).some(b=>(b.from===o.body.from&&b.nonce===o.body.nonce)||b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
+      const allS=[...Object.values(s.credited),...Object.values(s.uncredited??{})];
+      need(!allS.some(b=>b.from===o.body.from&&b.nonce===o.body.nonce)&&!Object.values(s.credited).some(b=>b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
       this.gate(); await this.fresh(); this.gate();
       this.journal.append("deposit",{rk,fingerprint,id},s=>{
         need(this.enabled(),"ESCROW_DISABLED"); need(!s.paused,"ESCROW_PAUSED"); need(!s.halt,"ESCROW_HALTED");
         need(!s.requests[rk],"ESCROW_IDEMPOTENCY_CONFLICT");
-        need(!s.credited[id] && !s.deposits[String(p.intent)]!.tx,"ESCROW_DEPOSIT_DUPLICATE");
-        need(!Object.values(s.credited).some(b=>(b.from===o.body.from&&b.nonce===o.body.nonce)||b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
+        need(!s.credited[id] && !s.uncredited?.[id] && !s.deposits[String(p.intent)]!.tx,"ESCROW_DEPOSIT_DUPLICATE");
+        const allNext=[...Object.values(s.credited),...Object.values(s.uncredited??{})];
+        need(!allNext.some(b=>b.from===o.body.from&&b.nonce===o.body.nonce)&&!Object.values(s.credited).some(b=>b.memo===o.body.memo),"ESCROW_DEPOSIT_DUPLICATE");
         const d=s.deposits[String(p.intent)]!; d.tx=id;s.credited[id]=o.body;s.assets=String(BigInt(s.assets)+micros(d.amount));
         s.available[c.actor]=String(BigInt(s.available[c.actor]??"0")+micros(d.amount));
         s.requests[rk]={fingerprint,result};
-      }); return result;
+      });
+      this.acknowledgeSurplus(o,micros(dep.amount));
+      return result;
     }
     if(!local) { await this.reconcileAt(status!); this.gate(); }
     this.journal.append(c.action,{rk,fingerprint,params:p},s=>{
@@ -640,7 +802,7 @@ export class Escrow {
         case "intent": {
           need(s.sequence<PILOT_ADMISSION_LIMIT,"ESCROW_JOURNAL_CAPACITY");
           exact(p,["amount"]); need(micros(p.amount)>0n,"ESCROW_AMOUNT");
-          const id=digest([rk,c]); s.deposits[id]={payer:c.actor,amount:String(p.amount),tx:null,createdAt:this.now()}; result={intent:id,memo:`poadomains:${id}`,to:this.policy.wallet}; break;
+          const id=digest([rk,c]); s.deposits[id]={payer:c.actor,amount:String(p.amount),tx:null,createdAt:this.now()}; result={intent:id,memo:`poadomains:${id}`,to:this.policy.wallet,payer:c.actor}; break;
         }
         case "list": case "open": {
           need(s.sequence<PILOT_ADMISSION_LIMIT,"ESCROW_JOURNAL_CAPACITY");

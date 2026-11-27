@@ -28,7 +28,7 @@ export const POA_NEW_NAME_PRICE_RULE =
 /** Agent-facing POA checkout steps, shared by MCP, llms.txt and the agent card. */
 export const POA_CHECKOUT_STEPS =
   "🪙 Everything here is priced and paid in POA. New names: 100 POA (common) or 1000 POA (premium). " +
-  "Buy with POA checkout: 1) sign escrow intent {amount}, send exactly that POA with memo poadomains:<intent> to the escrow address it returns, then sign detect {intent, txid}; " +
+  "Buy with POA checkout: 1) sign escrow intent {amount}, send exactly that POA from the same poa1 address that signed intent (third-party/treasury funding fails ESCROW_DEPOSIT_BINDING) with memo poadomains:<intent> to the escrow address it returns, then sign detect {intent, txid}; " +
   "2) sign a registry packet issueFromTreasury {name, asset:\"POA\", price:<micros>, expectedDeedId:null, expectedVersion:0, metadata from build_metadata_witness} with maxTotal \"0\", maxNetworkFee \"0\" and a deadline at least 10 minutes ahead (do not submit it to /v1/intents); " +
   "3) sign escrow issue {name, amount, registration:<that packet>} and POST {command,signature} to /v1/escrow/command. " +
   "Sell or auction a name you own with escrow list/open; buy or bid with buy/bid; take unused POA back with withdraw (paid only to the original payer). " +

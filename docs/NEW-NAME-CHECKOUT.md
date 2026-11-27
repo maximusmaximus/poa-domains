@@ -5,8 +5,8 @@ Status: **ON** after Max's approval on Nov 13 2026 (t136u, 3:20 PM PT), when the
 The committed Wrangler default remains `false`. Payments still follow escrow's current enabled, paused and held state.
 
 ## Flow: deposit → credit → issue
-1. The buyer signs `intent` {amount}, sends that exact POA amount with the memo `poadomains:<intent>`, then signs `detect` {intent, txid}.
-   This is the existing escrow credit (final transfer, exact binding).
+1. The buyer signs `intent` {amount}, sends that exact POA amount **from the same `poa1…` address that signed `intent`** (third-party/treasury funding fails `ESCROW_DEPOSIT_BINDING`) with the memo `poadomains:<intent>`, then signs `detect` {intent, txid}.
+   This is the existing escrow credit (final transfer, exact sender/recipient/amount/memo binding).
 2. The buyer signs a registry packet `issueFromTreasury`
    `{name, asset:"POA", price, expectedDeedId:null, expectedVersion:0, metadata}` with `maxTotal:"0"`.
 3. The buyer signs the escrow command `issue` {name, amount, registration:<packet>}, sent to `POST /v1/escrow/command`.

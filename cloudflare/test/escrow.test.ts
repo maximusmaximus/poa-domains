@@ -129,8 +129,18 @@ test("stale/down/wrong chain/fee change, paused/off flags hold without losing li
  if(mode==="stale")f.net.stale=true;if(mode==="down")f.net.down=true;if(mode==="chain")f.net.chain="wrong";if(mode==="fee")f.net.fee="0.010000";if(mode==="paused")f.e.pause(true);if(mode==="off")f.disable();
  await assert.rejects(f.e.tick());assert.equal(f.e.state().assets,"10000000");assert.equal(f.net.calls,0);}
 });
-test("reconciliation mismatch persists halt, unaligned cut holds, open funds not mixed with checkpoint assets",async()=>{
- const f=fixture();await fund(f);f.net.mismatch=1n;await assert.rejects(f.e.reconcile(),/MISMATCH/);assert.equal(f.make().state().halt,"ASSET_LIABILITY_MISMATCH");f.e.pause(false);await assert.rejects(f.e.tick(),/HALTED/);
+test("reconciliation mismatch persists halt on deficit or surplus drop, dust surplus does not DoS, unaligned cut holds",async()=>{
+ const f=fixture();await fund(f);
+ // Unexplained surplus (e.g. unsolicited dust) logs/watermarks without halting or writing to the journal.
+ const rowsBefore=f.journal.rows.length;
+ f.net.mismatch=10n;await f.e.reconcile();
+ assert.equal(f.e.state().halt,null);assert.equal(f.journal.rows.length,rowsBefore,"surplus consumes 0 journal entries");
+ // Any unexplained drop in previously observed surplus halts immediately so surplus can never mask outflow.
+ f.net.mismatch=5n;await assert.rejects(f.e.reconcile(),/MISMATCH/);
+ assert.equal(f.make().state().halt,"ASSET_LIABILITY_MISMATCH");f.e.pause(false);await assert.rejects(f.e.tick(),/HALTED/);
+ // Any direct deficit (observed < expected) halts immediately.
+ const d=fixture();await fund(d);d.net.mismatch=-1n;await assert.rejects(d.e.reconcile(),/MISMATCH/);
+ assert.equal(d.make().state().halt,"ASSET_LIABILITY_MISMATCH");d.e.pause(false);await assert.rejects(d.e.tick(),/HALTED/);
  const g=fixture();await fund(g);g.net.badCut=true;await assert.rejects(g.e.reconcile(),/UNALIGNED/);
  const h=fixture();h.net.covered=false;await fund(h);await h.e.reconcile();assert.equal(h.e.state().assets,"10000000");
 });
@@ -809,8 +819,8 @@ async function heldDeposit(attestations=5,covered=true){
  const f=fixture();await fund(f);
  const r=await f.e.command(command(who(4),"intent-held","intent",{amount:"1.000000"})) as any;
  const id=f.net.add(depositBody(4,policy.wallet,"1.000000",r.intent),attestations,covered);
- // The wallet holds 1 POA nobody credited: reconcile quarantines with ASSET_LIABILITY_MISMATCH.
- f.net.mismatch=micros("1.000000");await assert.rejects(f.e.reconcile(),/MISMATCH/);f.net.mismatch=0n;
+ // Simulate a pre-existing ASSET_LIABILITY_MISMATCH quarantine halt while the 1 POA deposit sits held on-chain.
+ f.net.mismatch=-micros("2.000000");await assert.rejects(f.e.reconcile(),/MISMATCH/);f.net.mismatch=0n;
  assert.equal(f.e.state().halt,"ASSET_LIABILITY_MISMATCH");
  return {f,review:{id:"held-1",txid:id,from:who(4),amount:"1.000000",intent:r.intent,halt:"ASSET_LIABILITY_MISMATCH"}};
 }
@@ -1026,7 +1036,7 @@ test("hung chain receipt falls back to /api/receipt; mismatched fallback binding
  assert.ok(paths.includes(`/api/receipt/${id}`));
 });
 
-test("auto-sweep credits finalized matching open intents before reconciliation without halting; unsolicited funds still halt",async()=>{
+test("auto-sweep credits finalized matching open intents before reconciliation; paused & unsolicited surplus track watermark without dust DoS",async()=>{
  const f=issueFixture();f.net.autoDiscover=true;
  const r=await f.e.command(command(who(3),"auto-intent","intent",{amount:"2.000000"})) as any;
  const depId=f.net.add(depositBody(3,policy.wallet,"2.000000",r.intent),5,true);
@@ -1043,16 +1053,31 @@ test("auto-sweep credits finalized matching open intents before reconciliation w
  // Buyer can immediately issue a domain using the auto-credited funds.
  const issued=await f.e.command(command(who(3),"auto-issue","issue",{name:"sweptname",amount:"2.000000",registration:registration(3,"sweptname")})) as any;
  assert.equal(issued.issued,"sweptname");assert.equal(f.issued.sweptname,who(3));
- // Paused escrow never auto-sweeps open intents.
+ // Paused escrow never auto-sweeps open intents, records surplus watermark without halting or spamming journal,
+ // and auto-sweeps cleanly once unpaused.
  const rPaused=await f.e.command(command(who(4),"paused-intent","intent",{amount:"1.000000"})) as any;
  await f.e.pause(true);
+ const seqWhilePaused=f.e.state().sequence;
  f.net.add(depositBody(4,policy.wallet,"1.000000",rPaused.intent),5,true);
- await assert.rejects(f.e.reconcile(),/MISMATCH/);
- assert.equal(f.e.state().halt,"ASSET_LIABILITY_MISMATCH");
+ await f.e.reconcile();
+ assert.equal(f.e.state().halt,null,"paused deposit surplus does not halt escrow");
+ assert.equal(f.e.state().sequence,seqWhilePaused,"surplus tracking consumes 0 journal entries");
  assert.equal(f.e.state().deposits[rPaused.intent]!.tx,null,"paused deposit is not auto-credited");
- // Unsolicited deposit (wrong memo / no open intent) on open escrow still quarantines with ASSET_LIABILITY_MISMATCH.
+ await f.e.pause(false);
+ await f.e.reconcile();
+ assert.equal(f.e.state().halt,null);
+ assert.equal(f.e.state().available[who(4)],"1000000","unpaused reconcile sweeps the deposit and lowers watermark");
+ // Unsolicited deposit (wrong memo / no open intent) on open escrow tracks surplus watermark without DoS-halting,
+ // while any unexplained drop in that surplus immediately halts with ASSET_LIABILITY_MISMATCH.
  const g=fixture();g.net.autoDiscover=true;
+ await g.e.pause(false);
+ const gRows=g.journal.rows.length;
  g.net.add(depositBody(4,policy.wallet,"1.000000","0".repeat(64)),5,true);
+ await g.e.reconcile();
+ assert.equal(g.e.state().halt,null);
+ assert.equal(g.journal.rows.length,gRows);
+ assert.equal((await g.e.uncreditedIncoming() as any).surplus.unexplainedMicros,"1000000");
+ g.net.mismatch=-1n;
  await assert.rejects(g.e.reconcile(),/MISMATCH/);
  assert.equal(g.e.state().halt,"ASSET_LIABILITY_MISMATCH");
 });
@@ -1937,4 +1962,121 @@ test("SQLiteEscrowJournal uses verified tip fast-path, paged streaming replay on
  assert.equal(journalRows.size,21);
  assert.equal(getHead()?.sequence,21);
  assert.equal(new SQLiteEscrowJournal(storage,policy).load().halt,"RESTORED_ARCHIVE_READ_ONLY");
+});
+
+test("refundUncredited bounces wrong-sender third-party funding strictly back to body.from on managed nonce lane (proactive & post-halt)",async()=>{
+ const f=fixture();f.net.autoDiscover=true;
+ // Buyer who(3) creates intent for 1705.011014 POA; third-party treasury wallet who(4) mistakenly sends the POA using buyer's intent memo.
+ const r=await f.e.command(command(who(3),"buyer-intent","intent",{amount:"1705.011014"})) as any;
+ assert.equal(r.payer,who(3),"intent response returns required payer address");
+ const mistakenBody=signer(4).transfer({type:"transfer",cid:CHAIN,from:who(4),to:policy.wallet,amount:"1705.011014",memo:`poadomains:${r.intent}`,nonce:1,parents,ts:1800000000});
+ const mistakenTx=f.net.add(mistakenBody,8,true);
+ // Buyer detect fails with ESCROW_DEPOSIT_BINDING; read-only receipt view surfaces mismatch diagnostic.
+ await assert.rejects(f.e.command(command(who(3),"buyer-detect","detect",{intent:r.intent,txid:mistakenTx})),/ESCROW_DEPOSIT_BINDING/);
+ const view=await f.e.depositView(r.intent,mistakenTx) as any;
+ assert.equal(view.status,"mismatch");assert.equal(view.mismatch,"sender");
+ // Reconcile records unexplained surplus watermark without halting or consuming journal entries.
+ const seqBefore=f.e.state().sequence;
+ await f.e.reconcile();
+ assert.equal(f.e.state().halt,null);assert.equal(f.e.state().sequence,seqBefore);
+ // Operator inspects uncredited incoming transfers.
+ const insp=await f.e.uncreditedIncoming() as any;
+ assert.equal(insp.surplus.unexplainedMicros,"1705011014");
+ assert.equal(insp.incoming.length,1);
+ assert.equal(insp.incoming[0].txid,mistakenTx);
+ assert.equal(insp.incoming[0].from,who(4));
+ assert.equal(insp.incoming[0].reason,"wrong_sender");
+ assert.equal(insp.incoming[0].intent,r.intent);
+ // Operator executes strictly sender-bound refundUncredited(txid).
+ const afterQueue=await f.e.refundUncredited(mistakenTx);
+ assert.equal(afterQueue.deposits[r.intent]!.tx,null,"original buyer intent stays open and untouched");
+ assert.equal(afterQueue.available[who(3)],undefined,"buyer receives no spendable balance");
+ assert.equal(afterQueue.available[who(4)],undefined,"sender receives direct refund liability, not spendable balance");
+ assert.ok(afterQueue.uncredited?.[mistakenTx],"recorded in s.uncredited");
+ const pid=`bounce-${mistakenTx}`;
+ assert.equal(afterQueue.payments[pid]!.to,who(4));
+ assert.equal(afterQueue.payments[pid]!.amount,"1705011014");
+ assert.equal(afterQueue.payments[pid]!.kind,"refund");
+ assert.equal(afterQueue.payments[pid]!.status,"READY");
+ assert.equal((await f.e.uncreditedIncoming() as any).surplus.unexplainedMicros,"0");
+ // Tick executes payout on managed nonce 1 -> FINAL, assets drain back to 0, replay passes.
+ await f.e.tick();await f.e.tick();
+ assert.equal(f.net.calls,1);
+ assert.equal(f.net.submitted[0]!.to,who(4));
+ assert.equal(f.net.submitted[0]!.amount,"1705.011014");
+ assert.equal(f.net.submitted[0]!.nonce,1);
+ assert.equal(f.e.state().payments[pid]!.status,"FINAL");
+ assert.equal(f.e.state().assets,"0");
+ await f.e.reconcile();
+ replay(f.journal.rows,policy);
+
+ // Post-halt recovery: clears pre-existing ASSET_LIABILITY_MISMATCH when covered, never alters paused=true.
+ const h=fixture();await fund(h,3,"10.000000");
+ const strayTx=h.net.add(signer(4).transfer({type:"transfer",cid:CHAIN,from:who(4),to:policy.wallet,amount:"5.000000",memo:"",nonce:1,parents,ts:1800000000}),5,true);
+ h.net.mismatch=-micros("6.000000");await assert.rejects(h.e.reconcile(),/MISMATCH/);h.net.mismatch=0n;
+ await h.e.pause(true);
+ assert.equal(h.e.state().halt,"ASSET_LIABILITY_MISMATCH");assert.equal(h.e.state().paused,true);
+ const cleared=await h.e.refundUncredited(strayTx);
+ assert.equal(cleared.halt,null,"halt cleared once covered deposit is booked");
+ assert.equal(cleared.paused,true,"paused flag is never cleared by refundUncredited");
+ await h.e.pause(false);
+ await h.e.tick();await h.e.tick();
+ assert.equal(h.e.state().payments[`bounce-${strayTx}`]!.status,"FINAL");
+ assert.equal(h.e.state().assets,"10000000");
+ replay(h.journal.rows,policy);
+});
+
+test("refundUncredited allows repeated empty-memo transfers, chunks >perTx, persists watermark across restarts, and fails closed on guards",async()=>{
+ // Custom persistent SurplusStore across Escrow restarts.
+ const marks=new Map<string,any>();
+ const store={read:(w:string)=>marks.get(w)??null,write:(w:string,m:any)=>marks.set(w,structuredClone(m))};
+ const tight={...policy,perTx:"10000.000000",daily:"50000.000000"};
+ const net=new MockNetwork(),journal=new MemoryJournal(tight);
+ const titles={terms:()=>({reserve:"1.000000",window:1000,quiet:500}),validate:()=>{},commit:()=>{}};
+ const mk=()=>new Escrow(journal,net,signer(),titles,tight,()=>net.now,()=>true,()=>false,()=>false,undefined,store);
+ const e1=mk();await e1.pause(false);
+
+ // Two unsolicited transfers with identical empty memo "" both bounce cleanly without depMemos collision.
+ const empty1=net.add(signer(4).transfer({type:"transfer",cid:CHAIN,from:who(4),to:tight.wallet,amount:"1.000000",memo:"",nonce:1,parents,ts:1800000000}),5,true);
+ const empty2=net.add(signer(3).transfer({type:"transfer",cid:CHAIN,from:who(3),to:tight.wallet,amount:"2.000000",memo:"",nonce:1,parents,ts:1800000000}),5,true);
+ await e1.reconcile();
+ assert.equal(marks.get(tight.wallet)?.unexplainedMicros,"3000000");
+ // Restart with fresh Escrow instance sharing persistent SurplusStore: an unexplained drop still halts immediately.
+ const eRestart=mk();
+ net.mismatch=-1n;
+ await assert.rejects(eRestart.reconcile(),/MISMATCH/,"watermark persists across restarts");
+ net.mismatch=0n;
+ // Bounce both empty-memo transfers (first clears halt, second drains remaining surplus to 0).
+ await eRestart.refundUncredited(empty1);
+ assert.equal(eRestart.state().halt,null);
+ await eRestart.refundUncredited(empty2);
+ assert.equal(marks.get(tight.wallet)?.unexplainedMicros,"0");
+ await assert.rejects(eRestart.refundUncredited(empty1),/ESCROW_DEPOSIT_DUPLICATE/);
+
+ // Oversized uncredited transfer (> perTx) chunks into <= perTx READY refunds and drains across nonces.
+ const bigTx=net.add(signer(4).transfer({type:"transfer",cid:CHAIN,from:who(4),to:tight.wallet,amount:"25000.000000",memo:"oops",nonce:2,parents,ts:1800000000}),5,true);
+ const bigState=await eRestart.refundUncredited(bigTx);
+ assert.equal(bigState.payments[`bounce-${bigTx}-0`]!.amount,"10000000000");
+ assert.equal(bigState.payments[`bounce-${bigTx}-1`]!.amount,"10000000000");
+ assert.equal(bigState.payments[`bounce-${bigTx}-2`]!.amount,"5000000000");
+ for(let i=0;i<10;i++)await eRestart.tick();
+ assert.equal(eRestart.state().assets,"0");
+ assert.equal(net.calls,5,"2 single refunds + 3 chunked refunds");
+ replay(journal.rows,tight);
+
+ // Fail-closed guards: never bounces a transfer matching an open intent, unfinalized, wrong recipient, self, bad txid, or restored archive.
+ const openIntent=await eRestart.command(command(who(3),"open-i","intent",{amount:"3.000000"})) as any;
+ const validMatch=net.add(depositBody(3,tight.wallet,"3.000000",openIntent.intent,2),5,true);
+ await assert.rejects(eRestart.refundUncredited(validMatch),/ESCROW_DEPOSIT_MATCHES_INTENT/);
+ const unfinal=net.add(signer(4).transfer({type:"transfer",cid:CHAIN,from:who(4),to:tight.wallet,amount:"1.000000",memo:"unfinal",nonce:3,parents,ts:1800000000}),1,false);
+ await assert.rejects(eRestart.refundUncredited(unfinal),/ESCROW_NOT_FINAL/);
+ const wrongTo=net.add(signer(4).transfer({type:"transfer",cid:CHAIN,from:who(4),to:who(3),amount:"1.000000",memo:"other",nonce:4,parents,ts:1800000000}),5,true);
+ await assert.rejects(eRestart.refundUncredited(wrongTo),/ESCROW_DEPOSIT_BINDING/);
+ const selfTx=net.add(signer(1).transfer({type:"transfer",cid:CHAIN,from:tight.wallet,to:tight.wallet,amount:"1.000000",memo:"self",nonce:99,parents,ts:1800000000}),5,true);
+ await assert.rejects(eRestart.refundUncredited(selfTx),/ESCROW_SELF_DEPOSIT/);
+ await assert.rejects(eRestart.refundUncredited("bad"),/ESCROW_TXID/);
+ await assert.rejects(eRestart.refundUncredited("f".repeat(64)),/ESCROW_UNKNOWN_DEPOSIT/);
+ journal.append("restore-paused",{},s=>{s.paused=true;s.halt="RESTORED_ARCHIVE_READ_ONLY";});
+ const afterRestore=net.add(signer(4).transfer({type:"transfer",cid:CHAIN,from:who(4),to:tight.wallet,amount:"1.000000",memo:"archived",nonce:5,parents,ts:1800000000}),5,true);
+ await assert.rejects(eRestart.refundUncredited(afterRestore),/ESCROW_HALTED/);
 });
