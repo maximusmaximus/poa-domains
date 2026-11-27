@@ -616,11 +616,12 @@ async function runAgentRoundtripVerification(
   const bidReceipt: any = await bidRes.json();
   assert.equal(bidReceipt.status, "succeeded");
 
-  // Human clicks #refresh in the Web UI and verifies all sections reflect the agent's execution
+  // Human opens Explore in the Web UI and verifies live auto-polling reflects the agent's execution
   await page.locator("#tabExplore").click();
-  await page.locator("#refresh").click();
-  await page.waitForFunction(() =>
-    document.querySelector("#names")?.textContent?.includes("builder.nexus"),
+  await page.waitForFunction(
+    () => document.querySelector("#names")?.textContent?.includes("builder.nexus"),
+    undefined,
+    { timeout: 10000 },
   );
 
   // Verify #names now includes BUILDER.NEXUS (domains render uppercase)

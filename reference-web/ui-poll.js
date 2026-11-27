@@ -1,18 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=cb83c6d2a3e0";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=cb83c6d2a3e0";
-import { renderManagement } from "./ui-manage.js?v=cb83c6d2a3e0";
-import { actionLabel } from "./ui-copy.js?v=cb83c6d2a3e0";
-import { activePoaFixedListings, findOpenPoaAuctionByName, isOwnDomainOrListing, poaMinimumNextBid, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, SELF_BID_MESSAGE, SELF_BUY_MESSAGE, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=cb83c6d2a3e0";
-import { ui } from "./ui-state.js?v=cb83c6d2a3e0";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=cb83c6d2a3e0";
-import { createPoaCopyButton } from "./ui-copy.js?v=cb83c6d2a3e0";
-import { addToCart, persistCart, renderCart, renderCartEscrowStatus, setCartItemUseDeposit, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=cb83c6d2a3e0";
-import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=cb83c6d2a3e0";
-import { renderDomainPage } from "./ui-domain.js?v=cb83c6d2a3e0";
-import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=cb83c6d2a3e0";
-import { renderIdeas } from "./ui-ideas.js?v=cb83c6d2a3e0";
-import { mountEscrow } from "./escrow.js?v=cb83c6d2a3e0";
-import { activeUserAddress, applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, renderSelfBidNotice, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=cb83c6d2a3e0";
+import { publicNameUnavailable } from "./shared.js?v=1f198b47f5b4";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=1f198b47f5b4";
+import { renderManagement } from "./ui-manage.js?v=1f198b47f5b4";
+import { actionLabel } from "./ui-copy.js?v=1f198b47f5b4";
+import { activePoaFixedListings, findOpenPoaAuctionByName, isOwnDomainOrListing, poaMinimumNextBid, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, SELF_BID_MESSAGE, SELF_BUY_MESSAGE, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=1f198b47f5b4";
+import { ui } from "./ui-state.js?v=1f198b47f5b4";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=1f198b47f5b4";
+import { createPoaCopyButton } from "./ui-copy.js?v=1f198b47f5b4";
+import { addToCart, persistCart, renderCart, renderCartEscrowStatus, setCartItemUseDeposit, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=1f198b47f5b4";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=1f198b47f5b4";
+import { renderDomainPage } from "./ui-domain.js?v=1f198b47f5b4";
+import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=1f198b47f5b4";
+import { renderIdeas } from "./ui-ideas.js?v=1f198b47f5b4";
+import { mountEscrow } from "./escrow.js?v=1f198b47f5b4";
+import { activeUserAddress, applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, renderSelfBidNotice, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=1f198b47f5b4";
 if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
  document.addEventListener("poa:owner-changed", () => {
  syncEscrowCardSelfBidGuards();
@@ -614,7 +614,6 @@ export function pageStatus(error = "", loading = false) {
  el("registryLoading").hidden = !loading || !!ui.latestState;
  document.body.dataset.registryStatus = error ? "error" : loading ? "loading" : "ready";
  updateTabDots(ui.latestState);
- el("refresh").disabled = loading;
  el("registryRetry").disabled = loading;
  updateCartCopyState();
  renderNetworkStatus();
@@ -748,7 +747,6 @@ export async function refreshRegistry({ background = false, force = !background 
  finally {
  if (gen === refreshGen) {
  ui.refreshing = false;
- el("refresh").disabled = false;
  el("registryRetry").disabled = false;
  updateCartCopyState();
  }
@@ -1211,7 +1209,6 @@ export async function loadRegistry() {
  }
  finally {
  ui.starting = false;
- el("refresh").disabled = false;
  el("registryRetry").disabled = false;
  }
 }

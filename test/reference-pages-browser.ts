@@ -171,7 +171,6 @@ export async function verifyReferenceStaticPage(
       () => document.querySelector("#digest")!.textContent!.length === 64,
     );
     await page.locator("#tabExplore").click();
-    await page.locator("#refresh").click();
     assert.deepEqual(violations, []);
     assert.deepEqual(errors, []);
     assert.ok(requests.some((p) => p.endsWith("/demo/state.json")));

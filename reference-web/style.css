@@ -81,7 +81,6 @@ h2,h3,h4{color:#9cffe0;overflow-wrap:anywhere;}
 .explore-head,.explore-panel-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;}
 .explore-head{padding-right:3rem;}
 .explore-head h2,.explore-panel-head h3,.explore-panel>h3{margin:0 0 .65rem;}
-.explore-head #refresh{margin:0;}
 .explore-tabs{padding-bottom:.65rem;border-bottom:1px solid #284252;margin:.75rem 0 1rem;}
 .explore-panel>#resourcesSection{margin:0;padding:0;background:transparent;}
 .actions-filters{margin:.25rem 0 .85rem;}
