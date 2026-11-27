@@ -135,7 +135,7 @@ const gateway = {
       const u = new URL(request.url);
       need((u.pathname + u.search).length <= 4096, "URL_SIZE");
       const host = u.hostname.toLowerCase();
-      need(host === "localhost" || host === "127.0.0.1" || host === env.BACKEND_HOST || host === "poadomains.grok.me" ||
+      need(host === "localhost" || host === "127.0.0.1" || host === env.BACKEND_HOST || host === "poadomains.grok.me" || host === "poadomains.link" ||
         host === new URL(env.PUBLIC_EXPLORER_URL).hostname || host.endsWith(".grok.me"), "HOST");
 
       const discovery=discoveryDocument(u.pathname);

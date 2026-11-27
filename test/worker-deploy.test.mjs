@@ -151,6 +151,8 @@ test("workflow is credential-free on PRs; main deploy is disarmed, current-CI ga
 
 test("production host is allowlisted; discovery paths run Worker first; all error logs are sampled", () => {
   assert.equal(endpoint("https://poadomains.grok.me"), "https://poadomains.grok.me");
+  assert.equal(endpoint("https://poadomains.link"), "https://poadomains.link");
+  assert.throws(() => endpoint("http://poadomains.link")); assert.throws(() => endpoint("https://poadomains.link.attacker.invalid"));
   assert.throws(() => endpoint("https://unrelated.example")); assert.throws(() => endpoint("http://poadomains.grok.me"));
   for (const path of ["/mcp", "/.well-known/*", "/llms.txt", "/d/*", "/p/*", "/v1/*"])
     assert.ok(config.assets.run_worker_first.includes(path));

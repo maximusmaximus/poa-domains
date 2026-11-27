@@ -159,7 +159,7 @@ export function sanitizeMarkdownUserText(text: string): string {
 
 function allowedHost(hostname: string, env: FeedbackEnv): boolean {
   const h = hostname.toLowerCase();
-  if (h === "localhost" || h === "127.0.0.1" || h === "poadomains.grok.me" || h === env.BACKEND_HOST || h.endsWith(".grok.me"))
+  if (h === "localhost" || h === "127.0.0.1" || h === "poadomains.grok.me" || h === "poadomains.link" || h === env.BACKEND_HOST || h.endsWith(".grok.me"))
     return true;
   if (env.PUBLIC_EXPLORER_URL) {
     try {
