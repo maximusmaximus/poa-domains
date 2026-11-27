@@ -2120,6 +2120,19 @@ try {
     metadata: [{ cid: "bafkreig6yhxy46wina3er5aekxvbrpi4tzomftvidfmyany4c3dif5d2hi", document: { schema: "poa-domains.profile.v1", version: 1, image: `ipfs://${mockAvatarCid}` } }],
   };
   h.payload.state.names.army = { name: "army", key: "army", activeId: "deed-army-footer", auctionId: null };
+  h.payload.state.deeds["deed-maxi-footer"] = {
+    id: "deed-maxi-footer",
+    name: "maxi",
+    owner: footerArmyOwner,
+    parentId: null,
+    retired: false,
+    version: 1,
+    ownerVersion: 1,
+    rights: { kind: "permanent" },
+    records: [],
+    metadata: [],
+  };
+  h.payload.state.names.maxi = { name: "maxi", key: "maxi", activeId: "deed-maxi-footer", auctionId: null };
   h.payload.state.primaryNames = { ...(h.payload.state.primaryNames ?? {}), [footerArmyOwner]: "army" };
   h.cap = { ...h.cap, escrow: { ...(h.cap.escrow ?? {}), enabled: true } };
 
@@ -2365,6 +2378,11 @@ try {
     await expect(pageGeom.locator("#footerCreditOwner a.owner-addr-link")).toHaveAttribute("href", "/p/army");
     await expect(pageGeom.locator("#footerCreditOwner a.owner-addr-link")).toHaveText("poa1...rQ5U");
     await expect(pageGeom.locator("#footerCreditOwner button.poa-copy-btn")).toHaveAttribute("data-copy-address", footerArmyOwner);
+    await expect(pageGeom.locator("#footerCreditDomain a.owner-primary-link")).toHaveAttribute("href", "/d/maxi");
+    await expect(pageGeom.locator("#footerCreditDomain a.owner-primary-link .domain-name")).toHaveText("maxi");
+    assert.equal(await pageGeom.locator("#footerCreditDomain a.owner-primary-link .domain-name").innerText(), "MAXI");
+    await expect(pageGeom.locator("#footerCreditDomain .domain-header-avatar-xs")).toHaveText("M");
+    await expect(pageGeom.locator('.footer-credit a[href*="maxi.grok.me"]')).toHaveCount(0);
     await auditUiGeometry(pageGeom, `${vp.name}:domain-page-with-escrow`);
 
     // 8) Owner Profile page (/p/nebula)

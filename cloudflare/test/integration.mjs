@@ -77,7 +77,7 @@ try {
   check("home UI ids, ideas strip, footer links and reference disclosure", () => {
     assert.equal(home.status, 200);
     for (const id of ["searchInput","searchBtn","cartList","cartPrompt","copyCartPrompt","stats","names","auctions","offers","history","balances","handoff"]) assert.ok(html.includes(`id="${id}"`), id);
-    for (const link of ["https://maximusmaximus.github.io/poa-domains/","github.com/maximusmaximus/poa-domains","https://maxi.grok.me"]) assert.ok(html.slice(html.indexOf('id="siteFooter"')).includes(link), link);
+    for (const link of ["https://maximusmaximus.github.io/poa-domains/","github.com/maximusmaximus/poa-domains","/d/maxi"]) assert.ok(html.slice(html.indexOf('id="siteFooter"')).includes(link), link);
     assert.ok(!html.includes("resource-nav"), "top link chips removed");
     assert.match(html, /href="\/style\.css\?v=[0-9a-f]{12}"/); assert.match(html, /src="\/app\.js\?v=[0-9a-f]{12}"/);
     assert.match(home.headers.get("cache-control") ?? "", /no-cache/);
