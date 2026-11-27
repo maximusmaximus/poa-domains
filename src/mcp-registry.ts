@@ -442,7 +442,7 @@ export function registryMcpProfile(backend: McpRegistryBackend, beforeWitness?: 
     {
       name: "get_escrow_capabilities",
       description:
-        "Read live POA escrow & auction readiness (enabled, paused, held, holdReason, escrow address, per-tx/daily limits, new-name checkout, subname sales, freshness, serverTime).",
+        "Read live POA escrow & auction readiness (enabled, paused, held, holdReason, instantSettlement zero-handover flag, escrow address, per-tx/daily limits, new-name checkout, subname sales, freshness, serverTime).",
       inputSchema: objectSchema({}),
       outputSchema: output(
         {
@@ -450,6 +450,7 @@ export function registryMcpProfile(backend: McpRegistryBackend, beforeWitness?: 
           paused: { type: "boolean" },
           held: { type: "boolean" },
           holdReason: { anyOf: [S, { type: "null" }] },
+          instantSettlement: { type: "boolean" },
           address: { anyOf: [S, { type: "null" }] },
           limits: O,
           serverTime: { type: "integer" },
@@ -461,7 +462,7 @@ export function registryMcpProfile(backend: McpRegistryBackend, beforeWitness?: 
     {
       name: "list_poa_auctions",
       description:
-        "List live, queued (first-bid start), closed POA auctions and fixed-price POA listings, with reserve, high bid, strict >10% minimumNextBid, closes, window, quiet, awaitingFirstBid and history. Optional filters: name, status, kind, phase.",
+        "List live, queued (first-bid start), closed POA auctions and fixed-price POA listings, with reserve, high bid, strict >10% minimumNextBid, closes, window, quiet, awaitingFirstBid, autoSettle (zero-handover automatic settlement) and history. Optional filters: name, status, kind, phase.",
       inputSchema: objectSchema(
         {
           name: NAME,
@@ -538,7 +539,7 @@ export function registryMcpProfile(backend: McpRegistryBackend, beforeWitness?: 
     {
       name: "submit_escrow_command",
       description:
-        "Submit one locally signed POA escrow command { command, signature } (view, intent, detect, open, list, bid, buy, settle, cancel, expire, withdraw, issue, list-sub, buy-sub, cancel-sub, repair-title). Never accepts private keys; outbid POA credits back immediately to available escrow balance for instant re-bidding or withdrawal back only to the original wallet.",
+        "Submit one locally signed POA escrow command { command, signature } (view, intent, detect, open, list, bid, buy, cancel, expire, withdraw, issue, list-sub, buy-sub, cancel-sub, plus legacy settle/repair-title). Fixed-price buy and closed won auctions settle automatically (zero seller handover step: escrow pays seller+fee on-chain to finality and commits title transfer automatically). Never accepts private keys; outbid POA credits back immediately to available escrow balance for instant re-bidding or withdrawal back only to the original wallet.",
       inputSchema: ESCROW_COMMAND_SCHEMA,
       outputSchema: output(
         {
@@ -641,7 +642,7 @@ export function registryMcpProfile(backend: McpRegistryBackend, beforeWitness?: 
           : name === "set_primary_name"
             ? "\nCall resolve_domain and quote_domain with action:\"setPrimaryName\" to verify the user's key owns this active domain and get exact expectedDeedId and expectedVersion. Confirm with the user, sign locally with action:\"setPrimaryName\" (maxTotal \"0\", maxNetworkFee \"0\", coSigners []), run simulate_intent, submit_intent, and verify via get_receipt and get_owner_profile. Setting a main domain binds it to the owner's public key across Owner Profiles; transferring or retiring the domain automatically clears it."
             : name === "bid_on_poa_auction"
-            ? "\nCall get_escrow_capabilities (abort if held/paused), then list_poa_auctions with { name } to inspect id, awaitingFirstBid, price (reserve), high, minimumNextBid (strict >10%), closes, window, and quiet. Queued auctions have closes=0 and start their timer on the first bid; bids near close extend by the anti-sniping quiet window. Call submit_escrow_command with action:\"view\" to check existing available escrow balance (including instant credits from outbid auctions). Deposit only the shortfall via intent -> finalized POA transfer -> detect. Confirm the maximum bid ceiling with the user, sign locally, and call submit_escrow_command with action:\"bid\". Unused or outbid POA stays in available balance for instant re-bidding or withdraw back only to the original wallet."
+            ? "\nCall get_escrow_capabilities (abort if held/paused; note instantSettlement), then list_poa_auctions with { name } to inspect id, awaitingFirstBid, autoSettle, price (reserve), high, minimumNextBid (strict >10%), closes, window, and quiet. Queued auctions have closes=0 and start their timer on the first bid; bids near close extend by the anti-sniping quiet window. Call submit_escrow_command with action:\"view\" to check existing available escrow balance (including instant credits from outbid auctions). Deposit only the shortfall via intent -> finalized POA transfer -> detect. Confirm the maximum bid ceiling with the user, sign locally, and call submit_escrow_command with action:\"bid\". When instantSettlement/autoSettle is enabled, winning a closed auction settles automatically (escrow pays seller + fee to finality and commits title transfer with zero second seller step). Unused or outbid POA stays in available balance for instant re-bidding or withdraw back only to the original wallet."
             : "\nCheck identity and the explicitly approved POA amount; quote each name (poaPrice), abort/reconfirm changes, then follow the POA checkout steps above. Never send more POA than approved. Unknown outcome: keep and resend only identical signed bytes; never create a new request key or payment.";
       return {
         description: prompt.description,

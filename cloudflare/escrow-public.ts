@@ -3,7 +3,7 @@ import { Escrow, State } from "./escrow.js";
 import { verifyCommand, address, decimal, micros } from "./escrow-codec.js";
 import { exact, need, parseJSON } from "../src/core.js";
 const PUBLIC_ACTIONS=new Set(["intent","detect","withdraw","open","list","bid","buy","cancel","expire","settle","repair-title","issue","list-sub","cancel-sub","buy-sub","view"]);
-export function marketView(s: State, name?: string) {
+export function marketView(s: State, name?: string, autoSettleDefault = false) {
   return Object.values(s.auctions).filter(a=>name===undefined||a.name===name).slice(-500).map(a=>{
     const reserveMicros=BigInt(a.reserve);
     const highMicros=a.high?BigInt(a.high.amount):null;
@@ -15,14 +15,16 @@ export function marketView(s: State, name?: string) {
     const bidders=[...new Set((a.history??[]).map(h=>h.payer).filter((x):x is string=>typeof x==="string"&&x.length>0))];
     if(a.high?.payer&&!bidders.includes(a.high.payer))bidders.push(a.high.payer);
     const startedAt=a.startedAt??(kind!=="fixed"&&a.high!==null?(a.history?.find(h=>h.amount)?.at??a.createdAt??null):null);
+    const st=s.settlements[a.id];
+    const autoSettle=Boolean(a.autoSettle||st?.auto||(autoSettleDefault&&a.status==="OPEN"));
     return {
       id:a.id,name:a.name,seller:a.seller,kind,price:decimal(reserveMicros),
       minimumNextBid:decimal(effectiveMin),
       status:a.status,closes:openFixed?0:a.closes,window:a.window??a.quiet,quiet:a.quiet,
-      createdAt:a.createdAt??null,startedAt,awaitingFirstBid,
+      createdAt:a.createdAt??null,startedAt,awaitingFirstBid,autoSettle,
       high:a.high?{payer:a.high.payer,amount:decimal(highMicros!)}:null,
       bidders,
-      settlement:s.settlements[a.id]?.status??null,
+      settlement:st?.status??null,
       history:(a.history??[{event:a.status,at:a.createdAt??0}]).slice(-100).map(h=>({...h,...(h.amount?{amount:decimal(BigInt(h.amount))}:{})})),
     };
   });

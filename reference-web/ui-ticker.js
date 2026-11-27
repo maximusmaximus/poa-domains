@@ -1,5 +1,5 @@
-import { autoScroll, itemStep } from "./ui-motion.js?v=d4d3df1db2e8";
-import { isPoaAuctionAwaitingFirstBid, poaShort, shapeLiveActions } from "./shared.js?v=d4d3df1db2e8";
+import { autoScroll, itemStep } from "./ui-motion.js?v=c9dead207803";
+import { isPoaAuctionAwaitingFirstBid, poaShort, shapeLiveActions } from "./shared.js?v=c9dead207803";
 export const MAX_RECENT_ACTIONS=100;
 export const MAX_EXPLORE_ACTIONS=500;
 const toMs=ts=>{const n=Number(ts);return!Number.isFinite(n)||n<=0?0:n<1e12?n*1000:n;};
@@ -22,15 +22,16 @@ export function receiptDisplay(r,state,fb=""){
   if(res.metadataVersion!=null)return{icon:"🪪",verb:"Profile updated",name:fb,actor:r.signer||"",recipient:""};
   if(res.recordsVersion!=null)return{icon:"🗂️",verb:"Records updated",name:fb,actor:r.signer||"",recipient:""};
   if(res.offerId)return{icon:"🤝",verb:"Offer published",name:fb,actor:r.signer||"",recipient:""};
-  if(res.auctionId)return{icon:"🔨",verb:"Auction announced",name:fb,actor:r.signer||"",recipient:""};
   if(res.deedId){
    const d=state?.deeds?.[res.deedId],name=res.name??d?.name??fb??"",owner=res.owner||d?.owner||"";
    if(req.startsWith("treasury-inventory-"))return{icon:"🏛️",verb:"Treasury minted",name,actor:owner||r.signer||"",recipient:""};
    if(req.startsWith("protocol-domain-"))return{icon:"🏛️",verb:"Protocol minted",name,actor:owner||r.signer||"",recipient:""};
-   if(r.signer&&owner&&r.signer!==owner)return{icon:"🤝",verb:/^treasury-(?:settle|repair)-/.test(req)?"Handover":"Transferred",name,actor:r.signer,recipient:owner};
+   const from=res.seller||r.signer||"";
+   if(from&&owner&&from!==owner)return{icon:"🤝",verb:/^(?:treasury-(?:settle|repair)-|escrow-settle-)/.test(req)||res.seller?"Handover":"Transferred",name,actor:from,recipient:owner};
    if(res.name&&(d?.parentId||String(res.name).includes(".")))return{icon:"🌱",verb:"Child purchase",name,actor:owner||r.signer||"",recipient:""};
    return{icon:"🎉",verb:"Registered",name,actor:owner||r.signer||"",recipient:""};
   }
+  if(res.auctionId)return{icon:"🔨",verb:"Auction announced",name:fb,actor:r.signer||"",recipient:""};
  }
  return{icon:r?.status==="rejected"?"⚠️":"🧾",verb:r?.status==="rejected"?"Rejected":"Registry action",name:fb,actor:r?.signer||"",recipient:""};
 }

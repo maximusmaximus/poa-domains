@@ -21,8 +21,12 @@ and `native_receipt`: it never gains a reference registry or signing fallback.
 Registry & POA tools include `read_state`, `read_capabilities`, `resolve_domain`,
 `get_domain_profile`, `get_owner_profile`, `build_metadata_witness`, `build_profile_witness`,
 `quote_domain`, `simulate_intent`, `submit_intent`, `get_receipt`, `get_nonce`,
-plus POA escrow & terms helpers (`poa_escrow_capabilities`, `poa_escrow_market`,
-`poa_escrow_quote`, `poa_escrow_status`, `get_terms`, `agree_terms`). All publish object-root
+plus POA escrow & terms helpers (`get_escrow_capabilities`, `list_poa_auctions`,
+`get_escrow_intent`, `submit_escrow_command`, `get_terms`, `agree_terms`). `get_escrow_capabilities`
+reports `instantSettlement: true` and `list_poa_auctions` reports `autoSettle: true` when
+zero-handover automatic settlement is enabled (fixed-price `buy` and closed won auctions pay
+seller + fee on-chain to finality and commit the permanent title transfer automatically with
+no second seller `settle` step). All publish object-root
 `outputSchema` and return `structuredContent` as well as the legacy text JSON. `src/mcp-schema.ts` is the
 single input-schema source: action-tagged `oneOf` with 16 enabled actions (including `setPrimaryName`
 to bind or clear an owner's default/main domain address, and `transfer`, which automatically resets

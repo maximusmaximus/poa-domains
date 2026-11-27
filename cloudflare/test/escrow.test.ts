@@ -121,7 +121,11 @@ test("bid holds, strict increment, outbid credits available balance for instant 
  invariant(f.e.state());
 });
 test("expiry/failure reclassifies refund liability even while admin paused",async()=>{
- const f=fixture(),a=await auction(f);f.e.pause(true);f.net.now+=1001;
+ const f=fixture(),a=await auction(f);f.e.pause(true);
+ // Must not expire before closes + quiet handover grace window passes, even while paused.
+ f.net.now+=1001;
+ await assert.rejects(f.e.command(command(who(4),"expire-early","expire",{auction:a})),/ESCROW_CANCEL_NOT_ALLOWED/);
+ f.net.now+=1000;
  await f.e.command(command(who(4),"expire","expire",{auction:a}));assert.equal(Object.values(f.e.state().payments)[0]!.to,who(3));invariant(f.e.state());
 });
 test("stale/down/wrong chain/fee change, paused/off flags hold without losing liabilities",async()=>{
@@ -2079,4 +2083,165 @@ test("refundUncredited allows repeated empty-memo transfers, chunks >perTx, pers
  journal.append("restore-paused",{},s=>{s.paused=true;s.halt="RESTORED_ARCHIVE_READ_ONLY";});
  const afterRestore=net.add(signer(4).transfer({type:"transfer",cid:CHAIN,from:who(4),to:tight.wallet,amount:"1.000000",memo:"archived",nonce:5,parents,ts:1800000000}),5,true);
  await assert.rejects(eRestart.refundUncredited(afterRestore),/ESCROW_HALTED/);
+});
+
+test("zero-handover instant settlement: fixed-price buy & closed auctions settle automatically, pay-before-title, parallel sales, crash recovery, and replay",async()=>{
+ const net=new MockNetwork(),journal=new MemoryJournal(policy);
+ const commits:any[]=[];
+ const engine=new Engine(mainnetConfig(who(6),who(5),[who(2),who(3),who(4)]),{now:()=>Math.floor(net.now/1000)});
+ engine.attach({append:(c:any)=>{commits.push(structuredClone(c));},close:()=>{}});
+ const mintFor=(targetIdx:number,name:string,reqId:string)=>{
+  const tier=name==="👩‍🦰"?"premium":"standard";
+  const price=poaNewNamePriceMicros(tier);
+  const body={domain:"poa-domains.local.intent.v1",revision:engine.config.revision,chainId:CHAIN,genesisHash:engine.config.genesisHash,
+   registryId:engine.registryId,policyHash:engine.policyHash,normalizationHash:engine.config.normalizationHash,
+   signer:who(targetIdx),coSigners:[],requestId:reqId,nonce:engine.nextNonce(who(targetIdx)),notBefore:0,deadline:2000000000,
+   maxTotal:"0",maxNetworkFee:"0",action:"issueFromTreasury",
+   params:{name,asset:"POA",price,expectedDeedId:null,expectedVersion:0,metadata:buildMetadataWitness(name)}};
+  assert.equal(engine.submitEscrowIssue(signBody(body as any,[key(targetIdx)])).status,"succeeded");
+ };
+ const mintTreasury=(name:string,reqId:string)=>{
+  const body={domain:"poa-domains.local.intent.v1",revision:engine.config.revision,chainId:CHAIN,genesisHash:engine.config.genesisHash,
+   registryId:engine.registryId,policyHash:engine.policyHash,normalizationHash:engine.config.normalizationHash,
+   signer:who(5),coSigners:[],requestId:reqId,nonce:engine.nextNonce(who(5)),notBefore:0,deadline:2000000000,
+   maxTotal:"0",maxNetworkFee:"0",action:"issueTreasuryInventory",
+   params:{name,expectedDeedId:null,expectedVersion:0,metadata:buildMetadataWitness(name)}};
+  assert.equal(engine.submit(signBody(body as any,[key(5)])).status,"succeeded");
+ };
+ mintFor(2,"alpha","mint-alpha");
+ mintFor(2,"beta","mint-beta");
+ mintFor(2,"other","mint-other");
+ mintFor(2,"👩‍🦰","mint-emoji");
+ mintTreasury("trez","mint-trez");
+ const deedOf=(name:string)=>{const s=engine.snapshot();return s.deeds[s.names[name]!.activeId!]!;};
+
+ // Set primaryName on alpha so we verify escrowSettle clears primaryName + resets profile cleanly!
+ const dAlpha0=deedOf("alpha");
+ assert.equal(engine.submit(signBody({
+  domain:"poa-domains.local.intent.v1",revision:engine.config.revision,chainId:CHAIN,genesisHash:engine.config.genesisHash,
+  registryId:engine.registryId,policyHash:engine.policyHash,normalizationHash:engine.config.normalizationHash,
+  signer:who(2),coSigners:[],requestId:"primary-alpha",nonce:engine.nextNonce(who(2)),notBefore:0,deadline:2000000000,
+  maxTotal:"0",maxNetworkFee:"0",action:"setPrimaryName",
+  params:{name:"alpha",expectedDeedId:dAlpha0.id,expectedVersion:dAlpha0.version},
+ } as any,[key(2)])).status,"succeeded");
+ assert.equal(engine.snapshot().primaryNames?.[who(2)],"alpha");
+
+ // Public submit & preview MUST refuse escrowSettle with ESCROW_ONLY.
+ const dAlpha1=deedOf("alpha");
+ const rawSettle=signBody({
+  domain:"poa-domains.local.intent.v1",revision:engine.config.revision,chainId:CHAIN,genesisHash:engine.config.genesisHash,
+  registryId:engine.registryId,policyHash:engine.policyHash,normalizationHash:engine.config.normalizationHash,
+  signer:who(5),coSigners:[],requestId:"direct-settle",nonce:engine.nextNonce(who(5)),notBefore:0,deadline:2000000000,
+  maxTotal:"0",maxNetworkFee:"0",action:"escrowSettle",
+  params:{name:"alpha",expectedDeedId:dAlpha1.id,expectedVersion:dAlpha1.version,expectedOwnerVersion:dAlpha1.ownerVersion,seller:who(2),recipient:who(3),auctionId:"a".repeat(64),price:"10000000"},
+ } as any,[key(5)]);
+ assert.throws(()=>engine.submit(rawSettle),/ESCROW_ONLY/);
+ assert.throws(()=>engine.preview(rawSettle),/ESCROW_ONLY/);
+
+ let armed="";
+ const makeEscrow=()=>new Escrow(journal,net,signer(),registryTitles(engine,key(5)),policy,()=>net.now,()=>true,
+  point=>{if(armed===point){armed="";throw Error("INJECTED_CRASH");}});
+ let e=makeEscrow();
+ assert.equal(e.instantSettlement(),true);
+ await e.pause(false);
+
+ const fundActor=async(actor:number,amount:string,k:string,nonce:number)=>{
+  const i=await e.command(command(who(actor),k+"-i","intent",{amount})) as any;
+  const tx=net.add(depositBody(actor,policy.wallet,amount,i.intent,nonce),5,true);
+  await e.command(command(who(actor),k+"-d","detect",{intent:i.intent,txid:tx}));
+ };
+ await fundActor(3,"200.000000","f3",1);
+ await fundActor(4,"200.000000","f4",1);
+
+ // 1. Fixed-price listing + auction listing by SAME seller who(2) simultaneously!
+ const lFixed=await e.command(command(who(2),"list-alpha","list",{name:"alpha",price:"20.000000"})) as any;
+ const oAuc=await e.command(command(who(2),"open-beta","open",{name:"beta",reserve:"10.000000"})) as any;
+ const oNoBid=await e.command(command(who(2),"open-nobid","open",{name:"👩‍🦰",reserve:"10.000000"})) as any;
+ assert.equal(e.state().auctions[lFixed.auction]!.autoSettle,true);
+ assert.equal(e.state().auctions[lFixed.auction]!.deedId,dAlpha1.id);
+ assert.equal(e.state().auctions[lFixed.auction]!.ownerVersion,dAlpha1.ownerVersion);
+
+ // Fixed-price buy immediately enters SETTLING (auto: true, packet: null) with READY payouts — zero seller action!
+ await e.command(command(who(3),"buy-alpha","buy",{auction:lFixed.auction,amount:"20.000000"}));
+ assert.equal(e.state().auctions[lFixed.auction]!.status,"SETTLING");
+ assert.equal(e.state().settlements[lFixed.auction]!.auto,true);
+ assert.equal(e.state().settlements[lFixed.auction]!.packet,null);
+ assert.equal(e.hasActiveWork(who(5)),true);
+ // Seller cannot cancel and nobody can expire after buy.
+ await assert.rejects(e.command(command(who(2),"cancel-bought","cancel",{auction:lFixed.auction})),/ESCROW_AUCTION_CLOSED/);
+ await assert.rejects(e.command(command(who(4),"expire-bought","expire",{auction:lFixed.auction})),/ESCROW_AUCTION_CLOSED/);
+ // Pay-before-title invariant: alpha STILL belongs to seller who(2) until payouts finalize!
+ assert.equal(deedOf("alpha").owner,who(2));
+ // Auto-settling seller is NOT nonce-blocked from managing unrelated domain "other", while "alpha" remains strictly locked!
+ const dOther=deedOf("other");
+ const otherMeta=signBody({
+  domain:"poa-domains.local.intent.v1",revision:engine.config.revision,chainId:CHAIN,genesisHash:engine.config.genesisHash,
+  registryId:engine.registryId,policyHash:engine.policyHash,normalizationHash:engine.config.normalizationHash,
+  signer:who(2),coSigners:[],requestId:"edit-other",nonce:engine.nextNonce(who(2)),notBefore:0,deadline:2000000000,
+  maxTotal:"0",maxNetworkFee:"0",action:"setMetadata",
+  params:{name:"other",expectedDeedId:dOther.id,expectedVersion:dOther.version,metadata:buildMetadataWitness("other",{kind:"permanent"},null,"Free to edit")},
+ } as any,[key(2)]);
+ assert.equal(escrowPacketBlocked(e.state(),engine,otherMeta),false,"auto-settling seller is not blocked on unrelated domains");
+ assert.equal(engine.submit(otherMeta).status,"succeeded");
+ const alphaMeta=signBody({
+  domain:"poa-domains.local.intent.v1",revision:engine.config.revision,chainId:CHAIN,genesisHash:engine.config.genesisHash,
+  registryId:engine.registryId,policyHash:engine.policyHash,normalizationHash:engine.config.normalizationHash,
+  signer:who(2),coSigners:[],requestId:"edit-alpha",nonce:engine.nextNonce(who(2)),notBefore:0,deadline:2000000000,
+  maxTotal:"0",maxNetworkFee:"0",action:"setMetadata",
+  params:{name:"alpha",expectedDeedId:dAlpha1.id,expectedVersion:dAlpha1.version,metadata:buildMetadataWitness("alpha",{kind:"permanent"},null,"Locked")},
+ } as any,[key(2)]);
+ assert.equal(escrowPacketBlocked(e.state(),engine,alphaMeta),true,"settling domain itself stays strictly locked");
+
+ // 2. Bid on beta (who(3) -> outbid by who(4)) and close past window -> BOTH alpha AND beta settle in parallel!
+ await e.command(command(who(3),"bid-beta-1","bid",{auction:oAuc.auction,amount:"10.000000"}));
+ await e.command(command(who(4),"bid-beta-2","bid",{auction:oAuc.auction,amount:"12.000000"}));
+ assert.equal(e.state().available[who(3)],"180000000","outbid bidder got instant credit back");
+ net.now+=3600001; // past 1h standard window for beta!
+ // Post-close won auto-settle auction CANNOT be cancelled by seller OR expired by anyone!
+ await assert.rejects(e.command(command(who(2),"rug-beta","cancel",{auction:oAuc.auction})),/ESCROW_CANCEL_NOT_ALLOWED/);
+ await assert.rejects(e.command(command(who(3),"snipe-beta","expire",{auction:oAuc.auction})),/ESCROW_CANCEL_NOT_ALLOWED/);
+ // Treasury auction also settles automatically with ONE single payout (fee=0)!
+ const oTrez=await e.command(command(who(5),"open-trez","open",{name:"trez",reserve:"5.000000"})) as any;
+ await e.command(command(who(3),"bid-trez","bid",{auction:oTrez.auction,amount:"10.000000"}));
+ net.now+=3600001; // past trez window too
+
+ // Inject crashes across every phase (before-submit, after-submit, after-payout, before-title) and recover with fresh Escrow instances!
+ for (const point of ["before-submit","after-submit","after-payout","before-title"]) {
+  armed=point;
+  let crashed=false;
+  for (let k=0;k<6&&!crashed;k++) {
+   try { await e.tick(); } catch (err: any) { assert.equal(err.message,"INJECTED_CRASH"); crashed=true; }
+  }
+  assert.equal(crashed,true,`expected crash at ${point}`);
+  e=makeEscrow(); // simulate DO restart
+ }
+ // Concurrent recovery ticks finish all remaining payouts and auto-settle titles without double payment or double commit.
+ for (let round=0;round<12;round++) await Promise.all([e.tick(),e.tick()]);
+ assert.equal(e.state().auctions[lFixed.auction]!.status,"COMPLETE");
+ assert.equal(e.state().auctions[oAuc.auction]!.status,"COMPLETE");
+ assert.equal(e.state().auctions[oTrez.auction]!.status,"COMPLETE");
+ assert.equal(deedOf("alpha").owner,who(3),"fixed-price buyer owns alpha without seller handover");
+ assert.equal(deedOf("beta").owner,who(4),"auction winner owns beta without seller handover");
+ assert.equal(deedOf("trez").owner,who(3),"treasury auction winner owns trez without handover");
+ assert.equal(engine.snapshot().primaryNames?.[who(2)],undefined,"escrowSettle clears seller primaryName cleanly");
+ // Treasury auction collapsed to single payout (10 POA, no fee split); alpha + beta had 2 payouts each = 5 total outgoing transfers!
+ assert.equal(net.calls,5);
+ assert.deepEqual(e.state().settlements[oTrez.auction]!.payments,[`seller-${oTrez.auction}`]);
+ // Unbid queued auction oNoBid stays OPEN (closes===0); seller can still cancel unbid listing cleanly.
+ assert.equal(e.state().auctions[oNoBid.auction]!.status,"OPEN");
+ await e.command(command(who(2),"cancel-nobid","cancel",{auction:oNoBid.auction}));
+ assert.equal(e.state().auctions[oNoBid.auction]!.status,"CANCELLED");
+ // Withdraw remaining balances -> assets === 0, full journal replay + engine invariants clean!
+ await e.command(command(who(3),"w3","withdraw",{amount:"170.000000"}));
+ await e.command(command(who(4),"w4","withdraw",{amount:"188.000000"}));
+ for (let i=0;i<6;i++) await e.tick();
+ assert.equal(e.state().assets,"0");
+ invariant(e.state());
+ engine.assertInvariants();
+ replay(journal.rows,policy);
+ // Verify Engine replay from genesis reproduces identical stateHash with escrowSettle commits!
+ const replayed=new Engine(engine.config,{now:()=>Math.floor(net.now/1000)});
+ assert.ok(commits.some((c:any)=>c.packet.body.action==="escrowSettle"),"journal recorded escrowSettle commits");
+ for (const c of commits) replayed.replay(c);
+ assert.equal(replayed.stateHash(),engine.stateHash(),"Engine replay of escrowSettle commits is byte-identical");
 });

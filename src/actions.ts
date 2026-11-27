@@ -71,6 +71,9 @@ export const ESCROW_ONLY_ACTIONS = {
   issueFromTreasury: ["name", "asset", "price", "expectedVersion", "expectedDeedId", "metadata"],
   // POA subname sale: the parent holder's escrow listing authorizes it; the buyer signs this packet.
   issueSubname: ["name", "parentDeedId", "parentOwnerVersion", "asset", "price", "expectedGeneration", "metadata"],
+  // Automatic zero-handover POA escrow settlement: seller authorized list/open in escrow, and escrow
+  // verified final seller + fee payouts before committing title transfer in the same storage tx.
+  escrowSettle: ["name", "expectedDeedId", "expectedVersion", "expectedOwnerVersion", "seller", "recipient", "auctionId", "price"],
 } as const;
 export const ESCROW_ISSUE_ACTIONS: readonly string[] = Object.freeze(Object.keys(ESCROW_ONLY_ACTIONS));
 // Treasury-only issuance of reserved protocol names (e.g. "escrow", "treasury") and non-reserved

@@ -939,6 +939,23 @@ export class Engine {
         root.version++;
         return { deedId: d.id, name: d.name, owner: d.owner };
       }
+      case "escrowSettle": {
+        // Automatic zero-handover POA escrow settlement: seller previously signed list/open in escrow,
+        // and escrow verified final seller + fee payouts before committing this transfer in the same storage tx.
+        need(this.config.revision === "poa-mainnet-v1", "ESCROW_ISSUE_POLICY");
+        need(b.signer === this.config.treasury, "NOT_OWNER");
+        need(b.maxTotal === "0", "AMOUNT_CAP");
+        const d = this.deed(s, p);
+        const seller = principal(p.seller);
+        const recipient = principal(p.recipient);
+        need(d.owner === seller && !d.retired && !d.lock && d.rights.kind === "permanent", "NOT_OWNER");
+        need(integer(p.expectedOwnerVersion) === d.ownerVersion, "STALE_VERSION");
+        need(seller !== recipient, "SELF_SALE");
+        need(typeof p.auctionId === "string" && /^[0-9a-f]{64}$/.test(p.auctionId), "SCHEMA");
+        amount(p.price, true);
+        this.transferDeed(s, d, recipient, time);
+        return { deedId: d.id, name: d.name, seller, owner: d.owner, auctionId: p.auctionId };
+      }
       case "issueReserved": {
         // Treasury-only claim of a reserved protocol root name under the registry's treasury principal.
         need(b.signer === this.config.treasury, "RESERVED_NAME");

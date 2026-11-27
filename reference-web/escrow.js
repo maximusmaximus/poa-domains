@@ -8,7 +8,21 @@ const node = (tag, text, cls) => { const n = document.createElement(tag); if (te
     n.className = cls; return n; };
 const append = (p, t, text, cls) => { const n = node(t, text, cls); p.append(n); return n; };
 export function mountEscrow({ base = "", capability, registryId, section, domain, selectTab }) {
-    let caps = { enabled: false, held: true, holdReason: "POA payments not open" }, intent = null, candidate = null, account = null, viewPacket = null, market = [], busy = false, stopped = false, currentName = "", serverOffset = 0;
+    let caps = { enabled: false, held: true, holdReason: "POA payments not open" }, intent = null, candidate = null, account = null, viewPacket = null, market = [], busy = false, stopped = false, currentName = "", serverOffset = 0, marketTab = "available";
+    const expandedIds = new Set();
+    const shortPoa = (v) => String(v ?? "").replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "");
+    const marketBucket = (item, nowMs) => {
+        if (item.status === "COMPLETE") return "completed";
+        if (item.status === "CANCELLED") return "expired";
+        if (item.status === "SETTLING") return "issues";
+        if (item.status === "OPEN") {
+            if (item.kind === "fixed") return item.high ? "issues" : "available";
+            const awaiting = Boolean(item.awaitingFirstBid || (item.closes === 0 && !item.high));
+            if (!awaiting && item.closes > 0 && nowMs >= item.closes) return "issues";
+            return "available";
+        }
+        return "issues";
+    };
     section.classList.add("escrow-screen");
     domain.classList.add("escrow-screen");
     const heading = append(section, "h2", "🪙 My POA"), mock = append(section, "p", "", "escrow-mock");
@@ -85,8 +99,8 @@ export function mountEscrow({ base = "", capability, registryId, section, domain
     const fund = btn("➕ Add POA", "intent", () => ({ amount: poaAmount(amount.value) }), "This creates an intent, not a payment. Send from this exact poa1 address only, using the exact recipient, amount and unique memo returned by that intent. After final credit, bid/buy needs a separate signed request.");
     fund.id = "escrowIntentPrompt";
     btn("👀 Read my escrow", "view", () => ({}), "Read only. This signature lets this page refresh only your account until it expires.");
-    const fixedList = btn("🏷️ List my name for POA", "list", () => ({ name: listingName.value.trim(), price: poaAmount(amount.value) }), "Only an existing permanent, unencumbered name you own can be listed. Registry-only offers must be cancelled first.");
-    const auctionOpen = btn("⏱️ Open my POA auction", "open", () => ({ name: listingName.value.trim(), reserve: poaAmount(amount.value) }), "This reserves your title. Settlement still needs your separately signed handover.");
+    const fixedList = btn("🏷️ List my name for POA", "list", () => ({ name: listingName.value.trim(), price: poaAmount(amount.value) }), "Only an existing permanent, unencumbered name you own can be listed. Registry-only offers must be cancelled first. Once a buyer pays, escrow pays you on-chain and transfers title automatically — no second handover step required.");
+    const auctionOpen = btn("⏱️ Open my POA auction", "open", () => ({ name: listingName.value.trim(), reserve: poaAmount(amount.value) }), "This reserves your title. Once a buyer wins and the auction closes, escrow pays you on-chain and transfers title automatically — no second handover step required.");
     const withdraw = btn("↩️ Request my refund", "withdraw", () => ({ amount: poaAmount(amount.value) }), "Refund only to my original payer address. Do not redirect it. A request is not final until verified on-chain.");
     withdraw.id = "escrowWithdrawPrompt";
     function drawDeposit() {
@@ -142,36 +156,136 @@ export function mountEscrow({ base = "", capability, registryId, section, domain
         for (const r of account.refunds ?? [])
             append(accountBox, "p", `↩️ ${r.amount} POA · ${r.status === "FINAL" ? "final ✅" : r.status === "READY" ? "queued" : r.status === "SIGNED" ? "prepared; waiting to send" : "checking final status"}`);
     }
-    function listing(parent, item) {
-        const card = append(parent, "article", undefined, "card");
+    function listing(parent, item, { compact = false } = {}) {
+        const nowMs = Date.now() + serverOffset;
+        const isAuto = Boolean(item.autoSettle || caps.instantSettlement);
+        const bucket = marketBucket(item, nowMs);
+        const card = append(parent, "article", undefined, compact ? "card escrow-compact" : "card");
+        card.dataset.escrowId = item.id;
+        card.dataset.escrowStatus = item.status;
+        card.dataset.escrowBucket = bucket;
+        card.dataset.escrowKind = item.kind === "fixed" ? "fixed" : "auction";
+        card.dataset.escrowAuto = isAuto ? "1" : "0";
+        const expanded = !compact || expandedIds.has(item.id);
+        if (compact)
+            card.dataset.escrowExpanded = expanded ? "1" : "0";
         append(card, "h3", item.name);
-        append(card, "p", `${item.kind === "fixed" ? "Buy price" : "Reserve"}: ${item.price} POA · ${item.status}`);
-        if (item.high)
-            append(card, "p", `Highest / reserved: ${item.high.amount} POA`);
-        append(card, "p", item.settlement ? `Handover: ${item.settlement}` : "Seller signs handover after funds are held. No title moves before final seller payment.");
-        if (item.status === "OPEN" && !item.high || item.status === "OPEN" && item.kind !== "fixed") {
+        if (compact) {
+            const amt = shortPoa(item.high?.amount || item.price);
+            const tag = bucket === "completed" ? `✅ ${amt} POA`
+                : bucket === "expired" ? `⏰ ${amt} POA`
+                    : item.settlement === "TITLE_PENDING" ? "⚠️ Title pending"
+                        : item.status === "SETTLING" ? `⏳ Settling · ${amt} POA`
+                            : bucket === "issues" ? `⚠️ ${amt} POA`
+                                : item.kind === "fixed" ? `💰 ${amt} POA`
+                                    : item.high ? `🔥 ${amt} POA` : `🔨 ${amt} POA`;
+            append(card, "span", tag, "escrow-row-meta");
+        }
+        const awaiting = Boolean(item.awaitingFirstBid || (item.closes === 0 && !item.high));
+        const actionable = item.status === "OPEN" && (item.kind === "fixed" ? !item.high : (awaiting || !item.closes || nowMs < item.closes));
+        if (actionable) {
             const b = append(card, "button", item.kind === "fixed" ? "🛍️ Pay with POA" : "🏷️ Bid with POA", "secondary");
             b.type = "button";
             b.disabled = !!caps.held;
-            b.addEventListener("click", () => { selectTab(); amount.value = item.kind === "fixed" ? item.price : amount.value; prepare("intent", { amount: poaAmount(amount.value) }, `For ${item.name}, escrow ${item.kind}, ID ${item.id}. This is funding only. After verified credit, sign ${item.kind === "fixed" ? "buy" : "bid"} with params {auction:"${item.id}",amount:"${poaAmount(amount.value)}"}. Check the live price and status again; never assume a transfer or sale completed.`); });
+            b.addEventListener("click", () => { selectTab(); amount.value = item.kind === "fixed" ? item.price : amount.value; prepare("intent", { amount: poaAmount(amount.value) }, `For ${item.name}, escrow ${item.kind}, ID ${item.id}. This is funding only. After verified credit, sign ${item.kind === "fixed" ? "buy" : "bid"} with params {auction:"${item.id}",amount:"${poaAmount(amount.value)}"}. ${isAuto ? "Settlement is automatic once purchased or closed (seller + fee paid on-chain before title commits)." : "Check the live price and status again; never assume a transfer or sale completed."}`); });
             const use = append(card, "button", item.kind === "fixed" ? "Use credited POA to buy" : "Use credited POA to bid", "secondary small");
             use.type = "button";
             use.disabled = !!caps.held;
             use.addEventListener("click", () => { selectTab(); if (item.kind === "fixed")
-                amount.value = item.price; prepare(item.kind === "fixed" ? "buy" : "bid", { auction: item.id, amount: poaAmount(amount.value) }, "Use only my verified credited funds. Seller must provide separately signed title handover. Purchase reservation is not completion."); });
+                amount.value = item.price; prepare(item.kind === "fixed" ? "buy" : "bid", { auction: item.id, amount: poaAmount(amount.value) }, isAuto ? "Use only my verified credited funds. Once bought or won at close, escrow pays the seller + fee on-chain and commits title automatically (no second seller handover step)." : "Use only my verified credited funds. Seller must provide separately signed title handover. Purchase reservation is not completion."); });
         }
-        if (item.status === "OPEN" && item.high) {
-            const finish = append(card, "button", "🤝 Ask my agent to finish handover", "secondary small");
+        const needsManualHandover = (item.status === "OPEN" && item.high && !isAuto) || (item.status === "SETTLING" && item.settlement === "TITLE_PENDING");
+        if (needsManualHandover) {
+            const finish = append(card, "button", item.settlement === "TITLE_PENDING" ? "🔧 Repair title handover" : "🤝 Ask my agent to finish handover", "secondary small");
             finish.type = "button";
             finish.disabled = !!caps.held;
-            finish.addEventListener("click", () => { selectTab(); prompt.textContent = `${caps.mock ? "MOCK ONLY — never send real POA.\n" : ""}As seller ${item.seller}, independently verify escrow ${item.id}, name ${item.name}, buyer ${item.high.payer}, amount ${item.high.amount} POA, registry ${registryId}, and live hold/freshness state. Wait until its close time. Read the registry API/capabilities/state and prepare a signed permanent-name transfer to that exact buyer, with the current deed ID/version/nonce, maxTotal and maxNetworkFee zero and a deadline at least 10 minutes ahead. Do not submit that transfer to /v1/intents. Include that public signed packet as params.transfer in a separately payer-signed escrow settle command with params.auction="${item.id}". Use the same domain/chain/registry and canonical Ed25519 format as the other escrow prompts, a new unique key and expiry within 1 hour. Submit only {command,signature} to ${new URL("/v1/escrow/command", base || location.origin)} with application/json and no admin credential. Never reveal keys. Settlement pays the seller/fee before title commit; a reservation is not a completed purchase.`; });
+            finish.addEventListener("click", () => { const cmdAction = item.settlement === "TITLE_PENDING" ? "repair-title" : "settle"; selectTab(); prompt.textContent = `${caps.mock ? "MOCK ONLY — never send real POA.\n" : ""}As seller ${item.seller}, independently verify escrow ${item.id}, name ${item.name}, buyer ${item.high.payer}, amount ${item.high.amount} POA, registry ${registryId}, and live hold/freshness state. Wait until its close time. Read the registry API/capabilities/state and prepare a signed permanent-name transfer to that exact buyer, with the current deed ID/version/nonce, maxTotal and maxNetworkFee zero and a deadline at least 10 minutes ahead. Do not submit that transfer to /v1/intents. Include that public signed packet as params.transfer in a separately payer-signed escrow ${cmdAction} command with params.auction="${item.id}". Use the same domain/chain/registry and canonical Ed25519 format as the other escrow prompts, a new unique key and expiry within 1 hour. Submit only {command,signature} to ${new URL("/v1/escrow/command", base || location.origin)} with application/json and no admin credential. Never reveal keys. Settlement pays the seller/fee before title commit; a reservation is not a completed purchase.`; });
         }
+        const body = compact ? append(card, "div", undefined, "escrow-card-details") : card;
+        if (compact) {
+            body.hidden = !expanded;
+            const toggle = append(card, "button", expanded ? "▾" : "▸", "secondary small escrow-expand-btn");
+            toggle.type = "button";
+            toggle.setAttribute("aria-expanded", String(expanded));
+            toggle.setAttribute("aria-label", `${expanded ? "Collapse" : "Expand"} details for ${item.name}`);
+            toggle.title = `${expanded ? "Collapse" : "Expand"} details`;
+            const flip = () => {
+                const open = !expandedIds.has(item.id);
+                if (open) expandedIds.add(item.id);
+                else expandedIds.delete(item.id);
+                card.dataset.escrowExpanded = open ? "1" : "0";
+                body.hidden = !open;
+                toggle.textContent = open ? "▾" : "▸";
+                toggle.setAttribute("aria-expanded", String(open));
+                toggle.setAttribute("aria-label", `${open ? "Collapse" : "Expand"} details for ${item.name}`);
+                toggle.title = `${open ? "Collapse" : "Expand"} details`;
+            };
+            toggle.addEventListener("click", flip);
+            card.addEventListener("click", (ev) => {
+                if (ev.target?.closest?.("button, input, label, a, [popover]")) return;
+                if (body.contains(ev.target)) return;
+                flip();
+            });
+            card.insertBefore(toggle, body);
+        }
+        append(body, "p", `${item.kind === "fixed" ? "Buy price" : "Reserve"}: ${item.price} POA · ${item.status}`);
+        if (item.high)
+            append(body, "p", `Highest / reserved: ${item.high.amount} POA`);
+        append(body, "p", item.settlement ? `Settlement: ${item.settlement}` : isAuto ? "Automatic settlement: escrow pays seller + fee on-chain and commits title once funded or closed (zero seller handover step)." : "Seller signs handover after funds are held. No title moves before final seller payment.");
         for (const h of item.history ?? [])
-            append(card, "p", `${h.event}${h.amount ? " · " + h.amount + " POA" : ""} · ${elapsed(h.at, Date.now() + serverOffset)}`, "muted");
+            append(body, "p", `${h.event}${h.amount ? " · " + h.amount + " POA" : ""} · ${elapsed(h.at, nowMs)}`, "muted");
     }
-    function drawMarket() { marketBox.replaceChildren(); append(marketBox, "h3", "🏷️ Names listed for POA"); if (!market.length)
-        append(marketBox, "p", "No names listed for POA."); for (const item of market)
-        listing(marketBox, item); }
+    function drawMarket() {
+        const nowMs = Date.now() + serverOffset;
+        const groups = { available: [], completed: [], expired: [], issues: [] };
+        for (const item of market)
+            groups[marketBucket(item, nowMs)].push(item);
+        marketBox.replaceChildren();
+        append(marketBox, "h3", "🏷️ Names listed for POA");
+        const tabBar = append(marketBox, "div", undefined, "escrow-market-tabs");
+        tabBar.setAttribute("role", "tablist");
+        tabBar.setAttribute("aria-label", "POA listing status");
+        const tabs = [
+            ["available", "🟢 Available", "No available names listed for POA right now."],
+            ["completed", "✅ Completed", "No completed POA sales or auctions yet."],
+            ["expired", "⏰ Expired", "No expired or cancelled listings."],
+            ["issues", "⚠️ Issues", "No listings settling or needing attention."],
+        ];
+        const tabButtons = [];
+        for (const [id, label] of tabs) {
+            const count = groups[id].length;
+            const t = append(tabBar, "button", `${label} (${count})`, "escrow-market-tab" + (marketTab === id ? " is-active" : ""));
+            t.type = "button";
+            t.setAttribute("role", "tab");
+            t.setAttribute("aria-selected", marketTab === id ? "true" : "false");
+            t.tabIndex = marketTab === id ? 0 : -1;
+            t.dataset.escrowMarketTab = id;
+            t.addEventListener("click", () => { if (marketTab !== id) { marketTab = id; drawMarket(); } });
+            tabButtons.push(t);
+        }
+        tabBar.addEventListener("keydown", (ev) => {
+            const idx = tabButtons.indexOf(document.activeElement);
+            if (idx < 0) return;
+            const next = ev.key === "ArrowRight" ? (idx + 1) % tabButtons.length
+                : ev.key === "ArrowLeft" ? (idx - 1 + tabButtons.length) % tabButtons.length
+                    : ev.key === "Home" ? 0
+                        : ev.key === "End" ? tabButtons.length - 1 : -1;
+            if (next < 0) return;
+            ev.preventDefault();
+            const target = tabButtons[next];
+            marketTab = target.dataset.escrowMarketTab;
+            drawMarket();
+            marketBox.querySelector(`.escrow-market-tab[data-escrow-market-tab="${marketTab}"]`)?.focus();
+        });
+        const activeItems = groups[marketTab] ?? [];
+        const emptyMsg = tabs.find(([id]) => id === marketTab)?.[2] ?? "No names listed for POA.";
+        if (!activeItems.length) {
+            append(marketBox, "p", emptyMsg, "muted");
+            return;
+        }
+        for (const item of activeItems)
+            listing(marketBox, item, { compact: true });
+    }
     async function domainView(name) { currentName = name || ""; domain.replaceChildren(); append(domain, "h3", "🪙 POA payments"); if (!caps.enabled) {
         append(domain, "p", "POA payments not open");
         return;
@@ -230,7 +344,7 @@ export function mountEscrow({ base = "", capability, registryId, section, domain
             held.textContent = "⏸️ POA payments held. Could not check freshness.";
             caps.held = true;
             fund.disabled = withdraw.disabled = fixedList.disabled = auctionOpen.disabled = true;
-            for (const b of [...marketBox.querySelectorAll("button"), ...domain.querySelectorAll("button")])
+            for (const b of [...marketBox.querySelectorAll("button:not(.escrow-market-tab):not(.escrow-expand-btn):not(.inline-info):not(.info-close)"), ...domain.querySelectorAll("button:not(.inline-info):not(.info-close)")])
                 b.disabled = true;
         }
         finally {

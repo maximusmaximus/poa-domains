@@ -30,9 +30,12 @@ export interface Network {
   submit(body: Transfer): Promise<void>;
 }
 export interface TitleStore {
-  terms(name: string, seller: string): { reserve: string; window: number; quiet: number };
+  terms(name: string, seller: string): { reserve: string; window: number; quiet: number; deedId?: string; ownerVersion?: number };
   validate(packet: Packet, name: string, seller: string, buyer: string): void;
   commit(packet: Packet): void;
+  /** Optional zero-handover automatic title settlement after seller/fee payouts reach finality. */
+  validateAutoSettle?(name: string, seller: string, buyer: string, auctionId: string, priceMicros: string, deedId?: string, ownerVersion?: number): void;
+  commitAutoSettle?(name: string, seller: string, buyer: string, auctionId: string, priceMicros: string, deedId?: string, ownerVersion?: number): void;
   /** POA new-name checkout (optional; absent => OFF). Price in POA micros from the registry reserve schedule. */
   issueTerms?(name: string): { price: string };
   validateIssue?(packet: Packet, name: string, buyer: string, price: string): void;
@@ -74,10 +77,14 @@ interface Auction {
   startedAt?: number | null;
   /** Extended handover deadline (ms) granted when another auction by the same seller finishes SETTLING. */
   handoverUntil?: number;
+  /** Deed ID and ownerVersion pinned at listing time for zero-handover auto-settlement. */
+  deedId?: string;
+  ownerVersion?: number;
+  autoSettle?: boolean;
   history?: {event:string;at:number;amount?:string;payer?:string}[];
   high: { payer: string; amount: string } | null; status: "OPEN" | "CANCELLED" | "SETTLING" | "COMPLETE";
 }
-interface Settlement { auction: string; packet: Packet; payments: string[]; status: "PAYING" | "TITLE_PENDING" | "COMPLETE"; }
+interface Settlement { auction: string; packet: Packet | null; auto?: boolean; payments: string[]; status: "PAYING" | "TITLE_PENDING" | "COMPLETE"; }
 export interface State {
   sequence: number; policy: string; paused: boolean; halt: string | null; assets: string; nonce: number | null;
   quarantine: Record<string,{observed:string;expectedMicros:string}>;
@@ -138,7 +145,7 @@ export function recoveryReserve(s: State, policy: Policy): bigint {
   for(const st of Object.values(s.settlements))n+=st.status==="PAYING"?2n:st.status==="TITLE_PENDING"?1n:0n;
   return n;
 }
-const DRAIN_EVENTS=new Set(["deposit","withdraw","cancel","expire","auto-expire","settle","repair-title",
+const DRAIN_EVENTS=new Set(["deposit","withdraw","cancel","expire","auto-expire","auto-settle","settle","repair-title",
   "outgoing-intent","outgoing-unknown","payment-final","title-pending","title-complete"]);
 export function nextEntry(s: State, previous: string, event: string, payload: unknown, change: (s: State)=>void, policy: Policy): Entry {
   const emergency=event==="pause"||event==="halt"||event==="reconciliation-quarantine"||event==="restore-paused";
@@ -321,15 +328,17 @@ export class Escrow {
     const prev=journalQueues.get(this.journal) ?? Promise.resolve();
     const result=prev.then(fn); journalQueues.set(this.journal,result.catch(()=>{})); return result;
   }
+  private canAutoSettle(): boolean { return Boolean(this.titles.validateAutoSettle && this.titles.commitAutoSettle); }
+  instantSettlement(): boolean { return this.canAutoSettle(); }
   state(): State { return this.journal.load(); }
   titleLocked(): boolean { return Object.values(this.state().auctions).some(a=>a.status==="OPEN"||a.status==="SETTLING"); }
   hasActiveWork(treasury: string): boolean {
     const s=this.state();
     if(s.paused||s.halt)return false;
-    const nowMs=this.now();
+    const nowMs=this.now(), auto=this.canAutoSettle();
     return Object.values(s.payments).some(p=>p.status!=="FINAL")||
       Object.values(s.settlements).some(st=>st.status!=="COMPLETE")||
-      Object.values(s.auctions).some(a=>a.status==="OPEN"&&a.seller===treasury&&a.high!==null&&a.closes>0&&nowMs>=a.closes);
+      Object.values(s.auctions).some(a=>a.status==="OPEN"&&a.high!==null&&a.closes>0&&nowMs>=a.closes&&(auto||a.seller===treasury));
   }
   /**
    * Idempotently open first-bid POA auctions for Treasury-owned inventory in a single atomic
@@ -347,7 +356,7 @@ export class Escrow {
     const tag = text(seedTag, 64);
     const s0 = this.state();
     if (s0.halt) return [];
-    const eligible: { id: string; name: string; reserveMicros: string; window: number; quiet: number }[] = [];
+    const eligible: { id: string; name: string; reserveMicros: string; window: number; quiet: number; deedId?: string; ownerVersion?: number }[] = [];
     const seenNames = new Set<string>();
     for (const item of items) {
       const name = text(item.name, 256);
@@ -357,15 +366,16 @@ export class Escrow {
       if (s0.auctions[id]) continue;
       if (Object.values(s0.auctions).some((a) => a.name === name && a.status !== "CANCELLED")) continue;
       if (Object.values(s0.subListings ?? {}).some((l) => l.parent === name && l.status === "OPEN")) continue;
-      let terms: { reserve: string; window: number; quiet: number };
+      let terms: { reserve: string; window: number; quiet: number; deedId?: string; ownerVersion?: number };
       try { terms = this.titles.terms(name, seller); } catch { continue; }
       const rMicros = micros(item.reserve);
       if (rMicros < micros(terms.reserve) || rMicros > micros(this.policy.perTx)) continue;
-      eligible.push({ id, name, reserveMicros: String(rMicros), window: terms.window, quiet: terms.quiet });
+      eligible.push({ id, name, reserveMicros: String(rMicros), window: terms.window, quiet: terms.quiet, deedId: terms.deedId, ownerVersion: terms.ownerVersion });
     }
     if (!eligible.length) return [];
     const now = this.now();
     const opened: string[] = [];
+    const autoSettle = this.canAutoSettle();
     this.journal.append("open-inventory", { seller, count: eligible.length }, (s) => {
       need(this.enabled(), "ESCROW_DISABLED");
       need(!s.halt, "ESCROW_HALTED");
@@ -383,6 +393,9 @@ export class Escrow {
           createdAt: now,
           window: item.window,
           startedAt: null,
+          ...(item.deedId ? { deedId: item.deedId } : {}),
+          ...(item.ownerVersion !== undefined ? { ownerVersion: item.ownerVersion } : {}),
+          ...(autoSettle ? { autoSettle: true } : {}),
           history: [{ event: "Auction queued; timer starts on first bid", at: now }],
           closes: 0,
           quiet: item.quiet,
@@ -810,11 +823,11 @@ export class Escrow {
           need(micros(reserve)>=micros(terms.reserve) && micros(reserve)<=micros(this.policy.perTx),"ESCROW_RESERVE");
           need(!Object.values(s.auctions).some(a=>a.name===name&&(a.status==="OPEN"||a.status==="SETTLING")),"ESCROW_TITLE_RESERVED");
           need(!Object.values(s.subListings??{}).some(l=>l.parent===name&&l.status==="OPEN"),"ESCROW_ENCUMBERED_TITLE");
-          const id=digest([rk,c]);
+          const id=digest([rk,c]), pin={...(terms.deedId?{deedId:terms.deedId}:{}),...(terms.ownerVersion!==undefined?{ownerVersion:terms.ownerVersion}:{}),...(this.canAutoSettle()?{autoSettle:true}:{})};
           s.auctions[id]=fixed
-            ? {id,name,seller:c.actor,reserve:String(micros(reserve)),kind:"fixed",createdAt:this.now(),history:[{event:"Listed for POA",at:this.now()}],
+            ? {id,name,seller:c.actor,reserve:String(micros(reserve)),kind:"fixed",createdAt:this.now(),...pin,history:[{event:"Listed for POA",at:this.now()}],
               closes:0,quiet:terms.quiet,high:null,status:"OPEN"}
-            : {id,name,seller:c.actor,reserve:String(micros(reserve)),kind:"auction",createdAt:this.now(),window:terms.window,startedAt:null,
+            : {id,name,seller:c.actor,reserve:String(micros(reserve)),kind:"auction",createdAt:this.now(),window:terms.window,startedAt:null,...pin,
               history:[{event:"Auction queued; timer starts on first bid",at:this.now()}],
               closes:0,quiet:terms.quiet,high:null,status:"OPEN"};
           result={auction:id};break;
@@ -831,6 +844,8 @@ export class Escrow {
           need(n>=BigInt(a.reserve)&&(!a.high||n*10n>BigInt(a.high.amount)*11n),"ESCROW_BID_INCREMENT");
           const bidderAvail=BigInt(s.available[c.actor]??"0");
           need(bidderAvail>=n,"ESCROW_INSUFFICIENT_FUNDS");
+          const autoFixed=c.action==="buy"&&this.canAutoSettle();
+          if(autoFixed)this.titles.validateAutoSettle!(a.name,a.seller,c.actor,a.id,String(n),a.deedId,a.ownerVersion);
           const prevHigh=a.high;
           // Debit new high bidder first, then credit displaced bidder back to available escrow balance
           // for instant re-bidding or signed withdrawal back to their original wallet (never redirected).
@@ -842,8 +857,21 @@ export class Escrow {
           a.high={payer:c.actor,amount:String(n)};
           const now=this.now();
           if(c.action==="buy"){
-            (a.history??=[]).push({event:"Purchase reserved; seller handover needed",at:now,amount:String(n),payer:c.actor});
             a.closes=now;
+            if(autoFixed){
+              const fee=a.seller===this.policy.treasury?0n:n*BigInt(this.policy.feeBps)/10000n;
+              const net=n-fee;
+              const payments:string[]=[];
+              for(const [kind,to,v] of [["seller",a.seller,net],["fee",this.policy.treasury,fee]] as const) if(v>0n){
+                const pid=`${kind}-${a.id}`;need(!s.payments[pid],"ESCROW_DUPLICATE");
+                s.payments[pid]={id:pid,kind,to,amount:String(v),status:"READY",day:null,body:null,txid:null};payments.push(pid);
+              }
+              a.status="SETTLING";a.autoSettle=true;
+              s.settlements[a.id]={auction:a.id,packet:null,auto:true,payments,status:"PAYING"};
+              (a.history??=[]).push({event:"Purchase paid; automatic settlement queued",at:now,amount:String(n),payer:c.actor});
+            } else {
+              (a.history??=[]).push({event:"Purchase reserved; seller handover needed",at:now,amount:String(n),payer:c.actor});
+            }
           } else if(!prevHigh){
             a.startedAt=now;
             a.closes=awaitingFirstBid?now+(a.window??a.quiet):Math.max(a.closes,now+a.quiet);
@@ -857,9 +885,11 @@ export class Escrow {
         case "cancel": case "expire": {
           exact(p,["auction"]);const a=s.auctions[text(p.auction,64)];need(a&&a.status==="OPEN","ESCROW_AUCTION_CLOSED");
           const unboughtFixed=a.kind==="fixed"&&a.high===null;
-          const sellerBusy=a.high!==null&&Object.values(s.auctions).some(other=>other.status==="SETTLING"&&other.seller===a.seller);
-          const expireAt=a.handoverUntil??a.closes;
-          need(c.action==="cancel"?a.seller===c.actor:!unboughtFixed&&a.closes>0&&this.now()>=expireAt&&!sellerBusy,"ESCROW_CANCEL_NOT_ALLOWED");
+          const sellerBusy=a.high!==null&&Object.values(s.auctions).some(other=>other.status==="SETTLING"&&other.seller===a.seller&&!s.settlements[other.id]?.auto);
+          const expireAt=a.handoverUntil??(a.high!==null?a.closes+a.quiet:a.closes);
+          const wonAuto=a.high!==null&&a.closes>0&&this.now()>=a.closes&&this.canAutoSettle();
+          const autoReady=wonAuto&&!s.paused&&!s.halt&&(()=>{try{this.titles.validateAutoSettle!(a.name,a.seller,a.high!.payer,a.id,a.high!.amount,a.deedId,a.ownerVersion);return true;}catch{return false;}})();
+          need(c.action==="cancel"?a.seller===c.actor&&!wonAuto:!unboughtFixed&&a.closes>0&&this.now()>=expireAt&&!sellerBusy&&!autoReady,"ESCROW_CANCEL_NOT_ALLOWED");
           // Expiry without a title consent is a failure refund, never silently pays a seller.
           if(a.high)this.refund(s,`cancel-${a.id}`,a.high.payer,a.high.amount);a.status="CANCELLED";(a.history??=[]).push({event:"Cancelled; original payer refund due",at:this.now()});break;
         }
@@ -870,8 +900,8 @@ export class Escrow {
         case "settle": {
           exact(p,["auction","transfer"]);const a=s.auctions[text(p.auction,64)];
           need(a&&a.status==="OPEN"&&a.high&&a.closes>0&&this.now()>=a.closes&&c.actor===a.seller,"ESCROW_SETTLE_NOT_ALLOWED");
-          // Prevent one seller from pinning two concurrent handovers on the same registry nonce.
-          need(!Object.values(s.auctions).some(other=>other.status==="SETTLING"&&other.seller===c.actor),"ESCROW_TITLE_RESERVED");
+          // Prevent one seller from pinning two concurrent legacy handovers on the same registry nonce.
+          need(!Object.values(s.auctions).some(other=>other.status==="SETTLING"&&other.seller===c.actor&&!s.settlements[other.id]?.auto),"ESCROW_TITLE_RESERVED");
           const packet=authenticate(p.transfer);this.titles.validate(packet,a.name,a.seller,a.high.payer);
           // Avoid splitting a Treasury-owned sale into two separate payouts to the same treasury wallet.
           const fee=a.seller===this.policy.treasury?0n:BigInt(a.high.amount)*BigInt(this.policy.feeBps)/10000n;
@@ -892,7 +922,7 @@ export class Escrow {
           need(n===BigInt(terms.price),"ESCROW_PRICE");need(n<=micros(this.policy.perTx),"ESCROW_PAYOUT_LIMIT");
           need(c.actor!==this.policy.treasury,"ESCROW_SELF_SALE");
           need(BigInt(s.available[c.actor]??"0")>=n,"ESCROW_INSUFFICIENT_FUNDS");
-          need(!Object.values(s.auctions).some(a=>(a.name===name&&(a.status==="OPEN"||a.status==="SETTLING"))||(a.status==="SETTLING"&&a.seller===c.actor)),"ESCROW_TITLE_RESERVED");
+          need(!Object.values(s.auctions).some(a=>(a.name===name&&(a.status==="OPEN"||a.status==="SETTLING"))||(a.status==="SETTLING"&&a.seller===c.actor&&!s.settlements[a.id]?.auto)),"ESCROW_TITLE_RESERVED");
           const packet=authenticate(p.registration);this.titles.validateIssue!(packet,name,c.actor,String(n));
           const id=`issue-${digest([rk,c])}`;need(!s.payments[id],"ESCROW_DUPLICATE");
           s.available[c.actor]=String(BigInt(s.available[c.actor]??"0")-n);
@@ -929,7 +959,7 @@ export class Escrow {
           need(name.endsWith("."+l.parent)&&name.length>l.parent.length+1,"ESCROW_SUB_NAME");
           need(n===BigInt(l.price),"ESCROW_PRICE");need(n<=micros(this.policy.perTx),"ESCROW_PAYOUT_LIMIT");
           need(c.actor!==l.seller,"ESCROW_SELF_SALE");
-          need(!Object.values(s.auctions).some(a=>(a.name===l.parent&&(a.status==="OPEN"||a.status==="SETTLING"))||(a.status==="SETTLING"&&a.seller===c.actor)),"ESCROW_TITLE_RESERVED");
+          need(!Object.values(s.auctions).some(a=>(a.name===l.parent&&(a.status==="OPEN"||a.status==="SETTLING"))||(a.status==="SETTLING"&&a.seller===c.actor&&!s.settlements[a.id]?.auto)),"ESCROW_TITLE_RESERVED");
           // The seller must still hold the same root, unchanged since listing (same rule as child offers).
           const t=this.titles.subTerms!(l.parent,l.seller);
           need(t.parentDeedId===l.parentDeedId&&t.ownerVersion===l.ownerVersion,"ESCROW_SUB_STALE");
@@ -951,7 +981,7 @@ export class Escrow {
           exact(p,["auction","transfer"]);const a=s.auctions[text(p.auction,64)], st=s.settlements[String(p.auction)];
           need(a&&st&&a.status==="SETTLING"&&c.actor===a.seller,"ESCROW_TITLE_NOT_PENDING");
           const packet=authenticate(p.transfer);this.titles.validate(packet,a.name,a.seller,a.high!.payer);
-          st.packet=packet;
+          st.packet=packet;st.auto=false;
           if(st.payments.every(id=>s.payments[id]!.status==="FINAL")){
             this.titles.commit(packet);st.status="COMPLETE";a.status="COMPLETE";(a.history??=[]).push({event:"Title repaired; handover complete",at:this.now()});
             this.extendBlockedHandovers(s,a.seller);
@@ -982,14 +1012,41 @@ export class Escrow {
     this.gate();const status=await this.fresh();this.gate();
     for(const a of Object.values(this.state().auctions)){
       const s0=this.state();
-      // Never auto-expire a seller's closed won auction while escrow itself blocks them via another SETTLING handover.
-      const sellerBusy=a.high!==null&&Object.values(s0.auctions).some(other=>other.status==="SETTLING"&&other.seller===a.seller);
+      // Zero-handover automatic settlement for any closed funded auction (or legacy bought fixed listing).
+      if(a.status==="OPEN"&&a.high!==null&&a.closes>0&&this.now()>=a.closes&&this.canAutoSettle()){
+        let canSettle=false;
+        try{
+          this.titles.validateAutoSettle!(a.name,a.seller,a.high.payer,a.id,a.high.amount,a.deedId,a.ownerVersion);
+          canSettle=true;
+        }catch{canSettle=false;}
+        if(canSettle){
+          this.journal.append("auto-settle",{auction:a.id},s=>{
+            need(this.enabled(),"ESCROW_DISABLED");need(!s.paused,"ESCROW_PAUSED");need(!s.halt,"ESCROW_HALTED");
+            const cur=s.auctions[a.id];if(!cur||cur.status!=="OPEN"||!cur.high||cur.closes<=0||this.now()<cur.closes)return;
+            this.titles.validateAutoSettle!(cur.name,cur.seller,cur.high.payer,cur.id,cur.high.amount,cur.deedId,cur.ownerVersion);
+            const fee=cur.seller===this.policy.treasury?0n:BigInt(cur.high.amount)*BigInt(this.policy.feeBps)/10000n;
+            const net=BigInt(cur.high.amount)-fee;
+            const payments:string[]=[];
+            for(const [kind,to,v] of [["seller",cur.seller,net],["fee",this.policy.treasury,fee]] as const) if(v>0n){
+              const pid=`${kind}-${cur.id}`;need(!s.payments[pid],"ESCROW_DUPLICATE");
+              s.payments[pid]={id:pid,kind,to,amount:String(v),status:"READY",day:null,body:null,txid:null};payments.push(pid);
+            }
+            cur.status="SETTLING";cur.autoSettle=true;
+            (cur.history??=[]).push({event:cur.kind==="fixed"?"Purchase paid; automatic settlement queued":"Auction won; automatic settlement queued",at:this.now()});
+            cur.history=cur.history.slice(-100);
+            s.settlements[cur.id]={auction:cur.id,packet:null,auto:true,payments,status:"PAYING"};
+          });
+          continue;
+        }
+      }
+      // Never auto-expire a seller's closed won auction while escrow itself blocks them via another legacy SETTLING handover.
+      const sellerBusy=a.high!==null&&Object.values(s0.auctions).some(other=>other.status==="SETTLING"&&other.seller===a.seller&&!s0.settlements[other.id]?.auto);
       const handoverDeadline=a.handoverUntil??(a.closes+a.quiet);
       if(a.status==="OPEN"&&a.closes>0&&((a.high===null&&a.kind!=="fixed"&&this.now()>=a.closes)||(a.high!==null&&!sellerBusy&&this.now()>=handoverDeadline))){
         this.journal.append("auto-expire",{auction:a.id},s=>{
           need(this.enabled(),"ESCROW_DISABLED");need(!s.paused,"ESCROW_PAUSED");need(!s.halt,"ESCROW_HALTED");
           const cur=s.auctions[a.id];if(!cur||cur.status!=="OPEN")return;
-          if(cur.high&&Object.values(s.auctions).some(other=>other.status==="SETTLING"&&other.seller===cur.seller))return;
+          if(cur.high&&Object.values(s.auctions).some(other=>other.status==="SETTLING"&&other.seller===cur.seller&&!s.settlements[other.id]?.auto))return;
           if(cur.high)this.refund(s,`cancel-${cur.id}`,cur.high.payer,cur.high.amount);
           cur.status="CANCELLED";(cur.history??=[]).push({event:"Expired; original payer refund due",at:this.now()});
         });
@@ -1028,7 +1085,15 @@ export class Escrow {
     for(const st of Object.values(this.state().settlements)) if(st.status==="PAYING"&&st.payments.every(id=>this.state().payments[id]!.status==="FINAL")){
       const a=this.state().auctions[st.auction]!;this.crash("before-title");
       let valid=false;
-      try { this.titles.validate(st.packet,a.name,a.seller,a.high!.payer); valid=true; }
+      try {
+        if(st.auto&&this.canAutoSettle()){
+          this.titles.validateAutoSettle!(a.name,a.seller,a.high!.payer,a.id,a.high!.amount,a.deedId,a.ownerVersion);
+        } else {
+          need(st.packet!==null,"ESCROW_TITLE_NOT_READY");
+          this.titles.validate(st.packet,a.name,a.seller,a.high!.payer);
+        }
+        valid=true;
+      }
       catch {
         this.journal.append("title-pending",{auction:a.id},s=>{
           need(this.enabled(),"ESCROW_DISABLED");need(!s.paused,"ESCROW_PAUSED");need(!s.halt,"ESCROW_HALTED");
@@ -1038,7 +1103,13 @@ export class Escrow {
       if(valid){
         this.journal.append("title-complete",{auction:a.id},s=>{
           need(this.enabled(),"ESCROW_DISABLED");need(!s.paused,"ESCROW_PAUSED");need(!s.halt,"ESCROW_HALTED");
-          this.titles.commit(st.packet);s.settlements[a.id]!.status="COMPLETE";s.auctions[a.id]!.status="COMPLETE";(s.auctions[a.id]!.history??=[]).push({event:"Payment and title complete",at:this.now()});
+          if(st.auto&&this.canAutoSettle()){
+            this.titles.commitAutoSettle!(a.name,a.seller,a.high!.payer,a.id,a.high!.amount,a.deedId,a.ownerVersion);
+          } else {
+            this.titles.commit(st.packet!);
+          }
+          s.settlements[a.id]!.status="COMPLETE";s.auctions[a.id]!.status="COMPLETE";(s.auctions[a.id]!.history??=[]).push({event:"Payment and title complete",at:this.now()});
+          s.auctions[a.id]!.history=s.auctions[a.id]!.history!.slice(-100);
           this.extendBlockedHandovers(s,a.seller);
         });
       }
