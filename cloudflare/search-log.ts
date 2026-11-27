@@ -15,11 +15,11 @@ async function boundedBody(request:Request):Promise<string>{const reader=request
 export async function searchLog(request:Request,env:SearchLogEnv):Promise<Response>{
  const requestId=correlationId(undefined),headers={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
  const fail=(status:number,code:string)=>Response.json(errorEnvelope(code,requestId),{status,headers});
- const u=new URL(request.url),allowed=new Set(["poadomains.grok.me",env.BACKEND_HOST]);if(["127.0.0.1","localhost"].includes(u.hostname))allowed.add(u.hostname);
+ const u=new URL(request.url),allowed=new Set(["poadomains.grok.me","poadomains.link",env.BACKEND_HOST]);if(["127.0.0.1","localhost"].includes(u.hostname))allowed.add(u.hostname);
  if(!allowed.has(u.hostname))return fail(403,"HOST");
  if(request.method!=="POST")return fail(405,"METHOD_NOT_ALLOWED");if(u.search)return fail(400,"QUERY_NOT_ALLOWED");
  let origin:URL;try{origin=new URL(request.headers.get("origin")??"");}catch{return fail(403,"HOST");}
- if(!allowed.has(origin.hostname)||origin.username||origin.password||origin.pathname!=="/"||origin.search||origin.hash||(u.hostname!=="127.0.0.1"&&u.hostname!=="localhost"&&(origin.protocol!=="https:"||!!origin.port))||origin.origin!==u.origin&&!(["poadomains.grok.me",env.BACKEND_HOST].includes(origin.hostname)&&["poadomains.grok.me",env.BACKEND_HOST].includes(u.hostname)))return fail(403,"HOST");
+ if(!allowed.has(origin.hostname)||origin.username||origin.password||origin.pathname!=="/"||origin.search||origin.hash||(u.hostname!=="127.0.0.1"&&u.hostname!=="localhost"&&(origin.protocol!=="https:"||!!origin.port))||origin.origin!==u.origin&&!(["poadomains.grok.me","poadomains.link",env.BACKEND_HOST].includes(origin.hostname)&&["poadomains.grok.me","poadomains.link",env.BACKEND_HOST].includes(u.hostname)))return fail(403,"HOST");
  if(!/^application\/json(?:;\s*charset=utf-8)?$/i.test(request.headers.get("content-type")??""))return fail(400,"CONTENT_TYPE");
  if(request.headers.has("content-encoding"))return fail(400,"ENCODING");const length=request.headers.get("content-length");if(length!==null&&(!/^[0-9]+$/.test(length)||Number(length)>1024))return fail(413,"BODY_TOO_LARGE");
  let query:string,result:string;

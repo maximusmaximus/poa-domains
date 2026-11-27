@@ -177,7 +177,7 @@ export async function checkHourlyUploadCaps(
 
 function allowedHost(hostname: string, env: ProfileStorageEnv): boolean {
   const h = hostname.toLowerCase();
-  if (h === "localhost" || h === "127.0.0.1" || h === "poadomains.grok.me" || h === env.BACKEND_HOST || h.endsWith(".grok.me"))
+  if (h === "localhost" || h === "127.0.0.1" || h === "poadomains.grok.me" || h === "poadomains.link" || h === env.BACKEND_HOST || h.endsWith(".grok.me"))
     return true;
   if (env.PUBLIC_EXPLORER_URL) {
     try {
@@ -402,7 +402,7 @@ export function validateSafePublicImageUrl(rawUrl: string): URL | null {
 
 function isSelfHost(hostname: string, env: ProfileStorageEnv): boolean {
   const h = hostname.toLowerCase().replace(/\.$/, "");
-  if (h === "poadomains.grok.me" || h === env.BACKEND_HOST.toLowerCase()) return true;
+  if (h === "poadomains.grok.me" || h === "poadomains.link" || h === env.BACKEND_HOST.toLowerCase()) return true;
   if (env.PUBLIC_EXPLORER_URL) {
     try {
       if (h === new URL(env.PUBLIC_EXPLORER_URL).hostname.toLowerCase()) return true;

@@ -42,6 +42,7 @@ export async function startReferenceServer(
     "127.0.0.1",
     "localhost",
     "poadomains.grok.me",
+    "poadomains.link",
     ...(options.allowedHosts ?? []),
   ]);
   if (options.publicUrl) {
