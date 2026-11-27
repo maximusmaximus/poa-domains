@@ -344,7 +344,7 @@ test("home HTML: skip link first, one-row tabs, ideas strip, footer links, no to
   assert.ok(footer.includes("https://maximusmaximus.github.io/poa-domains/"));
   assert.ok(footer.includes('id="advancedLink"'));
   assert.ok(footer.includes(">Advanced</a>"));
-  assert.ok(footer.includes("Tesselate Army"));
+  assert.ok(footer.includes("poa12XVYtPngbDsm1igG9GPeWPXAHDFTZ1bBLuSwhjqBrQ5U"));
   const header = html.slice(html.indexOf("<header>"), html.indexOf("</header>"));
   assert.ok(!header.includes("<a "), "no links in header");
   assert.equal(/xero[\s-]?emoji/i.test(html), false);
@@ -556,7 +556,7 @@ test("served UI HTML has no visible xero emoji phrasing", () => {
     false,
   );
   assert.match(html, /maxi\.grok\.me/);
-  assert.match(html, /Tesselate Army/);
+  assert.match(html, /poa12XVYtPngbDsm1igG9GPeWPXAHDFTZ1bBLuSwhjqBrQ5U/);
   assert.match(html, /networkStatusBar/);
   assert.ok(!html.includes("view-tabs"));
   assert.ok(html.includes('id="sectionTabs"'));

@@ -2019,6 +2019,21 @@ try {
       history: [{ event: "listed", amount: "250.000000", at: nowAudit - 1800000 }],
     },
   ];
+  const footerArmyOwner = "poa12XVYtPngbDsm1igG9GPeWPXAHDFTZ1bBLuSwhjqBrQ5U";
+  h.payload.state.deeds["deed-army-footer"] = {
+    id: "deed-army-footer",
+    name: "army",
+    owner: footerArmyOwner,
+    parentId: null,
+    retired: false,
+    version: 1,
+    ownerVersion: 1,
+    rights: { kind: "permanent" },
+    records: [],
+    metadata: [{ cid: "bafkreig6yhxy46wina3er5aekxvbrpi4tzomftvidfmyany4c3dif5d2hi", document: { schema: "poa-domains.profile.v1", version: 1, image: `ipfs://${mockAvatarCid}` } }],
+  };
+  h.payload.state.names.army = { name: "army", key: "army", activeId: "deed-army-footer", auctionId: null };
+  h.payload.state.primaryNames = { ...(h.payload.state.primaryNames ?? {}), [footerArmyOwner]: "army" };
   h.cap = { ...h.cap, escrow: { ...(h.cap.escrow ?? {}), enabled: true } };
 
   for (const vp of [
@@ -2242,6 +2257,13 @@ try {
     await expect(pageGeom.locator("#domainListing a.owner-addr-link").first()).toHaveAttribute("href", "/p/peer");
     await expect(pageGeom.locator("#domainListing .self-bid-notice")).toBeVisible();
     await expect(pageGeom.locator("#escrowDomain .self-bid-notice")).toBeVisible();
+    // Footer credit pulls main domain (army) + avatar icon + abbreviated Owner Profile link + POA copy icon
+    await expect(pageGeom.locator("#footerCreditOwner a.owner-primary-link")).toHaveAttribute("href", "/d/army");
+    await expect(pageGeom.locator("#footerCreditOwner a.owner-primary-link .domain-name")).toHaveText("army");
+    await expect(pageGeom.locator("#footerCreditOwner a.owner-primary-link .domain-header-avatar-xs img")).toHaveAttribute("src", `/v1/media/${mockAvatarCid}`);
+    await expect(pageGeom.locator("#footerCreditOwner a.owner-addr-link")).toHaveAttribute("href", "/p/army");
+    await expect(pageGeom.locator("#footerCreditOwner a.owner-addr-link")).toHaveText("poa12X...rQ5U");
+    await expect(pageGeom.locator("#footerCreditOwner button.poa-copy-btn")).toHaveAttribute("data-copy-address", footerArmyOwner);
     await auditUiGeometry(pageGeom, `${vp.name}:domain-page-with-escrow`);
 
     // 8) Owner Profile page (/p/nebula)

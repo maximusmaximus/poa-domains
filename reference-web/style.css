@@ -212,6 +212,8 @@ main#homeMain>section[data-section]:not([hidden]){display:block;grid-column:1/-1
 a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:3px solid #ffe08a;outline-offset:3px;}
 [hidden]{display:none !important;}
 .footer-credit a{text-decoration:underline;text-underline-offset:3px;}
+.footer-credit a.owner-primary-link{text-decoration:none;}
+.footer-credit a.owner-primary-link:hover .domain-name,.footer-credit a.owner-primary-link:focus-visible .domain-name{text-decoration:underline;}
 .section-navigation{position:sticky;top:0;z-index:30;}
 .section-navigation>.section-tabs{position:relative;}
 
