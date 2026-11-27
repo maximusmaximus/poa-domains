@@ -1,9 +1,9 @@
-import { ui } from "./ui-state.js?v=df469fa578f4";
-import { add, appendTextWithPoaAddress, el, endpointBase, person } from "./ui-core.js?v=df469fa578f4";
-import { createDomainAvatar, domainHeader, nameLink, notifyOwnerChanged, openPoa, ownerLink, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=df469fa578f4";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=df469fa578f4";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=df469fa578f4";
-import { createInlineInfo } from "./ui-help.js?v=df469fa578f4";
+import { ui } from "./ui-state.js?v=d4d3df1db2e8";
+import { add, appendTextWithPoaAddress, el, endpointBase, person } from "./ui-core.js?v=d4d3df1db2e8";
+import { createDomainAvatar, domainHeader, nameLink, notifyOwnerChanged, openPoa, ownerLink, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=d4d3df1db2e8";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=d4d3df1db2e8";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=d4d3df1db2e8";
+import { createInlineInfo } from "./ui-help.js?v=d4d3df1db2e8";
 import {
  buildProfileUpdatePrompt,
  buildSetPrimaryPrompt,
@@ -27,7 +27,7 @@ import {
  saveKnownOwner,
  shortenPoaAddress,
  validPrincipal,
-} from "./shared.js?v=df469fa578f4";
+} from "./shared.js?v=d4d3df1db2e8";
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const IDLE_MANAGE_PROMPT = "Edit profile fields or choose an action above to preview the code for your agent.";
 let managePromptState = { text: "", payload: null, filename: "poa-domains-manage.json", ready: false };
@@ -990,10 +990,12 @@ export function wireManagement() {
  if (!raw) {
  ui.knownOwner = "";
  ui.inferredCartOwner = "";
+ el("manageOwnerPrefillInfo")?.remove();
  saveKnownOwner(globalThis.localStorage, "");
  } else {
  const resolved = resolveOwnerInput(ui.latestState, raw, ui.cap);
  if (resolved?.owner && validPrincipal(resolved.owner)) {
+ if (resolved.owner !== ui.inferredCartOwner) el("manageOwnerPrefillInfo")?.remove();
  ui.knownOwner = resolved.owner;
  saveKnownOwner(globalThis.localStorage, resolved.owner);
  if (isPoaAddress(resolved.owner)) syncEscrowPayerAddress(resolved.owner, { force: true });
