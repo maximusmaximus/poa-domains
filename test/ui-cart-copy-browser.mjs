@@ -1056,8 +1056,24 @@ try {
     await pageGate.goto(hTerms.url + "/");
     await pageGate.waitForFunction(() => document.body.dataset.registryStatus === "ready");
 
-    // Modal is open, contains summary, key warning, Terms link, and NO close button
+    // Modal is open, shows full-width 10-glyph emoji banner (no "Welcome to PoA Domains"), summary, key warning, Terms link, and NO close button
     await expect(pageGate.locator("#termsGateModal")).toBeVisible();
+    await expect(pageGate.locator("#termsGateHeading")).toHaveAttribute("aria-label", "PoA Domains");
+    await expect(pageGate.locator("#termsGateHeading")).not.toContainText(/Welcome to PoA Domains/i);
+    await expect(pageGate.locator("#termsGateHeading .title-glyph")).toHaveCount(10);
+    const gateBannerGeom = await pageGate.evaluate(() => {
+      const m = document.querySelector("#termsGateModal");
+      const b = document.querySelector("#termsGateHeading").getBoundingClientRect();
+      const glyphs = [...document.querySelectorAll("#termsGateHeading .title-glyph")].map((g) => g.getBoundingClientRect());
+      return {
+        modalClientW: m.clientWidth,
+        modalScrollW: m.scrollWidth,
+        bannerW: b.width,
+        inside: glyphs.every((g) => g.left >= b.left - 1 && g.right <= b.right + 1),
+      };
+    });
+    assert.ok(Math.abs(gateBannerGeom.bannerW - gateBannerGeom.modalClientW) <= 2, `Terms banner must span modal width: ${JSON.stringify(gateBannerGeom)}`);
+    assert.ok(gateBannerGeom.modalScrollW <= gateBannerGeom.modalClientW + 1 && gateBannerGeom.inside, `Terms banner glyphs must fit cleanly: ${JSON.stringify(gateBannerGeom)}`);
     await expect(pageGate.locator("#termsGateSummary")).toContainText("permanent names");
     await expect(pageGate.locator("#termsGateSummary")).not.toContainText("not a native");
     await expect(pageGate.locator("#termsGateWarning")).toContainText("Never enter private keys");
