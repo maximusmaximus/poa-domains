@@ -555,7 +555,7 @@ test("served UI HTML has no visible xero emoji phrasing", () => {
     htmlHasVisibleXeroEmoji("<style>@font-face{font-family:'Xero Emoji'}</style><p>ok</p>"),
     false,
   );
-  assert.match(html, /maxi\.grok\.me/);
+  assert.match(html, /\/d\/maxi/);
   assert.match(html, /poa12XVYtPngbDsm1igG9GPeWPXAHDFTZ1bBLuSwhjqBrQ5U/);
   assert.match(html, /networkStatusBar/);
   assert.ok(!html.includes("view-tabs"));

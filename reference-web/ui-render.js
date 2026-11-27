@@ -1,13 +1,13 @@
-import { isOwnDomainOrListing, isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, resolveOwnerInput, validPrincipal } from "./shared.js?v=512106177d03";
-import { drawTicker } from "./ui-ticker.js?v=512106177d03";
-import { actionLabel } from "./ui-copy.js?v=512106177d03";
-import { returnFocus } from "./ui-a11y.js?v=512106177d03";
-import { activeResaleOffers, buildCreativeSiteTitle, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=512106177d03";
-import { ui } from "./ui-state.js?v=512106177d03";
-import { add, appendPoaAddress, appendPrincipal, appendTextWithPoaAddress, el, person, namedText } from "./ui-core.js?v=512106177d03";
-import { activeUserAddress, domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa, renderSelfBidNotice } from "./ui-router.js?v=512106177d03";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=512106177d03";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=512106177d03";
+import { isOwnDomainOrListing, isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, resolveOwnerInput, validPrincipal } from "./shared.js?v=2ca7cef90cec";
+import { drawTicker } from "./ui-ticker.js?v=2ca7cef90cec";
+import { actionLabel } from "./ui-copy.js?v=2ca7cef90cec";
+import { returnFocus } from "./ui-a11y.js?v=2ca7cef90cec";
+import { activeResaleOffers, buildCreativeSiteTitle, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=2ca7cef90cec";
+import { ui } from "./ui-state.js?v=2ca7cef90cec";
+import { add, appendPoaAddress, appendPrincipal, appendTextWithPoaAddress, el, person, namedText } from "./ui-core.js?v=2ca7cef90cec";
+import { activeUserAddress, createDomainAvatar, domainHeader, isRegisteredDomain, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa, renderSelfBidNotice } from "./ui-router.js?v=2ca7cef90cec";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=2ca7cef90cec";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=2ca7cef90cec";
 
 export function updateLiveAuctionsBadge(state = ui.latestState) {
  const badge = el("liveAuctionsBadge");
@@ -477,12 +477,38 @@ export function renderMarketplace(s) {
 
 export function renderFooterCredit() {
  const slot = el("footerCreditOwner");
- if (!slot) return;
- const addr = slot.dataset.poaAddr || slot.textContent?.trim() || "";
- if (!isPoaAddress(addr)) return;
- slot.dataset.poaAddr = addr;
- slot.replaceChildren();
- ownerLink(slot, addr);
+ if (slot) {
+  const addr = slot.dataset.poaAddr || slot.textContent?.trim() || "";
+  if (isPoaAddress(addr)) {
+   slot.dataset.poaAddr = addr;
+   slot.replaceChildren();
+   ownerLink(slot, addr);
+  }
+ }
+ const domSlot = el("footerCreditDomain");
+ if (domSlot) {
+  const name = (domSlot.dataset.domainName || domSlot.textContent?.trim() || "maxi").toLowerCase();
+  domSlot.dataset.domainName = name;
+  domSlot.replaceChildren();
+  if (isRegisteredDomain(name)) {
+   const a = document.createElement("a");
+   a.href = "/d/" + encodeURIComponent(name);
+   a.className = "domain-link owner-primary-link";
+   a.title = `Open ${name} domain page`;
+   a.append(createDomainAvatar(name, { size: "xs" }));
+   const label = document.createElement("span");
+   label.className = "domain-name";
+   label.textContent = name;
+   a.append(label);
+   a.addEventListener("click", (event) => {
+    event.preventDefault();
+    navigateDomain(name);
+   });
+   domSlot.append(a);
+  } else {
+   nameLink(domSlot, name, "domain-link", { registered: false });
+  }
+ }
 }
 
 export function render(payload) {

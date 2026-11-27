@@ -1,9 +1,9 @@
-import { ui } from "./ui-state.js?v=512106177d03";
-import { add, appendTextWithPoaAddress, el, endpointBase, person } from "./ui-core.js?v=512106177d03";
-import { createDomainAvatar, domainHeader, nameLink, notifyOwnerChanged, openPoa, ownerLink, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=512106177d03";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=512106177d03";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=512106177d03";
-import { createInlineInfo } from "./ui-help.js?v=512106177d03";
+import { ui } from "./ui-state.js?v=2ca7cef90cec";
+import { add, appendTextWithPoaAddress, el, endpointBase, person } from "./ui-core.js?v=2ca7cef90cec";
+import { createDomainAvatar, domainHeader, nameLink, notifyOwnerChanged, openPoa, ownerLink, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=2ca7cef90cec";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=2ca7cef90cec";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=2ca7cef90cec";
+import { createInlineInfo } from "./ui-help.js?v=2ca7cef90cec";
 import {
  buildProfileUpdatePrompt,
  buildSetPrimaryPrompt,
@@ -27,7 +27,7 @@ import {
  saveKnownOwner,
  shortenPoaAddress,
  validPrincipal,
-} from "./shared.js?v=512106177d03";
+} from "./shared.js?v=2ca7cef90cec";
 
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const IDLE_MANAGE_PROMPT = "Edit profile fields or choose an action above to preview the code for your agent.";
