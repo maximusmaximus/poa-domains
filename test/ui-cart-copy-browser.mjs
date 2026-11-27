@@ -2347,6 +2347,44 @@ try {
     assert.ok((await pageTicker.locator("#liveTicker").evaluate((n) => n.scrollLeft)) < 60, "Ticker should jump back near x=0 when a new top action arrives");
     assert.deepEqual(tickerErrors, []);
     await ctxTicker.close();
+
+    // Mobile touch regression: dragging off #liveTicker onto body + synthetic ghost pointerenter + tap-focus
+    // must NEVER permanently freeze auto-scroll or block live refreshes from jumping to scrollLeft=0!
+    const ctxMobTicker = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    const pageMobTicker = await ctxMobTicker.newPage();
+    const mobTickerErrors = [];
+    pageMobTicker.on("pageerror", (e) => mobTickerErrors.push(e.message));
+    await pageMobTicker.route("https://**", (r) => r.abort());
+    await pageMobTicker.route("**/v1/escrow/market", (r) =>
+      r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [staleDoneAuction], serverTime: Date.now() }) }),
+    );
+    await pageMobTicker.goto(h.url);
+    await pageMobTicker.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await pageMobTicker.locator("#termsAgreeBtn").tap();
+    await pageMobTicker.waitForFunction(() => document.querySelector("#liveTicker").scrollLeft > 15, { timeout: 5000 });
+    await pageMobTicker.evaluate(() => {
+      const t = document.getElementById("liveTicker");
+      const r = t.getBoundingClientRect();
+      // Start touch on ticker, move off onto body and lift there (normal vertical page scroll) + mobile ghost mouse enter
+      t.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "touch", clientX: r.left + 40, clientY: r.top + 20 }));
+      t.focus();
+      document.body.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerType: "touch", clientX: r.left + 40, clientY: r.top + 220 }));
+      t.dispatchEvent(new PointerEvent("pointerenter", { bubbles: false, pointerType: "mouse", clientX: r.left + 40, clientY: r.top + 20 }));
+    });
+    // Must automatically unpause after the 1.8s touch pause window instead of staying stuck paused forever
+    await expect(pageMobTicker.locator("#liveTicker")).toHaveAttribute("data-motion", "running", { timeout: 5000 });
+    const mobLiveDeedId = "ticker-deed-live-117";
+    h.payload.state.deeds[mobLiveDeedId] = { id: mobLiveDeedId, name: "mobilelive", owner: peerOwner, parentId: null, retired: false, version: 1, ownerVersion: 1, rights: { kind: "permanent" }, records: [], metadata: [] };
+    h.payload.state.names.mobilelive = { name: "mobilelive", key: "mobilelive", activeId: mobLiveDeedId, auctionId: null };
+    h.payload.state.receipts["tr-117"] = { intentId: "tr-117", sequence: 1117, time: baseSec + 1300, status: "succeeded", result: { deedId: mobLiveDeedId, owner: peerOwner } };
+    h.payload.state.sequence = 1117;
+    h.payload.state.time = baseSec + 1300;
+    h.payload.observedServerTime = baseSec + 1300;
+    await expect(pageMobTicker.locator("#liveTickerTrack .ticker-chip").first()).toContainText("mobilelive", { timeout: 9000 });
+    assert.ok((await pageMobTicker.locator("#liveTicker").evaluate((n) => n.scrollLeft)) < 60, "Mobile ticker must jump back near x=0 on new live action");
+    assert.deepEqual(mobTickerErrors, []);
+    await ctxMobTicker.close();
+
     h.payload.state.receipts = prevReceipts;
     h.payload.state.deeds = prevDeeds;
     h.payload.state.names = prevNames;

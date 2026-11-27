@@ -1,13 +1,13 @@
-import { publicNameUnavailable } from "./shared.js?v=326fa0f6eee9";
-import { registryUnit } from "./shared.js?v=326fa0f6eee9";
-import { actionLabel } from "./ui-copy.js?v=326fa0f6eee9";
-import { createInlineInfo } from "./ui-help.js?v=326fa0f6eee9";
-import { trapDialog } from "./ui-a11y.js?v=326fa0f6eee9";
-import { ui } from "./ui-state.js?v=326fa0f6eee9";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, cartSummary, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=326fa0f6eee9";
-import { add, el, endpointBase } from "./ui-core.js?v=326fa0f6eee9";
-import { activeUserAddress, domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=326fa0f6eee9";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=326fa0f6eee9";
+import { publicNameUnavailable } from "./shared.js?v=3d4aed61982b";
+import { registryUnit } from "./shared.js?v=3d4aed61982b";
+import { actionLabel } from "./ui-copy.js?v=3d4aed61982b";
+import { createInlineInfo } from "./ui-help.js?v=3d4aed61982b";
+import { trapDialog } from "./ui-a11y.js?v=3d4aed61982b";
+import { ui } from "./ui-state.js?v=3d4aed61982b";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, cartSummary, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=3d4aed61982b";
+import { add, el, endpointBase } from "./ui-core.js?v=3d4aed61982b";
+import { activeUserAddress, domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=3d4aed61982b";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=3d4aed61982b";
 
 export function cartCopyBlocked() {
  return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;

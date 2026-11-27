@@ -10,22 +10,28 @@ export function autoScroll(node, { speed = 20, advance, onScrollSettle } = {}) {
     return prior;
   }
   const media = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)");
+  const noHoverMedia = globalThis.matchMedia?.("(hover: none)");
   let hovered = false,
     touching = false,
+    focusFromTouch = false,
+    lastTouchAt = -Infinity,
     until = 0,
     settleTimer = null,
     last = performance.now(),
     position = node.scrollLeft,
     expectedScroll = node.scrollLeft;
+  const hasKeyboardFocus = () => node.contains(document.activeElement) && !focusFromTouch;
   const state = {
     speed,
     advance,
     onScrollSettle,
-    paused: () =>
+    interacting: () =>
       hovered ||
       touching ||
-      node.contains(document.activeElement) ||
-      performance.now() < until ||
+      hasKeyboardFocus() ||
+      performance.now() < until,
+    paused: () =>
+      state.interacting() ||
       !!media?.matches ||
       document.hidden,
     reset(next = 0) {
@@ -49,42 +55,66 @@ export function autoScroll(node, { speed = 20, advance, onScrollSettle } = {}) {
       }
     }, 140);
   };
-  node.addEventListener("pointerenter", (e) => {
-    if (e.pointerType !== "touch") hovered = true;
-  });
-  node.addEventListener("pointerleave", () => {
-    hovered = false;
-    pause();
-  });
-  node.addEventListener("touchstart", () => {
+  const beginTouch = () => {
     touching = true;
+    hovered = false;
+    focusFromTouch = true;
+    lastTouchAt = performance.now();
     clearTimeout(settleTimer);
     pause();
-  }, { passive: true });
-  node.addEventListener("touchmove", () => {
-    touching = true;
+  };
+  const endTouch = () => {
+    if (!touching) return;
+    touching = false;
+    hovered = false;
+    lastTouchAt = performance.now();
     pause();
+    scheduleSettle();
+  };
+  const onGlobalTouchEnd = (e) => {
+    if (e.type === "touchend" && (e.touches?.length ?? 0) > 0) return;
+    endTouch();
+  };
+  const onGlobalPointerEnd = (e) => {
+    if (e.pointerType && e.pointerType !== "touch") return;
+    endTouch();
+  };
+  const onGlobalKeyDown = () => {
+    focusFromTouch = false;
+  };
+  const onGlobalReset = () => {
+    endTouch();
+  };
+  node.addEventListener("pointerenter", (e) => {
+    if (e.pointerType !== "mouse" || performance.now() - lastTouchAt < 1200 || noHoverMedia?.matches) return;
+    hovered = true;
+  });
+  node.addEventListener("pointerleave", (e) => {
+    if (hovered) {
+      hovered = false;
+      pause();
+    } else if (e.pointerType === "mouse") {
+      hovered = false;
+    }
+  });
+  node.addEventListener("touchstart", beginTouch, { passive: true });
+  node.addEventListener("touchmove", beginTouch, { passive: true });
+  node.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "touch") beginTouch();
+    else pause();
   }, { passive: true });
   for (const type of ["touchend", "touchcancel"]) {
-    node.addEventListener(type, () => {
-      touching = false;
-      pause();
-      scheduleSettle();
-    }, { passive: true });
+    globalThis.addEventListener?.(type, onGlobalTouchEnd, { passive: true });
   }
-  node.addEventListener("pointerdown", (e) => {
-    if (e.pointerType === "touch") touching = true;
-    pause();
-  }, { passive: true });
   for (const type of ["pointerup", "pointercancel"]) {
-    node.addEventListener(type, (e) => {
-      if (e.pointerType === "touch") touching = false;
-      pause();
-      scheduleSettle();
-    }, { passive: true });
+    globalThis.addEventListener?.(type, onGlobalPointerEnd, { passive: true });
   }
+  globalThis.addEventListener?.("keydown", onGlobalKeyDown, { passive: true });
+  globalThis.addEventListener?.("blur", onGlobalReset, { passive: true });
+  document.addEventListener?.("visibilitychange", onGlobalReset, { passive: true });
   for (const type of ["wheel", "keydown", "focusout"]) {
     node.addEventListener(type, () => {
+      if (type === "focusout" && !node.contains(document.activeElement)) focusFromTouch = false;
       pause();
       if (type === "wheel") scheduleSettle();
     }, { passive: true });
@@ -98,6 +128,11 @@ export function autoScroll(node, { speed = 20, advance, onScrollSettle } = {}) {
   const tick = (now) => {
     if (!node.isConnected) {
       clearTimeout(settleTimer);
+      for (const type of ["touchend", "touchcancel"]) globalThis.removeEventListener?.(type, onGlobalTouchEnd);
+      for (const type of ["pointerup", "pointercancel"]) globalThis.removeEventListener?.(type, onGlobalPointerEnd);
+      globalThis.removeEventListener?.("keydown", onGlobalKeyDown);
+      globalThis.removeEventListener?.("blur", onGlobalReset);
+      document.removeEventListener?.("visibilitychange", onGlobalReset);
       controllers.delete(node);
       return;
     }

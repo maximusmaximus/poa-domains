@@ -1,18 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=326fa0f6eee9";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=326fa0f6eee9";
-import { renderManagement } from "./ui-manage.js?v=326fa0f6eee9";
-import { actionLabel } from "./ui-copy.js?v=326fa0f6eee9";
-import { activePoaFixedListings, findOpenPoaAuctionByName, isOwnDomainOrListing, poaMinimumNextBid, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, SELF_BID_MESSAGE, SELF_BUY_MESSAGE, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=326fa0f6eee9";
-import { ui } from "./ui-state.js?v=326fa0f6eee9";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=326fa0f6eee9";
-import { createPoaCopyButton } from "./ui-copy.js?v=326fa0f6eee9";
-import { addToCart, persistCart, renderCart, renderCartEscrowStatus, setCartItemUseDeposit, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=326fa0f6eee9";
-import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=326fa0f6eee9";
-import { renderDomainPage } from "./ui-domain.js?v=326fa0f6eee9";
-import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=326fa0f6eee9";
-import { renderIdeas } from "./ui-ideas.js?v=326fa0f6eee9";
-import { mountEscrow } from "./escrow.js?v=326fa0f6eee9";
-import { activeUserAddress, applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, renderSelfBidNotice, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=326fa0f6eee9";
+import { publicNameUnavailable } from "./shared.js?v=3d4aed61982b";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=3d4aed61982b";
+import { renderManagement } from "./ui-manage.js?v=3d4aed61982b";
+import { actionLabel } from "./ui-copy.js?v=3d4aed61982b";
+import { activePoaFixedListings, findOpenPoaAuctionByName, isOwnDomainOrListing, poaMinimumNextBid, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, SELF_BID_MESSAGE, SELF_BUY_MESSAGE, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=3d4aed61982b";
+import { ui } from "./ui-state.js?v=3d4aed61982b";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=3d4aed61982b";
+import { createPoaCopyButton } from "./ui-copy.js?v=3d4aed61982b";
+import { addToCart, persistCart, renderCart, renderCartEscrowStatus, setCartItemUseDeposit, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=3d4aed61982b";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=3d4aed61982b";
+import { renderDomainPage } from "./ui-domain.js?v=3d4aed61982b";
+import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=3d4aed61982b";
+import { renderIdeas } from "./ui-ideas.js?v=3d4aed61982b";
+import { mountEscrow } from "./escrow.js?v=3d4aed61982b";
+import { activeUserAddress, applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, renderSelfBidNotice, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=3d4aed61982b";
 
 if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
  document.addEventListener("poa:owner-changed", () => {
@@ -732,15 +732,24 @@ function snapshotRenderSig(payload, viewState, escrowMarket, marketServerTime) {
  ]);
 }
 
+let refreshGen = 0;
+let refreshStartedAt = 0;
+
 export async function refreshRegistry({ background = false, force = !background } = {}) {
- if (ui.refreshing || !ui.readState)
+ if (!ui.readState)
   return;
+ if (ui.refreshing && Date.now() - refreshStartedAt < 22000)
+  return;
+ const gen = ++refreshGen;
+ refreshStartedAt = Date.now();
  ui.refreshing = true;
  const wasFailed = ui.registryReadFailed;
  if (!background || wasFailed || !ui.latestState)
   pageStatus("", true);
  try {
   const [payload] = await Promise.all([ui.readState(), fetchEscrowMarketData()]);
+  if (gen !== refreshGen)
+   return;
   const viewState = registryViewState(payload);
   const dataSig = snapshotRenderSig(payload, viewState, ui.escrowMarket, ui.escrowMarketServerTime);
   const changed = force || wasFailed || !ui.latestState || dataSig !== ui.lastSnapshotSig;
@@ -770,16 +779,20 @@ export async function refreshRegistry({ background = false, force = !background 
   pageStatus();
  }
  catch {
+  if (gen !== refreshGen)
+   return;
   ui.registryReadFailed = true;
   ui.refreshing = false;
   pageStatus("⚠️ Could not update registry data. Your last view is kept. Tap Refresh to try again; cart copying is paused.");
   updatePromptText();
  }
  finally {
-  ui.refreshing = false;
-  el("refresh").disabled = false;
-  el("registryRetry").disabled = false;
-  updateCartCopyState();
+  if (gen === refreshGen) {
+   ui.refreshing = false;
+   el("refresh").disabled = false;
+   el("registryRetry").disabled = false;
+   updateCartCopyState();
+  }
  }
 }
 
@@ -1208,14 +1221,29 @@ export async function loadRegistry() {
   applyRoute();
   renderCart();
   if (!ui.demo && !ui.tickerTimer) {
+   const resumeLiveRefresh = () => {
+    if (document.hidden || ui.demo || !ui.readState)
+     return;
+    void refreshRegistry({ background: true });
+    void refreshNetworkStatus();
+    void refreshEscrowCaps();
+   };
    ui.tickerTimer = setInterval(() => {
     if (!document.hidden)
      void refreshRegistry({ background: true });
    }, ui.TICKER_MS);
    if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
-    document.addEventListener("visibilitychange", () => {
-     if (!document.hidden && !ui.demo && ui.readState)
-      void refreshRegistry({ background: true });
+    document.addEventListener("visibilitychange", resumeLiveRefresh);
+   }
+   if (typeof globalThis.addEventListener === "function") {
+    globalThis.addEventListener("pageshow", (e) => {
+     if (e?.persisted)
+      resumeLiveRefresh();
+    });
+    globalThis.addEventListener("online", resumeLiveRefresh);
+    globalThis.addEventListener("focus", () => {
+     if (Date.now() - (ui.lastLoadedAt || 0) >= 2000)
+      resumeLiveRefresh();
     });
    }
    refreshNetworkStatus();
