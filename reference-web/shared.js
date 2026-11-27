@@ -520,7 +520,7 @@ export function cartParamsForSigner(item, signer) {
  return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
- validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=bc6ae7df7f28";
+ validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=6392e78aa9c6";
 const b58Alphabet =
  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -769,7 +769,7 @@ export const CREATIVE_TITLE_TILE_COLORS = ["blue", "green", "gold", "violet", "c
 const TILE_TONES = ["blue", "green", "gold", "violet", "coral"];
 const SHAPE_PUN_OPTIONS = {
  p: ["\u{1F17F}\uFE0F", null, "\u{1F355}", "\u{1FA90}"],
- o: ["\u{1FA99}", "\u{1F369}", "\u2B55", "\u{1F315}", "\u{1F310}", "\u{1F17E}\uFE0F", null],
+ o: ["\u{1FA99}", "\u{1F369}", "\u2B55", "\u{1F315}", "\u{1F30D}", "\u{1F17E}\uFE0F", null],
  a: ["\u{1F170}\uFE0F", "\u{1F53A}", "\u26FA", "\u{1F3D4}\uFE0F", null],
  d: [null, "\u{1F319}", "\u{1F48E}"],
  m: ["\u24C2\uFE0F", "\u26F0\uFE0F", "\u{1F451}", null],
@@ -779,7 +779,7 @@ const SHAPE_PUN_OPTIONS = {
 };
 export const CREATIVE_TITLE_OPTIONS = {
  p: ["\u{1F17F}\uFE0F", null, "\u{1F355}", "\u{1FA90}", "\u{1F334}", "\u{1F427}"],
- o: ["\u{1F17E}\uFE0F", "\u2B55", "\u{1FA99}", "\u{1F369}", "\u{1F315}", "\u{1F310}", "\u{1F9FF}", "\u{1F52E}", null],
+ o: ["\u{1F17E}\uFE0F", "\u2B55", "\u{1FA99}", "\u{1F369}", "\u{1F315}", "\u{1F30D}", "\u{1F9FF}", "\u{1F52E}", null],
  a: ["\u{1F170}\uFE0F", "\u{1F53A}", "\u26FA", "\u{1F3D4}\uFE0F", "\u{1F680}", null],
  d: [null, "\u{1F319}", "\u{1F48E}", "\u{1F3B2}", "\u{1F409}"],
  m: ["\u24C2\uFE0F", "\u26F0\uFE0F", "\u{1F451}", "\u{1F98B}", null],
@@ -789,7 +789,7 @@ export const CREATIVE_TITLE_OPTIONS = {
 };
 const CRYPTO_ACCENT_OPTIONS = {
  p: [null, "\u{1F17F}\uFE0F", "\u{1FA90}"],
- o: ["\u{1FA99}", "\u{1F310}", "\u{1F315}", null],
+ o: ["\u{1FA99}", "\u{1F30D}", "\u{1F315}", null],
  a: [null, "\u{1F680}", "\u{1F170}\uFE0F"],
  d: [null, "\u{1F48E}", "\u{1F319}"],
  m: [null, "\u24C2\uFE0F", "\u{1F451}"],

@@ -1,13 +1,13 @@
-import { isOwnDomainOrListing, isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, resolveOwnerInput, validPrincipal } from "./shared.js?v=bc6ae7df7f28";
-import { drawTicker } from "./ui-ticker.js?v=bc6ae7df7f28";
-import { actionLabel } from "./ui-copy.js?v=bc6ae7df7f28";
-import { returnFocus } from "./ui-a11y.js?v=bc6ae7df7f28";
-import { activeResaleOffers, buildCreativeSiteTitle, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=bc6ae7df7f28";
-import { ui } from "./ui-state.js?v=bc6ae7df7f28";
-import { add, appendPoaAddress, appendPrincipal, appendTextWithPoaAddress, el, person, namedText } from "./ui-core.js?v=bc6ae7df7f28";
-import { activeUserAddress, domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa, renderSelfBidNotice } from "./ui-router.js?v=bc6ae7df7f28";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=bc6ae7df7f28";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=bc6ae7df7f28";
+import { isOwnDomainOrListing, isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, resolveOwnerInput, validPrincipal } from "./shared.js?v=6392e78aa9c6";
+import { drawTicker } from "./ui-ticker.js?v=6392e78aa9c6";
+import { actionLabel } from "./ui-copy.js?v=6392e78aa9c6";
+import { returnFocus } from "./ui-a11y.js?v=6392e78aa9c6";
+import { activeResaleOffers, buildCreativeSiteTitle, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=6392e78aa9c6";
+import { ui } from "./ui-state.js?v=6392e78aa9c6";
+import { add, appendPoaAddress, appendPrincipal, appendTextWithPoaAddress, el, person, namedText } from "./ui-core.js?v=6392e78aa9c6";
+import { activeUserAddress, domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa, renderSelfBidNotice } from "./ui-router.js?v=6392e78aa9c6";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=6392e78aa9c6";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=6392e78aa9c6";
 
 export function updateLiveAuctionsBadge(state = ui.latestState) {
  const badge = el("liveAuctionsBadge");
@@ -66,15 +66,25 @@ export function updateTabDots(state) {
  }
 }
 
-export function applySiteTitle({ creative = false, random } = {}) {
+const SITE_TITLE_SIG_KEY = "poadomains.siteTitleSig.v1";
+function loadLastSiteTitleSig() {
+ try { return globalThis.localStorage?.getItem?.(SITE_TITLE_SIG_KEY) || ""; } catch { return ""; }
+}
+function saveLastSiteTitleSig(sig) {
+ try { if (sig) globalThis.localStorage?.setItem?.(SITE_TITLE_SIG_KEY, sig); } catch {}
+}
+
+export function applySiteTitle({ creative = true, random } = {}) {
  const h1 = el("siteTitle");
  if (!h1) return null;
- const previous = h1.dataset.titleSig || "";
+ const previous = h1.dataset.titleSig || loadLastSiteTitleSig();
  const title = creative ? buildCreativeSiteTitle({ previous, random }) : buildSiteTitle(random);
  h1.replaceChildren();
  h1.dataset.theme = title.theme;
  h1.dataset.tile = title.tile;
- h1.dataset.titleSig = title.signature || `${title.text}|${title.theme}|${title.tile}`;
+ const sig = title.signature || `${title.text}|${title.theme}|${title.tile}`;
+ h1.dataset.titleSig = sig;
+ if (creative) saveLastSiteTitleSig(sig);
  h1.setAttribute("aria-label", "poadomains");
  title.glyphs.forEach((g) => {
   const span = document.createElement("span");
@@ -480,19 +490,29 @@ export function render(payload) {
  const s = registryViewState(payload);
  ui.latestState = s;
  el("state").textContent = JSON.stringify(payload, null, 2);
- el("freshness").textContent =
-  (ui.demo ? "SYNTHETIC DEMO · " : ui.configMode === "live-registry" ? "LIVE REGISTRY DATA · " : "LOCAL REGISTRY DATA · ") +
-   `as of ${formatClock(s.time)}, sequence ${s.sequence}. ${payload.finality}.`;
- if(payload.publicView?.filtered) el("freshness").textContent += " Public view only; sequence and hash include stored hidden records.";
- if (ui.demo && ui.details.generatedAt)
-  el("freshness").textContent +=
-   " Built " +
-    new Intl.DateTimeFormat("en-US", {
-     timeZone: "America/Los_Angeles",
-     dateStyle: "medium",
-     timeStyle: "short",
-    }).format(new Date(ui.details.generatedAt)) +
-    " Pacific time.";
+ const freshnessEl = el("freshness");
+ if (freshnessEl) {
+  freshnessEl.replaceChildren();
+  const sourceLabel = ui.demo ? "SYNTHETIC DEMO" : ui.configMode === "live-registry" ? "LIVE REGISTRY DATA" : "LOCAL REGISTRY DATA";
+  add(freshnessEl, "p", sourceLabel, "info-meta-heading");
+  const list = add(freshnessEl, "ul", "", "info-meta-list");
+  const addRow = (label, value) => {
+   const li = add(list, "li", "");
+   add(li, "strong", label + ": ");
+   li.append(value);
+  };
+  addRow("As of", formatClock(s.time));
+  addRow("Sequence", String(s.sequence));
+  addRow("Finality", String(payload.finality));
+  if (payload.publicView?.filtered)
+   addRow("Scope", "Public view only; sequence and hash include stored hidden records.");
+  if (ui.demo && ui.details.generatedAt)
+   addRow("Built", new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    dateStyle: "medium",
+    timeStyle: "short",
+   }).format(new Date(ui.details.generatedAt)) + " Pacific time");
+ }
  const names = Object.values(s.names).filter((n) => n.activeId), auctions = Object.values(s.auctions), offers = Object.values(s.offers ?? {}), bids = Object.values(s.bids ?? {}), receipts = Object.values(s.receipts ?? {});
  const servedCountEl = el("domainsServedCount");
  if (servedCountEl)

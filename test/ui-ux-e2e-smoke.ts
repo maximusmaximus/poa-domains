@@ -263,13 +263,15 @@ async function runFullUiUxFlowsOnRegistryApp(
     `${browserName}: GitHub Pages mirror link present in footer`,
   );
 
-  // 2. Idea strip UX: staggered headerless masonry, tap fills search + adds to cart
+  // 2. Idea strip UX: staggered headerless masonry, hover pauses strip and tap fills search + adds to cart
   await page.waitForFunction(
     () => document.querySelectorAll("#ideasStrip .ideas-row").length === 1,
   );
+  await page.locator("#ideasStrip .ideas-row").hover();
   const firstIdea = page.locator("#ideasStrip .idea").first();
   const ideaQuery = (await firstIdea.getAttribute("data-query")) ?? "";
   await firstIdea.click();
+  await page.mouse.move(0, 0);
   assert.equal(await page.locator("#searchInput").inputValue(), ideaQuery);
   assert.ok(
     (await searchDetails(page)).length > 10,
