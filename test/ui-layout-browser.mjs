@@ -21,10 +21,14 @@ for(const [name,launcher]of [['chromium',chromium],['firefox',firefox],['webkit'
    });measurements.push(geometry);
    assert.ok(geometry.doc<=width+1&&geometry.body<=width+1,JSON.stringify(geometry));
    if(width>=900){
-    assert.ok(Math.abs(geometry.gaps.headerStatusX-geometry.space)<2,'Desktop status banner must sit beside POADOMAINS logo '+JSON.stringify(geometry));
+    assert.ok(geometry.gaps.headerStatusX>=geometry.space-1,'Desktop status banner must sit right of POADOMAINS logo '+JSON.stringify(geometry));
+    assert.ok(Math.abs(geometry.topRow.status.right-geometry.topRow.siteTop.right)<2,'Desktop status banner must be right-justified '+JSON.stringify(geometry.topRow));
+    assert.ok(geometry.topRow.status.height<=geometry.topRow.header.height+2,'Status banner max height must match logo banner '+JSON.stringify(geometry.topRow));
     assert.ok(geometry.topRow.status.top<geometry.topRow.header.bottom&&geometry.topRow.header.top<geometry.topRow.status.bottom,'Desktop status banner shares top row with logo '+JSON.stringify(geometry.topRow));
    }else{
     assert.ok(Math.abs(geometry.gaps.headerStatus-geometry.space)<1,'headerStatus '+JSON.stringify(geometry));
+    assert.ok(Math.abs(geometry.topRow.status.right-geometry.topRow.siteTop.right)<2,'Mobile status banner must be right-justified '+JSON.stringify(geometry.topRow));
+    assert.ok(geometry.topRow.status.height<=geometry.topRow.header.height+2,'Mobile status banner max height must not exceed logo banner '+JSON.stringify(geometry.topRow));
    }
    for(const key of ['statusTicker','tickerTabs','tabsIdeas','searchCart','sectionFooter'])assert.ok(Math.abs(geometry.gaps[key]-geometry.space)<1,key+' '+JSON.stringify(geometry));
    for(const key of ['ideasField','labelInput'])assert.ok(Math.abs(geometry.gaps[key]-geometry.tight)<1,key+' '+JSON.stringify(geometry));
