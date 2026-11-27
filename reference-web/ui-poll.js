@@ -1,18 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=6ce08cf8fdbc";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=6ce08cf8fdbc";
-import { renderManagement } from "./ui-manage.js?v=6ce08cf8fdbc";
-import { actionLabel } from "./ui-copy.js?v=6ce08cf8fdbc";
-import { activePoaFixedListings, findOpenPoaAuctionByName, isOwnDomainOrListing, poaMinimumNextBid, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, SELF_BID_MESSAGE, SELF_BUY_MESSAGE, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=6ce08cf8fdbc";
-import { ui } from "./ui-state.js?v=6ce08cf8fdbc";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=6ce08cf8fdbc";
-import { createPoaCopyButton } from "./ui-copy.js?v=6ce08cf8fdbc";
-import { addToCart, persistCart, renderCart, renderCartEscrowStatus, setCartItemUseDeposit, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=6ce08cf8fdbc";
-import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=6ce08cf8fdbc";
-import { renderDomainPage } from "./ui-domain.js?v=6ce08cf8fdbc";
-import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=6ce08cf8fdbc";
-import { renderIdeas } from "./ui-ideas.js?v=6ce08cf8fdbc";
-import { mountEscrow } from "./escrow.js?v=6ce08cf8fdbc";
-import { activeUserAddress, applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, renderSelfBidNotice, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=6ce08cf8fdbc";
+import { publicNameUnavailable } from "./shared.js?v=326fa0f6eee9";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=326fa0f6eee9";
+import { renderManagement } from "./ui-manage.js?v=326fa0f6eee9";
+import { actionLabel } from "./ui-copy.js?v=326fa0f6eee9";
+import { activePoaFixedListings, findOpenPoaAuctionByName, isOwnDomainOrListing, poaMinimumNextBid, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, SELF_BID_MESSAGE, SELF_BUY_MESSAGE, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=326fa0f6eee9";
+import { ui } from "./ui-state.js?v=326fa0f6eee9";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=326fa0f6eee9";
+import { createPoaCopyButton } from "./ui-copy.js?v=326fa0f6eee9";
+import { addToCart, persistCart, renderCart, renderCartEscrowStatus, setCartItemUseDeposit, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=326fa0f6eee9";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=326fa0f6eee9";
+import { renderDomainPage } from "./ui-domain.js?v=326fa0f6eee9";
+import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=326fa0f6eee9";
+import { renderIdeas } from "./ui-ideas.js?v=326fa0f6eee9";
+import { mountEscrow } from "./escrow.js?v=326fa0f6eee9";
+import { activeUserAddress, applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, renderSelfBidNotice, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=326fa0f6eee9";
 
 if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
  document.addEventListener("poa:owner-changed", () => {
@@ -704,6 +704,34 @@ async function fetchEscrowMarketData() {
  }
 }
 
+function snapshotRenderSig(payload, viewState, escrowMarket, marketServerTime) {
+ const nowMs = marketServerTime || Date.now();
+ const offerFlags = Object.values(viewState?.offers ?? {}).map((o) => [
+  o.id,
+  !o.cancelled && o.uses < o.maxUses && viewState.time < o.validUntil,
+ ]);
+ const auctionFlags = Object.values(viewState?.auctions ?? {}).map((a) => [
+  a.id,
+  a.status,
+  viewState.time >= (a.openAt ?? 0),
+  viewState.time >= (a.closeAt ?? (a.openAt ?? 0) + (a.window ?? 0)),
+ ]);
+ const escrowFlags = (Array.isArray(escrowMarket) ? escrowMarket : []).map((a) => [
+  a.id,
+  a.status,
+  Boolean(a.closes && nowMs >= a.closes),
+ ]);
+ return JSON.stringify([
+  payload?.sequence ?? null,
+  payload?.stateHash ?? null,
+  payload?.state ?? null,
+  escrowMarket ?? null,
+  offerFlags,
+  auctionFlags,
+  escrowFlags,
+ ]);
+}
+
 export async function refreshRegistry({ background = false, force = !background } = {}) {
  if (ui.refreshing || !ui.readState)
   return;
@@ -714,7 +742,7 @@ export async function refreshRegistry({ background = false, force = !background 
  try {
   const [payload] = await Promise.all([ui.readState(), fetchEscrowMarketData()]);
   const viewState = registryViewState(payload);
-  const dataSig = JSON.stringify([payload.sequence ?? null, payload.stateHash ?? null, payload.state ?? null, ui.escrowMarket ?? null]);
+  const dataSig = snapshotRenderSig(payload, viewState, ui.escrowMarket, ui.escrowMarketServerTime);
   const changed = force || wasFailed || !ui.latestState || dataSig !== ui.lastSnapshotSig;
   ui.registryReadFailed = false;
   ui.refreshing = false;
@@ -822,8 +850,8 @@ export async function refreshEscrowMarket({ background = false } = {}) {
  const nextSig = JSON.stringify(ui.escrowMarket ?? null);
  if (background && nextSig === prevSig)
   return;
- if (ui.rawSnapshot)
-  ui.lastSnapshotSig = JSON.stringify([ui.rawSnapshot.sequence ?? null, ui.rawSnapshot.stateHash ?? null, ui.rawSnapshot.state ?? null, ui.escrowMarket ?? null]);
+ if (ui.rawSnapshot && ui.latestState)
+  ui.lastSnapshotSig = snapshotRenderSig(ui.rawSnapshot, ui.latestState, ui.escrowMarket, ui.escrowMarketServerTime);
  if (ui.latestState) {
   preserveInputs(() => {
    ui.cart = ui.cart.map((item) =>

@@ -1,13 +1,13 @@
-import { isOwnDomainOrListing, isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, resolveOwnerInput, validPrincipal } from "./shared.js?v=6ce08cf8fdbc";
-import { drawTicker } from "./ui-ticker.js?v=6ce08cf8fdbc";
-import { actionLabel } from "./ui-copy.js?v=6ce08cf8fdbc";
-import { returnFocus } from "./ui-a11y.js?v=6ce08cf8fdbc";
-import { activeResaleOffers, buildCreativeSiteTitle, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=6ce08cf8fdbc";
-import { ui } from "./ui-state.js?v=6ce08cf8fdbc";
-import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=6ce08cf8fdbc";
-import { activeUserAddress, domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa, renderSelfBidNotice } from "./ui-router.js?v=6ce08cf8fdbc";
-import { addDetailToCart, addToCart } from "./ui-cart.js?v=6ce08cf8fdbc";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=6ce08cf8fdbc";
+import { isOwnDomainOrListing, isPoaAddress, registryUnit, poaOnlyMode, poaAmount, poaShort, poaToMicros, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, partitionPoaAuctions, resolveDefaultAuctionTab, activePoaFixedListings, countLiveAuctions, countOwnedDomains, poaAuctionOutbidStatus, resolveOwnerInput, validPrincipal } from "./shared.js?v=326fa0f6eee9";
+import { drawTicker } from "./ui-ticker.js?v=326fa0f6eee9";
+import { actionLabel } from "./ui-copy.js?v=326fa0f6eee9";
+import { returnFocus } from "./ui-a11y.js?v=326fa0f6eee9";
+import { activeResaleOffers, buildCreativeSiteTitle, buildSiteTitle, formatClock, formatCountdown, formatDuration, formatEmojiCounter, historyForTarget, minimumNextBid, partitionAuctions, registryViewState, shapeLiveActions, tabHasNew, tabWatermarks } from "./shared.js?v=326fa0f6eee9";
+import { ui } from "./ui-state.js?v=326fa0f6eee9";
+import { add, appendPoaAddress, appendPrincipal, el, person, namedText } from "./ui-core.js?v=326fa0f6eee9";
+import { activeUserAddress, domainHeader, nameLink, navigateDomain, openManageDomain, ownerLink, openPoa, renderSelfBidNotice } from "./ui-router.js?v=326fa0f6eee9";
+import { addDetailToCart, addToCart } from "./ui-cart.js?v=326fa0f6eee9";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=326fa0f6eee9";
 
 export function updateLiveAuctionsBadge(state = ui.latestState) {
  const badge = el("liveAuctionsBadge");
