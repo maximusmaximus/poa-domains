@@ -1495,6 +1495,80 @@ test("primary status HTTP 503 enters cooldown even when fallback is stale, avoid
  }finally{console.error=origErr;}
 });
 
+test("displayStatus hedges stalled primary status and network-facts at 3.5s, cools both down, and never blocks past 10s",async()=>{
+ let now=NOW_V2;
+ const hits:Record<string,number>={};
+ const count=(p:string)=>{hits[p]=(hits[p]??0)+1;};
+ const liveFresh=()=>({network:"PoA prototype",K:5,txs:5600,final:4800,invalid:0,epochs_closed:128,as_of:new Date(now-1000).toISOString(),checkpoint_height:100,state_root:root});
+ const facts={chain_id:CHAIN,open_epoch:128,engine_sha256:MAINNET_ENGINE_SHA256,params_sha256:MAINNET_PARAMS_SHA256,economics:{K:5}};
+ let primarySlow=true;
+ const request=(async(input:any,init?:RequestInit)=>{
+  const p=new URL(String(input)).pathname;count(p);
+  if(p===`/chain/${CHAIN}/api/status`||p===`/chain/${CHAIN}/api/network-facts`){
+   if(primarySlow){
+    await new Promise<void>((_,reject)=>{init?.signal?.addEventListener("abort",()=>reject(new DOMException("aborted","AbortError")),{once:true});});
+   }
+   return Response.json(p.endsWith("/status")?{...liveFresh(),chain_id:CHAIN}:facts);
+  }
+  if(p==="/api/status")return Response.json(liveFresh());
+  if(p==="/api/network-facts")return Response.json(facts);
+  return new Response(null,{status:404});
+ }) as typeof fetch;
+
+ const net=new PoaHttpNetwork(()=>false,request,undefined,()=>now);
+ // 1st display read: both stalled primary routes hedge at 3.5s -> fallbacks win fast (~3.5-4.5s, well under 10s) and enter 5m cooldown.
+ const t0=Date.now();
+ const s1=await net.displayStatus();
+ const elapsed1=Date.now()-t0;
+ assert.equal(s1.stale,false);
+ assert.ok(elapsed1>=3400&&elapsed1<6000,`hedged fallback should resolve near 3.5s, got ${elapsed1}ms`);
+ assert.equal(hits[`/chain/${CHAIN}/api/status`],1);
+ assert.equal(hits[`/chain/${CHAIN}/api/network-facts`],1);
+ assert.equal(hits["/api/status"],1);
+ assert.equal(hits["/api/network-facts"],1);
+
+ // 2nd display read during cooldown skips both stalled primary routes completely and resolves immediately.
+ now+=15_000;
+ const t1=Date.now();
+ const s2=await net.displayStatus();
+ const elapsed2=Date.now()-t1;
+ assert.equal(s2.stale,false);
+ assert.ok(elapsed2<1000,`cooled-down read should resolve fast, got ${elapsed2}ms`);
+ assert.equal(hits[`/chain/${CHAIN}/api/status`],1,"stalled primary status skipped during cooldown");
+ assert.equal(hits[`/chain/${CHAIN}/api/network-facts`],1,"stalled primary facts skipped during cooldown");
+ assert.equal(hits["/api/status"],2);
+ assert.equal(hits["/api/network-facts"],2);
+
+ // After 5-minute cooldown expires, primary routes are re-probed and recover cleanly.
+ primarySlow=false;now+=300_000;
+ const s3=await net.displayStatus();
+ assert.equal(s3.stale,false);
+ assert.equal(hits[`/chain/${CHAIN}/api/status`],2,"primary status re-probed after cooldown");
+ assert.equal(hits[`/chain/${CHAIN}/api/network-facts`],2,"primary facts re-probed after cooldown");
+});
+
+test("primary network-facts HTTP 503 cools down /chain/.../api/network-facts and recovers after expiry",async()=>{
+ let now=NOW_V2,primaryFacts503=true;
+ const hits:Record<string,number>={};
+ const liveFresh=()=>({chain_id:CHAIN,network:"PoA prototype",K:5,txs:5600,final:4800,invalid:0,epochs_closed:128,as_of:new Date(now-1000).toISOString(),checkpoint_height:100,state_root:root});
+ const facts={chain_id:CHAIN,open_epoch:128,engine_sha256:MAINNET_ENGINE_SHA256,params_sha256:MAINNET_PARAMS_SHA256,economics:{K:5}};
+ const request=(async(input:any)=>{
+  const p=new URL(String(input)).pathname;hits[p]=(hits[p]??0)+1;
+  if(p===`/chain/${CHAIN}/api/status`)return Response.json(liveFresh());
+  if(p===`/chain/${CHAIN}/api/network-facts`)return primaryFacts503?Response.json({error:"warming"},{status:503}):Response.json(facts);
+  if(p==="/api/network-facts")return Response.json(facts);
+  return new Response(null,{status:404});
+ }) as typeof fetch;
+ const net=new PoaHttpNetwork(()=>false,request,undefined,()=>now);
+ await net.status();
+ assert.equal(hits[`/chain/${CHAIN}/api/network-facts`],1);assert.equal(hits["/api/network-facts"],1);
+ now+=30_000;await net.status();
+ assert.equal(hits[`/chain/${CHAIN}/api/network-facts`],1,"503 primary facts skipped during cooldown");
+ assert.equal(hits["/api/network-facts"],2);
+ primaryFacts503=false;now+=300_000;await net.status();
+ assert.equal(hits[`/chain/${CHAIN}/api/network-facts`],2,"primary facts re-probed after cooldown");
+});
+
 test("transport failures in cut/lookup/context map cleanly to ESCROW_NETWORK_HELD and bid only fetches status once before reconcile",async()=>{
  const f=fixture();await fund(f,3,"10.000000");
  const o=await f.e.command(command(who(2),"open-net","open",{name:"nettest",reserve:"1.000000"})) as any;

@@ -10,9 +10,11 @@ export const PILOT_DAILY = "1000000.000000";
 /** K=5 peer attestations: the same threshold Escrow.final() requires for open-window money. */
 const PEER_FINAL_ATTESTATIONS = 5;
 const PRIMARY_SLOW_TTL_MS = 300_000;
-/** Same cap readStatus uses on the uncached financial path before a fallback alias. */
+/** Same cap readStatus uses on primary routes before hedging/falling over to a fallback alias. */
 const PRIMARY_READ_TIMEOUT_MS = 3500;
 const RECEIPT_PRIMARY_TIMEOUT_MS = 3500;
+/** Hard ceiling on displayStatus() so /v1/escrow/capabilities always responds inside a 10s client timeout. */
+const DISPLAY_TOTAL_TIMEOUT_MS = 8500;
 /** 3 txs × 2 reads (tx + receipt) stays within Cloudflare Workers' 6-connection concurrency limit
  * and avoids overwhelming minepoa.com's Express receipt endpoint during cold-cache cuts. */
 const CUT_BATCH_SIZE = 3;
@@ -32,6 +34,7 @@ export class PoaHttpNetwork implements Network {
   private lastCutoff?: number;
   private lastCutoffHeight?: number;
   private primaryStatusSlowUntil = 0;
+  private primaryFactsSlowUntil = 0;
   private primaryReceiptSlowUntil = 0;
   private openWindowHeight?: number;
   private readonly openWindowAtHeight = new Set<string>();
@@ -132,15 +135,63 @@ export class PoaHttpNetwork implements Network {
         let v:any;
         if(isFallbackCapable&&firstPathTimeoutMs!==undefined&&firstPathTimeoutMs>0){
           if(displaySignal){
-            // Keep one shared AbortSignal across display aliases while still letting a hung primary fall back.
-            const attempt=this.get(path,limit,displaySignal,true);
-            attempt.catch(()=>{});
+            // Keep one shared AbortSignal across display aliases. If primary stalls past firstPathTimeoutMs,
+            // hedge the fallback alias in parallel while keeping primary in flight in case fallback 404s/fails.
+            const HEDGE=Symbol("hedge");
+            const primaryAttempt=this.get(path,limit,displaySignal,true);
+            type Settled<T>={ok:true;value:T}|{ok:false;error:unknown};
+            const pState:Promise<Settled<any>>=primaryAttempt.then(
+              value=>({ok:true as const,value}),
+              error=>({ok:false as const,error}),
+            );
             let timer:ReturnType<typeof setTimeout>|undefined;
-            const cap=new Promise<never>((_,reject)=>{
-              timer=setTimeout(()=>reject(new DOMException("Primary route timed out","TimeoutError")),firstPathTimeoutMs);
-            });
-            try{v=await Promise.race([attempt,cap]);}
-            finally{clearTimeout(timer);}
+            const cap=new Promise<typeof HEDGE>(resolve=>{timer=setTimeout(()=>resolve(HEDGE),firstPathTimeoutMs);});
+            const raced=await Promise.race([pState,cap]).finally(()=>clearTimeout(timer));
+            if(raced===HEDGE&&!displaySignal.aborted){
+              const fState:Promise<Settled<{value:any;refused:boolean;timedOutFirst:boolean;httpFailedFirst:boolean}>>=
+                this.getFirstTracked(paths.slice(1),limit,displaySignal).then(
+                  value=>({ok:true as const,value}),
+                  error=>({ok:false as const,error}),
+                );
+              const winner=await Promise.race([
+                pState.then(s=>({src:"primary" as const,s})),
+                fState.then(s=>({src:"fallback" as const,s})),
+              ]);
+              if(winner.src==="fallback"){
+                if(winner.s.ok&&winner.s.value.value!==null){
+                  return {value:winner.s.value.value,refused:winner.s.value.refused,timedOutFirst:true,httpFailedFirst:false};
+                }
+                const ps=await pState;
+                if(ps.ok&&ps.value!==null)return {value:ps.value,refused:false,timedOutFirst:false,httpFailedFirst:false};
+                if(!winner.s.ok)throw winner.s.error;
+                if(!ps.ok){
+                  if(ps.error instanceof Error&&ps.error.message==="ESCROW_NODE_HTTP"){
+                    console.error(JSON.stringify({event:"escrow-node-http",path:path.slice(0,64),status:(ps.error as {httpStatus?:number}).httpStatus??0}));
+                  }
+                  throw ps.error;
+                }
+                return {value:null,refused:winner.s.value.refused,timedOutFirst:true,httpFailedFirst:false};
+              }else{
+                if(winner.s.ok&&winner.s.value!==null)return {value:winner.s.value,refused:false,timedOutFirst:false,httpFailedFirst:false};
+                const primaryRefused=!winner.s.ok&&winner.s.error instanceof Error&&winner.s.error.message==="ESCROW_NODE_AUTH";
+                const primaryHttp=!winner.s.ok&&winner.s.error instanceof Error&&winner.s.error.message==="ESCROW_NODE_HTTP";
+                const fs=await fState;
+                if(fs.ok&&fs.value.value!==null){
+                  return {value:fs.value.value,refused:primaryRefused||fs.value.refused,timedOutFirst:!primaryRefused&&!primaryHttp,httpFailedFirst:primaryHttp};
+                }
+                if(!fs.ok)throw fs.error;
+                if(!winner.s.ok){
+                  if(primaryHttp){
+                    console.error(JSON.stringify({event:"escrow-node-http",path:path.slice(0,64),status:(winner.s.error as {httpStatus?:number}).httpStatus??0}));
+                  }
+                  throw winner.s.error;
+                }
+                return {value:null,refused:primaryRefused||fs.value.refused,timedOutFirst:!primaryRefused&&!primaryHttp,httpFailedFirst:primaryHttp};
+              }
+            }
+            const ps=raced===HEDGE?await pState:raced;
+            if(!ps.ok)throw ps.error;
+            v=ps.value;
           }else{
             v=await this.get(path,limit,AbortSignal.timeout(firstPathTimeoutMs),true);
           }
@@ -178,14 +229,14 @@ export class PoaHttpNetwork implements Network {
   private async readStatus(display:boolean):Promise<Status> {
     const started=integer(this.clock());
     const timing:ReadTiming={statusMs:null,factsMs:null,totalMs:0};
-    const displaySignal=display?AbortSignal.timeout(17000):undefined;
+    const displaySignal=display?AbortSignal.timeout(DISPLAY_TOTAL_TIMEOUT_MS):undefined;
     const primaryInCooldown=started<this.primaryStatusSlowUntil;
     const statusPaths=primaryInCooldown?["/api/status",`/chain/${CHAIN}/api/status`]:[`/chain/${CHAIN}/api/status`,"/api/status"];
-    const primaryCap=primaryInCooldown?(display?11800:RECEIPT_PRIMARY_TIMEOUT_MS):(display?11800:PRIMARY_READ_TIMEOUT_MS);
-    const read=async(paths:string[],kind:"statusMs"|"factsMs")=>{
-      try{return await this.getFirst(paths,2000000,displaySignal);}
-      finally{if(display)timing[kind]=Math.max(0,this.clock()-started);}
-    };
+    const primaryCap=primaryInCooldown?RECEIPT_PRIMARY_TIMEOUT_MS:PRIMARY_READ_TIMEOUT_MS;
+    const factsInCooldown=started<this.primaryFactsSlowUntil;
+    const factsPaths=factsInCooldown
+      ?["/api/network-facts",`/chain/${CHAIN}/api/network-facts`,"/api/network/facts"]
+      :[`/chain/${CHAIN}/api/network-facts`,"/api/network-facts","/api/network/facts"];
     try {
       // If PoA refuses the chain status route, its public summary is not a substitute: it is a
       // stale digest without a chain id. Hold honestly as "ledger locked" (ESCROW_NODE_AUTH)
@@ -206,8 +257,22 @@ export class PoaHttpNetwork implements Network {
           return r.value;
         }finally{if(display)timing.statusMs=Math.max(0,this.clock()-started);}
       })();
-      const pending=[statusRead,
-        read([`/chain/${CHAIN}/api/network-facts`,"/api/network-facts","/api/network/facts"],"factsMs")];
+      const factsRead=(async()=>{
+        try{
+          const r=await this.getFirstTracked(factsPaths,2000000,displaySignal,PRIMARY_READ_TIMEOUT_MS,started);
+          const fallbackUsed=r.timedOutFirst||r.httpFailedFirst;
+          if(factsInCooldown){
+            if(fallbackUsed)this.primaryFactsSlowUntil=0;
+          }else if(fallbackUsed){
+            this.primaryFactsSlowUntil=this.clock()+PRIMARY_SLOW_TTL_MS;
+            console.error(JSON.stringify({event:"escrow-primary-cooldown",route:"facts",reason:r.timedOutFirst?"timeout":"http",ttlMs:PRIMARY_SLOW_TTL_MS}));
+          }else{
+            this.primaryFactsSlowUntil=0;
+          }
+          return r.value;
+        }finally{if(display)timing.factsMs=Math.max(0,this.clock()-started);}
+      })();
+      const pending=[statusRead,factsRead];
       let s:any,f:any;
       if(display){
         // Wait for BOTH reads to settle, including a failed sibling. A completed
