@@ -1,17 +1,17 @@
-import { installHelp } from "./ui-help.js?v=1faf16f1702c";
-import { wireManagement } from "./ui-manage.js?v=1faf16f1702c";
-import { bindTabKeys } from "./ui-a11y.js?v=1faf16f1702c";
-import { applySiteTitle, closeDetail, renderAuctions, setAuctionTab, wireExploreTabs } from "./ui-render.js?v=1faf16f1702c";
-import { ui } from "./ui-state.js?v=1faf16f1702c";
-import { canonical, digest, dismissNetworkBanner, instructions, isPoaAddress, loadBidderAddress, loadCart, loadKnownOwner, loadTabSeen, makeBody, parsePublicJSON, recheckCartItem, resolveOwnerInput, saveBidderAddress, shouldHoldTransactions } from "./shared.js?v=1faf16f1702c";
-import { activeUserAddress, navigateHome, notifyOwnerChanged, openAdvanced, openPoa, restoreViewFromURL, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=1faf16f1702c";
-import { el, endpointBase } from "./ui-core.js?v=1faf16f1702c";
-import { clearHandoff, copyDomainListingPrompt, copySubnameListing, isTermsGateOpen, setFeedbackModalOpen, wireFeedbackModal, wireTermsGate } from "./ui-handoff.js?v=1faf16f1702c";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=1faf16f1702c";
-import { submitSearchQuery, wireSearchAutocomplete } from "./ui-search.js?v=1faf16f1702c";
-import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=1faf16f1702c";
-import { copyText, flashCopied, selectElementText } from "./ui-copy.js?v=1faf16f1702c";
-import { cartCopyBlocked, downloadCartJSON, clearAllCart, persistCart, renderCart, renderCurrentCartHandoff, setFloatingCartOpen } from "./ui-cart.js?v=1faf16f1702c";
+import { installHelp } from "./ui-help.js?v=cb83c6d2a3e0";
+import { wireManagement } from "./ui-manage.js?v=cb83c6d2a3e0";
+import { bindTabKeys } from "./ui-a11y.js?v=cb83c6d2a3e0";
+import { applySiteTitle, closeDetail, renderAuctions, setAuctionTab, wireExploreTabs } from "./ui-render.js?v=cb83c6d2a3e0";
+import { ui } from "./ui-state.js?v=cb83c6d2a3e0";
+import { canonical, digest, dismissNetworkBanner, instructions, isPoaAddress, loadBidderAddress, loadCart, loadKnownOwner, loadTabSeen, makeBody, parsePublicJSON, recheckCartItem, resolveOwnerInput, saveBidderAddress, shouldHoldTransactions } from "./shared.js?v=cb83c6d2a3e0";
+import { activeUserAddress, navigateHome, notifyOwnerChanged, openAdvanced, openPoa, restoreViewFromURL, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=cb83c6d2a3e0";
+import { el, endpointBase } from "./ui-core.js?v=cb83c6d2a3e0";
+import { clearHandoff, copyDomainListingPrompt, copySubnameListing, isTermsGateOpen, setFeedbackModalOpen, wireFeedbackModal, wireTermsGate } from "./ui-handoff.js?v=cb83c6d2a3e0";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=cb83c6d2a3e0";
+import { submitSearchQuery, wireSearchAutocomplete } from "./ui-search.js?v=cb83c6d2a3e0";
+import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=cb83c6d2a3e0";
+import { copyText, flashCopied, selectElementText } from "./ui-copy.js?v=cb83c6d2a3e0";
+import { cartCopyBlocked, downloadCartJSON, clearAllCart, persistCart, renderCart, renderCurrentCartHandoff, setFloatingCartOpen } from "./ui-cart.js?v=cb83c6d2a3e0";
 try {
  ui.statusPanelDismissed = false; // New page visits show status; closing lasts for this page only.
  applySiteTitle();

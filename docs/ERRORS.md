@@ -248,7 +248,7 @@ HTTP 400; retryable: false. Escrow cut. Check the documented inputs and current 
 
 ## ESCROW_DEPOSIT_BINDING
 
-HTTP 400; retryable: false. Escrow deposit binding. Check the documented inputs and current state.
+HTTP 400; retryable: false. The on-chain transfer does not match the deposit intent (sender, recipient, exact amount, and memo must all match). Deposits must be sent from the exact poa1 address that signed intent; third-party or treasury transfers cannot be credited.
 
 ## ESCROW_DEPOSIT_DUPLICATE
 
@@ -257,6 +257,10 @@ HTTP 400; retryable: false. Escrow deposit duplicate. Check the documented input
 ## ESCROW_DEPOSIT_INTENT
 
 HTTP 400; retryable: false. Escrow deposit intent. Check the documented inputs and current state.
+
+## ESCROW_DEPOSIT_MATCHES_INTENT
+
+HTTP 409; retryable: false. This transfer already satisfies an open deposit intent and must be credited via detect instead of bounced back.
 
 ## ESCROW_DISABLED
 

@@ -1,18 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=1faf16f1702c";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=1faf16f1702c";
-import { renderManagement } from "./ui-manage.js?v=1faf16f1702c";
-import { actionLabel } from "./ui-copy.js?v=1faf16f1702c";
-import { activePoaFixedListings, findOpenPoaAuctionByName, isOwnDomainOrListing, poaMinimumNextBid, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, SELF_BID_MESSAGE, SELF_BUY_MESSAGE, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=1faf16f1702c";
-import { ui } from "./ui-state.js?v=1faf16f1702c";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=1faf16f1702c";
-import { createPoaCopyButton } from "./ui-copy.js?v=1faf16f1702c";
-import { addToCart, persistCart, renderCart, renderCartEscrowStatus, setCartItemUseDeposit, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=1faf16f1702c";
-import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=1faf16f1702c";
-import { renderDomainPage } from "./ui-domain.js?v=1faf16f1702c";
-import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=1faf16f1702c";
-import { renderIdeas } from "./ui-ideas.js?v=1faf16f1702c";
-import { mountEscrow } from "./escrow.js?v=1faf16f1702c";
-import { activeUserAddress, applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, renderSelfBidNotice, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=1faf16f1702c";
+import { publicNameUnavailable } from "./shared.js?v=cb83c6d2a3e0";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=cb83c6d2a3e0";
+import { renderManagement } from "./ui-manage.js?v=cb83c6d2a3e0";
+import { actionLabel } from "./ui-copy.js?v=cb83c6d2a3e0";
+import { activePoaFixedListings, findOpenPoaAuctionByName, isOwnDomainOrListing, poaMinimumNextBid, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, SELF_BID_MESSAGE, SELF_BUY_MESSAGE, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=cb83c6d2a3e0";
+import { ui } from "./ui-state.js?v=cb83c6d2a3e0";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=cb83c6d2a3e0";
+import { createPoaCopyButton } from "./ui-copy.js?v=cb83c6d2a3e0";
+import { addToCart, persistCart, renderCart, renderCartEscrowStatus, setCartItemUseDeposit, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=cb83c6d2a3e0";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=cb83c6d2a3e0";
+import { renderDomainPage } from "./ui-domain.js?v=cb83c6d2a3e0";
+import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=cb83c6d2a3e0";
+import { renderIdeas } from "./ui-ideas.js?v=cb83c6d2a3e0";
+import { mountEscrow } from "./escrow.js?v=cb83c6d2a3e0";
+import { activeUserAddress, applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, renderSelfBidNotice, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=cb83c6d2a3e0";
 if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
  document.addEventListener("poa:owner-changed", () => {
  syncEscrowCardSelfBidGuards();

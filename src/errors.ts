@@ -65,6 +65,7 @@ ESCROW_CUT
 ESCROW_DEPOSIT_BINDING
 ESCROW_DEPOSIT_DUPLICATE
 ESCROW_DEPOSIT_INTENT
+ESCROW_DEPOSIT_MATCHES_INTENT
 ESCROW_DISABLED
 ESCROW_DISTINCT_WALLET
 ESCROW_DOMAIN
@@ -408,6 +409,7 @@ const statuses:Record<string,number> = {
  // Deployed financial business-state errors retain their existing status contract.
  ESCROW_PAUSED:409, ESCROW_STALE:409, ESCROW_NETWORK_HELD:409, ESCROW_NOT_FINAL:409, ESCROW_ACTION:409,
  ESCROW_UNALIGNED_CUT:409, ESCROW_CHECKPOINT_DETAILS_REQUIRED:409,
+ ESCROW_DEPOSIT_MATCHES_INTENT:409,
  ESCROW_REVIEW:409, ESCROW_REVIEW_INTENT:409, ESCROW_REVIEW_STATE:409, ESCROW_REVIEW_USED:409,
  ESCROW_SUBNAMES_OFF:409, ESCROW_SUB_CLOSED:409, ESCROW_SUB_COMMIT:409, ESCROW_SUB_CONSENT:409, ESCROW_SUB_LISTED:409, ESCROW_SUB_NAME:409, ESCROW_SUB_NOT_READY:409, ESCROW_SUB_STALE:409,
 };
@@ -454,6 +456,8 @@ const messages:Record<string,string> = {
  ESCROW_HELD:'Escrow is held. Keep the exact signed request and check its account before another action.',
  ESCROW_COMMAND_EXPIRED:'The signed escrow command has expired. Sign a fresh command with a future expiry timestamp.',
  ESCROW_COMMAND_SCHEMA:'The signed escrow command is missing required fields or has an invalid shape. Check the documented schema before signing again.',
+ ESCROW_DEPOSIT_BINDING:'The on-chain transfer does not match the deposit intent (sender, recipient, exact amount, and memo must all match). Deposits must be sent from the exact poa1 address that signed intent; third-party or treasury transfers cannot be credited.',
+ ESCROW_DEPOSIT_MATCHES_INTENT:'This transfer already satisfies an open deposit intent and must be credited via detect instead of bounced back.',
  ESCROW_SIGNATURE:'The escrow command signature is invalid or malformed. Verify the canonical command payload and Ed25519 base58 signature.',
  INVALID_POA_ADDRESS:'Enter a valid public poa1 address.',
  INVALID_BTC_ADDRESS:'Enter a valid Bitcoin mainnet address (bc1… SegWit/Taproot or legacy 1…/3… with valid checksum).',

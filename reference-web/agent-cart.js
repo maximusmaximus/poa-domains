@@ -1,12 +1,12 @@
-import { registryUnit } from "./shared.js?v=1faf16f1702c";
-import { actionLabel } from "./ui-copy.js?v=1faf16f1702c";
+import { registryUnit } from "./shared.js?v=cb83c6d2a3e0";
+import { actionLabel } from "./ui-copy.js?v=cb83c6d2a3e0";
 /** One unsigned Cart Handoff v2 object; text, clipboard and download derive from it. */
 import {
  canonical,
  safeObject,
  validPrincipal,
  cartParamsForSigner,
-} from "./shared.js?v=1faf16f1702c";
+} from "./shared.js?v=cb83c6d2a3e0";
 export const CART_SCHEMA_VERSION = "poa-domains.agent-cart.v2";
 export const CART_ILLUSTRATION_CONTEXT = "static-synthetic-illustration";
 export const CART_ILLUSTRATION_CONTEXT_DEPRECATED = "static-synthetic-demo";
@@ -722,14 +722,14 @@ function renderFundingStep(data, hasMarketItems) {
  const depositItems = items.filter((i) => i.useDeposit);
  if (!depositItems.length) {
  if (!hasMarketItems) {
- return `1) Sign escrow intent {amount:"${data.totalPrice}"} for my address and POST it to ${data.escrow.intent}. Send exactly that POA to the returned address with the returned memo, wait for PoA finality (K=5 attestations or checkpoint — seen is not final credit), then sign detect {intent, txid} (if escrow already auto-credited the finalized deposit, verify balance via ${data.escrow.account}).`;
+ return `1) Sign escrow intent {amount:"${data.totalPrice}"} for my address and POST it to ${data.escrow.intent}. Send exactly that POA from the same poa1 address that signed intent (third-party/treasury transfers fail ESCROW_DEPOSIT_BINDING) to the returned address with the returned memo, wait for PoA finality (K=5 attestations or checkpoint — seen is not final credit), then sign detect {intent, txid} (if escrow already auto-credited the finalized deposit, verify balance via ${data.escrow.account}).`;
  }
- return `1) Funding: First check my existing credited available POA via ${data.escrow.account} (signed view). Deposit ONLY the shortfall needed (never exceeding ${data.totalPrice} POA total): sign escrow intent {amount} to ${data.escrow.intent}, send exact POA with the exact returned memo, wait for PoA finality (K=5 attestations or checkpoint — seen is not final credit), then sign detect {intent, txid} (or confirm auto-credit via account).`;
+ return `1) Funding: First check my existing credited available POA via ${data.escrow.account} (signed view). Deposit ONLY the shortfall needed (never exceeding ${data.totalPrice} POA total): sign escrow intent {amount} to ${data.escrow.intent}, send exact POA from the same poa1 address that signed intent (never a third-party/treasury wallet) with the exact returned memo, wait for PoA finality (K=5 attestations or checkpoint — seen is not final credit), then sign detect {intent, txid} (or confirm auto-credit via account).`;
  }
  if (depositItems.length === items.length) {
  return `1) Funding (USE EXISTING DEPOSIT ONLY): Check my existing credited available POA via ${data.escrow.account} (signed view). Use ONLY my existing credited escrow deposit (${data.depositOnlyTotal ?? data.totalPrice} POA total) to fund these items — do NOT create a new deposit intent or send new POA from my wallet unless I explicitly approve a top-up. If my available escrow deposit is below what is needed, STOP and report the exact shortfall.`;
  }
- return `1) Funding (MIXED — existing deposit + new POA): First check my existing credited available POA via ${data.escrow.account} (signed view). For items marked [USE DEPOSIT] (${data.depositOnlyTotal} POA), use ONLY my existing credited escrow deposit — do NOT send new wallet POA for them (stop and report if existing deposit is insufficient). For the remaining items (${data.newFundingTotal} POA), deposit ONLY the shortfall needed after remaining available deposit (never exceeding ${data.newFundingTotal} POA new deposit or ${data.totalPrice} POA total): sign escrow intent {amount} to ${data.escrow.intent}, send exact POA with the exact returned memo, wait for PoA finality (K=5 attestations or checkpoint — seen is not final credit), then sign detect {intent, txid} (or confirm auto-credit via account).`;
+ return `1) Funding (MIXED — existing deposit + new POA): First check my existing credited available POA via ${data.escrow.account} (signed view). For items marked [USE DEPOSIT] (${data.depositOnlyTotal} POA), use ONLY my existing credited escrow deposit — do NOT send new wallet POA for them (stop and report if existing deposit is insufficient). For the remaining items (${data.newFundingTotal} POA), deposit ONLY the shortfall needed after remaining available deposit (never exceeding ${data.newFundingTotal} POA new deposit or ${data.totalPrice} POA total): sign escrow intent {amount} to ${data.escrow.intent}, send exact POA from the same poa1 address that signed intent (never a third-party/treasury wallet) with the exact returned memo, wait for PoA finality (K=5 attestations or checkpoint — seen is not final credit), then sign detect {intent, txid} (or confirm auto-credit via account).`;
 }
 export function renderPoaCheckoutHandoff(data) {
  if (!data) return "";

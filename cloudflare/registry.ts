@@ -6,7 +6,7 @@ import { backupCommittedProfile } from "./profiles-storage.js";
 import { validPoaAddr } from "./treasury.js";
 import { DurableObject } from "cloudflare:workers";
 import { createPrivateKey, generateKeyPairSync, KeyObject } from "node:crypto";
-import { Escrow, Policy, SQLiteEscrowJournal, EscrowArchive, exportEscrow, restoreEscrow, reviewedCredit, replay as replayEscrow } from "./escrow.js";
+import { Escrow, Policy, SQLiteEscrowJournal, EscrowArchive, exportEscrow, restoreEscrow, reviewedCredit, replay as replayEscrow, type SurplusStore, type SurplusWatermark } from "./escrow.js";
 import { CHAIN, WorkerSecretSigner, verifyCommand, digest } from "./escrow-codec.js";
 import { PoaHttpNetwork, MAINNET_ENGINE_SHA256, MAINNET_PARAMS_SHA256, PILOT_PER_TX, PILOT_DAILY, type CoveredTxCache } from "./escrow-network.js";
 import { nativePrincipal } from "../src/auth.js";
@@ -387,6 +387,7 @@ export class PoaRegistry extends DurableObject<Env> {
     this.ctx.storage.transactionSync(() => {
       sql.exec("DELETE FROM journal"); sql.exec("DELETE FROM bootstrap");
       sql.exec("DROP TABLE IF EXISTS escrow_covered_tx_cache");
+      sql.exec("DROP TABLE IF EXISTS escrow_surplus_watermark");
       sql.exec("INSERT INTO bootstrap(id, value) VALUES (1, ?)", JSON.stringify(bootstrap));
       for (const row of b.journal) sql.exec("INSERT INTO journal(sequence, record) VALUES (?, ?)", row.sequence, row.record);
       restoreEscrow(this.ctx.storage, escrow);
@@ -439,6 +440,33 @@ export class PoaRegistry extends DurableObject<Env> {
       },
     };
   }
+  /** Non-journal SQLite watermark tracking checkpoint-aligned unexplained surplus so dust never consumes journal capacity while unexpected surplus drops still halt immediately. */
+  private surplusStore(): SurplusStore {
+    const sql = this.ctx.storage.sql;
+    const ensure = () => {
+      sql.exec("CREATE TABLE IF NOT EXISTS escrow_surplus_watermark (wallet TEXT PRIMARY KEY, value TEXT NOT NULL)");
+    };
+    return {
+      read: (wallet) => {
+        ensure();
+        const row = sql.exec<{ value: string }>("SELECT value FROM escrow_surplus_watermark WHERE wallet = ?", wallet).toArray()[0];
+        if (!row) return null;
+        try {
+          const parsed = JSON.parse(row.value) as SurplusWatermark;
+          if (Number.isSafeInteger(parsed?.height) && typeof parsed?.root === "string" && /^(0|[1-9][0-9]*)$/.test(String(parsed?.unexplainedMicros ?? ""))) return parsed;
+        } catch {}
+        return null;
+      },
+      write: (wallet, mark) => {
+        ensure();
+        sql.exec("INSERT OR REPLACE INTO escrow_surplus_watermark(wallet, value) VALUES (?, ?)", wallet, JSON.stringify(mark));
+      },
+      clear: (wallet) => {
+        ensure();
+        sql.exec("DELETE FROM escrow_surplus_watermark WHERE wallet = ?", wallet);
+      },
+    };
+  }
   private escrow(): Escrow {
     if (this.escrowService) return this.escrowService;
     const policy = this.escrowPolicy();
@@ -448,7 +476,7 @@ export class PoaRegistry extends DurableObject<Env> {
     const titles = registryTitles(e);
     this.escrowService = new Escrow(new SQLiteEscrowJournal(this.ctx.storage, policy), new PoaHttpNetwork(signing, fetch, { engine: this.env.POA_ESCROW_ENGINE_SHA256 ?? MAINNET_ENGINE_SHA256, params: this.env.POA_ESCROW_PARAMS_SHA256 ?? MAINNET_PARAMS_SHA256 }, Date.now, this.env.POA_API_TOKEN, this.coveredTxCache()),
       new WorkerSecretSigner(policy.wallet, () => this.env.POA_ESCROW_KEY, signing), titles, policy, () => Date.now(), enabled,
-      undefined, () => newNameCheckout(this.env).status === "on", () => subnameSales(this.env).status === "on");
+      undefined, () => newNameCheckout(this.env).status === "on", () => subnameSales(this.env).status === "on", this.surplusStore());
     return this.escrowService;
   }
   async escrowRead(path:string,query:Record<string,string>):Promise<unknown>{
@@ -532,15 +560,17 @@ export class PoaRegistry extends DurableObject<Env> {
   async escrowAdmin(packetText: string): Promise<RegistryReply> {
     try {
       need(String(this.env.POA_ESCROW_ENABLED) === "true", "ESCROW_DISABLED");
-      const value = parseJSON(packetText), v = exact(value, ["action"], ["packet", "paused", "review"]), escrow = this.escrow();
+      const value = parseJSON(packetText), v = exact(value, ["action"], ["packet", "paused", "review", "txid"]), escrow = this.escrow();
       if (String(this.env.POA_ESCROW_NETWORK_WRITES) === "approved-v1") await this.ctx.storage.setAlarm(Date.now() + 60000);
       switch (v.action) {
         case "status": exact(value, ["action"]); return { status: 200, jsonText: JSON.stringify(escrow.state()) };
+        case "uncredited": exact(value, ["action"]); return { status: 200, jsonText: JSON.stringify(await escrow.uncreditedIncoming()) };
         case "pause": exact(value, ["action", "paused"]); await escrow.pause(v.paused); break;
         case "reconcile": exact(value, ["action"]); await escrow.reconcile(); break;
         case "tick": exact(value, ["action"]); await escrow.tick(); break;
         case "rebroadcast": exact(value, ["action"]); await escrow.rebroadcast(); break;
         case "credit-reviewed": exact(value, ["action", "review"]); await escrow.creditReviewed(reviewedCredit(v.review)); break;
+        case "refund-uncredited": exact(value, ["action", "txid"]); await escrow.refundUncredited(v.txid); if (String(this.env.POA_ESCROW_NETWORK_WRITES) === "approved-v1" && escrow.hasActiveWork(this.engine.config.treasury)) await this.ctx.storage.setAlarm(Date.now() + 1000); break;
         case "command": exact(value, ["action", "packet"]); await escrow.command(verifyCommand(v.packet, this.engine.registryId, Math.floor(Date.now()/1000))); break;
         default: need(false, "ESCROW_ACTION");
       }

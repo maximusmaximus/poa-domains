@@ -15,6 +15,7 @@ async function outbound(req){
  if(u.pathname.endsWith("/api/status"))body={K:5,chain_id:"poa-mainnet-1",checkpoint_height:17,checkpoint:{height:17,cutoff_ts:cutoff},as_of:new Date(Date.now()-(stale?86400000:0)).toISOString(),stale:false,state_root:"a".repeat(64)};
  else if(u.pathname.endsWith("/api/network-facts"))body={chain_id:"poa-mainnet-1",engine_sha256:engine,params_sha256:params};
  else if(u.pathname.endsWith("/api/explorer/address/"+wallet))body={address:wallet,balance:"0.000000",balance_as_of:{checkpoint_height:17},txs:[]};
+ else if(u.pathname.includes("/api/receipt/")||u.pathname.includes("/api/explorer/tx/"))return new Response(JSON.stringify({error:"not found"}),{status:404,headers:{"content-type":"application/json"}});
  else{denied++;throw Error("LOCAL_TEST_DENIED_OUTBOUND");}
  return Response.json(body);
 }
@@ -51,6 +52,12 @@ try{
  await call(mf,"invalid action reaches DO validation, not 404",{body:'{"action":"invalid"}'},409,"ESCROW_ACTION");
 await call(mf,"reviewed credit needs a committed review id",{body:'{"action":"credit-reviewed","review":"other"}'},409,"ESCROW_REVIEW");
 await call(mf,"reviewed credit refuses when escrow is not held with that halt",{body:'{"action":"credit-reviewed","review":"dt1-deposit-2026-11-13"}'},409,"ESCROW_REVIEW_STATE");
+ const unc=await call(mf,"uncredited action returns read-only inspection and surplus watermark",{body:'{"action":"uncredited"}'});
+ assert.equal(unc.wallet,wallet);assert.deepEqual(unc.incoming,[]);assert.deepEqual(unc.trackedUncredited,[]);assert.equal(unc.surplus.unexplainedMicros,"0");
+ await call(mf,"refund-uncredited requires a 64-hex txid",{body:'{"action":"refund-uncredited"}'},400,"SCHEMA");
+ await call(mf,"refund-uncredited refuses destination/amount redirection fields",{body:'{"action":"refund-uncredited","txid":"'+"f".repeat(64)+'","to":"'+wallet+'"}'},400,"SCHEMA");
+ await call(mf,"refund-uncredited rejects malformed txid",{body:'{"action":"refund-uncredited","txid":"not-hex"}'},400,"ESCROW_TXID");
+ await call(mf,"refund-uncredited rejects unknown on-chain txid without mutating state",{body:'{"action":"refund-uncredited","txid":"'+"f".repeat(64)+'"}'},400,"ESCROW_UNKNOWN_DEPOSIT");
  stale=true;await call(mf,"24-hour-old source still holds reconcile",{body:'{"action":"reconcile"}'},409,"ESCROW_NETWORK_HELD");stale=false;
  redirect=true;await call(mf,"redirect is held, never followed",{body:'{"action":"reconcile"}'},409,"ESCROW_NETWORK_HELD");redirect=false;
  await call(mf,"fresh reconcile recovers without clearing or bypassing a hold",{body:'{"action":"reconcile"}'});
