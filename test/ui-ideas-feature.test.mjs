@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {createIdeaGenerator,ideaPools} from "../reference-web/ideas-generator.js";
-import {MAX_EXPLORE_ACTIONS,MAX_RECENT_ACTIONS,recentActions} from "../reference-web/ui-ticker.js";
+import {MAX_EXPLORE_ACTIONS,MAX_RECENT_ACTIONS,receiptDisplay,recentActions} from "../reference-web/ui-ticker.js";
 import {ui} from "../reference-web/ui-state.js";
 import {actionLabel,buttonIcon,decorateEmojiButton} from "../reference-web/ui-copy.js";
 import {managedNames,managementPlan} from "../reference-web/ui-manage.js";
@@ -67,8 +67,18 @@ test('the ticker merges registry seconds and escrow milliseconds newest-first, l
  assert.ok(exploreItems.length>125&&exploreItems.length<=500);
  assert.equal(exploreItems[0].category,'market');
  assert.equal(exploreItems[0].actor,'poa1B');
+ assert.equal(exploreItems[0].verb,'High bid');
+ assert.equal(exploreItems[0].amount,'150 POA');
  assert.ok(exploreItems[0].atMs>1e12);
  assert.equal(exploreItems.find(x=>x.id==='receipt:r-126').category,'domain');
+ // Structured receiptDisplay separates treasury mints, handovers, and child purchases cleanly
+ const st={deeds:{d1:{id:'d1',name:'ai',owner:'poa1Buyer',parentId:null},d2:{id:'d2',name:'sub.ai',owner:'poa1Buyer',parentId:'d1'}}};
+ const mint=receiptDisplay({status:'succeeded',signer:'poa1Treas',requestId:'treasury-inventory-ai-v1',result:{deedId:'d1',name:'ai',owner:'poa1Treas'}},st);
+ assert.equal(mint.verb,'Treasury minted');assert.equal(mint.recipient,'');
+ const hand=receiptDisplay({status:'succeeded',signer:'poa1Treas',requestId:'treasury-settle-1',result:{deedId:'d1',owner:'poa1Buyer'}},st);
+ assert.equal(hand.verb,'Handover');assert.equal(hand.actor,'poa1Treas');assert.equal(hand.recipient,'poa1Buyer');
+ const child=receiptDisplay({status:'succeeded',signer:'poa1Buyer',requestId:'child-1',result:{deedId:'d2',name:'sub.ai',owner:'poa1Buyer'}},st);
+ assert.equal(child.verb,'Child purchase');
 });
 
 test('v3 keeps headerless masonry, flat closable status and always-visible corner help',()=>{

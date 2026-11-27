@@ -1,5 +1,5 @@
-import { autoScroll, itemStep } from "./ui-motion.js?v=1f198b47f5b4";
-import { isPoaAuctionAwaitingFirstBid, poaShort, shapeLiveActions } from "./shared.js?v=1f198b47f5b4";
+import { autoScroll, itemStep } from "./ui-motion.js?v=98cfad0a516b";
+import { isPoaAuctionAwaitingFirstBid, poaShort, shapeLiveActions } from "./shared.js?v=98cfad0a516b";
 export const MAX_RECENT_ACTIONS=100;
 export const MAX_EXPLORE_ACTIONS=500;
 const toMs=ts=>{const n=Number(ts);return!Number.isFinite(n)||n<=0?0:n<1e12?n*1000:n;};
@@ -14,6 +14,26 @@ function receiptActionLabel(r,name){
  }
  return(name?name+" · ":"")+"Registry action #"+r.sequence+" · "+r.status;
 }
+export function receiptDisplay(r,state,fb=""){
+ const res=r?.result,req=String(r?.requestId||"");
+ if(r?.status==="succeeded"&&res&&typeof res==="object"){
+  if(typeof res.primaryName==="string"&&res.primaryName)return{icon:"⭐",verb:"Main domain",name:res.primaryName,actor:res.signer||r.signer||"",recipient:""};
+  if(Object.prototype.hasOwnProperty.call(res,"primaryName")&&res.primaryName===null)return{icon:"⭐",verb:"Main domain cleared",name:fb,actor:r.signer||"",recipient:""};
+  if(res.metadataVersion!=null)return{icon:"🪪",verb:"Profile updated",name:fb,actor:r.signer||"",recipient:""};
+  if(res.recordsVersion!=null)return{icon:"🗂️",verb:"Records updated",name:fb,actor:r.signer||"",recipient:""};
+  if(res.offerId)return{icon:"🤝",verb:"Offer published",name:fb,actor:r.signer||"",recipient:""};
+  if(res.auctionId)return{icon:"🔨",verb:"Auction announced",name:fb,actor:r.signer||"",recipient:""};
+  if(res.deedId){
+   const d=state?.deeds?.[res.deedId],name=res.name??d?.name??fb??"",owner=res.owner||d?.owner||"";
+   if(req.startsWith("treasury-inventory-"))return{icon:"🏛️",verb:"Treasury minted",name,actor:owner||r.signer||"",recipient:""};
+   if(req.startsWith("protocol-domain-"))return{icon:"🏛️",verb:"Protocol minted",name,actor:owner||r.signer||"",recipient:""};
+   if(r.signer&&owner&&r.signer!==owner)return{icon:"🤝",verb:/^treasury-(?:settle|repair)-/.test(req)?"Handover":"Transferred",name,actor:r.signer,recipient:owner};
+   if(res.name&&(d?.parentId||String(res.name).includes(".")))return{icon:"🌱",verb:"Child purchase",name,actor:owner||r.signer||"",recipient:""};
+   return{icon:"🎉",verb:"Registered",name,actor:owner||r.signer||"",recipient:""};
+  }
+ }
+ return{icon:r?.status==="rejected"?"⚠️":"🧾",verb:r?.status==="rejected"?"Rejected":"Registry action",name:fb,actor:r?.signer||"",recipient:""};
+}
 export function recentActions(state,escrowMarket=[],limit=MAX_RECENT_ACTIONS){
  const receiptById=new Map(),seqTime=new Map();
  for(const r of Object.values(state?.receipts??{})){const id="receipt:"+(r.intentId??r.sequence);receiptById.set(id,r);if(r?.sequence!=null&&Number(r.time)>0)seqTime.set(r.sequence,Number(r.time));}
@@ -22,30 +42,30 @@ export function recentActions(state,escrowMarket=[],limit=MAX_RECENT_ACTIONS){
   seen.add(raw.id);const r=receiptById.get(raw.id);let item=raw;
   if(r?.status==="succeeded"&&typeof r.result?.primaryName==="string"&&r.result.primaryName)item={...raw,name:r.result.primaryName,label:`⭐ Main domain · ${r.result.primaryName}`};
   const rawAt=item.kind==="offer"||item.kind==="offer-active"||item.kind==="auction-upcoming"?(seqTime.get(item.sequence)??0):(item.at||seqTime.get(item.sequence)||0);
-  const actor=r?.signer||r?.result?.owner||(r?.result?.deedId&&state?.deeds?.[r.result.deedId]?.owner)||"";
-  reg.push({...item,actor,category:actionCategory(item.kind),atMs:toMs(rawAt)});
+  const m=r?receiptDisplay(r,state,item.name||""):(item.kind==="bid"?{icon:"🏷️",verb:"Bid"}:item.kind?.startsWith("auction")?{icon:"🔨",verb:item.kind==="auction-final"?"Auction closed":item.kind==="auction-upcoming"?"Auction scheduled":"Auction live"}:item.kind?.startsWith("offer")?{icon:"🤝",verb:"Offer"}:{icon:"🧾",verb:"Activity"});
+  const actor=m.actor||r?.signer||r?.result?.owner||(r?.result?.deedId&&state?.deeds?.[r.result.deedId]?.owner)||"";
+  reg.push({...item,icon:m.icon,verb:m.verb,amount:"",recipient:m.recipient||"",actor,category:actionCategory(item.kind),atMs:toMs(rawAt)});
  }
  for(const[id,r]of receiptById){
   if(seen.has(id))continue;
-  const name=r.result?.name??(typeof r.result?.primaryName==="string"?r.result.primaryName:"")??(r.result?.deedId&&state?.deeds?.[r.result.deedId]?.name)??"",at=r.time??0;
-  const actor=r.signer||r.result?.owner||(r.result?.deedId&&state?.deeds?.[r.result.deedId]?.owner)||"";
+  const fb=r.result?.name??(typeof r.result?.primaryName==="string"?r.result.primaryName:"")??(r.result?.deedId&&state?.deeds?.[r.result.deedId]?.name)??"",at=r.time??0,m=receiptDisplay(r,state,fb||"");
   const cat=r.result&&(r.result.primaryName!==undefined||r.result.metadataVersion!=null||r.result.recordsVersion!=null||r.result.deedId)?"domain":"other";
-  reg.push({id,name:name||"",sequence:r.sequence??0,at,actor,category:cat,atMs:toMs(at),label:receiptActionLabel(r,name||"")});
+  reg.push({id,name:m.name||"",sequence:r.sequence??0,at,icon:m.icon,verb:m.verb,amount:"",recipient:m.recipient||"",actor:m.actor||"",category:cat,atMs:toMs(at),label:receiptActionLabel(r,m.name||"")});
  }
- const esc=[];
+ const esc=[],mk=(id,kind,name,at,icon,verb,rawAmt,actor)=>{const amt=`${poaShort(rawAmt)} POA`;esc.push({id,kind,name,sequence:0,at,icon,verb,amount:amt,recipient:"",actor:actor||"",category:"market",atMs:toMs(at),label:`${icon} ${verb} · ${name} · ${amt}`});};
  for(const a of Array.isArray(escrowMarket)?escrowMarket:[]){
   if(!a||!a.name)continue;
   if(a.kind==="fixed"){
-   if(a.status==="COMPLETE"&&a.high){const t=Number(a.history?.at(-1)?.at||a.closes||a.createdAt||0);esc.push({id:`escrow-sold:${a.id}`,kind:"escrow-sold",name:a.name,sequence:0,at:t,actor:a.high.payer||a.seller||"",category:"market",atMs:toMs(t),label:`✅ Sold · ${a.name} · ${poaShort(a.high.amount)} POA`});}
-   else if(a.status==="OPEN"){const t=Number(a.history?.find(h=>h&&h.at)?.at||a.createdAt||0);if(t>0)esc.push({id:`escrow-listed:${a.id}`,kind:"escrow-listed",name:a.name,sequence:0,at:t,actor:a.seller||"",category:"market",atMs:toMs(t),label:`🏷️ Listed · ${a.name} · ${poaShort(a.price)} POA`});}
+   if(a.status==="COMPLETE"&&a.high)mk(`escrow-sold:${a.id}`,"escrow-sold",a.name,Number(a.history?.at(-1)?.at||a.closes||a.createdAt||0),"✅","Sold",a.high.amount,a.high.payer||a.seller);
+   else if(a.status==="OPEN"){const t=Number(a.history?.find(h=>h&&h.at)?.at||a.createdAt||0);if(t>0)mk(`escrow-listed:${a.id}`,"escrow-listed",a.name,t,"🏷️","Listed",a.price,a.seller);}
    continue;
   }
   if(isPoaAuctionAwaitingFirstBid(a))continue;
   if(a.status==="OPEN"&&a.high){
    const sh=(a.history??[]).find(h=>h&&h.amount&&/first bid|started/i.test(String(h.event??"")))??(a.history??[]).find(h=>h&&h.amount),st=Number(a.startedAt||sh?.at||a.createdAt||0),sa=sh?.amount||a.high.amount,lh=[...(a.history??[])].reverse().find(h=>h&&h.amount),lt=Number(lh?.at||st);
-   if(lh&&sa!==a.high.amount)esc.push({id:`escrow-bid:${a.id}:${a.high.amount}`,kind:"escrow-bid",name:a.name,sequence:0,at:lt,actor:a.high.payer||"",category:"market",atMs:toMs(lt),label:`🏷️ High bid · ${a.name} · ${poaShort(a.high.amount)} POA`});
-   esc.push({id:`escrow-started:${a.id}`,kind:"escrow-auction-started",name:a.name,sequence:0,at:st,actor:sh?.payer||a.high.payer||a.seller||"",category:"market",atMs:toMs(st),label:`🔥 Auction started · ${a.name} · ${poaShort(sa)} POA`});
-  }else if(a.status==="COMPLETE"&&a.high){const t=Number(a.history?.at(-1)?.at||a.closes||a.createdAt||0);esc.push({id:`escrow-complete:${a.id}`,kind:"escrow-auction-complete",name:a.name,sequence:0,at:t,actor:a.high.payer||"",category:"market",atMs:toMs(t),label:`✅ Auction won · ${a.name} · ${poaShort(a.high.amount)} POA`});}
+   if(lh&&sa!==a.high.amount)mk(`escrow-bid:${a.id}:${a.high.amount}`,"escrow-bid",a.name,lt,"🏷️","High bid",a.high.amount,a.high.payer);
+   mk(`escrow-started:${a.id}`,"escrow-auction-started",a.name,st,"🔥","Auction started",sa,sh?.payer||a.high.payer||a.seller);
+  }else if(a.status==="COMPLETE"&&a.high)mk(`escrow-complete:${a.id}`,"escrow-auction-complete",a.name,Number(a.history?.at(-1)?.at||a.closes||a.createdAt||0),"✅","Auction won",a.high.amount,a.high.payer);
  }
  const merged=[...esc,...reg].sort((a,b)=>(b.atMs-a.atMs)||((b.sequence??0)-(a.sequence??0))||String(b.id).localeCompare(String(a.id)));
  const cap=Number.isInteger(limit)&&limit>0?limit:MAX_RECENT_ACTIONS;
