@@ -1,7 +1,7 @@
 # Static public landing page
 
 The GitHub Pages site points people to the production Worker Explorer at
-https://poadomains.grok.me. Its table describes current tools only: the Explorer,
+https://poadomains.link. Its table describes current tools only: the Explorer,
 agent cart, HTTP MCP and enabled escrow. Escrow may be held by its existing
 freshness checks; My POA shows current payment availability. Native registry
 ownership and settlement remain unverified. Explorer data is not ownership proof.

@@ -167,7 +167,7 @@ test("issueReserved and provisionProtocolDomains: treasury claims escrow & treas
     },
   };
   const backupRes = await backupCommittedProfile(
-    { PROFILES: r2, BACKEND_HOST: "poadomains.grok.me" },
+    { PROFILES: r2, BACKEND_HOST: "poadomains.link" },
     provisioned[1].packet,
     provisioned[1].receipt,
   );

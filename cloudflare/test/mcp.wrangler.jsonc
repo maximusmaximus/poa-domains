@@ -20,7 +20,7 @@
     },
   ],
   "vars": {
-    "PUBLIC_EXPLORER_URL": "https://poadomains.grok.me",
+    "PUBLIC_EXPLORER_URL": "https://poadomains.link",
     "BACKEND_HOST": "poadomains-registry.maxinfeld-artshow.workers.dev",
     "CONTRACT_CONFIG": "",
   },

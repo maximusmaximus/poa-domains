@@ -73,15 +73,15 @@ test("terms worker endpoints verify native poa1 and fixture ed25519 signed agree
   const nowSec = 1_795_550_000;
   const nowMs = nowSec * 1000;
   const env = {
-    BACKEND_HOST: "poadomains.grok.me",
-    PUBLIC_EXPLORER_URL: "https://poadomains.grok.me",
+    BACKEND_HOST: "poadomains.link",
+    PUBLIC_EXPLORER_URL: "https://poadomains.link",
     PROFILES: r2,
     MCP_RATE_LIMITER: { limit: async () => ({ success: true }) },
   };
 
   // GET & HEAD /v1/terms
   const infoRes = await termsWorker.handleTermsInfo(
-    new Request("https://poadomains.grok.me/v1/terms"),
+    new Request("https://poadomains.link/v1/terms"),
     env,
     { nowSec: () => nowSec },
   );
@@ -89,11 +89,11 @@ test("terms worker endpoints verify native poa1 and fixture ed25519 signed agree
   const info = await infoRes.json();
   assert.equal(info.termsVersion, TERMS_VERSION);
   assert.equal(info.termsHash, TERMS_HASH);
-  assert.equal(info.termsUrl, "https://poadomains.grok.me/terms");
-  assert.equal((await termsWorker.handleTermsInfo(new Request("https://poadomains.grok.me/v1/terms", { method: "HEAD" }), env)).status, 200);
+  assert.equal(info.termsUrl, "https://poadomains.link/terms");
+  assert.equal((await termsWorker.handleTermsInfo(new Request("https://poadomains.link/v1/terms", { method: "HEAD" }), env)).status, 200);
   assert.equal((await termsWorker.handleTermsInfo(new Request("https://evil.invalid/v1/terms"), env)).status, 403);
-  assert.equal((await termsWorker.handleTermsInfo(new Request("https://poadomains.grok.me/v1/terms", { method: "POST" }), env)).status, 405);
-  assert.equal((await termsWorker.handleTermsInfo(new Request("https://poadomains.grok.me/v1/terms?x=1"), env)).status, 400);
+  assert.equal((await termsWorker.handleTermsInfo(new Request("https://poadomains.link/v1/terms", { method: "POST" }), env)).status, 405);
+  assert.equal((await termsWorker.handleTermsInfo(new Request("https://poadomains.link/v1/terms?x=1"), env)).status, 400);
 
   // Sign with a real native poa1... Ed25519 key
   const { privateKey: nativeKey } = generateKeyPairSync("ed25519");
@@ -101,17 +101,17 @@ test("terms worker endpoints verify native poa1 and fixture ed25519 signed agree
 
   // Status before agreement -> agreed: false
   const beforeRes = await termsWorker.handleTermsStatus(
-    new Request(`https://poadomains.grok.me/v1/terms/status?actor=${encodeURIComponent(poaActor)}`),
+    new Request(`https://poadomains.link/v1/terms/status?actor=${encodeURIComponent(poaActor)}`),
     env,
     store,
   );
   assert.equal(beforeRes.status, 200);
   assert.equal((await beforeRes.json()).agreed, false);
-  assert.equal((await termsWorker.handleTermsStatus(new Request(`https://poadomains.grok.me/v1/terms/status?actor=${encodeURIComponent(poaActor)}`, { method: "HEAD" }), env, store)).status, 200);
+  assert.equal((await termsWorker.handleTermsStatus(new Request(`https://poadomains.link/v1/terms/status?actor=${encodeURIComponent(poaActor)}`, { method: "HEAD" }), env, store)).status, 200);
   assert.equal((await termsWorker.handleTermsStatus(new Request("https://evil.invalid/v1/terms/status?actor=" + poaActor), env, store)).status, 403);
-  assert.equal((await termsWorker.handleTermsStatus(new Request("https://poadomains.grok.me/v1/terms/status?actor=" + poaActor, { method: "POST" }), env, store)).status, 405);
-  assert.equal((await termsWorker.handleTermsStatus(new Request("https://poadomains.grok.me/v1/terms/status"), env, store)).status, 400);
-  assert.equal((await termsWorker.handleTermsStatus(new Request("https://poadomains.grok.me/v1/terms/status?actor=bad"), env, store)).status, 400);
+  assert.equal((await termsWorker.handleTermsStatus(new Request("https://poadomains.link/v1/terms/status?actor=" + poaActor, { method: "POST" }), env, store)).status, 405);
+  assert.equal((await termsWorker.handleTermsStatus(new Request("https://poadomains.link/v1/terms/status"), env, store)).status, 400);
+  assert.equal((await termsWorker.handleTermsStatus(new Request("https://poadomains.link/v1/terms/status?actor=bad"), env, store)).status, 400);
 
   const statement = {
     domain: TERMS_DOMAIN,
@@ -126,7 +126,7 @@ test("terms worker endpoints verify native poa1 and fixture ed25519 signed agree
 
   // Submit signed agreement -> 201 + R2 archive
   const agreeRes = await termsWorker.handleTermsAgree(
-    new Request("https://poadomains.grok.me/v1/terms/agree", {
+    new Request("https://poadomains.link/v1/terms/agree", {
       method: "POST",
       headers: { "content-type": "application/json", "cf-connecting-ip": "198.51.100.9" },
       body: JSON.stringify(signed),
@@ -144,7 +144,7 @@ test("terms worker endpoints verify native poa1 and fixture ed25519 signed agree
 
   // Status after agreement -> agreed: true
   const afterRes = await termsWorker.handleTermsStatus(
-    new Request(`https://poadomains.grok.me/v1/terms/status?actor=${encodeURIComponent(poaActor)}`),
+    new Request(`https://poadomains.link/v1/terms/status?actor=${encodeURIComponent(poaActor)}`),
     env,
     store,
   );
@@ -154,9 +154,9 @@ test("terms worker endpoints verify native poa1 and fixture ed25519 signed agree
 
   // Idempotent replay -> 200 alreadyAgreed: true
   const replayRes = await termsWorker.handleTermsAgree(
-    new Request("https://poadomains.grok.me/v1/terms/agree", {
+    new Request("https://poadomains.link/v1/terms/agree", {
       method: "POST",
-      headers: { "content-type": "application/json", origin: "https://poadomains.grok.me" },
+      headers: { "content-type": "application/json", origin: "https://poadomains.link" },
       body: JSON.stringify(signed),
     }),
     env,
@@ -185,7 +185,7 @@ test("terms worker endpoints verify native poa1 and fixture ed25519 signed agree
   assert.throws(() => signTermsAgreement(statement, fixKey), /TERMS_SIGNATURE_INVALID/);
 
   // Invalid signature, version mismatch, expired, bad inputs & HTTP bounds
-  const post = (body, hdrs = {}, url = "https://poadomains.grok.me/v1/terms/agree", envOver = env) =>
+  const post = (body, hdrs = {}, url = "https://poadomains.link/v1/terms/agree", envOver = env) =>
     termsWorker.handleTermsAgree(
       new Request(url, {
         method: "POST",
@@ -212,8 +212,8 @@ test("terms worker endpoints verify native poa1 and fixture ed25519 signed agree
   assert.equal((await expRes.json()).code, "TERMS_EXPIRED");
 
   assert.equal((await post(signed, {}, "https://evil.invalid/v1/terms/agree")).status, 403);
-  assert.equal((await termsWorker.handleTermsAgree(new Request("https://poadomains.grok.me/v1/terms/agree", { method: "GET" }), env, store)).status, 405);
-  assert.equal((await post(signed, {}, "https://poadomains.grok.me/v1/terms/agree?a=1")).status, 400);
+  assert.equal((await termsWorker.handleTermsAgree(new Request("https://poadomains.link/v1/terms/agree", { method: "GET" }), env, store)).status, 405);
+  assert.equal((await post(signed, {}, "https://poadomains.link/v1/terms/agree?a=1")).status, 400);
   assert.equal((await post(signed, { "content-encoding": "gzip" })).status, 400);
   assert.equal((await post(signed, { origin: "https://evil.invalid" })).status, 403);
   assert.equal((await post(signed, { origin: "not a url" })).status, 403);
@@ -223,8 +223,8 @@ test("terms worker endpoints verify native poa1 and fixture ed25519 signed agree
   assert.equal((await post("")).status, 400);
   assert.equal((await post("{bad")).status, 400);
   assert.equal((await post({ ...signed, extra: 1 })).status, 400);
-  assert.equal((await post(signed, {}, "https://poadomains.grok.me/v1/terms/agree", { ...env, MCP_RATE_LIMITER: { limit: async () => ({ success: false }) } })).status, 429);
-  assert.equal((await post(signed, {}, "https://poadomains.grok.me/v1/terms/agree", { ...env, MCP_RATE_LIMITER: { limit: async () => { throw Error("rl"); } } })).status, 503);
+  assert.equal((await post(signed, {}, "https://poadomains.link/v1/terms/agree", { ...env, MCP_RATE_LIMITER: { limit: async () => ({ success: false }) } })).status, 429);
+  assert.equal((await post(signed, {}, "https://poadomains.link/v1/terms/agree", { ...env, MCP_RATE_LIMITER: { limit: async () => { throw Error("rl"); } } })).status, 503);
 });
 
 test("MCP get_terms and agree_terms work end-to-end against reference server and UI helpers persist versioned agreement", async () => {
@@ -279,7 +279,7 @@ test("MCP get_terms and agree_terms work end-to-end against reference server and
     saveTermsAgreement(storage, actor);
     assert.equal(hasAgreedToTerms(storage), true);
     assert.equal(JSON.parse(mem.get(TERMS_AGREED_KEY)).actor, actor);
-    const prompt = buildAgentTermsPrompt({ actor, endpointUrl: "https://poadomains.grok.me" });
+    const prompt = buildAgentTermsPrompt({ actor, endpointUrl: "https://poadomains.link" });
     assert.ok(prompt.includes(TERMS_VERSION) && prompt.includes(TERMS_HASH) && prompt.includes(actor));
     assert.ok(buildTermsInfo().summary.includes("custodial POA escrow"));
   } finally {

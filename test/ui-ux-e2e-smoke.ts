@@ -247,7 +247,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   });
   assert.equal(xeroFontReady, true, `${browserName}: Xero Emoji font loaded`);
 
-  // Verify ecosystem navigation & poadomains.grok.me links are rendered
+  // Verify ecosystem navigation & poadomains.link links are rendered
   assert.ok(
     (await page
       .locator('#siteFooter a[href="https://github.com/maximusmaximus/poa-domains"]')
@@ -860,9 +860,9 @@ async function runPublicProductionPagesMultiBrowserSmoke(prodUrl: string) {
       );
       assert.ok(
         (await page
-          .locator('a.hero-cta[href="https://poadomains.grok.me"]')
+          .locator('a.hero-cta[href="https://poadomains.link"]')
           .count()) >= 1,
-        `${name}: public GitHub Pages mirror links to poadomains.grok.me`,
+        `${name}: public GitHub Pages mirror links to poadomains.link`,
       );
       assert.equal((await page.locator(".footer-credit").innerText()).replace(/\s+/g," ").trim(),
         "made with ❤️ in SF by Tesselate Army | maxi.grok.me", `${name}: current landing footer`);

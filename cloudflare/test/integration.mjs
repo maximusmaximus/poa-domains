@@ -30,7 +30,7 @@ const post = packet => api("/v1/intents", { method: "POST", headers: { "content-
 async function start(label) {
   mkdirSync(resolve(root,persist), {recursive:true,mode:0o700}); chmodSync(resolve(root,persist),0o700);
   const log = openSync(resolve(ev, `${label}.log`), "w", 0o600);
-  server = spawn(process.execPath, ["node_modules/wrangler/bin/wrangler.js", "dev", "--local", "--local-upstream", "poadomains.grok.me", "--ip", "127.0.0.1", "--port", String(port), "--persist-to", persist],
+  server = spawn(process.execPath, ["node_modules/wrangler/bin/wrangler.js", "dev", "--local", "--local-upstream", "poadomains.link", "--ip", "127.0.0.1", "--port", String(port), "--persist-to", persist],
     { cwd: root, env: { ...process.env, WRANGLER_SEND_METRICS: "false" }, detached: true, stdio: ["ignore", log, log] });
   closeSync(log);
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -61,7 +61,7 @@ try {
   check("capabilities", () => {
     assert.equal(cap.emojiAliases, 5216); assert.equal(cap.reservedCount, 655);
     assert.equal(cap.assets.POA.premiumReserve, "100000"); assert.equal(cap.assets.POA.standardReserve, "1000");
-    assert.equal(cap.newAccountRegistryUnits, "10000000"); assert.equal(cap.onboardingGrantPoa, "10000000"); assert.equal(cap.publicExplorerUrl, "https://poadomains.grok.me");
+    assert.equal(cap.newAccountRegistryUnits, "10000000"); assert.equal(cap.onboardingGrantPoa, "10000000"); assert.equal(cap.publicExplorerUrl, "https://poadomains.link");
     assert.equal(cap.githubMirrorUrl, "https://maximusmaximus.github.io/poa-domains/"); assert.equal(cap.chainId, "poa-mainnet-1");
     assert.equal(cap.revision, "poa-mainnet-v1"); assert.equal(cap.normalizationHash, EMOJI17_NORMALIZATION_HASH);
     assert.equal(Object.keys(cap.actions).length, 18); assert.equal(cap.durability, "durable-object-sqlite");
@@ -127,7 +127,7 @@ try {
   const productionHost = await api("/v1/capabilities");
   check("production host capabilities retain non-native registry disclosure", () => {
     assert.equal(productionHost.status, 200); assert.equal(productionHost.body.livePoA, false);
-    assert.equal(productionHost.body.publicExplorerUrl, "https://poadomains.grok.me");
+    assert.equal(productionHost.body.publicExplorerUrl, "https://poadomains.link");
   });
   const initial = (await api("/v1/state")).body; save("state-initial.json", initial);
   check("seeded showcase domains, auctions, standing child offer, resale and records", () => {
@@ -165,7 +165,7 @@ try {
   const rejected = await post(signBody(rejectBody,[privateKey]));
   check("signed business rejection persists bookkeeping", () => { assert.equal(rejected.status,200); assert.equal(rejected.body.status,"rejected"); assert.equal(rejected.body.code,"NOT_SELLER"); });
   for (const [name,headers,status,code] of [
-    ["browser Origin blocked",{"content-type":"application/json",origin:"https://poadomains.grok.me"},400,"BROWSER_WRITES_DISABLED"],
+    ["browser Origin blocked",{"content-type":"application/json",origin:"https://poadomains.link"},400,"BROWSER_WRITES_DISABLED"],
     ["browser fetch metadata blocked",{"content-type":"application/json","sec-fetch-site":"same-origin"},400,"BROWSER_WRITES_DISABLED"],
     ["non-exact content type blocked",{"content-type":"application/json; charset=utf-8"},400,"CONTENT_TYPE"],
   ]) { const value=await api("/v1/intents",{method:"POST",headers,body:JSON.stringify(packet)}); check(name,()=>{assert.equal(value.status,status);assert.equal(value.body.code,code);}); }
@@ -178,7 +178,7 @@ try {
     assert.equal(termsInfo.status, 200);
     assert.equal(termsInfo.body.termsVersion, TERMS_VERSION);
     assert.equal(termsInfo.body.termsHash, TERMS_HASH);
-    assert.equal(termsInfo.body.termsUrl, "https://poadomains.grok.me/terms");
+    assert.equal(termsInfo.body.termsUrl, "https://poadomains.link/terms");
   });
   const unknown = await api(`/v1/receipts/${"f".repeat(64)}`);
   check("unknown receipt remains unknown",()=>{assert.equal(unknown.status,404);assert.equal(unknown.body.code,"UNKNOWN_OUTCOME");});

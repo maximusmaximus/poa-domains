@@ -520,7 +520,7 @@ export function cartParamsForSigner(item, signer) {
  return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
- validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=6392e78aa9c6";
+ validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=512106177d03";
 const b58Alphabet =
  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -2240,7 +2240,7 @@ export function profileImageMediaPath(image, domainName = null) {
  return null;
 }
 export function buildProfileUpdatePrompt({ name, deed, metadata, endpointUrl }) {
- const endpoint = endpointUrl || "https://poadomains.grok.me";
+ const endpoint = endpointUrl || "https://poadomains.link";
  const params = {
   name,
   expectedDeedId: deed.id,
@@ -2361,7 +2361,7 @@ export function resolveTransferRecipient(state, rawInput, { currentOwner = "", c
  return { ok: true, recipient, source, domainName: deed.name, domainOwner: deed.owner };
 }
 export function buildSetPrimaryPrompt({ name, deed = null, signer, endpointUrl }) {
- const endpoint = endpointUrl || "https://poadomains.grok.me";
+ const endpoint = endpointUrl || "https://poadomains.link";
  const clearing = name === null;
  const effectiveSigner = signer || deed?.owner || "";
  const params = clearing
@@ -2391,7 +2391,7 @@ export function buildSetPrimaryPrompt({ name, deed = null, signer, endpointUrl }
  ].join("\n");
 }
 export function buildTransferDomainPrompt({ name, deed, recipient, resolvedFromDomain = null, resolutionSource = "address", isPrimary = false, endpointUrl }) {
- const endpoint = endpointUrl || "https://poadomains.grok.me";
+ const endpoint = endpointUrl || "https://poadomains.link";
  const params = {
   name,
   expectedDeedId: deed.id,
@@ -2449,7 +2449,7 @@ export function saveTermsAgreement(storage, actor = null) {
  }
 }
 export function buildAgentTermsPrompt({ actor, endpointUrl, chainId = "poa-mainnet-1", nowSec = Math.floor(Date.now() / 1000) } = {}) {
- const endpoint = (endpointUrl || "https://poadomains.grok.me").replace(/\/+$/, "");
+ const endpoint = (endpointUrl || "https://poadomains.link").replace(/\/+$/, "");
  const statement = {
   domain: TERMS_DOMAIN,
   chainId,

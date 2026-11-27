@@ -243,9 +243,9 @@ separately approved production deployment; see [MCP](MCP.md).
 
 ## Discovery
 
-The Worker publishes [OpenAPI 3.1](https://poadomains.grok.me/openapi.json),
-[agent card](https://poadomains.grok.me/.well-known/agent.json) and
-[llms.txt](https://poadomains.grok.me/llms.txt). See [schemas, limits and safety](DISCOVERY.md).
+The Worker publishes [OpenAPI 3.1](https://poadomains.link/openapi.json),
+[agent card](https://poadomains.link/.well-known/agent.json) and
+[llms.txt](https://poadomains.link/llms.txt). See [schemas, limits and safety](DISCOVERY.md).
 Pages mirrors these documents but does not host their API.
 
 

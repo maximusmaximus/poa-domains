@@ -6,7 +6,7 @@
   "alias": { "#poa-unicode-data": "../unicode-data.ts" },
   "rules": [{ "type": "Text", "globs": ["**/*.txt"], "fallthrough": true }],
   "vars": {
-    "PUBLIC_EXPLORER_URL": "https://poadomains.grok.me",
+    "PUBLIC_EXPLORER_URL": "https://poadomains.link",
     "BACKEND_HOST": "poadomains-registry.maxinfeld-artshow.workers.dev",
   },
 }

@@ -18,7 +18,7 @@ Escrow has separate live policy variables and existing Cloudflare secret binding
 never redeploy the committed disabled defaults over those live values. See the
 [reviewed deployment gate](worker-deploy.md). The existing Worker
 `artshow-crypto-cron` is untouched. Configured public explorer URL:
-`https://poadomains.grok.me`.
+`https://poadomains.link`.
 
 ## Design
 
@@ -47,8 +47,8 @@ never redeploy the committed disabled defaults over those live values. See the
   caller gets an unknown outcome and must query its original receipt, not sign a new intent.
 - Fixed-size bounded HTTP decoding, exact content type, browser-write rejection and
   no-store dynamic responses are retained. Signed requests are not retried by this adapter.
-- The Worker and CLI allowlist `poadomains.grok.me` and the exact workers.dev hostname
-  above (not arbitrary workers.dev); the existing Grok Build `.grok.me` support remains.
+- The Worker and CLI allowlist `poadomains.link` and the exact workers.dev hostname
+  above (not arbitrary workers.dev). The retired `poadomains.grok.me` / `*.grok.me` hosts are no longer accepted.
 
 ## Local verification
 
@@ -87,15 +87,14 @@ Do not publish or import local private key data from `.local-cf-state/`.
 
 ## Explorer host
 
-`PUBLIC_EXPLORER_URL` is `https://poadomains.grok.me`. Keep the existing Grok Build
-proxy as the front door: a read-only zone lookup on November 9, 2026 found no
-`grok.me` zone in the configured account, so no failing `custom_domain` route is added.
-Direct domain binding needs Max or Grok Build. The stateless full-site proxy must forward root HTML, app/shared JS,
-style, icon, config, font, `/healthz` and all `/v1/*`; preserve raw POST bytes, content type,
-query strings, statuses and no-store headers; preserve Origin and Sec-Fetch-Site; strip
-unrelated cookies/authorization; never cache API state/receipts, retry POSTs, follow
-redirects for signed writes, accept a user-controlled upstream, or fall back to another
-registry. This Worker does not enforce a shared proxy-token header.
+`PUBLIC_EXPLORER_URL` is `https://poadomains.link`. The `poadomains.link` zone lives in the
+configured account and is bound to `poadomains-registry` as a Cloudflare Custom Domain via
+`routes: [{ pattern: "poadomains.link", custom_domain: true }]` in `wrangler.jsonc`. The zone
+uses Full (strict) TLS, Always Use HTTPS, minimum TLS 1.2 and Automatic HTTPS Rewrites;
+`www.poadomains.link` is a proxied placeholder record with a 301 Single Redirect to the apex
+(path and query preserved). There is no intermediate proxy: the Worker serves root HTML,
+assets, `/healthz`, `/mcp`, discovery and all `/v1/*` directly. The previous Grok Build
+`poadomains.grok.me` front door is retired and no longer in the Worker host allowlist.
 
 ## Current limits
 

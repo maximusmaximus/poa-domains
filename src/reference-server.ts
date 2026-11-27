@@ -41,7 +41,6 @@ export async function startReferenceServer(
   const allowedHostnames = new Set<string>([
     "127.0.0.1",
     "localhost",
-    "poadomains.grok.me",
     "poadomains.link",
     ...(options.allowedHosts ?? []),
   ]);
@@ -70,9 +69,7 @@ export async function startReferenceServer(
       need(
         Boolean(
           hostname &&
-          (allowedHostnames.has(hostname) ||
-            hostname === "grok.me" ||
-            hostname.endsWith(".grok.me")),
+          allowedHostnames.has(hostname),
         ),
         "HOST",
       );

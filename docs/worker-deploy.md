@@ -90,9 +90,9 @@ the guard. External operators must likewise avoid unguarded deployments.
 
 ## Domain and verification
 
-The connected account has no `grok.me` zone. Keep the existing Grok Build proxy;
-there is no `custom_domain` route that would fail deployment. Domain binding
-needs Max or Grok Build. The Worker and CLI accept the production host and local
+The production host `poadomains.link` is a zone in the connected account and is bound as
+a Custom Domain (`routes: [{ pattern: "poadomains.link", custom_domain: true }]`); it is the
+only route in the deploy plan. The Worker and CLI accept the production host and local
 workerd integration tests cover that Host, `/d/` and `/p/`, without production writes.
 
 `npm run cf:dry-run` uses the escrow-preserving config and performs no upload.
@@ -149,11 +149,9 @@ defaults. It does not alter the Durable Object's pause/state or escrow wallet.
 Only the existing secret binding **types** are checked; no secret value is read.
 
 The first MCP deploy also adds `MCP_RATE_LIMITER` (namespace `2026110908`,
-60 requests per minute per connecting IP). Keep the existing Grok Build front
-door (there is no grok.me zone/custom-domain binding here), confirm it passes
-POST/body/protocol/Accept headers and trusted client-IP behavior, and verify the
-remote handshake/security guards **after** the separately approved deployment.
-Merging later source does not configure the proxy, grant approval or deploy it.
+60 requests per minute per connecting IP). `poadomains.link` is served directly by the
+Worker Custom Domain (no intermediate proxy); verify the remote handshake/security guards
+**after** each gated deployment. Merging source does not grant approval or deploy it.
 
 ## Pin transition (repin)
 

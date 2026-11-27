@@ -1,12 +1,12 @@
-import { registryUnit } from "./shared.js?v=6392e78aa9c6";
-import { actionLabel } from "./ui-copy.js?v=6392e78aa9c6";
+import { registryUnit } from "./shared.js?v=512106177d03";
+import { actionLabel } from "./ui-copy.js?v=512106177d03";
 /** One unsigned Cart Handoff v2 object; text, clipboard and download derive from it. */
 import {
  canonical,
  safeObject,
  validPrincipal,
  cartParamsForSigner,
-} from "./shared.js?v=6392e78aa9c6";
+} from "./shared.js?v=512106177d03";
 export const CART_SCHEMA_VERSION = "poa-domains.agent-cart.v2";
 export const CART_ILLUSTRATION_CONTEXT = "static-synthetic-illustration";
 export const CART_ILLUSTRATION_CONTEXT_DEPRECATED = "static-synthetic-demo";
@@ -49,7 +49,7 @@ const operationSchema = obj({
 });
 export const AGENT_CART_SCHEMA = {
  $schema: "https://json-schema.org/draft/2020-12/schema",
- $id: "https://poadomains.grok.me/agent-cart-v2.schema.json",
+ $id: "https://poadomains.link/agent-cart-v2.schema.json",
  title:
   "PoA Domains Agent Cart Handoff v2 (unsigned plan, never a signed packet or spending approval)",
  ...obj({
@@ -81,7 +81,7 @@ export const AGENT_CART_SCHEMA = {
   signerPrincipal: { anyOf: [{ type: "string" }, { type: "null" }] },
   defaults: obj({ bidBeneficiary: { const: "signer" } }),
   mcp: obj({
-   url: { const: "https://poadomains.grok.me/mcp" },
+   url: { const: "https://poadomains.link/mcp" },
    transport: { const: "Streamable HTTP" },
    protocolVersion: { const: "2025-11-25" },
    identityMustMatch: { const: true },
@@ -419,7 +419,7 @@ export async function buildAgentCartHandoff(
   signerPrincipal: signer,
   defaults: { bidBeneficiary: "signer" },
   mcp: {
-   url: "https://poadomains.grok.me/mcp",
+   url: "https://poadomains.link/mcp",
    transport: "Streamable HTTP",
    protocolVersion: "2025-11-25",
    identityMustMatch: true,
@@ -474,7 +474,7 @@ export async function validateAgentCartHandoff(data) {
   if (!Number.isSafeInteger(data[key]) || data[key] < 0)
    throw Error("Invalid cart time or sequence");
  if (
-  data.mcp?.url !== "https://poadomains.grok.me/mcp" ||
+  data.mcp?.url !== "https://poadomains.link/mcp" ||
   data.mcp?.identityMustMatch !== true ||
   data.mcp?.protocolVersion !== "2025-11-25"
  )

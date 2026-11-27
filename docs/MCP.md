@@ -12,7 +12,7 @@ first release. No escrow signing/account/reconcile action was performed.
 
 ## Registry profile
 
-The live Worker endpoint is `https://poadomains.grok.me/mcp`.
+The live Worker endpoint is `https://poadomains.link/mcp`.
 The local `reference-cli.js mcp --url ORIGIN` stdio profile uses the same core,
 tool definitions, schemas, errors, resources and prompts. Native-only `cli.js mcp`
 uses that protocol core but **retains only** `registry_status`, `native_network`

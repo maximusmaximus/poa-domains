@@ -48,7 +48,7 @@ const child = spawn(
     "cloudflare/test/discovery.wrangler.jsonc",
     "--local",
     "--local-upstream",
-    "poadomains.grok.me",
+    "poadomains.link",
     "--ip",
     "127.0.0.1",
     "--port",

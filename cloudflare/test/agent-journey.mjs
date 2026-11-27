@@ -22,7 +22,7 @@ const expectedIdentity=capabilities(contractEngine(config));
 function pinIdentity(cap){for(const key of ['revision','chainId','genesisHash','registryId','policyHash','normalizationHash'])assert.equal(cap[key],expectedIdentity[key],'LOCAL_FIXTURE_IDENTITY');}
 const port=18898,base=`http://127.0.0.1:${port}`,target=base+'/mcp';
 function localTarget(url){const u=new URL(url);assert.equal(u.origin,base,'LOOPBACK_ONLY');assert.equal(u.pathname,'/mcp','MCP_ONLY');return u.href;}
-assert.throws(()=>localTarget('https://poadomains.grok.me/mcp'),/LOOPBACK_ONLY/);
+assert.throws(()=>localTarget('https://poadomains.link/mcp'),/LOOPBACK_ONLY/);
 assert.throws(()=>localTarget(base+'/v1/intents'),/MCP_ONLY/);
 const scratch=mkdtempSync(join(tmpdir(),'poa-agent-journey-')),logPath=join(scratch,'workerd.log'),log=openSync(logPath,'w',0o600);
 const child=spawn(process.execPath,['node_modules/wrangler/bin/wrangler.js','dev','--config','cloudflare/test/agent-journey.wrangler.jsonc','--local','--ip','127.0.0.1','--port',String(port),'--inspector-port','0','--persist-to',join(scratch,'state'),'--var',`CONTRACT_CONFIG:${JSON.stringify(config)}`],{detached:true,stdio:['ignore',log,log],env:{HOME:process.env.HOME,PATH:process.env.PATH,LANG:'C.UTF-8',WRANGLER_SEND_METRICS:'false',...(process.env.NODE_OPTIONS?{NODE_OPTIONS:process.env.NODE_OPTIONS,NODE_V8_COVERAGE:process.env.NODE_V8_COVERAGE}:{})}});closeSync(log);
@@ -50,7 +50,7 @@ async function committed(p){await preview(p);const receipt=await tool('submit_in
 async function validateCart(cart){
  await validateAgentCartHandoff(cart); // request IDs, exact per-item and whole-cart caps
  const cap=await tool('read_capabilities');pinIdentity(cap);for(const key of ['revision','chainId','genesisHash','registryId','policyHash','normalizationHash'])assert.equal(cart[key],cap[key],'REGISTRY_IDENTITY');
- assert.equal(cart.endpoint,base);assert.equal(cart.mcp.url,'https://poadomains.grok.me/mcp'); // production discovery is NOT followed
+ assert.equal(cart.endpoint,base);assert.equal(cart.mcp.url,'https://poadomains.link/mcp'); // production discovery is NOT followed
  const snapshot=await state();if(snapshot.state.sequence===cart.sequence)assert.equal(snapshot.stateHash,cart.stateHash);
 }
 async function fromCart(cart,{loseBid=false}={}){

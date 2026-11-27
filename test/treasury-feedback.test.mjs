@@ -82,11 +82,11 @@ test("treasury reader sums escrow + treasury balances, builds POAScan links, cac
     return new Response("not found", { status: 404 });
   };
   const reader = treasury.createTreasuryReader({ fetch: mockFetch, now: () => clock });
-  const env = { BACKEND_HOST: "poadomains.grok.me" };
+  const env = { BACKEND_HOST: "poadomains.link" };
   const addrs = async () => ({ escrow: ESCROW_ADDR, treasury: TREASURY_ADDR });
 
   const r1 = await treasury.handleTreasuryRequest(
-    new Request("https://poadomains.grok.me/v1/treasury"),
+    new Request("https://poadomains.link/v1/treasury"),
     env,
     addrs,
     reader,
@@ -107,7 +107,7 @@ test("treasury reader sums escrow + treasury balances, builds POAScan links, cac
   // Within 60s cache window -> zero extra upstream fetches
   clock += 10_000;
   const r2 = await treasury.handleTreasuryRequest(
-    new Request("https://poadomains.grok.me/v1/treasury"),
+    new Request("https://poadomains.link/v1/treasury"),
     env,
     addrs,
     reader,
@@ -119,7 +119,7 @@ test("treasury reader sums escrow + treasury balances, builds POAScan links, cac
   clock += 65_000;
   mode = "busy";
   const r3 = await treasury.handleTreasuryRequest(
-    new Request("https://poadomains.grok.me/v1/treasury"),
+    new Request("https://poadomains.link/v1/treasury"),
     env,
     addrs,
     reader,
@@ -130,14 +130,14 @@ test("treasury reader sums escrow + treasury balances, builds POAScan links, cac
 
   // HEAD works, POST returns 405
   const rHead = await treasury.handleTreasuryRequest(
-    new Request("https://poadomains.grok.me/v1/treasury", { method: "HEAD" }),
+    new Request("https://poadomains.link/v1/treasury", { method: "HEAD" }),
     env,
     addrs,
     reader,
   );
   assert.equal(rHead.status, 200);
   const rPost = await treasury.handleTreasuryRequest(
-    new Request("https://poadomains.grok.me/v1/treasury", { method: "POST" }),
+    new Request("https://poadomains.link/v1/treasury", { method: "POST" }),
     env,
     addrs,
     reader,
@@ -158,8 +158,8 @@ test("feedback challenge renders CSP-safe SVG, enforces anti-abuse guards, sanit
     );
   };
   const env = {
-    BACKEND_HOST: "poadomains.grok.me",
-    PUBLIC_EXPLORER_URL: "https://poadomains.grok.me",
+    BACKEND_HOST: "poadomains.link",
+    PUBLIC_EXPLORER_URL: "https://poadomains.link",
     FEEDBACK_GITHUB_TOKEN: "test-gh-token-for-unit-only",
     PROFILES: r2,
     MCP_RATE_LIMITER: { limit: async () => ({ success: true }) },
@@ -167,8 +167,8 @@ test("feedback challenge renders CSP-safe SVG, enforces anti-abuse guards, sanit
 
   async function issueChallenge() {
     const chRes = await feedback.handleFeedbackChallenge(
-      new Request("https://poadomains.grok.me/v1/feedback/challenge", {
-        headers: { origin: "https://poadomains.grok.me", "cf-connecting-ip": "198.51.100.7" },
+      new Request("https://poadomains.link/v1/feedback/challenge", {
+        headers: { origin: "https://poadomains.link", "cf-connecting-ip": "198.51.100.7" },
       }),
       env,
       store,
@@ -177,7 +177,7 @@ test("feedback challenge renders CSP-safe SVG, enforces anti-abuse guards, sanit
     assert.equal(chRes.status, 200);
     const ch = await chRes.json();
     const svgRes = await feedback.handleFeedbackCaptcha(
-      new Request(`https://poadomains.grok.me${ch.captchaUrl}`),
+      new Request(`https://poadomains.link${ch.captchaUrl}`),
       env,
       store,
       ch.challengeId,
@@ -196,11 +196,11 @@ test("feedback challenge renders CSP-safe SVG, enforces anti-abuse guards, sanit
   const c1 = await issueChallenge();
   const nonce1 = await solvePowLocal(c1.ch.powSalt, c1.ch.powBits);
   const fastRes = await feedback.handleFeedbackSubmit(
-    new Request("https://poadomains.grok.me/v1/feedback", {
+    new Request("https://poadomains.link/v1/feedback", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        origin: "https://poadomains.grok.me",
+        origin: "https://poadomains.link",
         "cf-connecting-ip": "198.51.100.7",
       },
       body: JSON.stringify({
@@ -223,11 +223,11 @@ test("feedback challenge renders CSP-safe SVG, enforces anti-abuse guards, sanit
   // 2. Honeypot filled -> rejected
   clock += 4000;
   const hpRes = await feedback.handleFeedbackSubmit(
-    new Request("https://poadomains.grok.me/v1/feedback", {
+    new Request("https://poadomains.link/v1/feedback", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        origin: "https://poadomains.grok.me",
+        origin: "https://poadomains.link",
         "cf-connecting-ip": "198.51.100.7",
       },
       body: JSON.stringify({
@@ -249,11 +249,11 @@ test("feedback challenge renders CSP-safe SVG, enforces anti-abuse guards, sanit
 
   // 3. Secret-like text rejected
   const secretRes = await feedback.handleFeedbackSubmit(
-    new Request("https://poadomains.grok.me/v1/feedback", {
+    new Request("https://poadomains.link/v1/feedback", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        origin: "https://poadomains.grok.me",
+        origin: "https://poadomains.link",
         "cf-connecting-ip": "198.51.100.7",
       },
       body: JSON.stringify({
@@ -274,11 +274,11 @@ test("feedback challenge renders CSP-safe SVG, enforces anti-abuse guards, sanit
 
   // 4. Wrong CAPTCHA burns challenge (one guess only)
   const wrongRes = await feedback.handleFeedbackSubmit(
-    new Request("https://poadomains.grok.me/v1/feedback", {
+    new Request("https://poadomains.link/v1/feedback", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        origin: "https://poadomains.grok.me",
+        origin: "https://poadomains.link",
         "cf-connecting-ip": "198.51.100.7",
       },
       body: JSON.stringify({
@@ -298,11 +298,11 @@ test("feedback challenge renders CSP-safe SVG, enforces anti-abuse guards, sanit
   assert.equal((await wrongRes.json()).code, "FEEDBACK_CAPTCHA_INVALID");
   // Reusing same challengeId with the right code is now expired/burned
   const retrySame = await feedback.handleFeedbackSubmit(
-    new Request("https://poadomains.grok.me/v1/feedback", {
+    new Request("https://poadomains.link/v1/feedback", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        origin: "https://poadomains.grok.me",
+        origin: "https://poadomains.link",
         "cf-connecting-ip": "198.51.100.7",
       },
       body: JSON.stringify({
@@ -326,11 +326,11 @@ test("feedback challenge renders CSP-safe SVG, enforces anti-abuse guards, sanit
   const nonce2 = await solvePowLocal(c2.ch.powSalt, c2.ch.powBits);
   clock += 4000;
   const okRes = await feedback.handleFeedbackSubmit(
-    new Request("https://poadomains.grok.me/v1/feedback", {
+    new Request("https://poadomains.link/v1/feedback", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        origin: "https://poadomains.grok.me",
+        origin: "https://poadomains.link",
         "cf-connecting-ip": "198.51.100.7",
       },
       body: JSON.stringify({
@@ -367,11 +367,11 @@ test("feedback challenge renders CSP-safe SVG, enforces anti-abuse guards, sanit
   const nonce3 = await solvePowLocal(c3.ch.powSalt, c3.ch.powBits);
   clock += 4000;
   const dupRes = await feedback.handleFeedbackSubmit(
-    new Request("https://poadomains.grok.me/v1/feedback", {
+    new Request("https://poadomains.link/v1/feedback", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        origin: "https://poadomains.grok.me",
+        origin: "https://poadomains.link",
         "cf-connecting-ip": "198.51.100.7",
       },
       body: JSON.stringify({
@@ -395,11 +395,11 @@ test("feedback challenge renders CSP-safe SVG, enforces anti-abuse guards, sanit
   const nonce4 = await solvePowLocal(c4.ch.powSalt, c4.ch.powBits);
   clock += 4000;
   const disabledRes = await feedback.handleFeedbackSubmit(
-    new Request("https://poadomains.grok.me/v1/feedback", {
+    new Request("https://poadomains.link/v1/feedback", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        origin: "https://poadomains.grok.me",
+        origin: "https://poadomains.link",
         "cf-connecting-ip": "198.51.100.7",
       },
       body: JSON.stringify({
@@ -421,8 +421,8 @@ test("feedback challenge renders CSP-safe SVG, enforces anti-abuse guards, sanit
 
 test("treasury and feedback enforce HTTP bounds, origin/method/host checks, rate limits, and upstream error handling", async () => {
   const env = {
-    BACKEND_HOST: "poadomains.grok.me",
-    PUBLIC_EXPLORER_URL: "https://poadomains.grok.me",
+    BACKEND_HOST: "poadomains.link",
+    PUBLIC_EXPLORER_URL: "https://poadomains.link",
     FEEDBACK_GITHUB_TOKEN: "test-gh-token-for-unit-only",
     MCP_RATE_LIMITER: { limit: async () => ({ success: true }) },
   };
@@ -435,13 +435,13 @@ test("treasury and feedback enforce HTTP bounds, origin/method/host checks, rate
   assert.equal(treasury.validPoaAddr(null), null);
   assert.equal(treasury.validPoaAddr("not-poa"), null);
   const qRes = await treasury.handleTreasuryRequest(
-    new Request("https://poadomains.grok.me/v1/treasury?x=1"),
+    new Request("https://poadomains.link/v1/treasury?x=1"),
     env,
     async () => ({ escrow: ESCROW_ADDR, treasury: TREASURY_ADDR }),
   );
   assert.equal(qRes.status, 400);
   const errRes = await treasury.handleTreasuryRequest(
-    new Request("https://poadomains.grok.me/v1/treasury"),
+    new Request("https://poadomains.link/v1/treasury"),
     env,
     async () => {
       throw Error("boom");
@@ -461,30 +461,30 @@ test("treasury and feedback enforce HTTP bounds, origin/method/host checks, rate
 
   // Challenge host / method / query / origin / rate-limit guards
   assert.equal((await feedback.handleFeedbackChallenge(new Request("https://evil.invalid/v1/feedback/challenge"), env, store)).status, 403);
-  assert.equal((await feedback.handleFeedbackChallenge(new Request("https://poadomains.grok.me/v1/feedback/challenge", { method: "POST" }), env, store)).status, 405);
-  assert.equal((await feedback.handleFeedbackChallenge(new Request("https://poadomains.grok.me/v1/feedback/challenge?a=1"), env, store)).status, 400);
-  assert.equal((await feedback.handleFeedbackChallenge(new Request("https://poadomains.grok.me/v1/feedback/challenge", { headers: { origin: "https://evil.invalid" } }), env, store)).status, 403);
-  assert.equal((await feedback.handleFeedbackChallenge(new Request("https://poadomains.grok.me/v1/feedback/challenge", { headers: { origin: "not a url" } }), env, store)).status, 403);
-  assert.equal((await feedback.handleFeedbackChallenge(new Request("https://poadomains.grok.me/v1/feedback/challenge"), { ...env, MCP_RATE_LIMITER: { limit: async () => ({ success: false }) } }, store)).status, 429);
-  assert.equal((await feedback.handleFeedbackChallenge(new Request("https://poadomains.grok.me/v1/feedback/challenge"), { ...env, MCP_RATE_LIMITER: { limit: async () => { throw Error("rl"); } } }, store)).status, 503);
-  assert.equal((await feedback.handleFeedbackChallenge(new Request("https://poadomains.grok.me/v1/feedback/challenge"), env, { ...store, createFeedbackChallenge: async () => ({ ok: false, code: "FEEDBACK_RATE_LIMITED" }) })).status, 429);
+  assert.equal((await feedback.handleFeedbackChallenge(new Request("https://poadomains.link/v1/feedback/challenge", { method: "POST" }), env, store)).status, 405);
+  assert.equal((await feedback.handleFeedbackChallenge(new Request("https://poadomains.link/v1/feedback/challenge?a=1"), env, store)).status, 400);
+  assert.equal((await feedback.handleFeedbackChallenge(new Request("https://poadomains.link/v1/feedback/challenge", { headers: { origin: "https://evil.invalid" } }), env, store)).status, 403);
+  assert.equal((await feedback.handleFeedbackChallenge(new Request("https://poadomains.link/v1/feedback/challenge", { headers: { origin: "not a url" } }), env, store)).status, 403);
+  assert.equal((await feedback.handleFeedbackChallenge(new Request("https://poadomains.link/v1/feedback/challenge"), { ...env, MCP_RATE_LIMITER: { limit: async () => ({ success: false }) } }, store)).status, 429);
+  assert.equal((await feedback.handleFeedbackChallenge(new Request("https://poadomains.link/v1/feedback/challenge"), { ...env, MCP_RATE_LIMITER: { limit: async () => { throw Error("rl"); } } }, store)).status, 503);
+  assert.equal((await feedback.handleFeedbackChallenge(new Request("https://poadomains.link/v1/feedback/challenge"), env, { ...store, createFeedbackChallenge: async () => ({ ok: false, code: "FEEDBACK_RATE_LIMITED" }) })).status, 429);
 
   // Captcha HEAD, bad host/method/id/expired
-  const ch = await (await feedback.handleFeedbackChallenge(new Request("https://poadomains.grok.me/v1/feedback/challenge"), env, store, { powBits: 4 })).json();
+  const ch = await (await feedback.handleFeedbackChallenge(new Request("https://poadomains.link/v1/feedback/challenge"), env, store, { powBits: 4 })).json();
   assert.equal((await feedback.handleFeedbackCaptcha(new Request("https://evil.invalid/v1/feedback/captcha/" + ch.challengeId), env, store, ch.challengeId)).status, 403);
-  assert.equal((await feedback.handleFeedbackCaptcha(new Request("https://poadomains.grok.me/v1/feedback/captcha/" + ch.challengeId, { method: "POST" }), env, store, ch.challengeId)).status, 405);
-  assert.equal((await feedback.handleFeedbackCaptcha(new Request("https://poadomains.grok.me/v1/feedback/captcha/bad"), env, store, "bad")).status, 404);
-  assert.equal((await feedback.handleFeedbackCaptcha(new Request("https://poadomains.grok.me/v1/feedback/captcha/" + "0".repeat(32)), env, store, "0".repeat(32))).status, 404);
-  const headCaptcha = await feedback.handleFeedbackCaptcha(new Request("https://poadomains.grok.me/v1/feedback/captcha/" + ch.challengeId, { method: "HEAD" }), env, store, ch.challengeId);
+  assert.equal((await feedback.handleFeedbackCaptcha(new Request("https://poadomains.link/v1/feedback/captcha/" + ch.challengeId, { method: "POST" }), env, store, ch.challengeId)).status, 405);
+  assert.equal((await feedback.handleFeedbackCaptcha(new Request("https://poadomains.link/v1/feedback/captcha/bad"), env, store, "bad")).status, 404);
+  assert.equal((await feedback.handleFeedbackCaptcha(new Request("https://poadomains.link/v1/feedback/captcha/" + "0".repeat(32)), env, store, "0".repeat(32))).status, 404);
+  const headCaptcha = await feedback.handleFeedbackCaptcha(new Request("https://poadomains.link/v1/feedback/captcha/" + ch.challengeId, { method: "HEAD" }), env, store, ch.challengeId);
   assert.equal(headCaptcha.status, 200);
   assert.equal(await headCaptcha.text(), "");
 
   // Submit protocol/bounds/validation/upstream error paths
-  const post = (body, hdrs = {}, url = "https://poadomains.grok.me/v1/feedback", envOver = env) =>
+  const post = (body, hdrs = {}, url = "https://poadomains.link/v1/feedback", envOver = env) =>
     feedback.handleFeedbackSubmit(
       new Request(url, {
         method: "POST",
-        headers: { "content-type": "application/json", origin: "https://poadomains.grok.me", ...hdrs },
+        headers: { "content-type": "application/json", origin: "https://poadomains.link", ...hdrs },
         body: typeof body === "string" ? body : JSON.stringify(body),
       }),
       envOver,
@@ -492,8 +492,8 @@ test("treasury and feedback enforce HTTP bounds, origin/method/host checks, rate
       { minDwellMs: 0, fetch: async () => new Response("err", { status: 500 }) },
     );
   assert.equal((await post({}, {}, "https://evil.invalid/v1/feedback")).status, 403);
-  assert.equal((await feedback.handleFeedbackSubmit(new Request("https://poadomains.grok.me/v1/feedback", { method: "GET" }), env, store)).status, 405);
-  assert.equal((await post({}, {}, "https://poadomains.grok.me/v1/feedback?q=1")).status, 400);
+  assert.equal((await feedback.handleFeedbackSubmit(new Request("https://poadomains.link/v1/feedback", { method: "GET" }), env, store)).status, 405);
+  assert.equal((await post({}, {}, "https://poadomains.link/v1/feedback?q=1")).status, 400);
   assert.equal((await post({}, { "content-encoding": "gzip" })).status, 400);
   assert.equal((await post({}, { origin: "https://evil.invalid" })).status, 403);
   assert.equal((await post({}, { "content-type": "text/plain" })).status, 400);
@@ -502,10 +502,10 @@ test("treasury and feedback enforce HTTP bounds, origin/method/host checks, rate
   assert.equal((await post("")).status, 400);
   assert.equal((await post("[]")).status, 400);
   assert.equal((await post({ unknownKey: 1 })).status, 400);
-  assert.equal((await post({}, {}, "https://poadomains.grok.me/v1/feedback", { ...env, MCP_RATE_LIMITER: { limit: async () => ({ success: false }) } })).status, 429);
-  assert.equal((await post({}, {}, "https://poadomains.grok.me/v1/feedback", { ...env, MCP_RATE_LIMITER: { limit: async () => { throw Error("rl"); } } })).status, 503);
+  assert.equal((await post({}, {}, "https://poadomains.link/v1/feedback", { ...env, MCP_RATE_LIMITER: { limit: async () => ({ success: false }) } })).status, 429);
+  assert.equal((await post({}, {}, "https://poadomains.link/v1/feedback", { ...env, MCP_RATE_LIMITER: { limit: async () => { throw Error("rl"); } } })).status, 503);
 
-  const svg = await (await feedback.handleFeedbackCaptcha(new Request("https://poadomains.grok.me" + ch.captchaUrl), env, store, ch.challengeId)).text();
+  const svg = await (await feedback.handleFeedbackCaptcha(new Request("https://poadomains.link" + ch.captchaUrl), env, store, ch.challengeId)).text();
   const code = [...svg.matchAll(/<text[^>]*>([A-Z0-9])<\/text>/g)].map((m) => m[1]).join("");
   const powNonce = await solvePowLocal(ch.powSalt, ch.powBits);
   const validPayload = {
@@ -528,11 +528,11 @@ test("treasury and feedback enforce HTTP bounds, origin/method/host checks, rate
     }
   }
   assert.equal((await post({ ...validPayload, powNonce: badPowNonce })).status, 400);
-  assert.equal((await post(validPayload, {}, "https://poadomains.grok.me/v1/feedback", { ...env, FEEDBACK_GITHUB_REPO: "bad repo" })).status, 503);
+  assert.equal((await post(validPayload, {}, "https://poadomains.link/v1/feedback", { ...env, FEEDBACK_GITHUB_REPO: "bad repo" })).status, 503);
 
   // Upstream GitHub failure returns 502
-  const ch502 = await (await feedback.handleFeedbackChallenge(new Request("https://poadomains.grok.me/v1/feedback/challenge"), env, store, { powBits: 4 })).json();
-  const svg502 = await (await feedback.handleFeedbackCaptcha(new Request("https://poadomains.grok.me" + ch502.captchaUrl), env, store, ch502.challengeId)).text();
+  const ch502 = await (await feedback.handleFeedbackChallenge(new Request("https://poadomains.link/v1/feedback/challenge"), env, store, { powBits: 4 })).json();
+  const svg502 = await (await feedback.handleFeedbackCaptcha(new Request("https://poadomains.link" + ch502.captchaUrl), env, store, ch502.challengeId)).text();
   const code502 = [...svg502.matchAll(/<text[^>]*>([A-Z0-9])<\/text>/g)].map((m) => m[1]).join("");
   const pow502 = await solvePowLocal(ch502.powSalt, ch502.powBits);
   const failUp = await post({

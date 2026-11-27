@@ -37,7 +37,7 @@ test("production Pages allowlist publishes external Worker discovery but no fixt
       },
     );
     assert.equal(existsSync(join(dir,"network.json")),false);
-    assert.equal(JSON.parse(readFileSync(join(dir,".well-known/agent.json"),"utf8")).url,"https://poadomains.grok.me");
+    assert.equal(JSON.parse(readFileSync(join(dir,".well-known/agent.json"),"utf8")).url,"https://poadomains.link");
     const app = readFileSync(join(dir, "app.js"), "utf8");
     assert.doesNotMatch(
       app,
@@ -52,7 +52,7 @@ test("production Pages allowlist publishes external Worker discovery but no fixt
     assert.match(html, /<meta name="description" content="[^"\n]+"/);
     for (const property of ["type", "title", "description", "url", "image"]) assert.match(html, new RegExp(`<meta property="og:${property}" content="[^"\n]+"`));
     assert.match(html, /<link rel="canonical" href="https:\/\/maximusmaximus.github.io\/poa-domains\/"/);
-    assert.match(html, /class="hero-cta" href="https:\/\/poadomains.grok.me"/);
+    assert.match(html, /class="hero-cta" href="https:\/\/poadomains.link"/);
     assert.match(html, /<p id="status">Checking…<\/p>/);
     assert.match(html, /<p id="network-status">Checking…<\/p>/);
     assert.match(html, /<button id="refresh" type="button" disabled>/);
