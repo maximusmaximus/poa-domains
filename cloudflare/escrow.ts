@@ -651,7 +651,7 @@ export class Escrow {
           const id=digest([rk,c]);
           s.auctions[id]=fixed
             ? {id,name,seller:c.actor,reserve:String(micros(reserve)),kind:"fixed",createdAt:this.now(),history:[{event:"Listed for POA",at:this.now()}],
-              closes:this.now()+terms.window,quiet:terms.quiet,high:null,status:"OPEN"}
+              closes:0,quiet:terms.quiet,high:null,status:"OPEN"}
             : {id,name,seller:c.actor,reserve:String(micros(reserve)),kind:"auction",createdAt:this.now(),window:terms.window,startedAt:null,
               history:[{event:"Auction queued; timer starts on first bid",at:this.now()}],
               closes:0,quiet:terms.quiet,high:null,status:"OPEN"};
@@ -661,7 +661,8 @@ export class Escrow {
           need(s.sequence<PILOT_JOURNAL_LIMIT-32,"ESCROW_JOURNAL_CAPACITY");
           exact(p,["auction","amount"]);const a=s.auctions[text(p.auction,64)];
           const awaitingFirstBid=Boolean(a&&a.kind!=="fixed"&&a.closes===0&&a.high===null);
-          need(a&&a.status==="OPEN"&&(awaitingFirstBid||this.now()<a.closes),"ESCROW_AUCTION_CLOSED");
+          const openFixed=Boolean(a&&a.kind==="fixed"&&a.high===null);
+          need(a&&a.status==="OPEN"&&(openFixed||awaitingFirstBid||this.now()<a.closes),"ESCROW_AUCTION_CLOSED");
           need(c.action==="buy"?a.kind==="fixed"&&a.high===null:a.kind!=="fixed","ESCROW_MARKET_KIND");
           const n=micros(p.amount);if(c.action==="buy")need(n===BigInt(a.reserve),"ESCROW_PRICE");need(n<=micros(this.policy.perTx),"ESCROW_PAYOUT_LIMIT");need(c.actor!==a.seller,"ESCROW_SELF_SALE");need(a.high?.payer!==c.actor,"ESCROW_SELF_RAISE");
           // Existing strict >10% rule, in integer micros (not rounded decimal floats).
@@ -693,9 +694,10 @@ export class Escrow {
         }
         case "cancel": case "expire": {
           exact(p,["auction"]);const a=s.auctions[text(p.auction,64)];need(a&&a.status==="OPEN","ESCROW_AUCTION_CLOSED");
+          const unboughtFixed=a.kind==="fixed"&&a.high===null;
           const sellerBusy=a.high!==null&&Object.values(s.auctions).some(other=>other.status==="SETTLING"&&other.seller===a.seller);
           const expireAt=a.handoverUntil??a.closes;
-          need(c.action==="cancel"?a.seller===c.actor:a.closes>0&&this.now()>=expireAt&&!sellerBusy,"ESCROW_CANCEL_NOT_ALLOWED");
+          need(c.action==="cancel"?a.seller===c.actor:!unboughtFixed&&a.closes>0&&this.now()>=expireAt&&!sellerBusy,"ESCROW_CANCEL_NOT_ALLOWED");
           // Expiry without a title consent is a failure refund, never silently pays a seller.
           if(a.high)this.refund(s,`cancel-${a.id}`,a.high.payer,a.high.amount);a.status="CANCELLED";(a.history??=[]).push({event:"Cancelled; original payer refund due",at:this.now()});break;
         }
@@ -821,7 +823,7 @@ export class Escrow {
       // Never auto-expire a seller's closed won auction while escrow itself blocks them via another SETTLING handover.
       const sellerBusy=a.high!==null&&Object.values(s0.auctions).some(other=>other.status==="SETTLING"&&other.seller===a.seller);
       const handoverDeadline=a.handoverUntil??(a.closes+a.quiet);
-      if(a.status==="OPEN"&&a.closes>0&&((a.high===null&&this.now()>=a.closes)||(a.high!==null&&!sellerBusy&&this.now()>=handoverDeadline))){
+      if(a.status==="OPEN"&&a.closes>0&&((a.high===null&&a.kind!=="fixed"&&this.now()>=a.closes)||(a.high!==null&&!sellerBusy&&this.now()>=handoverDeadline))){
         this.journal.append("auto-expire",{auction:a.id},s=>{
           need(this.enabled(),"ESCROW_DISABLED");need(!s.paused,"ESCROW_PAUSED");need(!s.halt,"ESCROW_HALTED");
           const cur=s.auctions[a.id];if(!cur||cur.status!=="OPEN")return;

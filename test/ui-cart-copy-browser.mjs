@@ -2463,7 +2463,28 @@ try {
     const chipAfter = await firstChip.boundingBox();
     assert.ok(Math.abs(chipAfter.width - chipBase.width) < 1.5, "Ticker chip must return to normal size off-hover");
     await expect(pageTicker.locator("#liveTicker")).toHaveAttribute("data-motion", "running", { timeout: 3000 });
-    const firstIdea = pageTicker.locator("#ideasStrip .ideas-row .idea").first();
+    // Verify home tab buttons have no "updated 0m ago" / .tab-age labels, track expands past container,
+    // and endless drag works in both directions on both strips (even under OS reduced-motion).
+    assert.equal(await pageTicker.locator(".section-tab .tab-age").count(), 0);
+    assert.equal(/updated \d+m ago/i.test(await pageTicker.locator("#sectionTabs").innerText()), false);
+    const trackGeom = await pageTicker.evaluate(() => ({
+      tickerClientW: document.querySelector("#liveTicker").clientWidth,
+      trackRectW: document.querySelector("#liveTickerTrack").getBoundingClientRect().width,
+    }));
+    assert.ok(trackGeom.trackRectW > trackGeom.tickerClientW * 4, `Expected #liveTickerTrack width > 4x container, got ${JSON.stringify(trackGeom)}`);
+    // Endless drag leftward from x=0 wraps last chip to front without hitting a wall
+    const beforeLeftDragFirst = await pageTicker.locator("#liveTickerTrack .ticker-chip").first().getAttribute("data-action-id");
+    await pageTicker.evaluate(() => { document.querySelector("#liveTicker").scrollLeft = 0; });
+    const tBox = await pageTicker.locator("#liveTicker").boundingBox();
+    await pageTicker.mouse.move(tBox.x + 80, tBox.y + tBox.height / 2);
+    await pageTicker.mouse.down();
+    await pageTicker.mouse.move(tBox.x + 360, tBox.y + tBox.height / 2, { steps: 6 });
+    await pageTicker.mouse.up();
+    const afterLeftDragFirst = await pageTicker.locator("#liveTickerTrack .ticker-chip").first().getAttribute("data-action-id");
+    assert.notEqual(afterLeftDragFirst, beforeLeftDragFirst, "Dragging #liveTicker right (scrolling left) must endlessly wrap last chips to front");
+    await pageTicker.mouse.move(0, 0);
+    const ideaTargetQuery = await pageTicker.locator("#ideasStrip .ideas-row .idea").nth(6).getAttribute("data-query");
+    const firstIdea = pageTicker.locator(`#ideasStrip .ideas-row .idea[data-query="${ideaTargetQuery}"]`);
     const ideaBase = await firstIdea.boundingBox();
     await firstIdea.hover();
     await pageTicker.waitForTimeout(240);
@@ -2473,12 +2494,19 @@ try {
       const row = document.querySelector("#ideasStrip .ideas-row");
       row.dispatchEvent(new PointerEvent("pointerdown", { pointerType: "mouse", bubbles: true }));
       row.focus();
+      window.dispatchEvent(new PointerEvent("pointerup", { pointerType: "mouse", bubbles: true }));
     });
     await pageTicker.mouse.move(0, 0);
     await pageTicker.waitForTimeout(240);
     const ideaAfter = await firstIdea.boundingBox();
     assert.ok(Math.abs(ideaAfter.width - ideaBase.width) < 1.5, "Idea chip must return to normal size off-hover");
     await expect(pageTicker.locator("#ideasStrip .ideas-row")).toHaveAttribute("data-motion", "running", { timeout: 3000 });
+    // Even with prefers-reduced-motion: reduce (Windows Animation effects off), both strips still gently auto-scroll
+    await pageTicker.emulateMedia({ reducedMotion: "reduce" });
+    await pageTicker.mouse.move(0, 0);
+    await expect(pageTicker.locator("#liveTicker")).toHaveAttribute("data-motion", "running", { timeout: 3000 });
+    await expect(pageTicker.locator("#ideasStrip .ideas-row")).toHaveAttribute("data-motion", "running", { timeout: 3000 });
+    await pageTicker.emulateMedia({ reducedMotion: "no-preference" });
     // Uppercase search input + domain drop shadow + top-right gear-only manage button check
     const domainCss = await pageTicker.evaluate(() => {
       const inp = document.getElementById("searchInput");

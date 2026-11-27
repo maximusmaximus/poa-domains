@@ -219,10 +219,11 @@ test("POA auction cart supports highest bid ceiling, outbid detection without au
     kind: "fixed",
     price: "250.000000",
     status: "OPEN",
-    closes: nowMs + 3600000,
+    closes: 0,
     high: null,
   };
   assert.deepEqual(activePoaFixedListings([...market, doneAuc, fixedListing], nowMs).map((x) => x.name), ["fixedname"]);
+  assert.deepEqual(activePoaFixedListings([{ ...fixedListing, closes: nowMs - 60000 }], nowMs).map((x) => x.name), ["fixedname"]);
   assert.deepEqual(partitionPoaAuctions([...market, doneAuc, fixedListing], nowMs).past.map((x) => x.name), ["done"]);
   const multiTicker = recentActions(state, [...market, doneAuc, fixedListing]);
   assert.ok(multiTicker.some((x) => x.name === "star" && /High bid.*350 POA/.test(x.label)));

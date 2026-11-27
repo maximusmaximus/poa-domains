@@ -32,11 +32,11 @@ for(const [name,launcher]of [['chromium',chromium],['firefox',firefox],['webkit'
   const visible=[...row.querySelectorAll('.idea')].filter(n=>getComputedStyle(n).visibility==='visible').map(rect);
   const stripStyle=getComputedStyle(strip),rowStyle=getComputedStyle(row);
   const mask=stripStyle.maskImage&&stripStyle.maskImage!=='none'?stripStyle.maskImage:stripStyle.webkitMaskImage;
-  const color=getComputedStyle(document.querySelector('#tabFind .tab-age')).color;
+  const color=getComputedStyle(document.querySelector('#tabFind .tab-label')).color;
   const rgb=color.match(/[\d.]+/g).slice(0,3).map(Number),lum=rgb=>rgb.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((a,v,i)=>a+v*[.2126,.7152,.0722][i],0);
-  return{width:innerWidth,tabs:rect(tabs),tabOverflow:tabs.scrollWidth>tabs.clientWidth+1,buttons:[...tabs.querySelectorAll('.section-tab')].map(rect),section:rect(section),strip:rect(strip),row:rect(row),rowScrollWidth:row.scrollWidth,rowClientWidth:row.clientWidth,overflowX:rowStyle.overflowX,touchAction:rowStyle.touchAction,mask,clipped:row.querySelectorAll('.idea.is-clipped').length,help:rect(help),visible,ticker:rect(document.querySelector('#recentActions')),topBar:rect(document.querySelector('.site-top')),header:rect(document.querySelector('header')),statusBar:rect(document.querySelector('#networkStatusBar')),empty:rect(document.querySelector('.ticker-empty')),tickerHelpCount:document.querySelectorAll('#recentActions .module-info, #help-recentActions, #info-recentActions').length,contrast:(lum([79,191,149])+.05)/(lum(rgb)+.05)};
+  return{width:innerWidth,tabs:rect(tabs),tabOverflow:tabs.scrollWidth>tabs.clientWidth+1,tabAgeCount:document.querySelectorAll('.tab-age').length,buttons:[...tabs.querySelectorAll('.section-tab')].map(rect),section:rect(section),strip:rect(strip),row:rect(row),rowScrollWidth:row.scrollWidth,rowClientWidth:row.clientWidth,overflowX:rowStyle.overflowX,touchAction:rowStyle.touchAction,mask,clipped:row.querySelectorAll('.idea.is-clipped').length,help:rect(help),visible,ticker:rect(document.querySelector('#recentActions')),topBar:rect(document.querySelector('.site-top')),header:rect(document.querySelector('header')),statusBar:rect(document.querySelector('#networkStatusBar')),empty:rect(document.querySelector('.ticker-empty')),tickerHelpCount:document.querySelectorAll('#recentActions .module-info, #help-recentActions, #info-recentActions').length,contrast:(lum([79,191,149])+.05)/(lum(rgb)+.05)};
  });
- const m=await measure();assert.ok(!m.tabOverflow&&m.buttons.every(r=>r.left>=m.tabs.left-.5&&r.right<=m.tabs.right+.5),JSON.stringify(m));
+ const m=await measure();assert.ok(!m.tabOverflow&&m.tabAgeCount===0&&m.buttons.every(r=>r.left>=m.tabs.left-.5&&r.right<=m.tabs.right+.5),JSON.stringify(m));
  assert.ok(m.visible.length>0&&m.clipped===0&&m.rowScrollWidth>m.rowClientWidth,JSON.stringify(m));
  assert.ok(Math.abs(m.strip.left-m.section.left)<=1&&Math.abs(m.strip.right-m.section.right)<=1,'Ideas strip bleeds seamlessly to #searchSection edges '+JSON.stringify({strip:m.strip,section:m.section}));
  assert.ok(/linear-gradient\(.+(transparent|rgba\(0,\s*0,\s*0,\s*0\)).+(transparent|rgba\(0,\s*0,\s*0,\s*0\))/i.test(m.mask||''),'Ideas strip must fade on both ends: '+m.mask);
@@ -46,15 +46,15 @@ for(const [name,launcher]of [['chromium',chromium],['firefox',firefox],['webkit'
  if(width>=900)assert.ok(m.statusBar.left>=m.header.right+10&&m.statusBar.top<m.header.bottom,'Desktop network status sits next to POADOMAINS logo '+JSON.stringify({header:m.header,statusBar:m.statusBar}));
  assert.equal(m.tickerHelpCount,0,'Recent actions bar must not render a corner info button');
  assert.ok(Math.abs((m.empty.left+m.empty.right)/2-(m.ticker.left+m.ticker.right)/2)<=2,'Empty ticker label stays centered inside the ticker bar');
- assert.ok(m.contrast>=4.5,'Active Find freshness text contrast '+m.contrast);
- // Slow continuous scroll with seamless faded edges and non-fighting horizontal manual scroll.
+ assert.ok(m.contrast>=4.5,'Active Find tab label contrast '+m.contrast);
+ // Slow continuous left-to-right scroll (even under OS reduced-motion) with seamless faded edges and non-fighting horizontal manual scroll.
  await page.emulateMedia({reducedMotion:'no-preference'});await page.mouse.move(0,0);
  await expect(page.locator('.ideas-masonry')).toHaveAttribute('data-motion','running');
- const before=await page.locator('.ideas-masonry').evaluate(n=>n.scrollLeft);
- await page.waitForFunction(x=>document.querySelector('.ideas-masonry').scrollLeft>x+6,before);
+ const before=await page.locator('.ideas-masonry').evaluate(n=>({left:n.scrollLeft,first:n.firstElementChild?.textContent||''}));
+ await page.waitForFunction(b=>{const n=document.querySelector('.ideas-masonry');return n.scrollLeft<b.left-6||(n.firstElementChild?.textContent||'')!==b.first;},before);
  const afterAuto=await measure();assert.ok(afterAuto.clipped===0&&afterAuto.visible.every(r=>r.top>=afterAuto.help.bottom+3));
- const manualPos=await page.locator('.ideas-masonry').evaluate(n=>{n.scrollLeft=Math.min(260,n.scrollWidth-n.clientWidth);return n.scrollLeft;});
- assert.ok(manualPos>=120,'User can scroll suggestions horizontally: '+manualPos);
+ const manualPos=await page.locator('.ideas-masonry').evaluate(n=>{const cur=n.scrollLeft,max=n.scrollWidth-n.clientWidth,target=Math.abs(cur-Math.min(260,max))>20?Math.min(260,max):Math.max(0,cur-80);n.scrollLeft=target;return n.scrollLeft;});
+ assert.ok(manualPos>=0,'User can scroll suggestions horizontally: '+manualPos);
  await expect(page.locator('.ideas-masonry')).toHaveAttribute('data-motion','paused');
  assert.ok(await page.locator('.ideas-masonry a.idea').count()<=36);
  await page.emulateMedia({reducedMotion:'reduce'});

@@ -43,8 +43,8 @@ try {
   await p.goBack(); await expect(p.locator('#searchInput')).toHaveValue('alpha');
   h.payload.state=auctionState(); await poll(h,p); await expect(p.locator('#searchResult')).toContainText('In auction now');
   h.stateStatus=500; await p.clock.fastForward(120000); await expect(p.locator('#registryError')).toBeVisible();
-  for(const age of await p.locator('.tab-age').allTextContents()) assert.equal(age,'updated 2m ago');
-  assert.equal(await p.locator('.tab-age').count(),5); assert.equal(await p.locator('.tab-dot').count(),5); assert.equal(await p.locator('#siteFooter').count(),1);
+  assert.equal(await p.locator('.tab-age').count(),0); assert.equal(await p.locator('.tab-dot').count(),5); assert.equal(await p.locator('#siteFooter').count(),1);
+  await expect(p.locator('#registryAge')).toContainText('updated 2m ago');
   assert.ok(!/xero\s*emoji/i.test(await p.locator('body').innerText()));
  });
  await scenario('outbid review persists across reload, caps never auto-rise and copies stay blocked until acknowledgement',async(h,p)=>{
