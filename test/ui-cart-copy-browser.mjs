@@ -754,6 +754,8 @@ try {
   await expect(pageUx.locator("#domainOwner")).not.toContainText("Permanent registry rights");
   await expect(pageUx.locator("#domainOwner")).not.toContainText("not proof of native-chain ownership");
   await expect(pageUx.locator("#domainCopyLink")).toBeVisible();
+  await expect(pageUx.locator("#domainCopyLink")).toHaveText("🔗");
+  await expect(pageUx.locator("#domainCopyLink")).toHaveAttribute("aria-label", "Copy link for agent");
   await pageUx.locator("#domainCopyLink").click();
   assert.equal(await pageUx.evaluate(() => navigator.clipboard.readText()), `${h.url}/d/agent`);
   await expect(pageUx.locator("#domainProfile")).toBeVisible();
@@ -1928,9 +1930,12 @@ try {
         }
       }
 
-      // G. Domain module top-right controls (🔗 Copy link sits inside #domainSection to the left of ℹ️; no ← Home button)
+      // G. Domain module top-right controls (icon-only 🔗 sits inside #domainSection to the left of ℹ️; no ← Home button; no ℹ️ on #recentActions)
       if (document.querySelector("#domainHomeLink, #ownerHomeLink")) {
         problems.push("LEGACY_HOME_LINK_PRESENT");
+      }
+      if (document.querySelector("#recentActions .module-info, #help-recentActions, #info-recentActions")) {
+        problems.push("RECENT_ACTIONS_HELP_PRESENT");
       }
       const domSec = document.querySelector("#domainSection");
       if (vis(domSec)) {
@@ -1938,6 +1943,10 @@ try {
         const info = domSec.querySelector(":scope > #help-domainSection");
         const title = domSec.querySelector(":scope > #domainTitle");
         if (vis(copy) && vis(info)) {
+          const copyTxt = (copy.textContent || "").trim();
+          if (copyTxt !== "🔗" && copyTxt !== "✅") {
+            problems.push(`DOMAIN_COPY_NOT_ICON_ONLY text=${JSON.stringify(copyTxt)}`);
+          }
           const rs = domSec.getBoundingClientRect(), rc = copy.getBoundingClientRect(), ri = info.getBoundingClientRect();
           if (rc.left < rs.left - 1 || rc.right > rs.right + 1 || rc.top < rs.top - 1 || rc.bottom > rs.bottom + 1) {
             problems.push(`DOMAIN_COPY_OUTSIDE_MODULE copy=${JSON.stringify(rc)} sec=${JSON.stringify(rs)}`);
@@ -1948,6 +1957,8 @@ try {
           if (cyDiff > 2.5) problems.push(`DOMAIN_COPY_INFO_VALIGN diff=${cyDiff.toFixed(1)}px`);
           const hDiff = Math.abs(ri.height - rc.height);
           if (hDiff > 2.5) problems.push(`DOMAIN_COPY_INFO_HEIGHT diff=${hDiff.toFixed(1)}px`);
+          const wDiff = Math.abs(ri.width - rc.width);
+          if (wDiff > 2.5) problems.push(`DOMAIN_COPY_INFO_WIDTH diff=${wDiff.toFixed(1)}px (${rc.width.toFixed(1)} vs ${ri.width.toFixed(1)})`);
           if (vis(title)) {
             const rt = title.getBoundingClientRect();
             const overlapX = Math.min(rt.right, rc.right) - Math.max(rt.left, rc.left);
@@ -2224,6 +2235,8 @@ try {
     await pageGeom.waitForFunction(() => document.body.dataset.registryStatus === "ready");
     await expect(pageGeom.locator("#domainHomeLink")).toHaveCount(0);
     await expect(pageGeom.locator("#domainSection > #domainCopyLink")).toBeVisible();
+    await expect(pageGeom.locator("#domainSection > #domainCopyLink")).toHaveText("🔗");
+    await expect(pageGeom.locator("#recentActions .module-info, #help-recentActions, #info-recentActions")).toHaveCount(0);
     await expect(pageGeom.locator("#escrowDomain article.card")).toHaveCount(1);
     await expect(pageGeom.locator("#domainListing a.owner-primary-link").first()).toHaveAttribute("href", "/d/peer");
     await expect(pageGeom.locator("#domainListing a.owner-addr-link").first()).toHaveAttribute("href", "/p/peer");
