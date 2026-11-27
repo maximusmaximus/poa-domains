@@ -292,7 +292,6 @@ header{border:0;padding-bottom:0}
 #searchSection{padding-top:0}
 #searchSection .ideas{margin:0 0 .2rem;padding:.4rem 0 0}
 #searchSection .ideas-masonry{height:204px}
-#ideasHeading{position:absolute;top:.1rem;right:0;width:40px;height:40px;z-index:2}
 .search-label{display:flex;gap:.4rem;align-items:center}
 .search-label label{margin:.2rem 0;font-weight:700}
 #searchHelp{display:inline-flex}
@@ -371,12 +370,9 @@ body[data-registry-status="error"] .tab-dot{background:#ff8e8e}
 .section-tab[aria-selected="true"] .tab-dot{background:#103e30}
 body[data-registry-status="error"] .section-tab[aria-selected="true"] .tab-dot{background:#702020}
 main#homeMain,main#homeMain>section,.ideas{min-width:0;max-width:100%;box-sizing:border-box}
-#searchSection .ideas-strip{position:relative;min-width:0;width:calc(100% + var(--ui-space) * 2);max-width:none;margin-inline:calc(var(--ui-space) * -1);margin-block:-5px;padding:5px 0;overflow:visible;box-sizing:border-box}
+#searchSection .ideas-strip{position:relative;min-width:0;width:calc(100% + var(--ui-space) * 2);max-width:none;margin-inline:calc(var(--ui-space) * -1);margin-block:0 -5px;padding:5px 0;overflow:visible;box-sizing:border-box}
 #searchSection .ideas-strip,#recentActions:not(.is-empty)>.live-ticker{-webkit-mask-image:linear-gradient(to right,transparent 0,rgba(0,0,0,.45) 14px,#000 clamp(28px,5vw,48px),#000 calc(100% - clamp(28px,5vw,48px)),rgba(0,0,0,.45) calc(100% - 14px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,rgba(0,0,0,.45) 14px,#000 clamp(28px,5vw,48px),#000 calc(100% - clamp(28px,5vw,48px)),rgba(0,0,0,.45) calc(100% - 14px),transparent 100%)}
 #searchSection .ideas-row{box-sizing:border-box;width:100%;padding:5px 0!important;margin:-5px 0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;touch-action:pan-x pan-y;scroll-padding-inline:clamp(28px,6vw,52px);mask-image:none;-webkit-mask-image:none}
-#searchSection .ideas-head{display:flex;justify-content:flex-end;min-height:40px;margin:0 0 4px}
-#searchSection #ideasHeading{position:static;width:40px;height:40px;margin:0}
-#ideasHeading>.module-info{position:static;margin:0;}
 .idea{white-space:normal;overflow-wrap:anywhere;box-sizing:border-box}
 .idea-column .idea{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 #recentActions.ticker-shell{width:100%;max-width:100%;margin-inline:0;box-sizing:border-box;display:flex;align-items:center;min-height:48px}
