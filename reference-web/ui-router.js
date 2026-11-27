@@ -1,11 +1,11 @@
-import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, primaryNameForOwner, profileImageMediaPath, readViewQuery, resolveOwnerInput, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=3d4aed61982b";
-import { ui } from "./ui-state.js?v=3d4aed61982b";
-import { add, appendPoaAddress, el, registerAddressNav } from "./ui-core.js?v=3d4aed61982b";
-import { runSearch } from "./ui-search.js?v=3d4aed61982b";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=3d4aed61982b";
-import { updateTabDots } from "./ui-render.js?v=3d4aed61982b";
-import { syncCartShortcutNow } from "./ui-cart.js?v=3d4aed61982b";
-import { renderManagement } from "./ui-manage.js?v=3d4aed61982b";
+import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, primaryNameForOwner, profileImageMediaPath, readViewQuery, resolveOwnerInput, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=a145e933754c";
+import { ui } from "./ui-state.js?v=a145e933754c";
+import { add, appendPoaAddress, el, registerAddressNav } from "./ui-core.js?v=a145e933754c";
+import { runSearch } from "./ui-search.js?v=a145e933754c";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=a145e933754c";
+import { updateTabDots } from "./ui-render.js?v=a145e933754c";
+import { syncCartShortcutNow } from "./ui-cart.js?v=a145e933754c";
+import { renderManagement } from "./ui-manage.js?v=a145e933754c";
 
 const LAST_POA_KEY = "poadomains.lastPoaAddress.v1";
 
@@ -185,15 +185,44 @@ export function isRegisteredDomain(name) {
  return Boolean(deed && !deed.retired);
 }
 
-function firstGrapheme(name) {
+// Derived from official Unicode 17.0 CLDR names (web/emoji17-data.mjs) so emoji domain icons without an attached image show their initial letter (e.g. 🔥 -> F).
+const EMOJI_SINGLE_INITIALS = {"1":"🥇","2":"🥈","3":"🥉","A":"😲😧😰😠👿👽👾💢🫀🐜🥑🏺🚑🚗🚛🛺⚓✈🛫🛬🚡⏰🎟🏈🎨🪗🧮🪓⚗🩹🏧⚛♈♒📶🅰🆎","B":"😁💓💔💙🤎🖤👈👉👆👇🧠🦴🫦👶👦🤱👼👤👥🦬🐗🦫🦇🐻🦡🐤🐦🐡🦋🐛🪲💐🌼🍌🫐🫑🥦🫘🍞🥖🥯🥓🌯🥣🧈🍱🎂🍼🍾🍺🧋🧃🏖🏗🧱🏦🌉💈🚅🚌🚲🚏🛎🎈⚾🏀🎳🏸🥊🎯🩲👙🎒🩰🧢🔔🔕🪕🔋📘📚📑🔖🗳✒💼📊💣🪃🏹⚖🛏🛁🧹🧺🪣🫧🚼🛄☣🔙🔆🅱🔵🟤⚫🟦🟫⬛◼◾▪🔲🏴","C":"🥶🤠😕😢😖🤡😹😼😿💥🤞🤙👏🧒👷💑🐱🐈🐮🐄🐪🐿🐔🐊🪸🦀🦗🪳🌸🌵🍒🥥🥕🥒🌰🥐🧀🥩🍳🥫🍚🍛🍪🧁🍫🍬🍮🍸🍻🥂🥤🥢🧭🏕🏛🏪🏰⛪🏙🌆🎠🎪🚧🛶🌙☁⛈🌧🌨🌩🌀🌂☄🎄🎊🎏🏏🥌🔮♣♟🧥👝👑🎛🖱💽🎬📷📸🕯📕🪙💳💹📫📪🖍🗂📅📇📈📉📋🗃⚔🪚🗜⛓🩼🛋🪑🚬⚰🛃🚸🔃🔄♋♑🎦💱✅☑✔❌❎➰©🆑🆒Ⓜ🏁🎌","D":"🫥🤤🥸🫪😞😓💫💨🧏🕵🐶🐕🫏🦌🕊🦆🦤🐲🐉🐬🌳🍡🥟🍩🏜🏝🏚🏬🚚💧🤿♦👗🥁🖥📀🪔💵🗡🧬🩸🚪↘⬇↙🔯🔽🔅➗‼➿💠","E":"😑🤯😡👂🦻👀👁🧝🐑🐘🦅🌲🪹🍆🌽🥚🕗🕣🕚🕦🔌💶✉📧📩🛗🔚⏏⁉✳✴","F":"😂😘😋😛🤭🫢🫣🤨😶🙄🫩😷🤒🤕🤮😵🧐🫤☹😮😳🥹😦😨😱😤🤬🫯🙏💪🦶🧚👪👣🫆🦊🐥🪶🦩🐸🐟🪰🍀🍂🫓🍟🧆🫕🍤🍥🥠🍽🍴🏭⛲🌁🎡🚒⛽⛴🛸🕓🕟🕔🕠🌓🌕🌛🌝🌫🔥🎆🧨🥏🏑⛳🎣🎴🖼🪭🥿🪈📠💾🎞📽🔦🖋📁🗄🧯⚱⏩⏪⏫⏬♀⚜🆓","G":"😀😃😄😆😅😬👺👻😺😸💗💚🩶👧💂🧞🦍🦮🐐🦒🪿🍇🍏🧄🫚🥗🥛🌍🌎🌏🌐🌟🥅🎲👓🥽🧤🎓💎🎸📗⚙♊🟢🟩","H":"🥵😯🙉💘💝💟❣💯🕳🖐🫰🫶🤝🫈🏇🐴🐎🦛🐹🦔🐣🐝🌺🪻🌿🌶🍔🌭🍯☕🛖🏘🏠🏡🏥🏨🛕♨🚄🚥🚁⌛⏳⚡♥👜🥾👠🪮🎧🪉🔨⚒🛠🪝🪦🪬🟰💲⭕","I":"☝🫵🍨🧊🏒⛸📨📥🪪♾🔠🔡🔢🔣🔤ℹ🆔","J":"🪼🫙🏣🏯🎃🎎🕹🃏👖🔰🈁🈂🈷🈶🈯🉐🈹🈚🈲🉑🈸🈴🈳㊗㊙🈺🈵","K":"😗😚😙😽💋💏🐨🦘🥝🔪🕋🛴🪁🪢👘⌨🔑🪯","L":"🤥😭💌🩵🗨🫲🫷🤟🤛🦵🫁🦁🐆🦙🦎🦞🐞🪷🍃🪾🍋🥬🍭🛘🏩🚂🚈🧳🌗🌜🥍🥼💄📢🎚🪘🪫💻💡📒🏷🖇🔒🔏🔐🔗🪜🧴🚮🛅⬅↔↪✝♌♎⏮🔶🔷","M":"🫠🤑🖕🦾🦿👄👨🤶🧙🧜🕺👬🐵🐒🫎🦣🐭🐁🦟🦠🍁🍄🍈🥭🍖🥮🧉🗾⛰🗻🕌🚇🚝🚞🚐🏍🛵🦽🦼🛣🛥🚠🕰🌌🎑🎖🥋🪄🪩🀄👞🪖🔇📣🎼🎵🎶🎤🎹🪇📱📲🎥🔍🔎💰💸📝🧲🔬🪞🪤🗿🚹🕎📴♂✖➖⚕","N":"😐🤢🤓💅👃🥷🪺🏞🌃🕘🕤🌑🌚🪆👔📔📓📰🔩🧿⛔🚳🚭🚯🚱🚷📵🔞⏭📛🆕🆖","O":"👹🧡👌👊👐🧓👴👵🦧🐂🦦🦉🫍🐙🦪🫒🧅🍢🏢🚍🚔🚖🚘🛢🕐🕜🩱💿📖📙📤📬📭📂🗝🔛🕉☦⛎🅾🆗🟠🟧","P":"😔🥳🥺😣💩😾🩷💜🫳🫴🤌🤏🤲🧑👱🧔🙍🙎🙅🙆💁🙋🙇🤦🤷👮🫅🤴👸👳👲🤵👰🤰🫃🫄💆💇🚶🧍🧎🏃🕴👯🧖🧗🤺🏌🏄🚣🏊⛹🏋🚴🚵🤸🤼🤽🤾🤹🧘🛀🛌🫂🐩🐷🐖🐽🐼🐾🐧🦚🦜🪴🌴🍍🍐🍑🥔🥜🫛🥨🥞🍗🍕🍲🍿🥧🫗🏤🛝🚓🛻🚨🛳🪂🎉🎍🏓🎱🧩🪅🎭👛📿📯📟🖨📃📄💷📦📮✏🖊🖌📌📎⛏🧫💊🪠🪧🚰🛂🚫🛐☮♓▶⏯⏸➕〽🅿🟣🟪","R":"🤣😌🤖💞❤🗯🤚✋🫱🫸✊🤜🙌🦝🐏🦏🐀🐰🐇🐓🏵🌹🍎🫜🍘🍙🍠🪨🎢🚃🏎🛼🛤🛟🚀🪐🌈🧧🎀🎗🏉🎽👟⛑💍📻🏮🗞🧾📍🪒🧻🚻☢➡↩⤴⤵🔁🔂◀⏺❓❗♻®🔴🟥🔺🔻🔘","S":"🙂😊😇🥰😍🤩☺🥲😝🤗🤫🫡😏🫨😪😴🤧😎🙁😥😈💀☠😻🙈🙊💖💦💬🤘🤳🎅🦸🦹⛷🏂🗣🦥🦨🦢🐍🦕🐳🦭🦈🐚🦐🦑🐌🕷🕸🦂🌻🌱🌾☘🍓🥪🥙🥘🧂🍜🍝🍣🍦🍧🍰🍶🥄🏔🏟🏫🗽🕍⛩🌄🌅🌇🚉🚙🛹🛑⛵🚤🚢🛩💺🚟🛰⏱🕕🕡🕖🕢☀🌞⭐🌠⛅🌤🌥🌦❄☃⛄🎇✨🏅⚽🥎🎿🛷🎰♠🪡🕶🦺🧣🧦🥻🩳🛍🔈🔉🔊🎙🎷📜🗒🗓📏✂🛡🪛🪏📡💉🩺🚿🧷🧼🧽🛒🔜✡☪♏♐🔀⏹❇🫟🆘🔸🔹","T":"🤔😫💕💭👍👎🦷👅🧌🐯🐅🐫🦃🐢🦖🐠🌷🍊🍅🌮🫔🥡🫖🍵🍹🥃🗼⛺🚆🚊🚋🚎🚕🚜⏲🕛🕧🕑🕝🕒🕞🕙🕥🌡🌪🎋🎫🏆🎾🧸🧵👕🩴🎩🎺🪊☎📞🖲📺🪎📆📐🧰🧪🔭🚽🪥🔝♉⚧🔱™🚩","U":"🙃😒🦄☂☔⛱🔓⬆↗↖↕🔼🆙","V":"🖖✌🧛🌋🚦🏐🎮🎻📹📼♍📳🆚","W":"😉😜🥴😟😩🙀🤍👋✍👩🧕💃👭👫🐺🐃🪽🐋🪱💮🥀🍉🧇🍷🗺🪵💒🛞⌚🌒🌔🌖🌘🌬🌊🎐🎁🔫👚👡👢👒🗑🔧🦯🪟♿🚺🚾⚠☸🛜❔❕〰⚪⬜◻◽▫🔳🏳","X":"🩻","Y":"🥱💛🪀🧶💴☯🟡🟨","Z":"🤪🤐💤🧟🦓"};
+const EMOJI_MULTI_INITIALS = {"A":"🧑‍🎨 🧑‍🚀","B":"🧑‍🩰 🐈‍⬛ 🐦‍⬛ 🍄‍🟫 ⛓‍💥","C":"🧑‍🍳","D":"🧏‍♂ 🧏‍♀","E":"👁‍🗨","F":"😶‍🌫 😮‍💨 😵‍💫 🧑‍🌾 🧑‍🏭 🧑‍🚒","H":"🙂‍↔ 🙂‍↕ ❤‍🔥 🫱‍🫲 🧑‍⚕","J":"🧑‍⚖","L":"🍋‍🟩","M":"❤‍🩹 🧑‍🔧 🧑‍🎄 🧜‍♀","O":"🧑‍💼","P":"🧑‍🦰 🧑‍🦱 🧑‍🦳 🧑‍🦲 🧑‍✈ 🧑‍🍼 🧑‍🦯 🧑‍🦯‍➡ 🧑‍🦼 🧑‍🦼‍➡ 🧑‍🦽 🧑‍🦽‍➡ 🧑‍🐰‍🧑 🧑‍🫯‍🧑 🧑‍🤝‍🧑 🐻‍❄ 🐦‍🔥 🏴‍☠","R":"🏳‍🌈","S":"🧑‍🎓 🧑‍🔬 🧑‍🎤 🐕‍🦺","T":"🧑‍🏫 🧑‍💻 🏳‍⚧"};
+let emojiInitialMap = null;
+function emojiZwjInitial(k, map) {
+ if (/^(?:[\u{1F1E6}-\u{1F1FF}]{2}|\u{1F3F4}[\u{E0020}-\u{E007F}]+)$/u.test(k)) return "F";
+ if (/^(?:[#*0-9]\u20E3|\u{1F51F})$/u.test(k)) return "K";
+ if (k.includes("\u200D\u2764\u200D\u{1F48B}\u200D")) return "K";
+ if (k.includes("\u200D\u2764\u200D") && /^[\u{1F468}\u{1F469}\u{1F9D1}]/u.test(k)) return "C";
+ if (/^[\u{1F468}\u{1F469}\u{1F9D1}](?:\u200D[\u{1F466}\u{1F467}\u{1F468}\u{1F469}\u{1F9D1}\u{1F9D2}])+$/u.test(k)) return "F";
+ if (k.endsWith("\u200D\u27A1")) { const base = k.slice(0, -2); return emojiZwjInitial(base, map) || map.get(base) || null; }
+ if (/^\u{1F468}\u200D/u.test(k)) return "M";
+ if (/^\u{1F469}\u200D/u.test(k)) return "W";
+ if (k.endsWith("\u200D\u2642")) return "M";
+ if (k.endsWith("\u200D\u2640")) return "W";
+ return null;
+}
+function lookupEmojiInitial(grapheme) {
+ const stripped = grapheme.replace(/[\uFE0F\u{1F3FB}-\u{1F3FF}]/gu, "");
+ if (!emojiInitialMap) {
+  emojiInitialMap = new Map();
+  for (const [letter, chars] of Object.entries(EMOJI_SINGLE_INITIALS))
+   for (const ch of chars) emojiInitialMap.set(ch, letter);
+  for (const [letter, list] of Object.entries(EMOJI_MULTI_INITIALS))
+   for (const seq of list.split(" ")) emojiInitialMap.set(seq, letter);
+ }
+ return emojiInitialMap.get(stripped) || emojiZwjInitial(stripped, emojiInitialMap);
+}
+
+export function avatarInitial(name) {
  const raw = String(name ?? "").trim();
  if (!raw) return "?";
- if (typeof Intl !== "undefined" && typeof Intl.Segmenter === "function") {
-  const seg = new Intl.Segmenter("en", { granularity: "grapheme" }).segment(raw)[Symbol.iterator]().next().value?.segment;
-  if (seg) return /^[a-z]$/i.test(seg) ? seg.toUpperCase() : seg;
- }
- const ch = [...raw][0] || "?";
- return /^[a-z]$/i.test(ch) ? ch.toUpperCase() : ch;
+ const seg = typeof Intl !== "undefined" && typeof Intl.Segmenter === "function"
+  ? new Intl.Segmenter("en", { granularity: "grapheme" }).segment(raw)[Symbol.iterator]().next().value?.segment
+  : [...raw][0];
+ const glyph = seg || "?";
+ if (/^[a-z]$/i.test(glyph)) return glyph.toUpperCase();
+ return lookupEmojiInitial(glyph) || glyph;
 }
 
 function avatarTone(name) {
@@ -223,7 +252,7 @@ export function domainAvatarMediaPath(name) {
 
 export function updateDomainAvatarElement(avatarEl, name, mediaPath) {
  if (!avatarEl) return;
- const glyph = firstGrapheme(name);
+ const glyph = avatarInitial(name);
  const isEmoji = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(glyph);
  avatarEl.dataset.avatarDomain = String(name ?? "");
  avatarEl.dataset.avatarTone = avatarTone(name);
