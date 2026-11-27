@@ -2393,6 +2393,59 @@ try {
     h.payload.observedServerTime = prevObsTime;
   }
 
+  // 12. Emoji domain icons without an attached profile image show the emoji's initial letter (e.g. 🔥 -> F)
+  //     and hovering any domain icon scales it 20% larger.
+  {
+    const fireDeedId = "deed-fire-emoji-icon";
+    h.payload.state.deeds[fireDeedId] = {
+      id: fireDeedId,
+      name: "🔥",
+      owner: peerOwner,
+      parentId: null,
+      retired: false,
+      version: 1,
+      ownerVersion: 1,
+      rights: { kind: "permanent" },
+      records: [],
+      metadata: [],
+    };
+    h.payload.state.names["🔥"] = { name: "🔥", key: "🔥", activeId: fireDeedId, auctionId: null };
+    const ctxEmojiIcon = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const pageEmojiIcon = await ctxEmojiIcon.newPage();
+    const emojiIconErrors = [];
+    pageEmojiIcon.on("pageerror", (e) => emojiIconErrors.push(e.message));
+    await pageEmojiIcon.route("https://**", (r) => r.abort());
+    await pageEmojiIcon.goto(`${h.url}/d/${encodeURIComponent("🔥")}`);
+    await pageEmojiIcon.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await pageEmojiIcon.locator("#termsAgreeBtn").click();
+    const domainAvatar = pageEmojiIcon.locator("#domainTitle .domain-header-avatar");
+    await expect(domainAvatar).toBeVisible();
+    await expect(domainAvatar.locator(".domain-avatar-glyph")).toHaveText("F");
+    await expect(domainAvatar.locator("img")).toHaveCount(0);
+    // Hover icon -> enlarges by 20% (scale 1.2)
+    const baseBox = await domainAvatar.boundingBox();
+    assert.ok(baseBox && baseBox.width > 30, `Unexpected base avatar box: ${JSON.stringify(baseBox)}`);
+    await domainAvatar.hover();
+    await pageEmojiIcon.waitForTimeout(240);
+    const hoverBox = await domainAvatar.boundingBox();
+    const ratioW = hoverBox.width / baseBox.width;
+    const ratioH = hoverBox.height / baseBox.height;
+    assert.ok(ratioW > 1.18 && ratioW < 1.22 && ratioH > 1.18 && ratioH < 1.22, `Expected 20% larger hover scale, got ${ratioW.toFixed(3)}x${ratioH.toFixed(3)}`);
+    // Manage Domains profile preview for 🔥 also displays F when no profile image is attached
+    await pageEmojiIcon.goto(`${h.url}/?tab=escrow`);
+    await pageEmojiIcon.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await pageEmojiIcon.locator("#manageOwner").fill(peerOwner);
+    await pageEmojiIcon.locator("#manageLookup").click();
+    const fireCard = pageEmojiIcon.locator('#manageNames article[data-domain-name="🔥"]');
+    await expect(fireCard.locator("h3 .domain-header-avatar .domain-avatar-glyph")).toHaveText("F");
+    await fireCard.locator("details.profile-editor summary").click();
+    await expect(fireCard.locator(".profile-avatar-preview .domain-header-avatar .domain-avatar-glyph")).toHaveText("F");
+    assert.deepEqual(emojiIconErrors, []);
+    await ctxEmojiIcon.close();
+    delete h.payload.state.deeds[fireDeedId];
+    delete h.payload.state.names["🔥"];
+  }
+
   console.log("PASS Cart copy regression + full-site UI spacing & alignment audit across desktop (1280) and mobile (390)");
 } finally {
   await h.close();

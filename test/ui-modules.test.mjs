@@ -324,8 +324,25 @@ test('router domain avatars, escrow payer autofill, management plans, and addres
   assert.equal(avatar.classList.contains('has-image'), false);
   assert.equal(imgNode.removed, true);
   const emojiAvatar = routerMod.createDomainAvatar('🚀', { size: 'sm' });
-  assert.equal(emojiAvatar.children[0].classList.contains('domain-name'), true);
-  assert.equal(emojiAvatar.children[0].textContent, '🚀');
+  assert.equal(emojiAvatar.children[0].classList.contains('domain-name'), false);
+  assert.equal(emojiAvatar.children[0].textContent, 'R');
+  const fireAvatar = routerMod.createDomainAvatar('🔥', { size: 'lg' });
+  assert.equal(fireAvatar.children[0].textContent, 'F');
+  assert.equal(routerMod.avatarInitial('🍕'), 'P');
+  assert.equal(routerMod.avatarInitial('👩‍🦰'), 'W');
+  assert.equal(routerMod.avatarInitial('👨‍🚀'), 'M');
+  assert.equal(routerMod.avatarInitial('🇺🇸'), 'F');
+  assert.equal(routerMod.avatarInitial('1️⃣'), 'K');
+  assert.equal(routerMod.avatarInitial('👩‍❤️‍💋‍👨'), 'K');
+  assert.equal(routerMod.avatarInitial('👩‍❤️‍👨'), 'C');
+  assert.equal(routerMod.avatarInitial('👨‍👩‍👧'), 'F');
+  assert.equal(routerMod.avatarInitial('🏃‍➡️'), 'P');
+  assert.equal(routerMod.avatarInitial('🏃‍♂️'), 'M');
+  assert.equal(routerMod.avatarInitial('🏃‍♀️'), 'W');
+  assert.equal(routerMod.avatarInitial('🔥🔥'), 'F');
+  const fireWithImg = routerMod.createDomainAvatar('🔥', { size: 'lg', mediaPath: `/v1/media/${avatarCid}` });
+  assert.equal(fireWithImg.classList.contains('has-image'), true);
+  assert.equal(fireWithImg.children.some((c) => c.tagName === 'IMG'), true);
 
   assert.equal(manageMod.managedNames(ui.latestState, ownerA).length, 1);
   const childOffer = manageMod.managementPlan('createChildOffer', ui.latestState.deeds[deedId], ui.latestState, ownerA, '50', '24');
