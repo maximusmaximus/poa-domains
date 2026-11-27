@@ -3,15 +3,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { bindTabKeys } from "../reference-web/ui-a11y.js";
 import { suites, coverageMatrix } from "../scripts/ci.mjs";
-test("every main and auction tab has a unique explicit panel, labelled panel and initial roving tab stop", () => {
+test("every main, auction and explore tab has a unique explicit panel, labelled panel and initial roving tab stop", () => {
   const html = readFileSync("reference-web/index.html", "utf8"),
     ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((x) => x[1]);
   assert.equal(new Set(ids).size, ids.length);
   const tabs = [...html.matchAll(/<button[^>]*role="tab"[^>]*>/g)].map(
     (x) => x[0],
   );
-  assert.equal(tabs.length, 8);
-  assert.equal(tabs.filter((x) => x.includes('tabindex="0"')).length, 2);
+  assert.equal(tabs.length, 15);
+  assert.equal(tabs.filter((x) => x.includes('tabindex="0"')).length, 3);
   assert.ok(!html.includes('id="tabHandoff"'));
   assert.ok(html.includes('id="advancedLink"'));
   assert.ok(html.includes('id="handoffSection" data-section="handoff" aria-labelledby="handoffHeading"'));

@@ -391,6 +391,7 @@ async function runFullUiUxFlowsOnRegistryApp(
   assert.equal(await page.locator("#cartCount").innerText(), "2");
 
   await page.locator("#tabExplore").click();
+  await page.locator("#exploreTabOffers").click();
   const offerButtons = page.locator('#offers .card button[aria-label="Add to cart"]');
   assert.equal(await offerButtons.count(), 2);
   await offerButtons.nth(0).click();
@@ -635,6 +636,7 @@ async function runAgentRoundtripVerification(
   assert.match(auctionsText, /137501 registry units/);
 
   await page.locator("#tabExplore").click();
+  await page.locator("#exploreTabHistory").click();
   // Verify #history shows the new child purchase and carol's displaced bid as OUTBID
   const historyText = await page.locator("#history").innerText();
   assert.match(historyText, /Child purchase: BUILDER\.NEXUS/);
@@ -642,6 +644,7 @@ async function runAgentRoundtripVerification(
   assert.match(historyText, /OUTBID/);
 
   // Verify #balances now shows carol's 100000 registry units withdrawable outbid escrow refund
+  await page.locator("#exploreTabBalances").click();
   const balancesText = await page.locator("#balances").innerText();
   assert.match(balancesText, /Refund: 100000 registry units/);
   const refund=page.locator("#balances .card").filter({has:page.getByRole("heading",{name:"Refund: 100000 registry units",exact:true})});

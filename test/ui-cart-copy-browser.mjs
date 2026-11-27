@@ -465,7 +465,8 @@ try {
 
   // Explore tab: Names, Record, History, Balances all shorten & copy full address
   await pageAddr.locator("#tabExplore").click();
-  for (const sel of ["#names", "#history", "#balances"]) {
+  for (const [tabSel, sel] of [["#exploreTabNames", "#names"], ["#exploreTabHistory", "#history"], ["#exploreTabBalances", "#balances"]]) {
+    await pageAddr.locator(tabSel).click();
     const text = await pageAddr.locator(sel).innerText();
     assert.equal(text.includes(sampleOwner), false, `${sel} must not show unshortened PoA address`);
     assert.ok(text.includes("poa1...piRf"), `${sel} must show shortened PoA address`);
@@ -2553,6 +2554,65 @@ try {
     await expect(pageTicker.locator("#liveTickerTrack .ticker-chip").first()).toContainText("brandnewlive", { timeout: 9000 });
     await expect(pageTicker.locator("#liveTickerTrack .ticker-chip")).toHaveCount(100);
     assert.ok((await pageTicker.locator("#liveTicker").evaluate((n) => n.scrollLeft)) < 60, "Ticker should jump back near x=0 when a new top action arrives");
+    // Left/right gradient fade on populated #liveTicker
+    const tickerMask = await pageTicker.locator("#liveTicker").evaluate((n) => {
+      const cs = getComputedStyle(n);
+      return cs.maskImage || cs.webkitMaskImage || "";
+    });
+    assert.match(tickerMask, /linear-gradient.*(?:transparent|rgba\(0,\s*0,\s*0,\s*0\))/i, `Expected left/right gradient fade mask on #liveTicker, got ${tickerMask}`);
+    // Clicking #liveTicker opens Explore -> Last 500 Actions nicely grouped by day with filters
+    await pageTicker.locator("#liveTickerTrack .ticker-chip").first().click();
+    await expect(pageTicker.locator("#tabExplore")).toHaveAttribute("aria-selected", "true");
+    await expect(pageTicker.locator("#exploreTabActions")).toHaveAttribute("aria-selected", "true");
+    await expect(pageTicker.locator("#explorePanelActions")).toBeVisible();
+    const totalActionsShown = await pageTicker.locator("#exploreActions .action-row").count();
+    assert.ok(totalActionsShown > 100 && totalActionsShown <= 500, `Expected >100 actions (up to 500) in Explore Last 500 Actions, got ${totalActionsShown}`);
+    assert.ok((await pageTicker.locator("#exploreActions .actions-day-group").count()) >= 1);
+    await pageTicker.locator('#exploreActionsFilters button[data-action-filter="market"]').click();
+    await expect(pageTicker.locator('#exploreActionsFilters button[data-action-filter="market"]')).toHaveAttribute("aria-pressed", "true");
+    assert.ok((await pageTicker.locator("#exploreActions .action-row").count()) >= 1);
+    await pageTicker.locator('#exploreActionsFilters button[data-action-filter="all"]').click();
+    assert.equal(await pageTicker.locator("#exploreActions .action-row").count(), totalActionsShown);
+    // All 7 Explore tabs cleanly separate each section and include emojis on tabs & headings
+    const explorePairs = [
+      ["#exploreTabNames", "#explorePanelNames"],
+      ["#exploreTabActions", "#explorePanelActions"],
+      ["#exploreTabOffers", "#explorePanelOffers"],
+      ["#exploreTabHistory", "#explorePanelHistory"],
+      ["#exploreTabBalances", "#explorePanelBalances"],
+      ["#exploreTabResources", "#explorePanelResources"],
+      ["#exploreTabRaw", "#explorePanelRaw"],
+    ];
+    for (const [tabSel, panelSel] of explorePairs) {
+      await pageTicker.locator(tabSel).click();
+      await expect(pageTicker.locator(tabSel)).toHaveAttribute("aria-selected", "true");
+      await expect(pageTicker.locator(panelSel)).toBeVisible();
+      const tabText = await pageTicker.locator(tabSel).innerText();
+      const headText = await pageTicker.locator(`${panelSel} h3`).first().innerText();
+      assert.match(tabText, /\p{Extended_Pictographic}/u, `Explore tab ${tabSel} must have an emoji: ${tabText}`);
+      assert.match(headText, /\p{Extended_Pictographic}/u, `Explore panel ${panelSel} heading must have an emoji: ${headText}`);
+      for (const [, otherPanel] of explorePairs) {
+        if (otherPanel !== panelSel) await expect(pageTicker.locator(otherPanel)).toBeHidden();
+      }
+    }
+    // Scrolling #liveTicker > 3 times (4th distinct scroll gesture) opens Explore -> Last 500 Actions
+    await pageTicker.locator("#tabFind").click();
+    await expect(pageTicker.locator("#tabFind")).toHaveAttribute("aria-selected", "true");
+    await pageTicker.locator("#exploreTabNames").evaluate((b) => b.click()); // ensure Actions tab isn't already selected
+    const scrollBox = await pageTicker.locator("#liveTicker").boundingBox();
+    for (let i = 1; i <= 4; i++) {
+      await pageTicker.mouse.move(scrollBox.x + 260, scrollBox.y + scrollBox.height / 2);
+      await pageTicker.mouse.down();
+      await pageTicker.mouse.move(scrollBox.x + 120, scrollBox.y + scrollBox.height / 2, { steps: 5 });
+      await pageTicker.mouse.up();
+      if (i <= 3) {
+        await expect(pageTicker.locator("#tabFind")).toHaveAttribute("aria-selected", "true");
+      } else {
+        await expect(pageTicker.locator("#tabExplore")).toHaveAttribute("aria-selected", "true");
+        await expect(pageTicker.locator("#exploreTabActions")).toHaveAttribute("aria-selected", "true");
+        await expect(pageTicker.locator("#explorePanelActions")).toBeVisible();
+      }
+    }
     assert.deepEqual(tickerErrors, []);
     await ctxTicker.close();
 

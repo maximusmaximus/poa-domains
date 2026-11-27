@@ -6,15 +6,15 @@ export function itemStep(el,gap=12){
  if(p)return el.getBoundingClientRect().left-p.getBoundingClientRect().left;
  return(el?.getBoundingClientRect().width||0)+gap;
 }
-export function autoScroll(node,{speed=20,direction=1,advance,onScroll,onScrollSettle}={}){
+export function autoScroll(node,{speed=20,direction=1,advance,onScroll,onScrollSettle,onUserScroll}={}){
  if(!node)return;
  const prior=controllers.get(node);
- if(prior){prior.speed=speed;prior.direction=direction<0?-1:1;prior.advance=advance;prior.onScroll=onScroll;prior.onScrollSettle=onScrollSettle;return prior;}
+ if(prior){prior.speed=speed;prior.direction=direction<0?-1:1;prior.advance=advance;prior.onScroll=onScroll;prior.onScrollSettle=onScrollSettle;prior.onUserScroll=onUserScroll;return prior;}
  const media=globalThis.matchMedia?.("(prefers-reduced-motion: reduce)"),noHover=globalThis.matchMedia?.("(hover: none)");
- let hovered=false,touching=false,dragging=false,dragMoved=false,dragStartX=0,dragLastX=0,suppressClickUntil=0,focusFromPointer=false,lastTouchAt=-Infinity,until=0,settleTimer=null,last=performance.now(),position=node.scrollLeft,expectedScroll=node.scrollLeft;
+ let hovered=false,touching=false,touchMoved=false,touchStartX=0,touchStartY=0,dragging=false,dragMoved=false,dragStartX=0,dragLastX=0,suppressClickUntil=0,focusFromPointer=false,lastTouchAt=-Infinity,lastWheelAt=-Infinity,until=0,settleTimer=null,last=performance.now(),position=node.scrollLeft,expectedScroll=node.scrollLeft;
  const hasKbFocus=()=>node.contains(document.activeElement)&&!focusFromPointer;
  const state={
-  speed,direction:direction<0?-1:1,advance,onScroll,onScrollSettle,
+  speed,direction:direction<0?-1:1,advance,onScroll,onScrollSettle,onUserScroll,
   interacting:()=>hovered||touching||dragging||hasKbFocus()||performance.now()<until,
   paused:()=>state.interacting()||document.hidden,
   reset(next=0){const t=typeof next==="number"&&Number.isFinite(next)?Math.max(0,next):0;position=expectedScroll=node.scrollLeft=t;},
@@ -33,9 +33,9 @@ export function autoScroll(node,{speed=20,direction=1,advance,onScroll,onScrollS
    if(typeof next==="number"&&Number.isFinite(next)){if(Math.abs(next-node.scrollLeft)>0.5)node.scrollLeft=next;position=expectedScroll=node.scrollLeft;}
   },140);
  };
- const beginTouch=()=>{touching=true;hovered=false;focusFromPointer=true;lastTouchAt=performance.now();clearTimeout(settleTimer);pause();};
- const endTouch=()=>{if(!touching)return;touching=false;hovered=false;lastTouchAt=performance.now();pause();scheduleSettle();};
- const endDrag=()=>{if(!dragging)return;const moved=dragMoved;dragging=false;dragMoved=false;node.classList.remove("is-dragging");if(moved){suppressClickUntil=performance.now()+250;pause();scheduleSettle();}};
+ const beginTouch=e=>{touching=true;const t=e?.touches?.[0];if(e?.type==="touchstart"&&t){touchStartX=t.clientX;touchStartY=t.clientY;}else if(e?.type==="touchmove"&&t){const dx=Math.abs(t.clientX-touchStartX),dy=Math.abs(t.clientY-touchStartY);if(dx>10&&dx>=dy)touchMoved=true;}hovered=false;focusFromPointer=true;lastTouchAt=performance.now();clearTimeout(settleTimer);pause();};
+ const endTouch=()=>{if(!touching)return;const swiped=touchMoved;touching=false;touchMoved=false;hovered=false;lastTouchAt=performance.now();pause();scheduleSettle();if(swiped)state.onUserScroll?.();};
+ const endDrag=()=>{if(!dragging)return;const moved=dragMoved;dragging=false;dragMoved=false;node.classList.remove("is-dragging");if(moved){suppressClickUntil=performance.now()+250;pause();scheduleSettle();state.onUserScroll?.();}};
  const onTouchEnd=e=>{if(e.type==="touchend"&&(e.touches?.length??0)>0)return;endTouch();};
  const onMove=e=>{
   if(!dragging)return;
@@ -77,9 +77,12 @@ export function autoScroll(node,{speed=20,direction=1,advance,onScroll,onScrollS
    if(e.shiftKey&&!e.deltaX){e.preventDefault();node.scrollLeft+=dx;expectedScroll=position=node.scrollLeft;}
    applyAdjust(dir);
   }
+  const now=performance.now();
+  if((dx!==0||Math.abs(e.deltaY)>0)&&now-lastWheelAt>450)state.onUserScroll?.();
+  lastWheelAt=now;
   pause();scheduleSettle();
  },{passive:false});
- for(const t of["keydown","focusout"])node.addEventListener(t,()=>{if(t==="focusout"&&!node.contains(document.activeElement))focusFromPointer=false;pause();},{passive:true});
+ for(const t of["keydown","focusout"])node.addEventListener(t,e=>{if(t==="focusout"&&!node.contains(document.activeElement))focusFromPointer=false;if(t==="keydown"&&(e.key==="ArrowLeft"||e.key==="ArrowRight"))state.onUserScroll?.();pause();},{passive:true});
  node.addEventListener("scroll",()=>{
   const cur=node.scrollLeft,delta=cur-expectedScroll;
   if(Math.abs(delta)>2){const dir=delta>0?1:-1;pause();if(!touching&&!dragging&&!hovered&&Math.abs(delta)>24)applyAdjust(dir);if(!touching&&!dragging)scheduleSettle();}

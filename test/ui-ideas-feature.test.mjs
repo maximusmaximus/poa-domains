@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {createIdeaGenerator,ideaPools} from "../reference-web/ideas-generator.js";
-import {MAX_RECENT_ACTIONS,recentActions} from "../reference-web/ui-ticker.js";
+import {MAX_EXPLORE_ACTIONS,MAX_RECENT_ACTIONS,recentActions} from "../reference-web/ui-ticker.js";
 import {ui} from "../reference-web/ui-state.js";
 import {actionLabel,buttonIcon,decorateEmojiButton} from "../reference-web/ui-copy.js";
 import {managedNames,managementPlan} from "../reference-web/ui-manage.js";
@@ -61,6 +61,14 @@ test('the ticker merges registry seconds and escrow milliseconds newest-first, l
  // Stale 18h-old auction and ancient future-expiring offer must NOT jump to front (and drop past 100)
  assert.ok(!items.some(x=>x.name==='oldwon'),'stale auction beyond last 100 must be dropped');
  assert.ok(!items.some(x=>x.id==='offer:offer-old'),'old offer with future validUntil must not pin to top');
+ // Explore Last 500 Actions cap returns up to 500 newest-first items with actor, category, and atMs metadata
+ assert.equal(MAX_EXPLORE_ACTIONS,500);
+ const exploreItems=recentActions({time:baseSec+1280,names:{},deeds,receipts,offers},market,MAX_EXPLORE_ACTIONS);
+ assert.ok(exploreItems.length>125&&exploreItems.length<=500);
+ assert.equal(exploreItems[0].category,'market');
+ assert.equal(exploreItems[0].actor,'poa1B');
+ assert.ok(exploreItems[0].atMs>1e12);
+ assert.equal(exploreItems.find(x=>x.id==='receipt:r-126').category,'domain');
 });
 
 test('v3 keeps headerless masonry, flat closable status and always-visible corner help',()=>{
