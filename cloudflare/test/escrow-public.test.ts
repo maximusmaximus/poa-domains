@@ -78,3 +78,34 @@ test('display error telemetry is bounded public codes, never raw private excepti
  const e=fixture();Object.assign(e.net,{displayStatus:async()=>{throw Error('synthetic-private-node-url-and-credential');}});
  const shown=await e.escrow.readiness();assert.equal(shown.held,true);assert.equal(shown.code,'ESCROW_NODE_UNAVAILABLE');assert.equal(shown.timing,null);assert.ok(!JSON.stringify(shown).includes('synthetic-private'));
 });
+test('expired, malformed, and bad-base58 commands throw deterministic ESCROW_* validation codes and never map to 503 across DO RPC',async()=>{
+ const get=()=>{throw Error('MUST_NOT_INIT');};
+ await assert.rejects(()=>publicCommand(get,packet(3,'intent',{amount:'1.000000'},'exp',{expires:1800000000}),'test-registry','intent',1800000000000),/ESCROW_COMMAND_EXPIRED/);
+ await assert.rejects(()=>publicCommand(get,JSON.stringify({command:{action:'view'},signature:'bad'}),'test-registry','account',1800000000000),/ESCROW_COMMAND_SCHEMA/);
+ await assert.rejects(()=>publicCommand(get,JSON.stringify({command:{...command(who(3),'sig','view',{}),expires:1800001800},signature:'not-base58!'}),'test-registry','account',1800000000000),/ESCROW_SIGNATURE/);
+ await assert.rejects(()=>publicCommand(get,JSON.stringify({command:{...command('poa1bad!','addr','view',{}),expires:1800001800},signature:'1'.repeat(88)}),'test-registry','account',1800000000000),/ESCROW_ADDRESS/);
+ // Simulate DO RPC prototype stripping (plain Error with catalogue code message).
+ for(const code of ['ESCROW_COMMAND_EXPIRED','ESCROW_COMMAND_SCHEMA','ESCROW_SIGNATURE','SCHEMA']){
+  const r=await escrowHttp(req('account',packet(3,'view',{})),env,()=>({escrowRead:async()=>({}),escrowCommand:async()=>{throw new Error(code);}}));
+  assert.equal(r.status,400,code);
+  const b=await r.json() as any;assert.equal(b.code,code);assert.equal(b.accepted,false);
+ }
+});
+test('display readiness backs off 15s on ESCROW_STALE / ESCROW_NODE_HTTP while financial commands stay uncached',async()=>{
+ const e=fixture();await e.escrow.pause(false);let probes=0;let mode:'stale'|'http'|'ok'='stale';
+ Object.assign(e.net,{displayStatus:async()=>{probes++;if(mode==='http')throw Error('ESCROW_NODE_HTTP');return {...await e.net.status(),stale:mode==='stale'};}});
+ const h1=await e.escrow.readiness();assert.equal(h1.held,true);assert.equal(h1.code,'ESCROW_STALE');assert.equal(probes,1);
+ e.net.now+=12000;
+ assert.equal((await e.escrow.readiness()).code,'ESCROW_STALE');assert.equal(probes,1,'stale hold stays cached for 15s');
+ // Uncached financial command still succeeds immediately when upstream is healthy.
+ mode='ok';
+ const intentRes:any=await call(e,3,'intent',{amount:'1.000000'},'uncached-ok','intent');
+ assert.ok(intentRes.result.intent,'financial command bypasses 15s display hold cache');
+ e.net.now+=3001;
+ const recovered=await e.escrow.readiness();assert.equal(recovered.held,false);assert.equal(probes,2);
+ // HTTP 503 display hold also caches for 15s.
+ e.net.now+=10001;mode='http';
+ const h2=await e.escrow.readiness();assert.equal(h2.held,true);assert.equal(h2.code,'ESCROW_NODE_HTTP');assert.equal(probes,3);
+ e.net.now+=14999;assert.equal((await e.escrow.readiness()).code,'ESCROW_NODE_HTTP');assert.equal(probes,3);
+ e.net.now+=2;mode='ok';assert.equal((await e.escrow.readiness()).held,false);assert.equal(probes,4);
+});

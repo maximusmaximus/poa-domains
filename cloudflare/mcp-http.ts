@@ -4,7 +4,7 @@ import { intentId } from "../src/auth.js";
 import { McpCore, MCP_VERSION, rpcError } from "../src/mcp-core.js";
 import { registryMcpProfile, McpRegistryBackend } from "../src/mcp-registry.js";
 import { parseMcpJSON } from "../src/mcp-json.js";
-import { correlationId, errorEnvelope, errorReply } from "../src/errors.js";
+import { correlationId, ERROR_CATALOGUE, errorEnvelope, errorReply } from "../src/errors.js";
 import { Fault, need } from "../src/core.js";
 import { SINGLETON } from "./registry.js";
 import { networkStatusMonitor } from "./network-status.js";
@@ -212,8 +212,8 @@ export async function mcpHttp(request: Request, env: Env, ctx?: ExecutionContext
           try {
             return await env.REGISTRY.getByName(SINGLETON).escrowCommand(JSON.stringify(packet), "command");
           } catch (error) {
-            const knownCode = error instanceof Fault ? error.code : error instanceof Error && /^ESCROW_[A-Z_]+$/.test(error.message) ? error.message : null;
-            const unknown = !knownCode || knownCode === "ESCROW_UNAVAILABLE" || knownCode === "ESCROW_HELD";
+            const knownCode = error instanceof Fault ? error.code : error instanceof Error && (/^ESCROW_[A-Z_]+$/.test(error.message) || Object.hasOwn(ERROR_CATALOGUE, error.message)) ? error.message : null;
+            const unknown = !knownCode || knownCode === "ESCROW_UNAVAILABLE" || knownCode === "ESCROW_HELD" || knownCode === "DURABILITY_UNKNOWN_RESTART_AND_QUERY" || knownCode === "OUTCOME_UNKNOWN" || knownCode === "UNKNOWN_OUTCOME";
             const code = knownCode ?? "ESCROW_UNAVAILABLE";
             throw Object.assign(new Fault(code), {
               detail: errorEnvelope(code, requestId, { accepted: unknown && isWrite ? "unknown" : false }),

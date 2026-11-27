@@ -56,7 +56,9 @@ ESCROW_CHAIN
 ESCROW_CHECKPOINT
 ESCROW_CHECKPOINT_DETAILS_REQUIRED
 ESCROW_CHECKPOINT_ROLLBACK
+ESCROW_COMMAND_EXPIRED
 ESCROW_COMMAND_EXPIRY
+ESCROW_COMMAND_SCHEMA
 ESCROW_CONSENT_EXPIRING
 ESCROW_CONTEXT_UNAVAILABLE
 ESCROW_CUT
@@ -450,6 +452,9 @@ const messages:Record<string,string> = {
  NETWORK_ERROR:'The read failed before any signed submission. Check the connection and try again.',
  ESCROW_UNAVAILABLE:'Escrow outcome may be unknown. Keep the exact signed request and query the signed account.',
  ESCROW_HELD:'Escrow is held. Keep the exact signed request and check its account before another action.',
+ ESCROW_COMMAND_EXPIRED:'The signed escrow command has expired. Sign a fresh command with a future expiry timestamp.',
+ ESCROW_COMMAND_SCHEMA:'The signed escrow command is missing required fields or has an invalid shape. Check the documented schema before signing again.',
+ ESCROW_SIGNATURE:'The escrow command signature is invalid or malformed. Verify the canonical command payload and Ed25519 base58 signature.',
  INVALID_POA_ADDRESS:'Enter a valid public poa1 address.',
  INVALID_BTC_ADDRESS:'Enter a valid Bitcoin mainnet address (bc1… SegWit/Taproot or legacy 1…/3… with valid checksum).',
  INVALID_ETH_ADDRESS:'Enter a valid Ethereum 0x… address (40 hex characters).',

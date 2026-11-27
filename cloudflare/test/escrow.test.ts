@@ -1457,6 +1457,44 @@ test("primary status timeout skips hung primary during cooldown and re-probes af
  assert.equal(primaryHits.length,3,"recovered primary stays active");
 });
 
+test("primary status HTTP 503 enters cooldown even when fallback is stale, avoids log spam, and re-probes after expiry",async()=>{
+ let now=NOW_V2,primary503=true,fallbackStale=true,fallback503=false;
+ const primaryHits:number[]=[],fallbackHits:number[]=[];
+ const liveStatus=()=>({network:"PoA prototype",K:5,txs:5600,final:4800,invalid:0,epochs_closed:128,as_of:new Date(now-1000).toISOString(),checkpoint_height:100,state_root:root,...(fallbackStale?{stale:true,stale_age_s:600}:{})});
+ const facts={chain_id:CHAIN,open_epoch:128,engine_sha256:MAINNET_ENGINE_SHA256,params_sha256:MAINNET_PARAMS_SHA256,economics:{K:5}};
+ const request=(async(input:any)=>{
+  const p=new URL(String(input)).pathname;
+  if(p===`/chain/${CHAIN}/api/status`){primaryHits.push(now);if(primary503)return Response.json({error:"warming",retry_after_seconds:15},{status:503});return Response.json({...liveStatus(),chain_id:CHAIN,stale:false});}
+  if(p==="/api/status"){fallbackHits.push(now);if(fallback503)return Response.json({error:"busy"},{status:503});return Response.json(liveStatus());}
+  return Response.json(facts);
+ }) as typeof fetch;
+
+ const logs:string[]=[];
+ const origErr=console.error;
+ console.error=(...args:any[])=>{logs.push(args.join(" "));};
+ try{
+  const net=new PoaHttpNetwork(()=>false,request,undefined,()=>now);
+  // 1st call: primary returns 503, fallback answers stale -> throws ESCROW_STALE AND enters 5m cooldown with 1 cooldown log (no escrow-node-http spam).
+  await assert.rejects(net.displayStatus(),/ESCROW_STALE/);
+  assert.equal(primaryHits.length,1);assert.equal(fallbackHits.length,1);
+  assert.equal(logs.filter(l=>l.includes("escrow-node-http")).length,0,"fallback-handled primary 503 must not spam escrow-node-http");
+  assert.equal(logs.filter(l=>l.includes("escrow-primary-cooldown")).length,1,"cooldown entry logged once");
+  // 2nd & 3rd calls during cooldown go straight to /api/status without touching the warming primary.
+  now+=15_000;await assert.rejects(net.displayStatus(),/ESCROW_STALE/);
+  fallbackStale=false;now+=15_000;await net.status();
+  assert.equal(primaryHits.length,1,"warming 503 primary stays skipped during cooldown even after ESCROW_STALE");
+  assert.equal(fallbackHits.length,3);
+  // After 5m cooldown expires, primary is probed again and recovers cleanly.
+  primary503=false;now+=300_000;
+  await net.status();
+  assert.equal(primaryHits.length,2,"primary re-probed after cooldown");
+  // When BOTH routes return 503, escrow-node-http IS logged and ESCROW_NODE_HTTP is thrown.
+  primary503=true;fallback503=true;now+=10_000;
+  await assert.rejects(net.status(),/ESCROW_NODE_HTTP/);
+  assert.ok(logs.some(l=>l.includes("escrow-node-http")),"total upstream HTTP failure still logs escrow-node-http");
+ }finally{console.error=origErr;}
+});
+
 test("transport failures in cut/lookup/context map cleanly to ESCROW_NETWORK_HELD and bid only fetches status once before reconcile",async()=>{
  const f=fixture();await fund(f,3,"10.000000");
  const o=await f.e.command(command(who(2),"open-net","open",{name:"nettest",reserve:"1.000000"})) as any;

@@ -201,19 +201,22 @@ export function createNetworkStatusMonitor(deps: NetworkStatusDeps = {}) {
         latencyMs,
       });
     };
-    const primaryCap = started < primarySlowUntil ? Math.min(2000, Math.floor(requestMs * 0.6)) : Math.floor(requestMs * 0.6);
-    const primary = await fetchStatusJson(STATUS_URL, primaryCap);
+    const inCooldown = started < primarySlowUntil;
+    const firstUrl = inCooldown ? FALLBACK_STATUS_URL : STATUS_URL;
+    const secondUrl = inCooldown ? STATUS_URL : FALLBACK_STATUS_URL;
+    const firstCap = Math.floor(requestMs * 0.6);
+    const first = await fetchStatusJson(firstUrl, firstCap);
     let body: Record<string, unknown> | null = null;
-    if ("body" in primary) {
-      body = primary.body;
-      primarySlowUntil = 0;
-    } else if (primary.retryable) {
+    if ("body" in first) {
+      body = first.body;
+      if (!inCooldown) primarySlowUntil = 0;
+    } else if (first.retryable) {
       const remaining = requestMs - Math.max(0, now() - started);
       if (remaining > 0) {
-        const fallback = await fetchStatusJson(FALLBACK_STATUS_URL, remaining);
-        if ("body" in fallback) {
-          body = fallback.body;
-          primarySlowUntil = now() + PRIMARY_SLOW_TTL_MS;
+        const second = await fetchStatusJson(secondUrl, remaining);
+        if ("body" in second) {
+          body = second.body;
+          primarySlowUntil = inCooldown ? 0 : now() + PRIMARY_SLOW_TTL_MS;
         }
       }
     }

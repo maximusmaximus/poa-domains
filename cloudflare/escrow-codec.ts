@@ -4,8 +4,9 @@ import { base58, unbase58 } from "../src/native-crypto.js";
 import { canonical, exact, integer, need, obj, text } from "../src/core.js";
 export const CHAIN = "poa-mainnet-1";
 export function address(value: unknown): string {
-  const s = text(value, 64); need(s.startsWith("poa1"), "ESCROW_ADDRESS");
-  unbase58(s.slice(4), 32); return s;
+  need(typeof value === "string" && value.length > 0 && value.length <= 64 && !/[\u0000-\u001f\ud800-\udfff]/u.test(value) && value.startsWith("poa1"), "ESCROW_ADDRESS");
+  try { unbase58(value.slice(4), 32); } catch { need(false, "ESCROW_ADDRESS"); }
+  return value;
 }
 export function micros(value: unknown): bigint {
   need(typeof value === "string" && /^(0|[1-9][0-9]{0,12})\.[0-9]{6}$/.test(value), "ESCROW_AMOUNT");
@@ -60,13 +61,23 @@ export interface Command {
   actor: string; key: string; expires: number; action: string; params: Record<string, unknown>;
 }
 export function verifyCommand(value: unknown, registryId: string, now: number): Command {
-  const v = exact(value, ["command", "signature"]);
-  const c = exact(v.command, ["domain", "chainId", "registryId", "actor", "key", "expires", "action", "params"]) as Command;
+  let v: Record<string, unknown>;
+  let c: Command;
+  try {
+    v = exact(value, ["command", "signature"]);
+    c = exact(v.command, ["domain", "chainId", "registryId", "actor", "key", "expires", "action", "params"]) as Command;
+  } catch { need(false, "ESCROW_COMMAND_SCHEMA"); }
   need(c.domain === "poa-domains.escrow.v1" && c.chainId === CHAIN && c.registryId === registryId, "ESCROW_DOMAIN");
-  address(c.actor); need(/^[a-zA-Z0-9_-]{1,64}$/.test(text(c.key,64)), "ESCROW_IDEMPOTENCY_KEY");
-  integer(c.expires, now + 1); text(c.action, 32); obj(c.params);
+  address(c.actor);
+  need(typeof c.key === "string" && /^[a-zA-Z0-9_-]{1,64}$/.test(c.key), "ESCROW_IDEMPOTENCY_KEY");
+  need(typeof c.expires === "number" && Number.isSafeInteger(c.expires) && c.expires >= 0, "ESCROW_COMMAND_SCHEMA");
+  need(c.expires >= now + 1, "ESCROW_COMMAND_EXPIRED");
+  need(typeof c.action === "string" && c.action.length > 0 && c.action.length <= 32 && !/[\u0000-\u001f\ud800-\udfff]/u.test(c.action), "ESCROW_ACTION");
+  try { obj(c.params); } catch { need(false, "ESCROW_COMMAND_SCHEMA"); }
+  let sigBytes: Buffer;
+  try { sigBytes = unbase58(v.signature, 64); } catch { need(false, "ESCROW_SIGNATURE"); }
   const pub = createPublicKey({ format: "der", type: "spki", key: Buffer.concat([
     Buffer.from("302a300506032b6570032100", "hex"), unbase58(c.actor.slice(4),32)]) });
-  need(verify(null, Buffer.from(canonical(c)), pub, unbase58(v.signature,64)), "ESCROW_SIGNATURE");
+  need(verify(null, Buffer.from(canonical(c)), pub, sigBytes), "ESCROW_SIGNATURE");
   return c;
 }
