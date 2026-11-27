@@ -91,15 +91,18 @@ h2,h3,h4{color:#9cffe0;overflow-wrap:anywhere}
 .actions-list{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
 .action-row{display:grid;gap:.35rem;padding:.62rem .78rem;background:#10212c;border:1px solid #264252;border-radius:.6rem;font-size:.86rem;line-height:1.35;margin:0}
 .action-row-top,.action-row-foot{display:flex;align-items:center;justify-content:space-between;gap:.35rem .6rem;flex-wrap:wrap;min-width:0}
-.action-row-main,#history .action-row>h4{display:inline-flex;flex-wrap:wrap;align-items:center;gap:.32rem;min-width:0;margin:0;font-size:.86rem;font-weight:600;color:#d9eff7;overflow-wrap:anywhere}
+.action-row-main,#history .action-row>h4{min-width:0;margin:0;font-size:.86rem;font-weight:600;color:#d9eff7;overflow-wrap:anywhere}
+.action-row-main{display:inline-flex;flex-wrap:wrap;align-items:center;gap:.32rem}
 #history .action-row{grid-template-columns:1fr auto}
+#history .action-row>h4{align-self:center}
 #history .action-row>.action-row-foot,#history .action-row>.action-row-req{grid-column:1/-1}
 .action-verb{display:inline-flex;align-items:center;gap:.25rem;padding:.1rem .48rem;border-radius:999px;background:#162d3b;border:1px solid #2f5466;color:#d9eff7;font-size:.76rem;font-weight:600;white-space:nowrap}
-.action-row-right{display:inline-flex;align-items:center;gap:.35rem;margin-left:auto;white-space:nowrap;font-variant-numeric:tabular-nums}
+.action-row-right,.action-row-time{margin-left:auto;white-space:nowrap;font-variant-numeric:tabular-nums}
+.action-row-right{display:inline-flex;align-items:center;gap:.35rem}
 .action-amount{color:#9cffe0;font-weight:700;font-size:.84rem}
 .action-row-foot{font-size:.77rem;color:#9db7c7;padding-top:.22rem;border-top:1px solid rgba(55,90,108,.35)}
 .action-row-actor{display:inline-flex;flex-wrap:wrap;align-items:center;gap:.25rem;min-width:0}
-.action-row-time{margin-left:auto;white-space:nowrap;font-variant-numeric:tabular-nums;color:#8faabc}
+.action-row-time{color:#8faabc}
 .action-row-req{font-size:.72rem;color:#9db7c7;overflow-wrap:anywhere}
 .action-seq{padding:.06rem .42rem;border-radius:999px;background:#173242;border:1px solid #3d6474;color:#9cffe0;font-size:.74rem;font-weight:600}
 .action-row .poa-copy-btn{padding:.08rem .24rem;min-height:1.5rem;min-width:1.5rem;font-size:.72rem}
