@@ -7,5 +7,5 @@
   "assets":{"directory":"../../reference-web","binding":"ASSETS","run_worker_first":["/healthz","/v1/*","/d/*","/p/*"]},
   "alias":{"#poa-unicode-data":"../unicode-data.ts"},
   "rules":[{"type":"Text","globs":["**/*.txt"],"fallthrough":true}],
-  "vars":{"PUBLIC_EXPLORER_URL":"https://poadomains.grok.me","BACKEND_HOST":"poadomains-registry.maxinfeld-artshow.workers.dev","CONTRACT_CONFIG":""}
+  "vars":{"PUBLIC_EXPLORER_URL":"https://poadomains.link","BACKEND_HOST":"poadomains-registry.maxinfeld-artshow.workers.dev","CONTRACT_CONFIG":""}
 }

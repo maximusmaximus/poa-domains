@@ -34,9 +34,9 @@ test("POA amounts are exact 6-decimal strings; bad input is refused", () => {
   for (const bad of ["", "0", "-1", "1.0000001", "1e3", "01", "abc", "1,5"]) assert.throws(() => poaAmount(bad), /POA amount/);
 });
 test("agent requests are unsigned, exact and POA-only", () => {
-  const sell = buildSubnameListingPrompt({ parent: "maple", price: "12.5", endpointUrl: "https://poadomains.grok.me" });
+  const sell = buildSubnameListingPrompt({ parent: "maple", price: "12.5", endpointUrl: "https://poadomains.link" });
   assert.match(sell, /list-sub \{parent:"maple", price:"12\.500000"\}/); assert.match(sell, /cancel-sub/); assert.match(sell, /Only after I approve/);
-  const buy = buildSubnamePurchasePrompt({ name: "shop.maple", listing: "a".repeat(64), price: "12.500000", endpointUrl: "https://poadomains.grok.me" });
+  const buy = buildSubnamePurchasePrompt({ name: "shop.maple", listing: "a".repeat(64), price: "12.500000", endpointUrl: "https://poadomains.link" });
   assert.match(buy, /Never send more than 12\.500000 POA/); assert.match(buy, /price:"12500000"/); assert.match(buy, /buy-sub \{listing:"a{64}", name:"shop\.maple", amount:"12\.500000"/);
   assert.match(buy, /Do not submit it to \/v1\/intents/);
   for (const t of [sell, buy]) assert.doesNotMatch(t, /registry units|internal units|private key/i);

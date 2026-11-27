@@ -52,7 +52,7 @@ const child = spawn(
     "cloudflare/test/mcp.wrangler.jsonc",
     "--local",
     "--local-upstream",
-    "poadomains.grok.me",
+    "poadomains.link",
     "--ip",
     "127.0.0.1",
     "--port",
@@ -317,7 +317,7 @@ try {
       .code,
     -32602,
   );
-  await post(rpc("ping"), { origin: "https://poadomains.grok.me" }, 403);
+  await post(rpc("ping"), { origin: "https://poadomains.link" }, 403);
   await post(rpc("ping"), { "sec-fetch-site": "same-origin" }, 403);
   await post(rpc("ping"), { "mcp-protocol-version": "bad" }, 400);
   await post(rpc("ping"), { accept: "application/json" }, 406);

@@ -31,7 +31,7 @@ time and generation time (milliseconds). SHA-256 is computed over the canonical
 `["local-state/v1", rawCommittedState]`, matching the Engine. The observed-clock
 UI projection is **not** a committed hash. A provided inconsistent hash is rejected.
 
-Use remote MCP **first**, `https://poadomains.grok.me/mcp`, Streamable HTTP,
+Use remote MCP **first**, `https://poadomains.link/mcp`, Streamable HTTP,
 protocol `2025-11-25`; local CLI prepare/submit is second. Before using a target,
 read capabilities/state and compare the complete identity and initial snapshot.
 A local or synthetic-demo cart must never be submitted to production merely

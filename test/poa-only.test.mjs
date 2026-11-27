@@ -97,7 +97,7 @@ test("POA cart: fixed POA price, review catches a taken name, handoff totals exa
   const taken = structuredClone(state); taken.names.newpublicname = { activeId: "x".repeat(64), auctionId: null };
   assert.equal(cartReview(a, cap, taken).canAcknowledge, false);
   assert.equal(cartReview({ ...a, amount: "1.000000" }, cap, state).canAcknowledge, false, "a changed price needs review");
-  const handoff = buildPoaCheckoutHandoff([a, b], cap, "https://poadomains.grok.me", payload, 1);
+  const handoff = buildPoaCheckoutHandoff([a, b], cap, "https://poadomains.link", payload, 1);
   assert.equal(handoff.totalPrice, "1100.000000");
   assert.equal(handoff.items[1].priceMicros, "1000000000");
   assert.equal(handoff.registryId, PRODUCTION_REGISTRY_ID);
@@ -109,6 +109,6 @@ test("POA cart: fixed POA price, review catches a taken name, handoff totals exa
   assert.match(text, /mints permanent ownership to my address immediately/);
   assert.match(text, /\/v1\/resolve\?name=<name>/);
   assert.doesNotMatch(text, /registry units|internal/);
-  assert.throws(() => buildPoaCheckoutHandoff([{ ...a, action: "bid" }], cap, "https://poadomains.grok.me", payload, 1));
+  assert.throws(() => buildPoaCheckoutHandoff([{ ...a, action: "bid" }], cap, "https://poadomains.link", payload, 1));
   assert.throws(() => buildCartItem({ name: "newpublicname", action: "poaCheckout" }, { ...cap, poaOnly: undefined }, state));
 });

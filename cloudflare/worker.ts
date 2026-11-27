@@ -135,8 +135,8 @@ const gateway = {
       const u = new URL(request.url);
       need((u.pathname + u.search).length <= 4096, "URL_SIZE");
       const host = u.hostname.toLowerCase();
-      need(host === "localhost" || host === "127.0.0.1" || host === env.BACKEND_HOST || host === "poadomains.grok.me" || host === "poadomains.link" ||
-        host === new URL(env.PUBLIC_EXPLORER_URL).hostname || host.endsWith(".grok.me"), "HOST");
+      need(host === "localhost" || host === "127.0.0.1" || host === env.BACKEND_HOST || host === "poadomains.link" ||
+        host === new URL(env.PUBLIC_EXPLORER_URL).hostname, "HOST");
 
       const discovery=discoveryDocument(u.pathname);
       if(discovery){if(request.method!=="GET"&&request.method!=="HEAD")return fail(405,{code:"METHOD_NOT_ALLOWED"});return new Response(request.method==="HEAD"?null:discovery.text,{headers:{...SECURITY,"content-type":discovery.type,"access-control-allow-origin":"*"}});}

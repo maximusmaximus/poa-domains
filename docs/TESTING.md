@@ -32,7 +32,7 @@ The integrated emoji format browser gate runs with `npm run test:emoji-format:br
 and local workerd with the production Worker HTTP adapter. Identical deterministic
 Engine fixtures receive the same disposable signed packet and exact resend. It
 compares status and body on every shared registry route, malformed input, bounds,
-browser-write rejection, `/d/` and `/p/` deep links on `poadomains.grok.me`, and UI
+browser-write rejection, `/d/` and `/p/` deep links on `poadomains.link`, and UI
 module assets. Its registry RPC seam is volatile and **local only**: the unchanged
 production-DO integration suite separately exercises SQLite, restart/recovery and
 title reservations. Neither test performs upstream PoA actions.

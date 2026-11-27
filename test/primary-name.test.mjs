@@ -531,12 +531,12 @@ test("UI default-domain & transfer-recipient helpers handle addresses, default d
   assert.match(listedDom.error, /listed for sale/);
 
   // Prompt builders
-  const setPrompt = buildSetPrimaryPrompt({ name: "alpha", deed: state.deeds.d1, signer: ownerA, endpointUrl: "https://poadomains.grok.me" });
+  const setPrompt = buildSetPrimaryPrompt({ name: "alpha", deed: state.deeds.d1, signer: ownerA, endpointUrl: "https://poadomains.link" });
   assert.match(setPrompt, /setPrimaryName/);
   assert.match(setPrompt, /"expectedDeedId": "d1"/);
   assert.match(setPrompt, /"expectedVersion": 3/);
 
-  const clearPrompt = buildSetPrimaryPrompt({ name: null, signer: ownerA, endpointUrl: "https://poadomains.grok.me" });
+  const clearPrompt = buildSetPrimaryPrompt({ name: null, signer: ownerA, endpointUrl: "https://poadomains.link" });
   assert.match(clearPrompt, /"name": null/);
   assert.match(clearPrompt, /"expectedDeedId": null/);
 
@@ -547,7 +547,7 @@ test("UI default-domain & transfer-recipient helpers handle addresses, default d
     resolvedFromDomain: "beta",
     resolutionSource: "default-domain",
     isPrimary: true,
-    endpointUrl: "https://poadomains.grok.me",
+    endpointUrl: "https://poadomains.link",
   });
   assert.match(xferPrompt, /"recipient":/);
   assert.match(xferPrompt, /default domain address/);

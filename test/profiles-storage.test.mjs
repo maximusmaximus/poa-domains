@@ -65,18 +65,18 @@ test("handleMediaUpload validates binary & JSON base64 uploads, stores in R2, pi
   };
   const env = {
     PROFILES: r2,
-    BACKEND_HOST: "poadomains.grok.me",
-    PUBLIC_EXPLORER_URL: "https://poadomains.grok.me",
+    BACKEND_HOST: "poadomains.link",
+    PUBLIC_EXPLORER_URL: "https://poadomains.link",
     PINATA_JWT: "test-pinata-jwt",
     MEDIA_UPLOAD_LIMITER: { limit: async () => ({ success: true }) },
   };
 
   // Raw PNG binary upload from allowed origin
-  const req1 = new Request("https://poadomains.grok.me/v1/media/upload", {
+  const req1 = new Request("https://poadomains.link/v1/media/upload", {
     method: "POST",
     headers: {
       "content-type": "image/png",
-      origin: "https://poadomains.grok.me",
+      origin: "https://poadomains.link",
       "cf-connecting-ip": "203.0.113.5",
     },
     body: SAMPLE_PNG,
@@ -93,7 +93,7 @@ test("handleMediaUpload validates binary & JSON base64 uploads, stores in R2, pi
   assert.equal(pinataCalls.length, 1);
 
   // JSON base64 upload (agent/CLI friendly, no Origin header) -> same deterministic CID
-  const req2 = new Request("https://poadomains.grok.me/v1/media/upload", {
+  const req2 = new Request("https://poadomains.link/v1/media/upload", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -109,13 +109,13 @@ test("handleMediaUpload validates binary & JSON base64 uploads, stores in R2, pi
   assert.equal(body2.r2Stored, true);
 
   // Serve via GET and HEAD
-  const getRes = await handleMediaGet(new Request(`https://poadomains.grok.me/v1/media/${body1.cid}`), env, body1.cid);
+  const getRes = await handleMediaGet(new Request(`https://poadomains.link/v1/media/${body1.cid}`), env, body1.cid);
   assert.equal(getRes.status, 200);
   assert.equal(getRes.headers.get("content-type"), "image/png");
   assert.match(getRes.headers.get("cache-control"), /immutable/);
   assert.deepEqual(new Uint8Array(await getRes.arrayBuffer()), SAMPLE_PNG);
 
-  const headRes = await handleMediaGet(new Request(`https://poadomains.grok.me/v1/media/${body1.cid}`, { method: "HEAD" }), env, body1.cid);
+  const headRes = await handleMediaGet(new Request(`https://poadomains.link/v1/media/${body1.cid}`, { method: "HEAD" }), env, body1.cid);
   assert.equal(headRes.status, 200);
   assert.equal(headRes.headers.get("content-length"), String(SAMPLE_PNG.byteLength));
 });
@@ -124,14 +124,14 @@ test("handleMediaUpload enforces origin, format, size, rate-limit, and storage g
   const r2 = mockR2();
   const baseEnv = {
     PROFILES: r2,
-    BACKEND_HOST: "poadomains.grok.me",
-    PUBLIC_EXPLORER_URL: "https://poadomains.grok.me",
+    BACKEND_HOST: "poadomains.link",
+    PUBLIC_EXPLORER_URL: "https://poadomains.link",
     MEDIA_UPLOAD_LIMITER: { limit: async () => ({ success: true }) },
   };
 
   // Untrusted Origin -> 403
   const badOrigin = await handleMediaUpload(
-    new Request("https://poadomains.grok.me/v1/media/upload", {
+    new Request("https://poadomains.link/v1/media/upload", {
       method: "POST",
       headers: { "content-type": "image/png", origin: "https://evil.example" },
       body: SAMPLE_PNG,
@@ -142,19 +142,19 @@ test("handleMediaUpload enforces origin, format, size, rate-limit, and storage g
 
   // Missing PROFILES binding -> 503 MEDIA_STORAGE_DISABLED
   const noStorage = await handleMediaUpload(
-    new Request("https://poadomains.grok.me/v1/media/upload", {
+    new Request("https://poadomains.link/v1/media/upload", {
       method: "POST",
       headers: { "content-type": "image/png" },
       body: SAMPLE_PNG,
     }),
-    { BACKEND_HOST: "poadomains.grok.me" },
+    { BACKEND_HOST: "poadomains.link" },
   );
   assert.equal(noStorage.status, 503);
   assert.equal((await noStorage.json()).code, "MEDIA_STORAGE_DISABLED");
 
   // Rate limited -> 429 MEDIA_RATE_LIMITED
   const limited = await handleMediaUpload(
-    new Request("https://poadomains.grok.me/v1/media/upload", {
+    new Request("https://poadomains.link/v1/media/upload", {
       method: "POST",
       headers: { "content-type": "image/png" },
       body: SAMPLE_PNG,
@@ -166,7 +166,7 @@ test("handleMediaUpload enforces origin, format, size, rate-limit, and storage g
 
   // Spoofed SVG declared as image/png -> 400 INVALID_IMAGE_FORMAT
   const spoofed = await handleMediaUpload(
-    new Request("https://poadomains.grok.me/v1/media/upload", {
+    new Request("https://poadomains.link/v1/media/upload", {
       method: "POST",
       headers: { "content-type": "image/png" },
       body: new TextEncoder().encode("<svg xmlns='http://www.w3.org/2000/svg'/>"),
@@ -178,7 +178,7 @@ test("handleMediaUpload enforces origin, format, size, rate-limit, and storage g
 
   // Oversized content-length > 5 MiB -> 413 IMAGE_TOO_LARGE
   const oversized = await handleMediaUpload(
-    new Request("https://poadomains.grok.me/v1/media/upload", {
+    new Request("https://poadomains.link/v1/media/upload", {
       method: "POST",
       headers: { "content-type": "image/png", "content-length": String(6 * 1024 * 1024) },
       body: SAMPLE_PNG,
@@ -189,7 +189,7 @@ test("handleMediaUpload enforces origin, format, size, rate-limit, and storage g
   assert.equal((await oversized.json()).code, "IMAGE_TOO_LARGE");
 
   // Malformed CID on GET -> 400
-  const badCid = await handleMediaGet(new Request("https://poadomains.grok.me/v1/media/not-a-cid"), baseEnv, "not-a-cid");
+  const badCid = await handleMediaGet(new Request("https://poadomains.link/v1/media/not-a-cid"), baseEnv, "not-a-cid");
   assert.equal(badCid.status, 400);
 });
 
@@ -211,7 +211,7 @@ test("backupCommittedProfile backs up v1 profile JSON to R2 and optionally pins 
   };
   const env = {
     PROFILES: r2,
-    BACKEND_HOST: "poadomains.grok.me",
+    BACKEND_HOST: "poadomains.link",
     PINATA_JWT: "test-jwt",
   };
   const packet = {
@@ -238,7 +238,7 @@ test("backupCommittedProfile backs up v1 profile JSON to R2 and optionally pins 
 
 const GROUP = "8c21bf28-7ce3-4282-a200-d9e7f50dcedc";
 const uploadReq = (ip = "198.51.100.7") =>
-  new Request("https://poadomains.grok.me/v1/media/upload", {
+  new Request("https://poadomains.link/v1/media/upload", {
     method: "POST",
     headers: { "content-type": "image/png", "cf-connecting-ip": ip },
     body: SAMPLE_PNG,
@@ -305,7 +305,7 @@ test("pin failures log only status and Pinata's error code/message, never the JW
 });
 
 test("upload endpoint has its own per-minute limiter and fails closed without it", async () => {
-  const env = { PROFILES: mockR2(), BACKEND_HOST: "poadomains.grok.me" };
+  const env = { PROFILES: mockR2(), BACKEND_HOST: "poadomains.link" };
   const missing = await handleMediaUpload(uploadReq(), env);
   assert.equal(missing.status, 503);
   assert.equal((await missing.json()).code, "MEDIA_RATE_UNAVAILABLE");
@@ -329,7 +329,7 @@ test("upload endpoint has its own per-minute limiter and fails closed without it
 test("hourly caps: per client and global, with Retry-After to the next hour and no raw IPs stored", async () => {
   const r2 = mockR2();
   const now = Date.UTC(2026, 10, 24, 5, 59, 30);
-  const env = { PROFILES: r2, BACKEND_HOST: "poadomains.grok.me", MEDIA_UPLOAD_LIMITER: { limit: async () => ({ success: true }) } };
+  const env = { PROFILES: r2, BACKEND_HOST: "poadomains.link", MEDIA_UPLOAD_LIMITER: { limit: async () => ({ success: true }) } };
   for (let i = 0; i < MEDIA_UPLOAD_HOURLY_PER_CLIENT; i++) {
     const ok = await handleMediaUpload(uploadReq("203.0.113.50"), env, undefined, () => now);
     assert.equal(ok.status, 200, "upload " + i);
@@ -389,8 +389,8 @@ test("handleDomainAvatarGet serves committed https:// and ipfs:// avatars same-o
   const owner = nativeAddress(randomBytes(32));
   const env = {
     PROFILES: r2,
-    BACKEND_HOST: "poadomains.grok.me",
-    PUBLIC_EXPLORER_URL: "https://poadomains.grok.me",
+    BACKEND_HOST: "poadomains.link",
+    PUBLIC_EXPLORER_URL: "https://poadomains.link",
     MEDIA_UPLOAD_LIMITER: { limit: async () => ({ success: true }) },
   };
   const makeDeed = (name, image, extra = {}) => {
@@ -416,7 +416,7 @@ test("handleDomainAvatarGet serves committed https:// and ipfs:// avatars same-o
   };
   const lookupMoon = async () => ({ status: 200, deed: moonDeed });
 
-  const firstGet = await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/moon"), env, "moon", lookupMoon, okFetch);
+  const firstGet = await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/moon"), env, "moon", lookupMoon, okFetch);
   assert.equal(firstGet.status, 200);
   assert.equal(firstGet.headers.get("content-type"), "image/png");
   assert.equal(firstGet.headers.get("content-disposition"), "inline");
@@ -424,20 +424,20 @@ test("handleDomainAvatarGet serves committed https:// and ipfs:// avatars same-o
   assert.equal(fetchCalls, 1);
 
   // Cached GET & HEAD hit R2 without calling fetch again
-  const cachedGet = await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/moon"), env, "moon", lookupMoon, okFetch);
+  const cachedGet = await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/moon"), env, "moon", lookupMoon, okFetch);
   assert.equal(cachedGet.status, 200);
   assert.deepEqual(new Uint8Array(await cachedGet.arrayBuffer()), SAMPLE_PNG);
   assert.equal(fetchCalls, 1);
 
-  const cachedHead = await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/moon", { method: "HEAD" }), env, "moon", lookupMoon, okFetch);
+  const cachedHead = await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/moon", { method: "HEAD" }), env, "moon", lookupMoon, okFetch);
   assert.equal(cachedHead.status, 200);
   assert.equal(cachedHead.headers.get("content-length"), String(SAMPLE_PNG.byteLength));
   assert.equal(fetchCalls, 1);
 
   // HEAD on cold cache (no PROFILES) still validates & returns empty body
   const coldHead = await handleDomainAvatarGet(
-    new Request("https://poadomains.grok.me/v1/media/domain/moon", { method: "HEAD" }),
-    { BACKEND_HOST: "poadomains.grok.me" },
+    new Request("https://poadomains.link/v1/media/domain/moon", { method: "HEAD" }),
+    { BACKEND_HOST: "poadomains.link" },
     "moon",
     lookupMoon,
     okFetch,
@@ -448,7 +448,7 @@ test("handleDomainAvatarGet serves committed https:// and ipfs:// avatars same-o
 
   // 2. Committed ipfs:// avatar -> served directly via handleMediaGet with zero external fetches
   const upRes = await handleMediaUpload(
-    new Request("https://poadomains.grok.me/v1/media/upload", {
+    new Request("https://poadomains.link/v1/media/upload", {
       method: "POST",
       headers: { "content-type": "image/png" },
       body: SAMPLE_PNG,
@@ -458,7 +458,7 @@ test("handleDomainAvatarGet serves committed https:// and ipfs:// avatars same-o
   const { uri } = await upRes.json();
   const ipfsDeed = makeDeed("nova", uri);
   const ipfsRes = await handleDomainAvatarGet(
-    new Request("https://poadomains.grok.me/v1/media/domain/nova"),
+    new Request("https://poadomains.link/v1/media/domain/nova"),
     env,
     "nova",
     async () => ({ status: 200, deed: ipfsDeed }),
@@ -469,24 +469,24 @@ test("handleDomainAvatarGet serves committed https:// and ipfs:// avatars same-o
   assert.deepEqual(new Uint8Array(await ipfsRes.arrayBuffer()), SAMPLE_PNG);
 
   // 3. Guards: method, path, withheld/404, retired, reset/empty image, self-host, SSRF, redirects, bad format, oversized
-  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/moon", { method: "POST" }), env, "moon", lookupMoon)).status, 405);
-  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/a/b"), env, "a/b", lookupMoon)).status, 400);
-  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/hidden"), env, "hidden", async () => ({ status: 409, code: "PUBLIC_RECORD_WITHHELD" }))).status, 409);
-  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/missing"), env, "missing", async () => ({ status: 404, code: "NOT_FOUND" }))).status, 404);
-  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/old"), env, "old", async () => ({ status: 200, deed: { ...moonDeed, retired: true } }))).status, 404);
-  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/reset"), env, "reset", async () => ({ status: 200, deed: { ...moonDeed, profileResetAt: 1 } }))).status, 404);
-  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/noimg"), env, "noimg", async () => ({ status: 200, deed: makeDeed("noimg", null) }))).status, 404);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/moon", { method: "POST" }), env, "moon", lookupMoon)).status, 405);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/a/b"), env, "a/b", lookupMoon)).status, 400);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/hidden"), env, "hidden", async () => ({ status: 409, code: "PUBLIC_RECORD_WITHHELD" }))).status, 409);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/missing"), env, "missing", async () => ({ status: 404, code: "NOT_FOUND" }))).status, 404);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/old"), env, "old", async () => ({ status: 200, deed: { ...moonDeed, retired: true } }))).status, 404);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/reset"), env, "reset", async () => ({ status: 200, deed: { ...moonDeed, profileResetAt: 1 } }))).status, 404);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/noimg"), env, "noimg", async () => ({ status: 200, deed: makeDeed("noimg", null) }))).status, 404);
 
-  const selfDeed = makeDeed("loop", "https://poadomains.grok.me/v1/media/domain/loop");
-  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/loop"), env, "loop", async () => ({ status: 200, deed: selfDeed }), async () => assert.fail("self-host must not fetch"))).status, 404);
+  const selfDeed = makeDeed("loop", "https://poadomains.link/v1/media/domain/loop");
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/loop"), env, "loop", async () => ({ status: 200, deed: selfDeed }), async () => assert.fail("self-host must not fetch"))).status, 404);
 
   const ssrfDeed = makeDeed("meta", "https://169.254.169.254/latest/meta-data/");
-  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/meta"), env, "meta", async () => ({ status: 200, deed: ssrfDeed }), async () => assert.fail("SSRF IP must not fetch"))).status, 404);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/meta"), env, "meta", async () => ({ status: 200, deed: ssrfDeed }), async () => assert.fail("SSRF IP must not fetch"))).status, 404);
 
   const uncachedDeed = makeDeed("other", "https://cdn.example.com/other.png");
-  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/other"), env, "other", async () => ({ status: 200, deed: uncachedDeed }), async () => new Response(null, { status: 302, headers: { location: "https://127.0.0.1/" } }))).status, 404);
-  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/other"), env, "other", async () => ({ status: 200, deed: uncachedDeed }), async () => { throw Error("network down"); })).status, 404);
-  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/other"), env, "other", async () => ({ status: 200, deed: uncachedDeed }), async () => new Response("<svg xmlns='http://www.w3.org/2000/svg'/>", { status: 200, headers: { "content-type": "image/png" } }))).status, 400);
-  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/other"), env, "other", async () => ({ status: 200, deed: uncachedDeed }), async () => new Response(SAMPLE_PNG, { status: 200, headers: { "content-length": String(6 * 1024 * 1024) } }))).status, 413);
-  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.grok.me/v1/media/domain/other"), env, "other", async () => ({ status: 200, deed: uncachedDeed }), async () => new Response(new Uint8Array(5 * 1024 * 1024 + 10), { status: 200 }))).status, 413);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/other"), env, "other", async () => ({ status: 200, deed: uncachedDeed }), async () => new Response(null, { status: 302, headers: { location: "https://127.0.0.1/" } }))).status, 404);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/other"), env, "other", async () => ({ status: 200, deed: uncachedDeed }), async () => { throw Error("network down"); })).status, 404);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/other"), env, "other", async () => ({ status: 200, deed: uncachedDeed }), async () => new Response("<svg xmlns='http://www.w3.org/2000/svg'/>", { status: 200, headers: { "content-type": "image/png" } }))).status, 400);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/other"), env, "other", async () => ({ status: 200, deed: uncachedDeed }), async () => new Response(SAMPLE_PNG, { status: 200, headers: { "content-length": String(6 * 1024 * 1024) } }))).status, 413);
+  assert.equal((await handleDomainAvatarGet(new Request("https://poadomains.link/v1/media/domain/other"), env, "other", async () => ({ status: 200, deed: uncachedDeed }), async () => new Response(new Uint8Array(5 * 1024 * 1024 + 10), { status: 200 }))).status, 413);
 });

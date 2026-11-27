@@ -32,7 +32,7 @@ function tempRepo(engine = ENG_OLD, params = PAR_OLD) {
       vars: {
         POA_ESCROW_ENGINE_SHA256: engine,
         POA_ESCROW_PARAMS_SHA256: params,
-        PUBLIC_EXPLORER_URL: "https://poadomains.grok.me",
+        PUBLIC_EXPLORER_URL: "https://poadomains.link",
       },
     }),
   );
@@ -51,7 +51,7 @@ test("readCommittedPins reads wrangler.jsonc pins and rejects malformed hashes",
   const real = readCommittedPins();
   assert.match(real.engine, /^[0-9a-f]{64}$/);
   assert.match(real.params, /^[0-9a-f]{64}$/);
-  assert.equal(real.publicUrl, "https://poadomains.grok.me");
+  assert.equal(real.publicUrl, "https://poadomains.link");
 
   const badDir = tempRepo("not-a-hash", PAR_OLD);
   try {

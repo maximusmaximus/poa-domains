@@ -74,7 +74,7 @@ test('all UI modules load without booting a browser, and shared copy guards rema
   assert.equal(isPoaAddress('other-public-identity'),false);
   assert.equal(shortenPoaAddress(samplePoa),'poa1...piRf');
   assert.equal(core.person(samplePoa),'poa1...piRf');
-  ui.demo=true;assert.equal(core.endpointBase(),'http://127.0.0.1:8787');ui.demo=false;ui.base='https://poadomains.grok.me';assert.equal(core.endpointBase(),ui.base);
+  ui.demo=true;assert.equal(core.endpointBase(),'http://127.0.0.1:8787');ui.demo=false;ui.base='https://poadomains.link';assert.equal(core.endpointBase(),ui.base);
  }finally{Object.assign(ui,previous);}
 });
 
@@ -148,7 +148,7 @@ test('copyText tries Clipboard API, falls back to execCommand inside dialog/body
    stateMod.ui.handoffData = buildPoaCheckoutHandoff(
     [{ name: 'freshpoaname', action: 'poaCheckout', amount: '100.000000', tier: 'standard' }],
     poaCap,
-    'https://poadomains.grok.me',
+    'https://poadomains.link',
     snap,
     1000000,
    );
@@ -608,7 +608,7 @@ test('owner profile, domain page, ownerLink primary rendering, and Manage main-d
    setItem: (k, v) => store.set(k, String(v)),
    removeItem: (k) => store.delete(k),
   };
-  Object.defineProperty(globalThis, 'location', { value: { origin: 'https://poadomains.grok.me', pathname: '/', search: '' }, configurable: true });
+  Object.defineProperty(globalThis, 'location', { value: { origin: 'https://poadomains.link', pathname: '/', search: '' }, configurable: true });
   Object.defineProperty(globalThis, 'navigator', { value: { clipboard: { writeText: async (v) => copied.push(v) } }, configurable: true });
   globalThis.document = {
    activeElement: null,
@@ -642,7 +642,7 @@ test('owner profile, domain page, ownerLink primary rendering, and Manage main-d
   const d1 = 'a'.repeat(64), d2 = 'b'.repeat(64), d3 = 'c'.repeat(64);
 
   ui.demo = false;
-  ui.base = 'https://poadomains.grok.me';
+  ui.base = 'https://poadomains.link';
   ui.registryReadFailed = false;
   ui.details = { roles: {} };
   ui.reservedSet = new Set();

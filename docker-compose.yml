@@ -9,7 +9,7 @@ services:
       POA_DOMAINS_HOST: "0.0.0.0"
       POA_DOMAINS_PORT: "8787"
       POA_DOMAINS_DATA: "/data/registry"
-      POA_DOMAINS_PUBLIC_URL: "https://poadomains.grok.me"
+      POA_DOMAINS_PUBLIC_URL: "https://poadomains.link"
     volumes:
       - poa_domains_data:/data/registry
 

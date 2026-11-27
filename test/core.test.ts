@@ -696,7 +696,7 @@ test("launchable full-stack registry app initializes mainnet profile, serves Uni
       assert.equal(app1.config.chainId, "poa-mainnet-1");
       assert.ok(app1.principals.alice!.startsWith("poa1"));
       const healthRes = await fetch(app1.url + "/healthz", {
-        headers: { host: "poadomains.grok.me" },
+        headers: { host: "poadomains.link" },
       });
       assert.equal(healthRes.status, 200);
       const health: any = await healthRes.json();
@@ -708,7 +708,7 @@ test("launchable full-stack registry app initializes mainnet profile, serves Uni
       assert.equal(cap.emojiAliases, 5216);
       assert.equal(cap.chainId, "poa-mainnet-1");
       assert.equal(cap.reservedCount, 655);
-      assert.equal(cap.publicExplorerUrl, "https://poadomains.grok.me");
+      assert.equal(cap.publicExplorerUrl, "https://poadomains.link");
       assert.equal(cap.newAccountRegistryUnits, "10000000");
       assert.equal(cap.onboardingGrantPoa, "10000000");
       assert.equal(cap.onboardingGrantRegistryUnits, "10000000");

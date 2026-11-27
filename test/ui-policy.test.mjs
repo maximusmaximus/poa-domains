@@ -31,13 +31,13 @@ test('static policy matches generated responses, limits connect-src to current o
 test('header boundary preserves all response bytes/status/CORS for JSON and MCP; only HTML loses wildcard CORS',async()=>{
  for(const [type,status]of [['application/json',200],['application/json',409],['application/json',503],['text/plain',200]]){
   const body=' {"unchanged":"exact public response bytes"}\n';
-  const response=secureUiResponse(new Response(body,{status,headers:{'content-type':type,'access-control-allow-origin':'*','retry-after':'30','cache-control':'no-store','mcp-protocol-version':'2025-11-25'}}),new URL('https://poadomains.grok.me/mcp'));
+  const response=secureUiResponse(new Response(body,{status,headers:{'content-type':type,'access-control-allow-origin':'*','retry-after':'30','cache-control':'no-store','mcp-protocol-version':'2025-11-25'}}),new URL('https://poadomains.link/mcp'));
   assert.equal(await response.text(),body);assert.equal(response.status,status);assert.equal(response.headers.get('access-control-allow-origin'),'*');assert.equal(response.headers.get('retry-after'),'30');assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.get('mcp-protocol-version'),'2025-11-25');
   for(const[k,v]of Object.entries(UI_SECURITY))assert.equal(response.headers.get(k),v);
  }
- const html=secureUiResponse(new Response('<html>same</html>',{headers:{'content-type':'text/html; charset=utf-8','access-control-allow-origin':'*'}}),new URL('https://poadomains.grok.me/d/alpha'));
+ const html=secureUiResponse(new Response('<html>same</html>',{headers:{'content-type':'text/html; charset=utf-8','access-control-allow-origin':'*'}}),new URL('https://poadomains.link/d/alpha'));
  assert.equal(html.headers.get('access-control-allow-origin'),null);assert.equal(await html.text(),'<html>same</html>');
- const font=secureUiResponse(new Response('font',{headers:{'cache-control':'no-store'}}),new URL('https://poadomains.grok.me/'+DOMAIN_FONT_FILE));assert.equal(font.headers.get('cache-control'),IMMUTABLE_FONT_CACHE);assert.equal(font.headers.get('content-type'),'font/woff2');
+ const font=secureUiResponse(new Response('font',{headers:{'cache-control':'no-store'}}),new URL('https://poadomains.link/'+DOMAIN_FONT_FILE));assert.equal(font.headers.get('cache-control'),IMMUTABLE_FONT_CACHE);assert.equal(font.headers.get('content-type'),'font/woff2');
 });
 
 test('escrow domain font selector includes listing titles but excludes account and deposit headings',()=>{

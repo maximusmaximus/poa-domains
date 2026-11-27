@@ -25,11 +25,11 @@ rule changes. In particular, public JSON/discovery CORS is preserved, but HTML
 has no wildcard CORS.
 
 - CSP `connect-src 'self'`: the browser's actual origin, not a hardcoded backend.
-  Both workers.dev and the Grok Build front door use relative same-origin APIs.
+  Both workers.dev and the poadomains.link Custom Domain use relative same-origin APIs.
   Native minepoa reads remain server-side and are unaffected by browser CSP.
 - HSTS `max-age=31536000`, deliberately without includeSubDomains/preload on shared
-  hosting. The Grok Build front door already adds its own HSTS with
-  includeSubDomains; that existing stronger edge policy is not changed. Local
+  hosting. The poadomains.link Custom Domain serves this Worker header directly
+  (Always Use HTTPS is on at the zone). Local
   HTTP ignores HSTS normally.
 - COOP `same-origin`, with **no COEP/CORP** that could break public read clients.
   There is no popup-based signing/OAuth flow in this UI.

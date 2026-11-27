@@ -35,7 +35,7 @@ function provider(overrides = {}) {
     calls.push(url); assert.equal(options.method, "GET"); assert.equal(options.redirect, "error");
     assert.ok(url.startsWith(`https://api.github.com/repos/${REPO}/`) ||
       url.startsWith(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/workers/scripts/${WORKER}/`) ||
-      url.startsWith("https://poadomains.grok.me/"));
+      url.startsWith("https://poadomains.link/"));
     const key = Object.keys(replies).find(k => url.endsWith(k)); assert.ok(key, url);
     return { ok: true, json: async () => structuredClone(replies[key]) };
   };
@@ -49,7 +49,7 @@ test("deploy plan omits every escrow override, preserves server bindings and nev
   assert.equal(config.vars.POA_ESCROW_ENABLED, "false"); assert.equal(config.vars.POA_ESCROW_NETWORK_WRITES, "false");
   assert.equal(config.vars.POA_ESCROW_NEW_NAMES, "false");
   assert.deepEqual(plan.durable_objects, config.durable_objects); assert.deepEqual(plan.migrations, config.migrations);
-  assert.ok(!plan.routes?.some(r => r.custom_domain), "grok.me is not a zone in this account");
+  assert.deepEqual(plan.routes, [{ pattern: "poadomains.link", custom_domain: true }], "only the poadomains.link Custom Domain is bound");
   for (const flag of [true, false]) {
     const args = wranglerArgs("plan.json", flag);
     assert.ok(args.includes("--strict")); assert.ok(args.includes("--keep-vars"));
@@ -150,14 +150,14 @@ test("workflow is credential-free on PRs; main deploy is disarmed, current-CI ga
 });
 
 test("production host is allowlisted; discovery paths run Worker first; all error logs are sampled", () => {
-  assert.equal(endpoint("https://poadomains.grok.me"), "https://poadomains.grok.me");
   assert.equal(endpoint("https://poadomains.link"), "https://poadomains.link");
+  assert.throws(() => endpoint("https://poadomains.grok.me")); assert.throws(() => endpoint("https://other.grok.me"));
   assert.throws(() => endpoint("http://poadomains.link")); assert.throws(() => endpoint("https://poadomains.link.attacker.invalid"));
-  assert.throws(() => endpoint("https://unrelated.example")); assert.throws(() => endpoint("http://poadomains.grok.me"));
+  assert.throws(() => endpoint("https://unrelated.example")); assert.throws(() => endpoint("http://poadomains.link"));
   for (const path of ["/mcp", "/.well-known/*", "/llms.txt", "/d/*", "/p/*", "/v1/*"])
     assert.ok(config.assets.run_worker_first.includes(path));
   assert.equal(config.observability.logs.head_sampling_rate, 1);
-  assert.ok(readFileSync("cloudflare/test/integration.mjs", "utf8").includes('"--local-upstream", "poadomains.grok.me"'));
+  assert.ok(readFileSync("cloudflare/test/integration.mjs", "utf8").includes('"--local-upstream", "poadomains.link"'));
   const coverage = JSON.parse(readFileSync(".c8rc.json", "utf8"));
   assert.ok(coverage.src.includes("scripts")); assert.ok(coverage.include.includes("scripts/worker-deploy.mjs"));
 });
@@ -436,7 +436,7 @@ test("compat self-verified evidence, automatic pin sync from wrangler.jsonc, and
 
     // Post-deploy check retries transient ESCROW_PROTOCOL_CHANGED during DO rollout, then fails closed if persistent.
     let staleProbes = 0;
-    const recovered = await assertLiveEscrowFresh("https://poadomains.grok.me", async () => ({
+    const recovered = await assertLiveEscrowFresh("https://poadomains.link", async () => ({
       ok: true,
       json: async () => (++staleProbes < 3
         ? { held: true, freshness: { code: "ESCROW_PROTOCOL_CHANGED" } }
@@ -445,12 +445,12 @@ test("compat self-verified evidence, automatic pin sync from wrangler.jsonc, and
     assert.equal(staleProbes, 3);
     assert.equal(recovered.held, false);
     let persistentProbes = 0;
-    await assert.rejects(assertLiveEscrowFresh("https://poadomains.grok.me", async () => ({
+    await assert.rejects(assertLiveEscrowFresh("https://poadomains.link", async () => ({
       ok: true,
       json: async () => { persistentProbes++; return { freshness: { code: "ESCROW_PROTOCOL_CHANGED" } }; },
     }), 0, 4), /ESCROW_PROTOCOL_CHANGED/);
     assert.equal(persistentProbes, 4);
-    await assert.rejects(assertLiveEscrowFresh("https://poadomains.grok.me", async () => ({ ok: false, status: 502 }), 0), /ESCROW_CAPABILITIES_HTTP_ERROR/);
-    await assert.rejects(assertLiveEscrowFresh("https://poadomains.grok.me", async () => { throw new Error("down"); }, 0), /ESCROW_CAPABILITIES_UNAVAILABLE/);
+    await assert.rejects(assertLiveEscrowFresh("https://poadomains.link", async () => ({ ok: false, status: 502 }), 0), /ESCROW_CAPABILITIES_HTTP_ERROR/);
+    await assert.rejects(assertLiveEscrowFresh("https://poadomains.link", async () => { throw new Error("down"); }, 0), /ESCROW_CAPABILITIES_UNAVAILABLE/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

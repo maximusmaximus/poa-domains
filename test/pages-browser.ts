@@ -204,7 +204,7 @@ export async function verifyStaticPage(url: string, screenshot?: string) {
     assert.equal(await page.locator('#refresh').isDisabled(), true);
     assert.equal(await page.locator('#network-status').innerText(), 'Checking…');
     assert.equal(await page.locator('#observationSection').getAttribute('aria-busy'), 'true');
-    assert.equal(await page.locator('header .hero-cta').getAttribute('href'), 'https://poadomains.grok.me');
+    assert.equal(await page.locator('header .hero-cta').getAttribute('href'), 'https://poadomains.link');
     assert.equal((await page.locator('.footer-credit').innerText()).replace(/\s+/g,' ').trim(), 'made with ❤️ in SF by Tesselate Army | maxi.grok.me');
     assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), 'https://maximusmaximus.github.io/poa-domains/');
     assert.ok(await page.locator('meta[name="description"]').getAttribute('content'));

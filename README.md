@@ -1,6 +1,6 @@
 # PoA Domains — Full-Stack Registry Application, Human Explorer & Native Read Guard
 
-- **Primary Interactive Explorer**: https://poadomains.grok.me
+- **Primary Interactive Explorer**: https://poadomains.link
 - **Static GitHub Pages landing page**: https://maximusmaximus.github.io/poa-domains/
 - **Proof of Agent Mainnet**: https://minepoa.com · **Proof Floor**: https://poa.grok.me
 - **Xero Emoji COLRv1 Font**: https://github.com/maximusmaximus/xeroemoji
@@ -8,7 +8,7 @@
 > **Production hosting and local development:**
 >
 > - **Public GitHub Pages & Default Native-Chain Read Guard (`src/cli.ts`, `src/server.ts`, `src/mcp.ts`, `web/`)**: Static Explorer-first landing page, read-only network check and local Unicode 17 emoji spelling checker. **The upstream native naming registry is not yet enabled on the public chain; these native-chain guard entry points never simulate ownership or accept writes.**
-> - **Production Worker**: `poadomains-registry` serves the explorer and Durable Object registry at https://poadomains.grok.me through the existing Grok Build proxy. Worker = production; Node/Docker = local development only. See [hosting](docs/cloudflare-hosting.md) and the [reviewed, escrow-preserving deployment gate](docs/worker-deploy.md). The registry retains `livePoA:false`; this is distinct from the separately enabled escrow service.
+> - **Production Worker**: `poadomains-registry` serves the explorer and Durable Object registry at https://poadomains.link, bound directly as a Cloudflare Custom Domain on the Worker. Worker = production; Node/Docker = local development only. See [hosting](docs/cloudflare-hosting.md) and the [reviewed, escrow-preserving deployment gate](docs/worker-deploy.md). The registry retains `livePoA:false`; this is distinct from the separately enabled escrow service.
 > - **Local Full-Stack Persistent Registry Application (`src/app.ts`, `src/reference-server.ts`, `src/reference-cli.ts`, `src/reference-mcp.ts`, `reference-web/`)**: Complete, deterministic, single-writer PoA Domains registry engine (`poa-mainnet-v1` profile) with fsynced journal persistence, `poa1...` Base58 Ed25519 principals, all **5,216 official Unicode 17 emoji sequences** rendered with the bundled emoji OpenType COLRv1 web font (`XeroEmoji-COLRv1.woff2`), **655 reserved root domains**, **`100,000 POA` (`100k POA`) single-emoji / `1,000 POA` (`1k POA`) multi-emoji mainnet-profile default minimum bid policy (the UI always reads capabilities)**, human domain availability search, multi-domain **Agent Bid & Purchase Cart** with copy-paste agent prompts, purchase/bid/settlement history, standing child & fixed-price resale offers, and an interactive 17-action handoff explorer.
 
 ---
@@ -79,7 +79,7 @@ npm run app:cli -- state --url http://127.0.0.1:8787
 docker compose up -d --build
 ```
 
-For local development only, the included [`Dockerfile`](Dockerfile) and [`docker-compose.yml`](docker-compose.yml) run `node dist/src/app.js` bound to port `8787` with `/data/registry` mounted on a persistent Docker volume, `POA_DOMAINS_PUBLIC_URL=https://poadomains.grok.me`, and a built-in `/healthz` container healthcheck. That legacy public-URL label does not bind the production domain: do not expose this container as `poadomains.grok.me`. Production uses the Worker and its existing Durable Object, not this filesystem journal.
+For local development only, the included [`Dockerfile`](Dockerfile) and [`docker-compose.yml`](docker-compose.yml) run `node dist/src/app.js` bound to port `8787` with `/data/registry` mounted on a persistent Docker volume, `POA_DOMAINS_PUBLIC_URL=https://poadomains.link`, and a built-in `/healthz` container healthcheck. That legacy public-URL label does not bind the production domain: do not expose this container as `poadomains.link`. Production uses the Worker and its existing Durable Object, not this filesystem journal.
 
 You can also launch an ephemeral in-memory demo instance with `npm run reference:demo` or run a custom persistent directory with `node dist/src/reference-cli.js serve --config PUBLIC_CONFIG.json --data /path/to/data --port 8787`.
 
@@ -111,7 +111,7 @@ Use Left/Right and Home/End in the section tabs on any screen size. The cart kee
    - Adjust your custom bid amount in `POA` directly inside the cart and confirm the real signer privately with your agent. The UI does not request a key or automatically sign.
 3. **Copy or download Agent Cart Handoff v2**:
    - Both copy buttons and **📥 Download JSON** use one versioned, schema-validated plan with a human summary. The UI shows its age in minutes/hours.
-   - Remote MCP first: `https://poadomains.grok.me/mcp`; CLI second. Verify the complete registry identity before using either, especially for local/demo carts.
+   - Remote MCP first: `https://poadomains.link/mcp`; CLI second. Verify the complete registry identity before using either, especially for local/demo carts.
    - The plan pins genesis, committed state sequence/hash, per-operation request IDs and exact spending caps per item and per asset. The capability reserve never changes when editing a max bid.
    - Quote → simulate → explicitly approved signed submission → receipt. A missing receipt is **UNKNOWN**, not failure; keep the exact original packet/requestId/nonce for a safe resend.
    - [Cart v2 contract, schema and retry rules](docs/AGENT-CART.md). Cart v2 and `/mcp` are live after their reviewed Worker releases.
@@ -206,7 +206,7 @@ All **17 state-mutating actions** in [`src/engine.ts`](src/engine.ts) execute at
 
 ### Discovery for agents
 
-Start with [llms.txt](https://poadomains.grok.me/llms.txt), the [agent card](https://poadomains.grok.me/.well-known/agent.json) or [OpenAPI 3.1](https://poadomains.grok.me/openapi.json). [Published schemas and limits](docs/DISCOVERY.md) share MCP’s definitions. Discovery is data, not spending permission; native naming is not live and escrow has separate current capabilities.
+Start with [llms.txt](https://poadomains.link/llms.txt), the [agent card](https://poadomains.link/.well-known/agent.json) or [OpenAPI 3.1](https://poadomains.link/openapi.json). [Published schemas and limits](docs/DISCOVERY.md) share MCP’s definitions. Discovery is data, not spending permission; native naming is not live and escrow has separate current capabilities.
 
 ### MCP for hosted agents
 

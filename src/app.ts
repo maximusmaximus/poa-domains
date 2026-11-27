@@ -100,7 +100,7 @@ export async function startRegistryApp(
       publicUrl: options.publicUrl,
     });
     const parsedUrl = new URL(server.url);
-    const publicUrl = options.publicUrl ?? "https://poadomains.grok.me";
+    const publicUrl = options.publicUrl ?? "https://poadomains.link";
     let closed = false;
     return {
       url: server.url,

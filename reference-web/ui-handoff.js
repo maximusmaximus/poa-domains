@@ -1,8 +1,8 @@
-import { copyText } from "./ui-copy.js?v=6392e78aa9c6";
-import { trapDialog } from "./ui-a11y.js?v=6392e78aa9c6";
-import { ui } from "./ui-state.js?v=6392e78aa9c6";
-import { el, endpointBase, ownershipView } from "./ui-core.js?v=6392e78aa9c6";
-import { buildAgentTermsPrompt, buildListingPrompt, buildSubnameListingPrompt, hasAgreedToTerms, isPoaAddress, parsePublicJSON, resolveDomainView, resolveOwnerInput, saveTermsAgreement, shouldHoldTransactions } from "./shared.js?v=6392e78aa9c6";
+import { copyText } from "./ui-copy.js?v=512106177d03";
+import { trapDialog } from "./ui-a11y.js?v=512106177d03";
+import { ui } from "./ui-state.js?v=512106177d03";
+import { el, endpointBase, ownershipView } from "./ui-core.js?v=512106177d03";
+import { buildAgentTermsPrompt, buildListingPrompt, buildSubnameListingPrompt, hasAgreedToTerms, isPoaAddress, parsePublicJSON, resolveDomainView, resolveOwnerInput, saveTermsAgreement, shouldHoldTransactions } from "./shared.js?v=512106177d03";
 
 export function clearHandoff() {
  ui.generation++;
@@ -168,7 +168,7 @@ export async function loadFeedbackChallenge() {
  clearFeedbackCaptchaImg();
  if (ui.demo) {
   if (submitBtn) submitBtn.disabled = true;
-  setFeedbackStatus("🧪 Static demo mode has no backend. Use poadomains.grok.me or GitHub to submit feedback.");
+  setFeedbackStatus("🧪 Static demo mode has no backend. Use poadomains.link or GitHub to submit feedback.");
   return;
  }
  setFeedbackStatus("⏳ Loading verification code…");
@@ -412,7 +412,7 @@ export function wireTermsGate() {
   el("termsAgentSubmitBtn")?.addEventListener("click", async () => {
    if (termsSubmitBusy) return;
    if (ui.demo) {
-    setTermsAgentStatus("🧪 Static demo mode has no backend. Click I Agree to browse the demo, or submit signed attestations on poadomains.grok.me.", "warn");
+    setTermsAgentStatus("🧪 Static demo mode has no backend. Click I Agree to browse the demo, or submit signed attestations on poadomains.link.", "warn");
     return;
    }
    const raw = el("termsAgentPacket")?.value.trim() ?? "";

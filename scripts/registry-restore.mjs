@@ -47,7 +47,7 @@ export async function restoreBackup({ file, key, privateKeyPath, expectSha256, p
 
     const persist = join(work, "state"), base = `http://127.0.0.1:${port}`;
     const log = openSync(join(work, "wrangler.log"), "w", 0o600);
-    server = spawn(process.execPath, [join(root, "node_modules/wrangler/bin/wrangler.js"), "dev", "--local", "--ip", "127.0.0.1",
+    server = spawn(process.execPath, [join(root, "node_modules/wrangler/bin/wrangler.js"), "dev", "--local", "--local-upstream", "127.0.0.1", "--ip", "127.0.0.1",
       "--port", String(port), "--persist-to", persist, "--var", "BACKUP_RESTORE_ENABLED:local-only", ...wranglerArgs],
       { cwd: root, env: { ...process.env, WRANGLER_SEND_METRICS: "false" }, detached: true, stdio: ["ignore", log, log] });
     closeSync(log);

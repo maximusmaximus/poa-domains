@@ -210,7 +210,7 @@ test("committed Worker/docs and Pages mirror match pure generation; no stale net
     assert.equal(card.schema, API_SCHEMA_VERSION);
     assert.equal(card.surface.status.livePoA, false);
     assert.equal(card.authentication.browserRegistryWrites, false);
-    assert.equal(card.url, "https://poadomains.grok.me");
+    assert.equal(card.url, "https://poadomains.link");
     assert.equal(
       JSON.parse(readFileSync(join(dir, "config.json"))).publicApiBase,
       null,

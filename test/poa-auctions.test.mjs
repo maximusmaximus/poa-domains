@@ -135,9 +135,9 @@ test("POA auction cart supports highest bid ceiling, outbid detection without au
   assert.equal(moonItem.params.awaitingFirstBid, true);
 
   // Copy cart prompt for mixed cart includes exact ceilings and ALL auction nuances
-  const handoff = buildPoaCheckoutHandoff([starItem, moonItem, newItem], cap, "https://poadomains.grok.me", payload, nowMs);
+  const handoff = buildPoaCheckoutHandoff([starItem, moonItem, newItem], cap, "https://poadomains.link", payload, nowMs);
   assert.equal(handoff.totalPrice, "550.000000");
-  assert.equal(handoff.escrow.market, "https://poadomains.grok.me/v1/escrow/market");
+  assert.equal(handoff.escrow.market, "https://poadomains.link/v1/escrow/market");
   assert.equal(handoff.items[0].kind, "auctionBid");
   assert.equal(handoff.items[0].maxBid, "300.000000");
   assert.equal(handoff.items[1].awaitingFirstBid, true);
@@ -181,7 +181,7 @@ test("POA auction cart supports highest bid ceiling, outbid detection without au
   assert.equal(exceeded.needsReview, true);
   assert.equal(exceeded.amount, "300.000000");
   assert.equal(cartReview(exceeded, cap, state, market, "", nowMs).canAcknowledge, false);
-  assert.throws(() => buildPoaCheckoutHandoff([exceeded], cap, "https://poadomains.grok.me", payload, nowMs), /Review the cart/);
+  assert.throws(() => buildPoaCheckoutHandoff([exceeded], cap, "https://poadomains.link", payload, nowMs), /Review the cart/);
 
   // Leading bidder cannot queue a self-raise
   assert.equal(cartReview(exceeded, cap, state, market, BIDDER_A, nowMs).canAcknowledge, false);
@@ -195,7 +195,7 @@ test("POA auction cart supports highest bid ceiling, outbid detection without au
 
   // Auction-only prompt (no new-name items) + sub-hour window formatting + multi-bid & COMPLETE ticker chips
   const shortConfirmed = { ...confirmed, params: { ...confirmed.params, window: 2700000, quiet: 5400000 } };
-  const aucOnly = buildPoaCheckoutHandoff([shortConfirmed], cap, "https://poadomains.grok.me", payload, nowMs);
+  const aucOnly = buildPoaCheckoutHandoff([shortConfirmed], cap, "https://poadomains.link", payload, nowMs);
   const aucOnlyText = renderPoaCheckoutHandoff(aucOnly);
   assert.match(aucOnlyText, /POA Auction Bids/);
   assert.doesNotMatch(aucOnlyText, /issueFromTreasury/);
@@ -235,7 +235,7 @@ test("POA auction cart supports highest bid ceiling, outbid detection without au
   assert.equal(buyDeposit.useDeposit, true);
   assert.equal(buyDeposit.needsReview, false);
   const bidDeposit = buildCartItem({ name: "moon", action: "poaBid", auctionId: AUC_QUEUED, amount: "150", useDeposit: true }, cap, state, fullMarket, "", nowMs);
-  const allDepositHandoff = buildPoaCheckoutHandoff([bidDeposit, buyDeposit], cap, "https://poadomains.grok.me", payload, nowMs);
+  const allDepositHandoff = buildPoaCheckoutHandoff([bidDeposit, buyDeposit], cap, "https://poadomains.link", payload, nowMs);
   assert.equal(allDepositHandoff.useDepositCount, 2);
   assert.equal(allDepositHandoff.depositOnlyTotal, "400.000000");
   assert.equal(allDepositHandoff.newFundingTotal, "0.000000");
@@ -245,7 +245,7 @@ test("POA auction cart supports highest bid ceiling, outbid detection without au
   assert.match(allDepositPrompt, /USE EXISTING DEPOSIT ONLY/);
   assert.match(allDepositPrompt, /sign escrow buy/);
 
-  const mixedDepositHandoff = buildPoaCheckoutHandoff([bidDeposit, buyDeposit, newItem], cap, "https://poadomains.grok.me", payload, nowMs);
+  const mixedDepositHandoff = buildPoaCheckoutHandoff([bidDeposit, buyDeposit, newItem], cap, "https://poadomains.link", payload, nowMs);
   assert.equal(mixedDepositHandoff.useDepositCount, 2);
   assert.equal(mixedDepositHandoff.depositOnlyTotal, "400.000000");
   assert.equal(mixedDepositHandoff.newFundingTotal, "100.000000");

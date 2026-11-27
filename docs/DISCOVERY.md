@@ -3,7 +3,7 @@
 The production Worker publishes `/llms.txt`, `/.well-known/agent.json`,
 `/openapi.json`, `/schemas/signed-packet.json` and `/schemas/mcp-tools.json`.
 The cart schema remains `/agent-cart-v2.schema.json`. All links use the canonical
-Worker front door, https://poadomains.grok.me; Node/Docker are local development.
+Worker front door, https://poadomains.link; Node/Docker are local development.
 
 `src/discovery.ts` generates the OpenAPI 3.1 contract and JSON Schema 2020-12
 contracts from the **same** `PACKET_SCHEMA`, action definitions and tool profiles

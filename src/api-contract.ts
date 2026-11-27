@@ -2,7 +2,7 @@
 import { ACTIONS } from "./actions.js";
 import { PACKET_SCHEMA, ACTION_SCHEMAS } from "./mcp-schema.js";
 export const API_SCHEMA_VERSION = "poa-domains.api.v1";
-export const API_ORIGIN = "https://poadomains.grok.me";
+export const API_ORIGIN = "https://poadomains.link";
 export const API_LIMITS = Object.freeze({
   bodyBytes: 65536,
   timeoutMs: 5000,

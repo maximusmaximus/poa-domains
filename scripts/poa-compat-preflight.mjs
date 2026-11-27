@@ -26,7 +26,7 @@ export function readCommittedPins(root = process.cwd()) {
   };
   const engine = pick("POA_ESCROW_ENGINE_SHA256");
   const params = pick("POA_ESCROW_PARAMS_SHA256");
-  const publicUrl = pick("PUBLIC_EXPLORER_URL") || "https://poadomains.grok.me";
+  const publicUrl = pick("PUBLIC_EXPLORER_URL") || "https://poadomains.link";
   if (!HEX64.test(engine) || !HEX64.test(params)) {
     throw new Error("INVALID_COMMITTED_PIN");
   }

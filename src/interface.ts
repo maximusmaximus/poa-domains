@@ -62,7 +62,7 @@ export function capabilities(e: Engine): any {
     emojiManifest: activeManifest,
     reservedCount: e.config.reserved.length,
     reservedCatalog: e.config.reserved.join(","),
-    publicExplorerUrl: "https://poadomains.grok.me",
+    publicExplorerUrl: "https://poadomains.link",
     githubMirrorUrl: "https://maximusmaximus.github.io/poa-domains/",
     ...newAccountUnitsFields(e),
     assets: e.config.assets,

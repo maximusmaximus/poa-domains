@@ -16,7 +16,7 @@ h.cap = get(poaEng, "/v1/capabilities", { include: "emoji" }).data;
 h.payload = get(poaEng, "/v1/state").data;
 
 try {
-  // 1. Granted real browser clipboard permissions in POA-only mode (matches poadomains.grok.me)
+  // 1. Granted real browser clipboard permissions in POA-only mode (matches poadomains.link)
   const ctxGranted = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   await ctxGranted.grantPermissions(["clipboard-read", "clipboard-write"], { origin: h.url });
   const page = await ctxGranted.newPage();

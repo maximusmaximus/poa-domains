@@ -20,7 +20,7 @@ const config=fixtureConfig(issuer,'ed25519:'+'3'.repeat(64),[]),engine=contractE
 const node=await startReferenceServer(engine,0,{host:'127.0.0.1',routes:CONTRACT_OPTIONS});
 const scratch=mkdtempSync(join(tmpdir(),'poa-routes-contract-')),port=Number(process.env.CF_CONTRACT_PORT??18895),base=`http://127.0.0.1:${port}`;
 const logPath=join(scratch,'workerd.log'),log=openSync(logPath,'w',0o600);
-const child=spawn(process.execPath,['node_modules/wrangler/bin/wrangler.js','dev','--config','cloudflare/test/contract.wrangler.jsonc','--local','--local-upstream','poadomains.grok.me','--ip','127.0.0.1','--port',String(port),'--inspector-port','0','--persist-to',join(scratch,'state'),'--var',`CONTRACT_CONFIG:${JSON.stringify(config)}`],{cwd:resolve(import.meta.dirname,'../..'),env:{...process.env,WRANGLER_SEND_METRICS:'false'},detached:true,stdio:['ignore',log,log]});
+const child=spawn(process.execPath,['node_modules/wrangler/bin/wrangler.js','dev','--config','cloudflare/test/contract.wrangler.jsonc','--local','--local-upstream','poadomains.link','--ip','127.0.0.1','--port',String(port),'--inspector-port','0','--persist-to',join(scratch,'state'),'--var',`CONTRACT_CONFIG:${JSON.stringify(config)}`],{cwd:resolve(import.meta.dirname,'../..'),env:{...process.env,WRANGLER_SEND_METRICS:'false'},detached:true,stdio:['ignore',log,log]});
 closeSync(log);
 const observed=new Set();let count=0;
 async function compare(path,init={}) {
@@ -46,7 +46,7 @@ try {
   for(const path of ['/d/routecheck','/p/'+issuer,'/ui-cart.js','/ui-poll.js'])await compare(path);
   await compare('/v1/intents',post('{'));
   await compare('/v1/intents',{...post('{}'),headers:{'content-type':'text/plain'}});
-  await compare('/v1/intents',{...post('{}'),headers:{'content-type':'application/json',origin:'https://poadomains.grok.me'}});
+  await compare('/v1/intents',{...post('{}'),headers:{'content-type':'application/json',origin:'https://poadomains.link'}});
   await compare('/v1/intents',{...post('{}'),headers:{'content-type':'application/json','sec-fetch-site':'same-origin'}});
   await compare('/v1/intents?unexpected=1',post('{}'));
   await compare('/v1/intents',post('x'.repeat(65537)));
@@ -58,7 +58,7 @@ try {
   const initial=engine.snapshot();
   const preview=await compare('/v1/intents/preview',post(packet));assert.equal(preview.body.wouldSucceed,true);assert.equal(preview.body.accepted,false);assert.deepEqual(engine.snapshot(),initial);
   for(const path of ['/v1/intents/preview','/v1/intents/preview?unexpected=1'])await compare(path,post('{'));
-  await compare('/v1/intents/preview',{...post(packet),headers:{'content-type':'application/json',origin:'https://poadomains.grok.me'}});
+  await compare('/v1/intents/preview',{...post(packet),headers:{'content-type':'application/json',origin:'https://poadomains.link'}});
   await compare('/v1/intents/preview',{...post(packet),headers:{'content-type':'application/json','sec-fetch-site':'same-origin'}});
   await compare('/v1/intents/preview',{...post('{}'),headers:{'content-type':'text/plain'}});
   await compare('/v1/intents/preview',post('x'.repeat(65537)));

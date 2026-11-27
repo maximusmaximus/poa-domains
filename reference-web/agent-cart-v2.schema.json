@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://poadomains.grok.me/agent-cart-v2.schema.json",
+  "$id": "https://poadomains.link/agent-cart-v2.schema.json",
   "title": "PoA Domains Agent Cart Handoff v2 (unsigned plan, never a signed packet or spending approval)",
   "type": "object",
   "properties": {
@@ -96,7 +96,7 @@
       "type": "object",
       "properties": {
         "url": {
-          "const": "https://poadomains.grok.me/mcp"
+          "const": "https://poadomains.link/mcp"
         },
         "transport": {
           "const": "Streamable HTTP"
