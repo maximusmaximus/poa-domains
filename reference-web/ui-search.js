@@ -1,13 +1,13 @@
-import { copyText } from "./ui-copy.js?v=a145e933754c";
-import { publicNameUnavailable } from "./shared.js?v=a145e933754c";
-import { isOwnDomainOrListing, registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, activePoaFixedListings, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=a145e933754c";
-import { ui } from "./ui-state.js?v=a145e933754c";
-import { activeUserAddress, domainHeader, nameLink, navigateDomain, openManageDomain, openPoa, ownerLink, renderSelfBidNotice, writeViewURL } from "./ui-router.js?v=a145e933754c";
-import { add, appendPrincipal, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=a145e933754c";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=a145e933754c";
-import { addToCart } from "./ui-cart.js?v=a145e933754c";
-import { suggestNames } from "./ideas-generator.js?v=a145e933754c";
-import { logSubmittedSearch } from "./ui-search-log.js?v=a145e933754c";
+import { copyText } from "./ui-copy.js?v=7b4d1403d6f1";
+import { publicNameUnavailable } from "./shared.js?v=7b4d1403d6f1";
+import { isOwnDomainOrListing, registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, activePoaFixedListings, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=7b4d1403d6f1";
+import { ui } from "./ui-state.js?v=7b4d1403d6f1";
+import { activeUserAddress, domainHeader, nameLink, navigateDomain, openManageDomain, openPoa, ownerLink, renderSelfBidNotice, writeViewURL } from "./ui-router.js?v=7b4d1403d6f1";
+import { add, appendPrincipal, appendTextWithPoaAddress, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=7b4d1403d6f1";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=7b4d1403d6f1";
+import { addToCart } from "./ui-cart.js?v=7b4d1403d6f1";
+import { suggestNames } from "./ideas-generator.js?v=7b4d1403d6f1";
+import { logSubmittedSearch } from "./ui-search-log.js?v=7b4d1403d6f1";
 
 let activeSuggestionIdx = -1;
 let currentSuggestions = [];
@@ -522,7 +522,7 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
    autoAdded = true;
   }
   const cartItem = ui.cart.find((x) => x.action === "poaBid" && x.params?.auctionId === poaAuction.id) ?? null;
-  const outbidInfo = poaAuctionOutbidStatus(poaAuction, { bidderAddress: ui.bidderAddress || userAddr, cartItem });
+  const outbidInfo = poaAuctionOutbidStatus(poaAuction, { bidderAddress: ui.bidderAddress || userAddr, cartItem, state: ui.latestState });
   add(card, "p", awaiting ? "🔨 For Auction · Starts on first bid" : "🔥 Live Auction", awaiting ? "badge" : "badge-ok");
   if (!isOwn) {
    add(
@@ -546,7 +546,7 @@ export function runSearch(rawQuery, remember = true, { autoAdd = false, fromSugg
   if (outbidInfo.status === "leading")
    add(card, "p", outbidInfo.message, "auction-leading-badge");
   else if (outbidInfo.status === "outbid" || outbidInfo.status === "outbid-covered")
-   add(card, "p", outbidInfo.message, "auction-outbid-badge");
+   appendTextWithPoaAddress(add(card, "p", "", "auction-outbid-badge"), outbidInfo.message, outbidInfo.currentHighPayer);
   const auctionInfo = add(card, "p", `Reserve ${poaShort(poaAuction.price)} POA · `);
   if (poaAuction.high) {
    auctionInfo.append(`Current high bid ${poaShort(poaAuction.high.amount)} POA by `);

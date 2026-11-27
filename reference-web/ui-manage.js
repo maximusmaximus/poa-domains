@@ -1,9 +1,9 @@
-import { ui } from "./ui-state.js?v=a145e933754c";
-import { add, el, endpointBase, person } from "./ui-core.js?v=a145e933754c";
-import { createDomainAvatar, domainHeader, nameLink, notifyOwnerChanged, openPoa, ownerLink, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=a145e933754c";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=a145e933754c";
-import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=a145e933754c";
-import { createInlineInfo } from "./ui-help.js?v=a145e933754c";
+import { ui } from "./ui-state.js?v=7b4d1403d6f1";
+import { add, appendTextWithPoaAddress, el, endpointBase, person } from "./ui-core.js?v=7b4d1403d6f1";
+import { createDomainAvatar, domainHeader, nameLink, notifyOwnerChanged, openPoa, ownerLink, syncEscrowPayerAddress, updateDomainAvatarElement } from "./ui-router.js?v=7b4d1403d6f1";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=7b4d1403d6f1";
+import { actionLabel, copyText, flashCopied } from "./ui-copy.js?v=7b4d1403d6f1";
+import { createInlineInfo } from "./ui-help.js?v=7b4d1403d6f1";
 import {
  buildProfileUpdatePrompt,
  buildSetPrimaryPrompt,
@@ -27,7 +27,7 @@ import {
  saveKnownOwner,
  shortenPoaAddress,
  validPrincipal,
-} from "./shared.js?v=a145e933754c";
+} from "./shared.js?v=7b4d1403d6f1";
 
 const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const IDLE_MANAGE_PROMPT = "Edit profile fields or choose an action above to preview the code for your agent.";
@@ -78,7 +78,7 @@ export function managementPlan(action, deed, state, owner, price = "100", hours 
  return { action, signer: owner, coSigners, params };
 }
 
-function showManagePrompt(text, { meta = "", payload = null, filename = "", ready = Boolean(text), showPanel } = {}) {
+function showManagePrompt(text, { meta = "", metaAddress = null, payload = null, filename = "", ready = Boolean(text), showPanel } = {}) {
  const panel = el("managePromptPanel");
  const promptEl = el("managePrompt");
  const metaEl = el("managePromptMeta");
@@ -109,9 +109,15 @@ function showManagePrompt(text, { meta = "", payload = null, filename = "", read
  };
  if (promptEl) promptEl.textContent = hasText ? text : IDLE_MANAGE_PROMPT;
  if (metaEl) {
-  metaEl.textContent = meta || (canCopy
+  const metaText = meta || (canCopy
    ? "Generated from your actions and fields above — review before approving with your agent."
    : IDLE_MANAGE_PROMPT);
+  if (metaAddress) {
+   metaEl.replaceChildren();
+   appendTextWithPoaAddress(metaEl, metaText, metaAddress);
+  } else {
+   metaEl.textContent = metaText;
+  }
  }
  if (copyBtn) copyBtn.disabled = !canCopy;
  if (dlBtn) dlBtn.disabled = !(canCopy && payload !== null);
@@ -643,12 +649,14 @@ function buildTransferSection(card, deed, owner, { isPrimary = false } = {}) {
   const res = resolveCurrent();
   if (res.ok) {
    const recPrimary = res.source === "address" ? primaryNameForOwner(ui.latestState, res.recipient) : null;
-   previewNode.textContent =
+   const text =
     res.source === "address"
      ? (recPrimary ? `✅ Recipient: ${recPrimary} (${shortenPoaAddress(res.recipient)})` : `✅ Recipient address: ${shortenPoaAddress(res.recipient)}`)
      : res.source === "default-domain"
       ? `✅ Default domain "${res.domainName}" → ${shortenPoaAddress(res.recipient)}`
       : `✅ Domain "${res.domainName}" POA address → ${shortenPoaAddress(res.recipient)}`;
+   previewNode.replaceChildren();
+   appendTextWithPoaAddress(previewNode, text, res.recipient);
   } else {
    previewNode.textContent = "";
   }
@@ -726,6 +734,7 @@ function buildTransferSection(card, deed, owner, { isPrimary = false } = {}) {
   };
   showManagePrompt(promptText, {
    meta: `↪️ Generated · Transfer "${fresh.name}" to ${shortenPoaAddress(pending.recipient)}`,
+   metaAddress: pending.recipient,
    payload,
    filename: `poa-domains-${safeSlug(fresh.name)}-transfer.json`,
    ready: true,

@@ -9,6 +9,7 @@ import {
  formatCountdown,
  formatDuration,
  isOwnDomainOrListing,
+ isPoaAddress,
  isPoaAuctionAwaitingFirstBid,
  minimumNextBid,
  partitionPoaAuctions,
@@ -24,13 +25,13 @@ import {
  resolveDomainView,
  resolveOwnerInput,
  unavailableKey,
-} from "./shared.js?v=a145e933754c";
-import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=a145e933754c";
-import { createInlineInfo } from "./ui-help.js?v=a145e933754c";
-import { ui } from "./ui-state.js?v=a145e933754c";
-import { add, appendPoaAddress, appendPrincipal, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=a145e933754c";
-import { activeUserAddress, domainHeader, nameLink, openManageDomain, openPoa, ownerLink, renderSelfBidNotice } from "./ui-router.js?v=a145e933754c";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=a145e933754c";
+} from "./shared.js?v=7b4d1403d6f1";
+import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=7b4d1403d6f1";
+import { createInlineInfo } from "./ui-help.js?v=7b4d1403d6f1";
+import { ui } from "./ui-state.js?v=7b4d1403d6f1";
+import { add, appendPoaAddress, appendPrincipal, appendTextWithPoaAddress, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=7b4d1403d6f1";
+import { activeUserAddress, domainHeader, nameLink, openManageDomain, openPoa, ownerLink, renderSelfBidNotice } from "./ui-router.js?v=7b4d1403d6f1";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=7b4d1403d6f1";
 
 function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) {
  const wrap = document.createElement("span");
@@ -43,11 +44,20 @@ function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) 
  parent.append(wrap);
 }
 
-function appendRecordRow(parent, rec, name) {
+function appendRecordRow(parent, rec, name, { ownerPageId = null } = {}) {
  if (!rec || typeof rec !== "object") return;
  if (rec.type === "wallet") {
   const row = add(parent, "p", `Wallet (${rec.chain}): `, "record");
-  appendCopyableValue(row, String(rec.address ?? ""), `Copy ${rec.chain} wallet record for ${name}`);
+  const addr = String(rec.address ?? "");
+  if (isPoaAddress(addr)) {
+   appendPoaAddress(row, addr, {
+    code: true,
+    ariaLabel: `Copy ${rec.chain} wallet record for ${name}`,
+    linkPoascan: Boolean(ownerPageId && addr === ownerPageId),
+   });
+  } else {
+   appendCopyableValue(row, addr, `Copy ${rec.chain} wallet record for ${name}`);
+  }
  } else if (rec.type === "service") {
   const row = add(parent, "p", "Service: ", "record");
   appendCopyableValue(row, String(rec.url ?? ""), `Copy service record for ${name}`, { shorten: false });
@@ -76,7 +86,7 @@ function appendActivityDetails(parent, history) {
  parent.append(det);
 }
 
-function renderProfileInto(box, deed, { listedForSale = false, showCleanSlate = true } = {}) {
+function renderProfileInto(box, deed, { listedForSale = false, showCleanSlate = true, ownerPageId = null } = {}) {
  if (!box) return;
  box.replaceChildren();
  if (!deed) {
@@ -118,7 +128,7 @@ function renderProfileInto(box, deed, { listedForSale = false, showCleanSlate = 
   if (p.description) add(box, "p", p.description, "domain-profile-bio");
   const fields = add(box, "div", "", "domain-profile-fields");
   const poaRow = add(fields, "p", "POA: ", "record");
-  appendPoaAddress(poaRow, p.poa, { code: true });
+  appendPoaAddress(poaRow, p.poa, { code: true, linkPoascan: Boolean(ownerPageId && p.poa === ownerPageId) });
   if (p.btc) {
    const btcRow = add(fields, "p", "BTC: ", "record");
    appendCopyableValue(btcRow, p.btc, `Copy BTC address for ${deed.name}`);
@@ -152,7 +162,7 @@ function renderProfileInto(box, deed, { listedForSale = false, showCleanSlate = 
   if (activeRecords.length) {
    const recBox = add(more, "div", "", "domain-records-list");
    add(recBox, "h4", "Attached domain records");
-   for (const rec of activeRecords) appendRecordRow(recBox, rec, deed.name);
+   for (const rec of activeRecords) appendRecordRow(recBox, rec, deed.name, { ownerPageId });
   }
   box.append(more);
  }
@@ -269,7 +279,7 @@ function renderDomainSalesAndAuctions(name, view, salesInfo, poa, nowMs) {
 
   if (outbidInfo.status === "leading") add(item, "p", outbidInfo.message, "auction-leading-badge");
   else if (outbidInfo.status === "outbid" || outbidInfo.status === "outbid-covered")
-   add(item, "p", outbidInfo.message, "auction-outbid-badge");
+   appendTextWithPoaAddress(add(item, "p", "", "auction-outbid-badge"), outbidInfo.message, outbidInfo.currentHighPayer);
 
   const bidLine = add(item, "p", `Reserve ${poaShort(a.price)} POA · `);
   if (a.high) {
@@ -624,7 +634,7 @@ export function renderOwnerPage(rawOwnerId) {
   nameLink(principalNode, resolved.viaDomain);
   principalNode.append(" · ");
  }
- appendPoaAddress(principalNode, ownerId, { code: true, resolvePrimary: false, linkOwner: false });
+ appendPoaAddress(principalNode, ownerId, { code: true, resolvePrimary: false, linkPoascan: true });
 
  const nowMs = ui.escrowMarketServerTime || Date.now();
  if (profileBox) {
@@ -639,6 +649,7 @@ export function renderOwnerPage(rawOwnerId) {
    renderProfileInto(profileBox, primaryDeed, {
     listedForSale: primarySale.listedForSale,
     showCleanSlate: false,
+    ownerPageId: ownerId,
    });
   } else {
    profileBox.hidden = true;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,readdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {transformSync} from 'esbuild';
-import {buildCartItem,editCartAmount,isPoaAddress,resolveDefaultAuctionTab,shortenPoaAddress} from '../reference-web/shared.js';
+import {buildCartItem,editCartAmount,hasPoaSiteActions,isPoaAddress,poascanAddressUrl,resolveDefaultAuctionTab,shortenPoaAddress} from '../reference-web/shared.js';
 import {capabilities} from '../dist/src/interface.js';
 import {profileEngine} from './fixtures/ui-harness.mjs';
 import {auctionState,offerState} from './fixtures/ui-state.mjs';
@@ -726,19 +726,55 @@ test('owner profile, domain page, ownerLink primary rendering, and Manage main-d
   routerMod.ownerLink(plainBox, hiddenOwner);
   assert.ok(collectText(plainBox).includes('poa1...1119'));
   assert.equal(findAll(plainBox, (n) => n.classList?.contains('owner-primary-link')).length, 0);
+  const hiddenLinks = findAll(plainBox, (n) => n.tagName === 'A' && n.classList?.contains('poa-addr-text'));
+  assert.equal(hiddenLinks.length, 1);
+  assert.equal(hiddenLinks[0].href, poascanAddressUrl(hiddenOwner));
+  assert.equal(hiddenLinks[0].target, '_blank');
+  assert.equal(hiddenLinks[0].rel, 'noopener noreferrer');
+
+  // hasPoaSiteActions & appendTextWithPoaAddress distinguish active site accounts vs POAScan-only addresses
+  assert.equal(hasPoaSiteActions(ui.latestState, ownerA, ui.escrowMarket), true);
+  assert.equal(hasPoaSiteActions(ui.latestState, hiddenOwner, ui.escrowMarket), false);
+  assert.equal(hasPoaSiteActions(ui.latestState, hiddenOwner, [{ seller: hiddenOwner }]), true);
+  assert.equal(hasPoaSiteActions(ui.latestState, hiddenOwner, [{ bidders: [hiddenOwner] }]), true);
+  assert.equal(hasPoaSiteActions(ui.latestState, hiddenOwner, [{ history: [{ payer: hiddenOwner }] }]), true);
+  const msgActive = makeNode('p');
+  coreMod.appendTextWithPoaAddress(msgActive, `High bid by nebula (${shortenPoaAddress(ownerA)})`, ownerA);
+  const msgActiveLink = findAll(msgActive, (n) => n.tagName === 'A')[0];
+  assert.equal(msgActiveLink.href, '/p/nebula');
+  assert.equal(msgActiveLink.target, undefined);
+  const msgInactive = makeNode('p');
+  coreMod.appendTextWithPoaAddress(msgInactive, `Recipient: ${shortenPoaAddress(hiddenOwner)}`, hiddenOwner);
+  const msgInactiveLink = findAll(msgInactive, (n) => n.tagName === 'A')[0];
+  assert.equal(msgInactiveLink.href, poascanAddressUrl(hiddenOwner));
+  assert.equal(msgInactiveLink.target, '_blank');
+  assert.equal(msgInactiveLink.rel, 'noopener noreferrer');
 
   // 2. renderOwnerPage via domain name & via address displays main domain + profile fields + held names + POA listings
+  // On an owner profile page, the owner's abbreviated address links to POAScan in a new window.
   domainMod.renderOwnerPage('comet');
   assert.ok(collectText(byId.get('ownerTitle')).includes('nebula'));
   assert.ok(collectText(byId.get('ownerProfile')).includes('Main bio'));
   assert.equal(byId.get('ownerProfile').hidden, false);
   assert.ok(collectText(byId.get('ownerNames')).includes('nebula'));
   assert.ok(collectText(byId.get('ownerListings')).includes('comet'));
+  const ownerPrincipalLink = findAll(byId.get('ownerPrincipal'), (n) => n.tagName === 'A' && n.classList?.contains('poa-addr-text'))[0];
+  assert.equal(ownerPrincipalLink.href, poascanAddressUrl(ownerA));
+  assert.equal(ownerPrincipalLink.target, '_blank');
+  assert.equal(ownerPrincipalLink.rel, 'noopener noreferrer');
+  const ownerProfilePoaLink = findAll(byId.get('ownerProfile'), (n) => n.tagName === 'A' && n.classList?.contains('poa-addr-text'))[0];
+  assert.equal(ownerProfilePoaLink.href, poascanAddressUrl(ownerA));
+  assert.equal(ownerProfilePoaLink.target, '_blank');
+  assert.equal(ownerProfilePoaLink.rel, 'noopener noreferrer');
 
-  // renderOwnerPage without a primary name hides #ownerProfile
+  // renderOwnerPage without a primary name hides #ownerProfile and still links #ownerPrincipal to POAScan in a new window
   domainMod.renderOwnerPage(hiddenOwner);
   assert.equal(byId.get('ownerTitle').textContent, '👤 Owner profile');
   assert.equal(byId.get('ownerProfile').hidden, true);
+  const hiddenPrincipalLink = findAll(byId.get('ownerPrincipal'), (n) => n.tagName === 'A' && n.classList?.contains('poa-addr-text'))[0];
+  assert.equal(hiddenPrincipalLink.href, poascanAddressUrl(hiddenOwner));
+  assert.equal(hiddenPrincipalLink.target, '_blank');
+  assert.equal(hiddenPrincipalLink.rel, 'noopener noreferrer');
 
   // 3. renderDomainPage for unlisted primary domain and listed domain
   domainMod.renderDomainPage('nebula');
