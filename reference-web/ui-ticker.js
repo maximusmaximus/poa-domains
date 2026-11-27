@@ -1,24 +1,101 @@
-import { autoScroll } from "./ui-motion.js?v=51ff8692aecf";
-import { isPoaAuctionAwaitingFirstBid, poaShort, shapeLiveActions } from "./shared.js?v=51ff8692aecf";
-import { actionLabel } from "./ui-copy.js?v=51ff8692aecf";
-export function recentActions(state, escrowMarket = []) {
-  const items = shapeLiveActions(state, Number.MAX_SAFE_INTEGER);
-  const seen = new Set(items.map((x) => x.id));
+import { autoScroll } from "./ui-motion.js?v=6ce08cf8fdbc";
+import { isPoaAuctionAwaitingFirstBid, poaShort, shapeLiveActions } from "./shared.js?v=6ce08cf8fdbc";
+
+export const MAX_RECENT_ACTIONS = 100;
+
+function toActionTimestampMs(ts) {
+  const n = Number(ts);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return n < 1e12 ? n * 1000 : n;
+}
+
+function receiptActionLabel(r, name) {
+  const res = r?.result;
+  if (r?.status === "succeeded" && res && typeof res === "object") {
+    if (typeof res.primaryName === "string" && res.primaryName)
+      return `⭐ Main domain · ${res.primaryName}`;
+    if (Object.prototype.hasOwnProperty.call(res, "primaryName") && res.primaryName === null)
+      return `Main domain cleared · #${r.sequence}`;
+    if (res.metadataVersion != null)
+      return `🪪 Profile updated · #${r.sequence}`;
+    if (res.recordsVersion != null)
+      return `🗂️ Records updated · #${r.sequence}`;
+  }
+  return (name ? name + " · " : "") + "Registry action #" + r.sequence + " · " + r.status;
+}
+
+export function recentActions(state, escrowMarket = [], limit = MAX_RECENT_ACTIONS) {
+  const receiptById = new Map();
+  const seqTime = new Map();
   for (const r of Object.values(state?.receipts ?? {})) {
     const id = "receipt:" + (r.intentId ?? r.sequence);
-    if (!seen.has(id)) {
-      items.push({
-        id,
-        name: r.result?.name ?? "",
-        sequence: r.sequence ?? 0,
-        at: r.time ?? 0,
-        label: (r.result?.name ? r.result.name + " · " : "") + "Registry action #" + r.sequence + " · " + r.status,
-      });
+    receiptById.set(id, r);
+    if (r?.sequence != null && Number(r.time) > 0) seqTime.set(r.sequence, Number(r.time));
+  }
+  const shaped = shapeLiveActions(state, Number.MAX_SAFE_INTEGER);
+  const seen = new Set();
+  const registryItems = [];
+  for (const raw of shaped) {
+    seen.add(raw.id);
+    const r = receiptById.get(raw.id);
+    let item = raw;
+    if (r?.status === "succeeded" && typeof r.result?.primaryName === "string" && r.result.primaryName) {
+      item = { ...raw, name: r.result.primaryName, label: `⭐ Main domain · ${r.result.primaryName}` };
     }
+    const rawAt =
+      item.kind === "offer" || item.kind === "offer-active" || item.kind === "auction-upcoming"
+        ? (seqTime.get(item.sequence) ?? 0)
+        : (item.at || seqTime.get(item.sequence) || 0);
+    registryItems.push({ ...item, atMs: toActionTimestampMs(rawAt) });
+  }
+  for (const [id, r] of receiptById) {
+    if (seen.has(id)) continue;
+    const name =
+      r.result?.name ??
+      (typeof r.result?.primaryName === "string" ? r.result.primaryName : "") ??
+      (r.result?.deedId && state?.deeds?.[r.result.deedId]?.name) ??
+      "";
+    const at = r.time ?? 0;
+    registryItems.push({
+      id,
+      name: name || "",
+      sequence: r.sequence ?? 0,
+      at,
+      atMs: toActionTimestampMs(at),
+      label: receiptActionLabel(r, name || ""),
+    });
   }
   const escrowItems = [];
   for (const a of Array.isArray(escrowMarket) ? escrowMarket : []) {
-    if (!a || a.kind === "fixed" || !a.name) continue;
+    if (!a || !a.name) continue;
+    if (a.kind === "fixed") {
+      if (a.status === "COMPLETE" && a.high) {
+        const doneAt = Number(a.history?.at(-1)?.at || a.closes || a.createdAt || 0);
+        escrowItems.push({
+          id: `escrow-sold:${a.id}`,
+          kind: "escrow-sold",
+          name: a.name,
+          sequence: 0,
+          at: doneAt,
+          atMs: toActionTimestampMs(doneAt),
+          label: `✅ Sold · ${a.name} · ${poaShort(a.high.amount)} POA`,
+        });
+      } else if (a.status === "OPEN") {
+        const listedAt = Number(a.history?.find((h) => h && h.at)?.at || a.createdAt || 0);
+        if (listedAt > 0) {
+          escrowItems.push({
+            id: `escrow-listed:${a.id}`,
+            kind: "escrow-listed",
+            name: a.name,
+            sequence: 0,
+            at: listedAt,
+            atMs: toActionTimestampMs(listedAt),
+            label: `🏷️ Listed · ${a.name} · ${poaShort(a.price)} POA`,
+          });
+        }
+      }
+      continue;
+    }
     // Unbid inventory auctions have NOT started yet — do not announce them on the top scroll bar.
     if (isPoaAuctionAwaitingFirstBid(a)) continue;
     if (a.status === "OPEN" && a.high) {
@@ -32,8 +109,9 @@ export function recentActions(state, escrowMarket = []) {
           id: `escrow-bid:${a.id}:${a.high.amount}`,
           kind: "escrow-bid",
           name: a.name,
-          sequence: Number.MAX_SAFE_INTEGER,
+          sequence: 0,
           at: latestAt,
+          atMs: toActionTimestampMs(latestAt),
           label: `🏷️ High bid · ${a.name} · ${poaShort(a.high.amount)} POA`,
         });
       }
@@ -41,8 +119,9 @@ export function recentActions(state, escrowMarket = []) {
         id: `escrow-started:${a.id}`,
         kind: "escrow-auction-started",
         name: a.name,
-        sequence: Number.MAX_SAFE_INTEGER,
+        sequence: 0,
         at: startAt,
+        atMs: toActionTimestampMs(startAt),
         label: `🔥 Auction started · ${a.name} · ${poaShort(startAmt)} POA`,
       });
     } else if (a.status === "COMPLETE" && a.high) {
@@ -51,24 +130,35 @@ export function recentActions(state, escrowMarket = []) {
         id: `escrow-complete:${a.id}`,
         kind: "escrow-auction-complete",
         name: a.name,
-        sequence: Number.MAX_SAFE_INTEGER,
+        sequence: 0,
         at: doneAt,
+        atMs: toActionTimestampMs(doneAt),
         label: `✅ Auction won · ${a.name} · ${poaShort(a.high.amount)} POA`,
       });
     }
   }
-  escrowItems.sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
-  items.sort((a, b) => (b.sequence ?? 0) - (a.sequence ?? 0));
-  return [...escrowItems, ...items];
+  const merged = [...escrowItems, ...registryItems];
+  merged.sort(
+    (a, b) =>
+      (b.atMs - a.atMs) ||
+      ((b.sequence ?? 0) - (a.sequence ?? 0)) ||
+      String(b.id).localeCompare(String(a.id)),
+  );
+  const cap = Number.isInteger(limit) && limit > 0 ? limit : MAX_RECENT_ACTIONS;
+  return merged.slice(0, cap).map(({ atMs: _atMs, ...rest }) => rest);
 }
 let signature = "";
+let topActionId = "";
 export function drawTicker(state, escrowMarket = []) {
   const strip = document.getElementById("liveTicker"),
     track = document.getElementById("liveTickerTrack"),
     items = recentActions(state, escrowMarket),
     key = JSON.stringify(items);
   if (!strip || !track || key === signature || track.contains(document.activeElement)) return;
+  const nextTopId = items[0]?.id ?? "";
+  const hasNewTop = Boolean(topActionId && nextTopId && nextTopId !== topActionId);
   signature = key;
+  topActionId = nextTopId;
   track.replaceChildren();
   document.getElementById("recentActions").classList.toggle("is-empty", !items.length);
   if (!items.length) {
@@ -85,7 +175,8 @@ export function drawTicker(state, escrowMarket = []) {
     const label = String(item.label).replace(/settled/g, "recorded").replace(/ · live · /g, " · registry auction · ");
     if (item.name) {
       chip.href = "/d/" + encodeURIComponent(item.name);
-      const at = label.indexOf(item.name);
+      const sep = label.indexOf(" · " + item.name);
+      const at = sep >= 0 ? sep + 3 : label.indexOf(item.name);
       chip.append(document.createTextNode(at < 0 ? "" : label.slice(0, at)));
       const name = document.createElement("span");
       const activeId = state?.names?.[item.name]?.activeId;
@@ -96,5 +187,6 @@ export function drawTicker(state, escrowMarket = []) {
     } else chip.textContent = label;
     track.append(chip);
   }
-  autoScroll(strip, { speed: 18 });
+  const ctrl = autoScroll(strip, { speed: 18 });
+  if (hasNewTop && ctrl && !ctrl.paused()) ctrl.reset(0);
 }

@@ -2280,6 +2280,81 @@ try {
     await ctxGeom.close();
   }
 
+  // 11. Near-real-time top ticker: chronologically merges registry seconds & escrow ms, caps at 100 chips,
+  //     and auto-pulls a newly arrived action within one background poll while jumping scrollLeft back to 0.
+  {
+    const baseSec = Math.floor(Date.now() / 1000) - 2000;
+    const prevReceipts = h.payload.state.receipts;
+    const prevDeeds = h.payload.state.deeds;
+    const prevNames = h.payload.state.names;
+    const prevSeq = h.payload.state.sequence;
+    const prevTime = h.payload.state.time;
+    const prevObsTime = h.payload.observedServerTime;
+    const tickerReceipts = {};
+    const tickerDeeds = { ...prevDeeds };
+    const tickerNames = { ...prevNames };
+    for (let i = 1; i <= 115; i++) {
+      const id = `ticker-deed-${i}`;
+      const nm = `tick${i}`;
+      tickerDeeds[id] = { id, name: nm, owner: peerOwner, parentId: null, retired: false, version: 1, ownerVersion: 1, rights: { kind: "permanent" }, records: [], metadata: [] };
+      tickerNames[nm] = { name: nm, key: nm, activeId: id, auctionId: null };
+      tickerReceipts[`tr-${i}`] = { intentId: `tr-${i}`, sequence: 1000 + i, time: baseSec + i * 5, status: "succeeded", result: { deedId: id, owner: peerOwner } };
+    }
+    h.payload.state.deeds = tickerDeeds;
+    h.payload.state.names = tickerNames;
+    h.payload.state.receipts = tickerReceipts;
+    h.payload.state.sequence = 1115;
+    h.payload.state.time = baseSec + 115 * 5;
+    h.payload.observedServerTime = baseSec + 115 * 5;
+    const staleDoneAuction = {
+      id: "e".repeat(64),
+      kind: "auction",
+      name: "ancientwon",
+      seller: peerOwner,
+      price: "100.000000",
+      status: "COMPLETE",
+      awaitingFirstBid: false,
+      high: { payer: mainOwner, amount: "100.000000" },
+      closes: (baseSec - 86400) * 1000,
+      history: [{ event: "Payment and title complete", at: (baseSec - 86400) * 1000, amount: "100.000000" }],
+    };
+    const ctxTicker = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const pageTicker = await ctxTicker.newPage();
+    const tickerErrors = [];
+    pageTicker.on("pageerror", (e) => tickerErrors.push(e.message));
+    await pageTicker.route("https://**", (r) => r.abort());
+    await pageTicker.route("**/v1/escrow/market", (r) =>
+      r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [staleDoneAuction], serverTime: Date.now() }) }),
+    );
+    await pageTicker.goto(h.url);
+    await pageTicker.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await pageTicker.locator("#termsAgreeBtn").click();
+    await expect(pageTicker.locator("#liveTickerTrack .ticker-chip")).toHaveCount(100);
+    await expect(pageTicker.locator("#liveTickerTrack .ticker-chip").first()).toContainText("tick115");
+    assert.equal((await pageTicker.locator("#liveTickerTrack").innerText()).includes("ancientwon"), false);
+    // Let ticker scroll away from x=0, then land a brand-new action and verify near-real-time auto-poll brings it to front
+    await pageTicker.mouse.move(0, 0);
+    await pageTicker.waitForFunction(() => document.querySelector("#liveTicker").scrollLeft > 10, { timeout: 5000 });
+    const liveDeedId = "ticker-deed-live-116";
+    h.payload.state.deeds[liveDeedId] = { id: liveDeedId, name: "brandnewlive", owner: peerOwner, parentId: null, retired: false, version: 1, ownerVersion: 1, rights: { kind: "permanent" }, records: [], metadata: [] };
+    h.payload.state.names.brandnewlive = { name: "brandnewlive", key: "brandnewlive", activeId: liveDeedId, auctionId: null };
+    h.payload.state.receipts["tr-116"] = { intentId: "tr-116", sequence: 1116, time: baseSec + 1200, status: "succeeded", result: { deedId: liveDeedId, owner: peerOwner } };
+    h.payload.state.sequence = 1116;
+    h.payload.state.time = baseSec + 1200;
+    h.payload.observedServerTime = baseSec + 1200;
+    await expect(pageTicker.locator("#liveTickerTrack .ticker-chip").first()).toContainText("brandnewlive", { timeout: 9000 });
+    await expect(pageTicker.locator("#liveTickerTrack .ticker-chip")).toHaveCount(100);
+    assert.ok((await pageTicker.locator("#liveTicker").evaluate((n) => n.scrollLeft)) < 60, "Ticker should jump back near x=0 when a new top action arrives");
+    assert.deepEqual(tickerErrors, []);
+    await ctxTicker.close();
+    h.payload.state.receipts = prevReceipts;
+    h.payload.state.deeds = prevDeeds;
+    h.payload.state.names = prevNames;
+    h.payload.state.sequence = prevSeq;
+    h.payload.state.time = prevTime;
+    h.payload.observedServerTime = prevObsTime;
+  }
+
   console.log("PASS Cart copy regression + full-site UI spacing & alignment audit across desktop (1280) and mobile (390)");
 } finally {
   await h.close();
