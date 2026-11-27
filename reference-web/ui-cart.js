@@ -1,13 +1,13 @@
-import { publicNameUnavailable } from "./shared.js?v=df469fa578f4";
-import { registryUnit } from "./shared.js?v=df469fa578f4";
-import { actionLabel } from "./ui-copy.js?v=df469fa578f4";
-import { createInlineInfo } from "./ui-help.js?v=df469fa578f4";
-import { trapDialog } from "./ui-a11y.js?v=df469fa578f4";
-import { ui } from "./ui-state.js?v=df469fa578f4";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, cartSummary, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=df469fa578f4";
-import { add, appendTextWithPoaAddress, el, endpointBase } from "./ui-core.js?v=df469fa578f4";
-import { activeUserAddress, domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=df469fa578f4";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=df469fa578f4";
+import { publicNameUnavailable } from "./shared.js?v=d4d3df1db2e8";
+import { registryUnit } from "./shared.js?v=d4d3df1db2e8";
+import { actionLabel } from "./ui-copy.js?v=d4d3df1db2e8";
+import { createInlineInfo } from "./ui-help.js?v=d4d3df1db2e8";
+import { trapDialog } from "./ui-a11y.js?v=d4d3df1db2e8";
+import { ui } from "./ui-state.js?v=d4d3df1db2e8";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, cartSummary, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=d4d3df1db2e8";
+import { add, appendTextWithPoaAddress, el, endpointBase } from "./ui-core.js?v=d4d3df1db2e8";
+import { activeUserAddress, domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=d4d3df1db2e8";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=d4d3df1db2e8";
 export function cartCopyBlocked() {
  return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
 }
@@ -448,14 +448,19 @@ export function maybePrefillOwnerFromPurchasedCart(state) {
  ? "🎉 Prefilled from your recently registered cart names."
  : "🎉 Prefilled from a settled name in your cart.",
  );
- manageNotice.append(
- createInlineInfo(
- "manage-owner-notice",
- "About prefilled owner address",
- "View-only until your agent signs an update. Nothing is submitted from this page.",
- ),
- );
  manageNotice.hidden = false;
+ }
+ const fieldInfo = el("info-manage-owner-field");
+ if (fieldInfo) {
+ let note = el("manageOwnerPrefillInfo");
+ if (!note) {
+ note = document.createElement("p");
+ note.id = "manageOwnerPrefillInfo";
+ const closeBtn = fieldInfo.querySelector(".info-close");
+ if (closeBtn) fieldInfo.insertBefore(note, closeBtn);
+ else fieldInfo.append(note);
+ }
+ note.textContent = "Prefilled from a settled name in your cart. View-only until your agent signs an update. Nothing is submitted from this page.";
  }
  }
  }

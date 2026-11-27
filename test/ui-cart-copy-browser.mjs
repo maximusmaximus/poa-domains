@@ -744,8 +744,10 @@ try {
   // Pre-listing warning lives in ℹ️ info popovers, not as inline banners on unlisted cards / Step 1
   await expect(pageUx.locator('#manageNames article[data-domain-name="agent"] .sale-fields-warning')).toHaveCount(0);
   await expect(pageUx.locator("#escrowListingFieldWarning")).toHaveCount(0);
+  await expect(pageUx.locator("#manageOwnerNotice .inline-info, #help-manage-owner-notice")).toHaveCount(0);
   await pageUx.locator("#help-manage-owner-field").click();
   await expect(pageUx.locator("#info-manage-owner-field")).toBeVisible();
+  await expect(pageUx.locator("#info-manage-owner-field")).toContainText("Prefilled from a settled name in your cart.");
   await pageUx.keyboard.press("Escape");
   await pageUx.locator("#help-escrow-name-field").click();
   await expect(pageUx.locator("#info-escrow-name-field")).toBeVisible();
