@@ -206,7 +206,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .section-navigation{position:sticky;top:0;z-index:30;}
 .section-navigation>.section-tabs{position:relative;}
 
-.domain-name,.idea,#searchInput,#searchAutofill,#escrowName,#escrowMarket article.card>h3,#escrowDomain article.card>h3{font-family:var(--emoji-font),var(--text-font),"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji";text-transform:uppercase;}
+.domain-name,.idea,#searchInput,#searchAutofill,#escrowName,#escrowMarket article.card > h3,#escrowDomain article.card > h3{font-family:var(--emoji-font),var(--text-font),"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji";text-transform:uppercase;}
 #searchInput::placeholder,#escrowName::placeholder{text-transform:none;}
 .domain-name{text-shadow:0 1px 3px rgba(0,0,0,.42);}
 .site-title .title-glyph:nth-child(1){--i:0;}.site-title .title-glyph:nth-child(2){--i:1;}.site-title .title-glyph:nth-child(3){--i:2;}.site-title .title-glyph:nth-child(4){--i:3;}.site-title .title-glyph:nth-child(5){--i:4;}.site-title .title-glyph:nth-child(6){--i:5;}.site-title .title-glyph:nth-child(7){--i:6;}.site-title .title-glyph:nth-child(8){--i:7;}.site-title .title-glyph:nth-child(9){--i:8;}.site-title .title-glyph:nth-child(10){--i:9;}
