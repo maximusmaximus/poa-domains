@@ -32,7 +32,7 @@ export class EscrowHarness extends DurableObject<TestEnv> {
       {issuer:key(6),treasury:key(5),alice:key(2),bob:key(3),carol:key(4)});
     this.clock.overrideTime=Math.floor(this.net.now/1000);
     const p={...policy,perTx:"250000.000000",daily:"1000000.000000",feeBps:this.engine.config.feeBps};
-    this.escrow=new Escrow(new SQLiteEscrowJournal(ctx.storage,p),this.net,signer(),registryTitles(this.engine),p,()=>this.net.now,()=>true,
+    this.escrow=new Escrow(new SQLiteEscrowJournal(ctx.storage,p),this.net,signer(),registryTitles(this.engine,key(5)),p,()=>this.net.now,()=>true,
       point=>{if(this.armed===point){this.armed="";throw Error("TEST_CRASH");}},()=>this.newNames);
     save();
   });}
@@ -84,12 +84,12 @@ export class EscrowHarness extends DurableObject<TestEnv> {
     if(path==="core-state")return {state:this.engine.snapshot(),stateHash:this.engine.stateHash()};
     if(path==="network-status")return {level:this.net.stale?"down":"up",hold:this.net.stale,message:"MOCK CHAIN"};
     if(path==="ui-enabled")return this.uiEnabled;
-    if(path==="capabilities"){const s=this.escrow.state(),freshness=await this.escrow.readiness();return {enabled:this.uiEnabled,mock:true,paused:s.paused,held:s.paused||!!s.halt||freshness.held,holdReason:s.paused?"POA payments paused":s.halt??freshness.reason,address:policy.wallet,limits:{perTransaction:this.escrow.policy.perTx,daily:this.escrow.policy.daily},freshness,serverTime:this.net.now,registryId:this.engine.registryId};}
+    if(path==="capabilities"){const s=this.escrow.state(),freshness=await this.escrow.readiness();return {enabled:this.uiEnabled,mock:true,paused:s.paused,held:s.paused||!!s.halt||freshness.held,holdReason:s.paused?"POA payments paused":s.halt??freshness.reason,instantSettlement:this.escrow.instantSettlement(),address:policy.wallet,limits:{perTransaction:this.escrow.policy.perTx,daily:this.escrow.policy.daily},freshness,serverTime:this.net.now,registryId:this.engine.registryId};}
     if(path==="intent")return this.escrow.depositView(query.id!,query.txid);
-    return {items:marketView(this.escrow.state(),path==="domain"?query.name:undefined),serverTime:this.net.now};
+    return {items:marketView(this.escrow.state(),path==="domain"?query.name:undefined,this.escrow.instantSettlement()),serverTime:this.net.now};
   }
   async escrowRead(path:string,query:Record<string,string>){return this.web(path,query);}
-  async escrowCommand(packet:string,endpoint:string){const result=await publicCommand(()=>this.escrow,packet,this.engine.registryId,endpoint,this.net.now);if(this.armed==="after-public-command"){this.armed="";throw Error("ESCROW_UNAVAILABLE");}return result;}
+  async escrowCommand(packet:string,endpoint:string){const result=await publicCommand(()=>this.escrow,packet,this.engine.registryId,endpoint,this.net.now);if(this.armed==="after-public-command"&&result.action!=="view"){this.armed="";throw Error("ESCROW_UNAVAILABLE");}return result;}
   private result(){const state=this.escrow.state();invariant(state);const snapshot=this.engine.snapshot();return{state,owner:snapshot.deeds[snapshot.names["👩‍🦰"]!.activeId!]!.owner,
     engineSequence:snapshot.sequence,submissions:this.net.submitted.map(b=>({nonce:b.nonce,to:b.to,amount:b.amount})),calls:this.net.calls};}
 }

@@ -18,7 +18,7 @@ async function start(label){const fd=openSync(join(work,label+".log"),"w",0o600)
  try{const r=await fetch(url,{method:"POST",body:'{"op":"status"}',signal:AbortSignal.timeout(2000)});if(r.status===200)return await r.json();}catch{}await delay(100);}
  throw Error("LOCAL_WORKER_START_TIMEOUT "+work);
 }
-async function stop(hard=false){if(!server||server.exitCode!==null)return;const done=once(server,"exit");process.kill(-server.pid,hard?"SIGKILL":"SIGTERM");await Promise.race([done,delay(10000)]);if(server.exitCode===null)process.kill(-server.pid,"SIGKILL");}
+async function stop(hard=false){if(!server||server.exitCode!==null)return;const done=once(server,"exit");const send=sig=>{try{if(process.platform==="win32")server.kill(sig);else process.kill(-server.pid,sig);}catch{}};send(hard?"SIGKILL":"SIGTERM");await Promise.race([done,delay(10000)]);if(server.exitCode===null)send("SIGKILL");}
 const cmd=(actor,key,action,params)=>call({op:"command",actor,key,action,params});
 try{
  const first=await start("first");check("real workerd + SQLite initializes actual registry",()=>assert.equal(first.engineSequence,15));await call({op:"unpause"});
@@ -35,13 +35,16 @@ try{
  const before=await call({op:"status"});await stop();const after=await start("deposit-restart");
  check("full process restart replays deposit, bid hold, title and journal exactly",()=>assert.deepEqual(after,before));
  await call({op:"stale",value:true});const held=await call({op:"tick"},409);check("stale network prohibits signing/payout",()=>assert.equal(held.code,"ESCROW_STALE"));await call({op:"stale",value:false});
- await call({op:"advance",ms:86400001});const consent=await call({op:"consent"});
- await cmd(2,"settle","settle",{auction,transfer:consent.packet});await call({op:"mode",mode:"after-timeout"});
- await call({op:"tick"});await call({op:"arm",point:"after-payout"});const crashed=await call({op:"tick"},409);check("crash after external payout before title commit is injected",()=>assert.equal(crashed.code,"TEST_CRASH"));
+ await call({op:"advance",ms:86400001});
+ // Zero-handover automatic settlement: NO seller `settle` command needed! Post-close cancel/expire are blocked.
+ await call({op:"command",actor:2,key:"rug-cancel",action:"cancel",params:{auction}},409);count++;
+ await call({op:"command",actor:4,key:"snipe-expire",action:"expire",params:{auction}},409);count++;
+ await call({op:"mode",mode:"after-timeout"});
+ await call({op:"tick"});await call({op:"arm",point:"after-payout"});const crashed=await call({op:"tick"},409);check("crash after external payout before automatic title commit is injected",()=>assert.equal(crashed.code,"TEST_CRASH"));
  const paid=await call({op:"status"});check("payout final while title remains reserved for seller",()=>{assert.equal(paid.owner,who(2));assert.equal(paid.calls,1);});
  await stop(true);await start("payout-restart");
  for(let i=0;i<5;i++)await call({op:"tick"});
- const completed=await call({op:"status"});check("restart recovers seller payout, fee and actual permanent-name transfer",()=>{assert.equal(completed.owner,who(3));assert.equal(completed.calls,2);assert.equal(completed.state.settlements[auction].status,"COMPLETE");assert.equal(completed.engineSequence,16);});
+ const completed=await call({op:"status"});check("restart recovers seller payout, fee and automatic permanent-name transfer (zero seller handover)",()=>{assert.equal(completed.owner,who(3));assert.equal(completed.calls,2);assert.equal(completed.state.settlements[auction].status,"COMPLETE");assert.equal(completed.state.settlements[auction].auto,true);assert.equal(completed.engineSequence,16);});
  check("sequential outgoing nonces and fee split match actual registry policy",()=>{assert.deepEqual(completed.submissions.map(x=>x.nonce),[1,2]);assert.deepEqual(completed.submissions.map(x=>x.amount),["97500.000000","2500.000000"]);});
  await Promise.all(Array.from({length:12},()=>call({op:"tick"})));const duplicate=await call({op:"status"});check("concurrent recovery cannot repay or repeat title transfer",()=>{assert.equal(duplicate.calls,2);assert.equal(duplicate.engineSequence,16);});
  await cmd(3,"withdraw","withdraw",{amount:"10000.000000"});await call({op:"pause"});await call({op:"tick"},409);count++;

@@ -19,10 +19,19 @@ It is a bounded, single-custodian implementation, not native naming escrow.
   Reads continue. These reservations survive disabling the feature.
 - An external payout and a registry name transfer are **not atomic**. The durable
   saga is `PAYING -> TITLE_PENDING -> COMPLETE`. Seller/fee payments must be verified
-  final before a local SQLite transaction commits the signed title transfer and
-  settlement journal. If consent expires, payment is not repeated: title remains
-  reserved until the seller supplies a valid `repair-title` consent. There is no
-  automatic refund after any uncertain or verified payout.
+  final before a local SQLite transaction commits the title transfer and settlement
+  journal. With **zero-handover automatic settlement** (`instantSettlement: true` on
+  `/v1/escrow/capabilities`, `autoSettle: true` on listings), the seller's signed
+  `list` or `open` command pins the deed (`deedId` + `ownerVersion`) and authorizes
+  automatic settlement: fixed-price `buy` immediately enters `SETTLING`, and closed
+  funded auctions automatically enter `SETTLING` on the next `tick()` / alarm —
+  paying seller + fee on-chain to finality and then committing the escrow-only
+  `escrowSettle` title transfer in the same SQLite transaction with **zero second
+  seller step**. Because `escrowSettle` is signed with the registry treasury key at
+  commit time, multiple sales by the same seller settle in parallel without pinning
+  the seller's own registry nonce. Legacy `settle` and `repair-title` remain supported
+  for non-auto listings or rare `TITLE_PENDING` recovery. There is no automatic
+  refund after any uncertain or verified payout.
 - A custodian/runtime/account compromise can drain held money. Worker secrets do not
   protect against compromised application code. No independent security approval or
   independent consensus-proof verification is implied by this module.
@@ -106,14 +115,14 @@ Command parameter schemas (all fields required; no extras):
 |---|---|
 | `intent` | `amount` (returns unique intent, exact memo, public recipient, and required `payer` sender address; on-chain funding must come from `payer`) |
 | `detect` | `intent`, `txid` (requires `body.from === intent.payer`, exact recipient, amount, and memo) |
-| `list` | `name`, `price` (fixed-price escrow listing) |
-| `buy` | `auction`, `amount` (exact fixed price; reserves credited funds) |
+| `list` | `name`, `price` (fixed-price escrow listing; pins deed for automatic settlement) |
+| `buy` | `auction`, `amount` (exact fixed price; debits credited funds and immediately queues automatic settlement) |
 | `view` | no parameters (public signed account read only) |
-| `open` | `name`, `reserve` |
+| `open` | `name`, `reserve` (first-bid auction; pins deed for automatic settlement on close) |
 | `bid` | `auction`, `amount` |
-| `cancel` / `expire` | `auction` |
+| `cancel` / `expire` | `auction` (post-close won auto-settle auctions cannot be snipe-cancelled or expired while ready to settle) |
 | `withdraw` | `amount` (original payer only; no redirect) |
-| `settle` / `repair-title` | `auction`, `transfer` (seller-signed existing registry transfer packet) |
+| `settle` / `repair-title` | `auction`, `transfer` (legacy seller-signed transfer or rare `TITLE_PENDING` repair; not needed when `instantSettlement: true`) |
 | `issue` | `name`, `amount`, `registration` (buyer-signed `issueFromTreasury`; on when `POA_ESCROW_NEW_NAMES=approved-v1`; see NEW-NAME-CHECKOUT.md) |
 
 Outbid/cancel/expiry create original-payer refund obligations. Pausing or a network

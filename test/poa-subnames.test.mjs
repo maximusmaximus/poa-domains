@@ -11,8 +11,10 @@ import { buildSubnameListingPrompt, buildSubnamePurchasePrompt, poaAmount } from
 
 test("issueSubname is escrow-only: never a public registry action", () => {
   assert.ok(!Object.hasOwn(ACTIONS, "issueSubname"));
+  assert.ok(!Object.hasOwn(ACTIONS, "escrowSettle"));
   assert.deepEqual(ESCROW_ONLY_ACTIONS.issueSubname, ["name", "parentDeedId", "parentOwnerVersion", "asset", "price", "expectedGeneration", "metadata"]);
-  assert.deepEqual([...ESCROW_ISSUE_ACTIONS].sort(), ["issueFromTreasury", "issueSubname"]);
+  assert.deepEqual(ESCROW_ONLY_ACTIONS.escrowSettle, ["name", "expectedDeedId", "expectedVersion", "expectedOwnerVersion", "seller", "recipient", "auctionId", "price"]);
+  assert.deepEqual([...ESCROW_ISSUE_ACTIONS].sort(), ["escrowSettle", "issueFromTreasury", "issueSubname"]);
 });
 test("agents are told the subname steps in POA, with the escrow route", () => {
   for (const text of [POA_CHECKOUT_STEPS, MCP_INSTRUCTIONS]) {

@@ -1544,6 +1544,19 @@ try {
   await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");
   await expect(pageFields.locator("#domainStatus")).toContainText("For sale");
   await expect(pageFields.locator(`#domainListing article[data-sale-id="${agentFixedId}"]`)).toContainText("250 POA");
+  // Because prevOwner is the active owner/seller here, #domainListing shows the compact 🚫 popup icon instead of a self-buy button!
+  await expect(pageFields.locator(`#domainListing article[data-sale-id="${agentFixedId}"] .self-bid-btn`)).toBeVisible();
+  await pageFields.locator(`#domainListing article[data-sale-id="${agentFixedId}"] .self-bid-btn`).click();
+  await expect(pageFields.locator(`#domainListing article[data-sale-id="${agentFixedId}"] .self-bid-popover`)).toContainText(
+    "You can't buy your own domain. Update your public key or domain name in the Public owner address field to buy with another account.",
+  );
+  // Switching to a different account (non-seller) restores the "Open My POA to buy" button!
+  await pageFields.evaluate((other) => {
+    localStorage.setItem("poadomains.knownOwner.v1", other);
+    localStorage.setItem("poadomains.lastPoaAddress.v1", other);
+  }, newOwner);
+  await pageFields.reload();
+  await pageFields.waitForFunction(() => document.body.dataset.registryStatus === "ready");
   await expect(pageFields.locator("#domainListing").getByRole("button", { name: /Open My POA to buy/ })).toBeVisible();
 
   // 10d. After transfer to new holder: clean slate in #domainProfile, past completed auction in #domainListing,
@@ -2078,6 +2091,7 @@ try {
       seller: mainOwner,
       price: "100.000000",
       status: "OPEN",
+      autoSettle: true,
       high: { payer: peerOwner, amount: "120.000000" },
       closes: nowAudit + 3600000,
       window: 3600000,
@@ -2091,6 +2105,7 @@ try {
       seller: peerOwner,
       price: "50.000000",
       status: "OPEN",
+      autoSettle: true,
       high: null,
       closes: 0,
       window: 86400000,
@@ -2104,9 +2119,60 @@ try {
       seller: peerOwner,
       price: "250.000000",
       status: "OPEN",
+      autoSettle: true,
       high: null,
-      closes: nowAudit + 86400000,
+      closes: 0,
       history: [{ event: "listed", amount: "250.000000", at: nowAudit - 1800000 }],
+    },
+    {
+      id: "c".repeat(64),
+      kind: "fixed",
+      name: "orbit",
+      seller: mainOwner,
+      price: "300.000000",
+      status: "OPEN",
+      autoSettle: true,
+      high: null,
+      closes: 0,
+      history: [{ event: "listed", amount: "300.000000", at: nowAudit - 1500000 }],
+    },
+    {
+      id: "9".repeat(64),
+      kind: "fixed",
+      name: "done1",
+      seller: peerOwner,
+      price: "90.000000",
+      status: "COMPLETE",
+      autoSettle: true,
+      settlement: "COMPLETE",
+      high: { payer: mainOwner, amount: "90.000000" },
+      closes: nowAudit - 500000,
+      history: [{ event: "Payment and title complete", amount: "90.000000", at: nowAudit - 400000 }],
+    },
+    {
+      id: "8".repeat(64),
+      kind: "auction",
+      name: "exp1",
+      seller: peerOwner,
+      price: "40.000000",
+      status: "CANCELLED",
+      autoSettle: true,
+      high: null,
+      closes: nowAudit - 900000,
+      history: [{ event: "Expired; original payer refund due", at: nowAudit - 800000 }],
+    },
+    {
+      id: "7".repeat(64),
+      kind: "fixed",
+      name: "issue1",
+      seller: mainOwner,
+      price: "75.000000",
+      status: "SETTLING",
+      autoSettle: true,
+      settlement: "TITLE_PENDING",
+      high: { payer: peerOwner, amount: "75.000000" },
+      closes: nowAudit - 100000,
+      history: [{ event: "Purchase paid; automatic settlement queued", amount: "75.000000", at: nowAudit - 100000 }],
     },
   ];
   const footerArmyOwner = "poa12XVYtPngbDsm1igG9GPeWPXAHDFTZ1bBLuSwhjqBrQ5U";
@@ -2146,8 +2212,7 @@ try {
     let marketHigh = "120.000000";
     const currentAuditItems = () => [
       { ...auditMarketItems[0], high: { payer: peerOwner, amount: marketHigh } },
-      auditMarketItems[1],
-      auditMarketItems[2],
+      ...auditMarketItems.slice(1),
     ];
     const ctxGeom = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
     const pageGeom = await ctxGeom.newPage();
@@ -2162,6 +2227,7 @@ try {
           enabled: true,
           held: false,
           mock: false,
+          instantSettlement: true,
           address: mainOwner,
           registryId: h.cap.registryId,
           serverTime: nowAudit,
@@ -2248,12 +2314,17 @@ try {
     await expect(pageGeom.locator("#names article.card").first()).toBeVisible();
     await auditUiGeometry(pageGeom, `${vp.name}:explore`);
 
-    // 5) Manage domains + 🪙 My POA (including #escrowMarket cards with Bid with POA + Use credited POA to bid + Ask my agent to finish handover!)
+    // 5) Manage domains + 🪙 My POA (compact collapsible #escrowMarket with 4 status tabs + 🚫 self-buy/self-bid popup icons!)
     await pageGeom.locator("#tabEscrow").click();
     await pageGeom.locator("#manageOwner").fill(mainOwner);
     await pageGeom.locator("#manageLookup").click();
     await expect(pageGeom.locator('#manageNames article[data-domain-name="nebula"]')).toBeVisible();
-    await expect(pageGeom.locator("#escrowMarket article.card")).toHaveCount(3);
+    // Default #escrowMarket tab shows ONLY the 4 available items (Completed/Expired/Issues live in separate tabs!)
+    await expect(pageGeom.locator('#escrowMarket .escrow-market-tab[data-escrow-market-tab="available"]')).toHaveAttribute("aria-selected", "true");
+    await expect(pageGeom.locator('#escrowMarket .escrow-market-tab[data-escrow-market-tab="completed"]')).toContainText("(1)");
+    await expect(pageGeom.locator('#escrowMarket .escrow-market-tab[data-escrow-market-tab="expired"]')).toContainText("(1)");
+    await expect(pageGeom.locator('#escrowMarket .escrow-market-tab[data-escrow-market-tab="issues"]')).toContainText("(1)");
+    await expect(pageGeom.locator("#escrowMarket article.card")).toHaveCount(4);
     // Open Transfer & confirm on comet card AND open profile editor with ETH checksum hint on nebula card
     const cometCardG = pageGeom.locator('#manageNames article[data-domain-name="comet"]');
     await cometCardG.locator('button[data-transfer-toggle="comet"]').click();
@@ -2267,23 +2338,66 @@ try {
     await expect(nebulaCardG.locator(".profile-eth-fix")).toBeVisible();
     await auditUiGeometry(pageGeom, `${vp.name}:manage-and-escrow-market`);
 
-    // Explicitly verify #escrowMarket card actions:
-    // - "nebula" is owned/listed by mainOwner (currently in Public owner address), so bidding on it is BLOCKED with guidance to update Public owner address (while seller handover stays visible!)
-    // - "star" & "vault" are listed by peerOwner, so they show "🏷️ Bid"/"🛍️ Buy" + "Use deposit" checkbox with clean gap & matching heights (no "with POA")
+    // Explicitly verify #escrowMarket compact collapsible rows, 4 status tabs, and 🚫 self-buy/self-bid popup icons:
     const withPoaBtns = await pageGeom.evaluate(() =>
       [...document.querySelectorAll("button")]
         .filter((b) => !b.hidden && /with POA/i.test(b.textContent ?? ""))
         .map((b) => b.textContent?.trim()),
     );
     assert.deepEqual(withPoaBtns, [], `No visible button should say "with POA": ${JSON.stringify(withPoaBtns)}`);
-    const nebulaEscrowCard = pageGeom.locator("#escrowMarket article.card", { has: pageGeom.locator("h3", { hasText: "nebula" }) });
-    await expect(nebulaEscrowCard.locator(".self-bid-notice")).toBeVisible();
-    await expect(nebulaEscrowCard.locator(".self-bid-notice")).toContainText(/can't bid on your own domain.*Public owner address/i);
-    await expect(nebulaEscrowCard.getByRole("button", { name: "🏷️ Bid", exact: true })).toBeHidden();
-    await expect(nebulaEscrowCard.getByRole("button", { name: /finish handover/ })).toBeVisible();
 
+    // Own auction ("nebula") and own fixed-price listing ("orbit") show compact 🚫 popup icons next to domain, zero legacy handover button (autoSettle=true)
+    const nebulaEscrowCard = pageGeom.locator("#escrowMarket article.card", { has: pageGeom.locator("h3", { hasText: "nebula" }) });
+    const orbitEscrowCard = pageGeom.locator("#escrowMarket article.card", { has: pageGeom.locator("h3", { hasText: "orbit" }) });
+    await expect(nebulaEscrowCard).toHaveAttribute("data-escrow-expanded", "0");
+    await expect(nebulaEscrowCard.locator(".escrow-card-details")).toBeHidden();
+    await expect(nebulaEscrowCard.locator(".self-bid-btn")).toBeVisible();
+    await expect(nebulaEscrowCard.locator(".self-bid-btn")).toHaveText("🚫");
+    await expect(nebulaEscrowCard.getByRole("button", { name: "🏷️ Bid", exact: true })).toBeHidden();
+    await expect(nebulaEscrowCard.getByRole("button", { name: /finish handover/ })).toHaveCount(0);
+    // Click 🚫 on own fixed-price listing "orbit" -> popover shows exact user-requested buy message!
+    await expect(orbitEscrowCard.locator(".self-bid-btn")).toBeVisible();
+    await orbitEscrowCard.locator(".self-bid-btn").click();
+    await expect(orbitEscrowCard.locator(".self-bid-popover")).toBeVisible();
+    await expect(orbitEscrowCard.locator(".self-bid-popover")).toContainText(
+      "You can't buy your own domain. Update your public key or domain name in the Public owner address field to buy with another account.",
+    );
+    await orbitEscrowCard.locator(".self-bid-popover .info-close").click();
+    await expect(orbitEscrowCard.locator(".self-bid-popover")).toBeHidden();
+
+    // Expand and collapse "star" row on click
     const starEscrowCard = pageGeom.locator("#escrowMarket article.card", { has: pageGeom.locator("h3", { hasText: "star" }) });
     const vaultEscrowCard = pageGeom.locator("#escrowMarket article.card", { has: pageGeom.locator("h3", { hasText: "vault" }) });
+    await expect(starEscrowCard.locator(".escrow-card-details")).toBeHidden();
+    await starEscrowCard.locator(".escrow-expand-btn").click();
+    await expect(starEscrowCard).toHaveAttribute("data-escrow-expanded", "1");
+    await expect(starEscrowCard.locator(".escrow-card-details")).toBeVisible();
+    await expect(starEscrowCard.locator(".escrow-card-details")).toContainText(/Automatic settlement/i);
+    await starEscrowCard.locator(".escrow-expand-btn").click();
+    await expect(starEscrowCard.locator(".escrow-card-details")).toBeHidden();
+    const expandRights = await pageGeom.evaluate(() =>
+      [...document.querySelectorAll("#escrowMarket article.card .escrow-expand-btn")].map((b) => Math.round(b.getBoundingClientRect().right)),
+    );
+    assert.equal(expandRights.length, 4);
+    assert.ok(
+      Math.max(...expandRights) - Math.min(...expandRights) <= 2,
+      `Expand buttons should align flush-right across peer and own rows (${vp.name}): ${JSON.stringify(expandRights)}`,
+    );
+
+    // Verify Completed / Expired / Issues tabs show only their respective items
+    await pageGeom.locator('#escrowMarket .escrow-market-tab[data-escrow-market-tab="completed"]').click();
+    await expect(pageGeom.locator("#escrowMarket article.card")).toHaveCount(1);
+    await expect(pageGeom.locator("#escrowMarket article.card h3")).toHaveAttribute("data-domain-name", "done1");
+    await pageGeom.locator('#escrowMarket .escrow-market-tab[data-escrow-market-tab="expired"]').click();
+    await expect(pageGeom.locator("#escrowMarket article.card")).toHaveCount(1);
+    await expect(pageGeom.locator("#escrowMarket article.card h3")).toHaveAttribute("data-domain-name", "exp1");
+    await pageGeom.locator('#escrowMarket .escrow-market-tab[data-escrow-market-tab="issues"]').click();
+    await expect(pageGeom.locator("#escrowMarket article.card")).toHaveCount(1);
+    await expect(pageGeom.locator("#escrowMarket article.card h3")).toHaveAttribute("data-domain-name", "issue1");
+    await expect(pageGeom.locator('#escrowMarket article.card button', { hasText: /Repair title/ })).toBeVisible();
+    await pageGeom.locator('#escrowMarket .escrow-market-tab[data-escrow-market-tab="available"]').click();
+    await expect(pageGeom.locator("#escrowMarket article.card")).toHaveCount(4);
+
     const escrowCardItems = await starEscrowCard.evaluate((card) =>
       [...card.querySelectorAll(".escrow-card-actions > button, .escrow-card-actions > label.use-deposit-toggle")].map((el) => {
         const r = el.getBoundingClientRect();
@@ -2319,14 +2433,26 @@ try {
     await starEscrowCard.getByRole("button", { name: "🏷️ Bid", exact: true }).click();
     await expect(pageGeom.locator("#escrowPrompt")).toContainText('"action": "intent"');
 
-    // Also verify Auctions tab blocks self-bidding on mainOwner's own "nebula" and links back to Public owner address!
+    // Also verify For sale tab shows 🚫 popup icon next to own fixed-price listing "orbit"!
+    await pageGeom.locator("#tabMarket").click();
+    const orbitMarketCard = pageGeom.locator("#marketplace article.card", { has: pageGeom.locator("h4", { hasText: "orbit" }) });
+    await expect(orbitMarketCard.locator(".self-bid-btn")).toBeVisible();
+    await orbitMarketCard.locator(".self-bid-btn").click();
+    await expect(orbitMarketCard.locator(".self-bid-popover")).toContainText(
+      "You can't buy your own domain. Update your public key or domain name in the Public owner address field to buy with another account.",
+    );
+    await orbitMarketCard.locator(".self-bid-popover .info-close").click();
+
+    // Also verify Auctions tab blocks self-bidding on mainOwner's own "nebula" via 🚫 popup icon and links back to Public owner address!
     await pageGeom.locator("#tabAuctions").click();
     await pageGeom.locator("#auctionTabCurrent").click();
     const nebulaAucCard = pageGeom.locator("#auctions article.card", { has: pageGeom.locator("h4", { hasText: "nebula" }) });
-    await expect(nebulaAucCard.locator(".self-bid-notice")).toBeVisible();
-    await expect(nebulaAucCard.locator(".self-bid-notice")).toContainText(/Public owner address/i);
+    await expect(nebulaAucCard.locator(".self-bid-btn")).toBeVisible();
     await expect(nebulaAucCard.locator(".auction-bid-controls")).toHaveCount(0);
-    await nebulaAucCard.locator(".self-bid-notice button").click();
+    await nebulaAucCard.locator(".self-bid-btn").click();
+    await expect(nebulaAucCard.locator(".self-bid-popover")).toBeVisible();
+    await expect(nebulaAucCard.locator(".self-bid-popover")).toContainText(/Public owner address/i);
+    await nebulaAucCard.locator(".self-bid-popover .self-bid-go").click();
     await expect(pageGeom.locator("#manageOwner")).toBeFocused();
 
     // 6) Floating Cart modal + Bug / Feature modal (verify multi-item cart with star + vault + Use deposit prompt!)

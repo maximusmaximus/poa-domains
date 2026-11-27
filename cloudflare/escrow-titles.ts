@@ -1,5 +1,6 @@
+import type { KeyObject } from "node:crypto";
 import { Engine } from "../src/engine.js";
-import { Packet } from "../src/auth.js";
+import { DOMAIN, Packet, signBody } from "../src/auth.js";
 import { ACTIONS } from "../src/actions.js";
 import { ownershipKey } from "../src/emoji-ownership.js";
 import { normalizeName } from "../src/names.js";
@@ -30,12 +31,14 @@ export function escrowPacketBlocked(escrowState: State, engine: Engine, packet: 
   if (!params || typeof params !== "object") return true;
   const p = params as Record<string, unknown>;
 
-  // Protect settling sellers so no concurrent write (even a rejected one) burns their handover nonce.
+  // Protect settling sellers with legacy seller-signed transfer packets so no concurrent write
+  // burns their handover nonce. Auto-settled sales sign with treasury at commit time (no seller nonce pin).
   const settlingSigners = new Set<string>();
   for (const a of reserved) {
     if (a.status !== "SETTLING") continue;
-    settlingSigners.add(a.seller);
     const st = escrowState.settlements[a.id];
+    if (st?.auto) continue;
+    settlingSigners.add(a.seller);
     if (st?.packet?.body?.signer) settlingSigners.add(st.packet.body.signer);
     for (const cs of st?.packet?.body?.coSigners ?? []) settlingSigners.add(cs);
   }
@@ -129,15 +132,62 @@ export function escrowPacketBlocked(escrowState: State, engine: Engine, packet: 
       return true;
   }
 }
-export function registryTitles(e: Engine): TitleStore {
+export function registryTitles(e: Engine, treasuryKey?: KeyObject): TitleStore {
   need(e.config.increment.kind === "eosStrict10", "ESCROW_INCREMENT_POLICY");
+  const buildAutoSettlePacket = (
+    name: string,
+    seller: string,
+    buyer: string,
+    auctionId: string,
+    priceMicros: string,
+    deedId?: string,
+    ownerVersion?: number,
+  ): Packet => {
+    need(Boolean(treasuryKey), "ESCROW_TITLE_NOT_READY");
+    const s = e.snapshot();
+    const d = s.deeds[s.names[name]?.activeId ?? ""];
+    need(d && d.owner === seller && !d.lock && d.rights.kind === "permanent" && !d.retired, "ESCROW_TITLE_NOT_READY");
+    if (deedId !== undefined) need(d.id === deedId, "ESCROW_TITLE_NOT_READY");
+    if (ownerVersion !== undefined) need(d.ownerVersion === ownerVersion, "ESCROW_TITLE_NOT_READY");
+    need(!Object.values(s.offers).some(o => o.parentId === d.id && !o.cancelled && o.uses < o.maxUses), "ESCROW_ENCUMBERED_TITLE");
+    const nowSec = Math.max(e.observedTime(), s.time);
+    const body = {
+      domain: DOMAIN,
+      revision: e.config.revision,
+      chainId: e.config.chainId,
+      genesisHash: e.config.genesisHash,
+      registryId: e.registryId,
+      policyHash: e.policyHash,
+      normalizationHash: e.config.normalizationHash,
+      signer: e.config.treasury,
+      coSigners: [],
+      requestId: `escrow-settle-${auctionId.slice(0, 32)}`,
+      nonce: e.nextNonce(e.config.treasury),
+      notBefore: 0,
+      deadline: nowSec + 3600,
+      maxTotal: "0",
+      maxNetworkFee: "0",
+      action: "escrowSettle",
+      params: {
+        name: d.name,
+        expectedDeedId: d.id,
+        expectedVersion: d.version,
+        expectedOwnerVersion: d.ownerVersion,
+        seller,
+        recipient: buyer,
+        auctionId,
+        price: priceMicros,
+      },
+    };
+    return signBody(body as any, [treasuryKey!]);
+  };
   return {
       terms: (name, seller) => {
         const s = e.snapshot(), d = s.deeds[s.names[name]?.activeId ?? ""];
         need(d && d.owner === seller && !d.lock && d.rights.kind === "permanent" && !d.retired, "ESCROW_TITLE");
         need(!Object.values(s.offers).some(o => o.parentId === d.id && !o.cancelled && o.uses < o.maxUses), "ESCROW_ENCUMBERED_TITLE");
         const premium = normalizeName(name, e.normalizationMode).tier === "premium";
-        return { reserve: "0.000001", window: premium ? 86400000 : 3600000, quiet: premium ? 86400000 : 3600000 };
+        return { reserve: "0.000001", window: premium ? 86400000 : 3600000, quiet: premium ? 86400000 : 3600000, deedId: d.id, ownerVersion: d.ownerVersion };
       },
       validate: (packet: Packet, name, seller, buyer) => {
         need(packet.body.action === "transfer" && packet.body.signer === seller && packet.body.params.name === name &&
@@ -145,6 +195,16 @@ export function registryTitles(e: Engine): TitleStore {
         need(e.preview(packet).status === "succeeded", "ESCROW_TITLE_NOT_READY");
       },
       commit: (packet: Packet) => { need(e.submit(packet).status === "succeeded", "ESCROW_TITLE_COMMIT"); },
+      ...(treasuryKey ? {
+        validateAutoSettle: (name: string, seller: string, buyer: string, auctionId: string, priceMicros: string, deedId?: string, ownerVersion?: number) => {
+          const packet = buildAutoSettlePacket(name, seller, buyer, auctionId, priceMicros, deedId, ownerVersion);
+          need(e.previewEscrowIssue(packet).status === "succeeded", "ESCROW_TITLE_NOT_READY");
+        },
+        commitAutoSettle: (name: string, seller: string, buyer: string, auctionId: string, priceMicros: string, deedId?: string, ownerVersion?: number) => {
+          const packet = buildAutoSettlePacket(name, seller, buyer, auctionId, priceMicros, deedId, ownerVersion);
+          need(e.submitEscrowIssue(packet).status === "succeeded", "ESCROW_TITLE_COMMIT");
+        },
+      } : {}),
       // POA new-name checkout. Explicit schedule, not the immutable registry auction reserve:
       // standard/common 100.000000 POA, premium 1000.000000 POA (1 POA = 1,000,000 micros).
       issueTerms: (name) => {

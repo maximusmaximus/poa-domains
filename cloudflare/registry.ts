@@ -473,7 +473,9 @@ export class PoaRegistry extends DurableObject<Env> {
     const enabled = () => String(this.env.POA_ESCROW_ENABLED) === "true";
     const signing = () => enabled() && String(this.env.POA_ESCROW_NETWORK_WRITES) === "approved-v1";
     const e = this.engine;
-    const titles = registryTitles(e);
+    const savedRow = this.ctx.storage.sql.exec<{ value: string }>("SELECT value FROM bootstrap WHERE id=1").toArray()[0];
+    const treasuryKey = savedRow ? createPrivateKey((JSON.parse(savedRow.value) as Bootstrap).keys.treasury!) : undefined;
+    const titles = registryTitles(e, treasuryKey);
     this.escrowService = new Escrow(new SQLiteEscrowJournal(this.ctx.storage, policy), new PoaHttpNetwork(signing, fetch, { engine: this.env.POA_ESCROW_ENGINE_SHA256 ?? MAINNET_ENGINE_SHA256, params: this.env.POA_ESCROW_PARAMS_SHA256 ?? MAINNET_PARAMS_SHA256 }, Date.now, this.env.POA_API_TOKEN, this.coveredTxCache()),
       new WorkerSecretSigner(policy.wallet, () => this.env.POA_ESCROW_KEY, signing), titles, policy, () => Date.now(), enabled,
       undefined, () => newNameCheckout(this.env).status === "on", () => subnameSales(this.env).status === "on", this.surplusStore());
@@ -486,10 +488,11 @@ export class PoaRegistry extends DurableObject<Env> {
       const freshness=await escrow.readiness(),s=escrow.state();const configured=String(this.env.POA_ESCROW_NETWORK_WRITES)==="approved-v1"&&!!this.env.POA_ESCROW_KEY&&(this.env.ESCROW_ADMIN_TOKEN?.length??0)>=32;
       return {enabled:true,paused:s.paused,held:s.paused||!!s.halt||freshness.held||!configured,
         holdReason:s.halt??(s.paused?"POA payments paused":!configured?"POA payments held for operator setup":freshness.reason),
+        instantSettlement:escrow.instantSettlement(),
         address:escrow.policy.wallet,limits:{perTransaction:escrow.policy.perTx,daily:escrow.policy.daily},newNameCheckout:newNameCheckout(this.env),subnameSales:subnameSales(this.env),freshness,serverTime:Date.now(),registryId:this.engine.registryId};
     }
     if(path==="intent")return escrow.depositView(query.id!,query.txid);
-    if(path==="market"||path==="domain")return {items:marketView(escrow.state(),path==="domain"?query.name:undefined),serverTime:Date.now()};
+    if(path==="market"||path==="domain")return {items:marketView(escrow.state(),path==="domain"?query.name:undefined,escrow.instantSettlement()),serverTime:Date.now()};
     if(path==="subnames")return {items:subnameView(escrow.state(),query.parent),serverTime:Date.now()};
     need(false,"ESCROW_ROUTE");
   }
@@ -550,11 +553,22 @@ export class PoaRegistry extends DurableObject<Env> {
         throw error;
       }
     };
-    await runStep("auto-settle-pre", () => this.autoSettleTreasuryAuctions());
     await runStep("tick", () => this.escrow().tick());
-    await runStep("auto-settle-post", () => this.autoSettleTreasuryAuctions());
-    // Drain active payouts/settlements every 15s; fall back to 60s when idle.
-    await this.ctx.storage.setAlarm(Date.now() + (this.escrow().hasActiveWork(this.engine.config.treasury) ? 15000 : 60000));
+    await runStep("auto-settle-fallback", () => this.autoSettleTreasuryAuctions());
+    // Drain active payouts/settlements every 15s; wake promptly if a funded auction closes sooner; else 60s.
+    const esc = this.escrow();
+    let delayMs = esc.hasActiveWork(this.engine.config.treasury) ? 15000 : 60000;
+    if (delayMs > 15000) {
+      const nowMs = Date.now(), s = esc.state();
+      if (!s.paused && !s.halt) {
+        for (const a of Object.values(s.auctions)) {
+          if (a.status === "OPEN" && a.high !== null && a.closes > nowMs) {
+            delayMs = Math.min(delayMs, Math.max(1000, a.closes - nowMs + 500));
+          }
+        }
+      }
+    }
+    await this.ctx.storage.setAlarm(Date.now() + delayMs);
   }
   /** Authenticated Worker RPC only. There is no browser signing, key-read, or generic send route. */
   async escrowAdmin(packetText: string): Promise<RegistryReply> {
