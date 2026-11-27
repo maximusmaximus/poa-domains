@@ -1,5 +1,8 @@
 /** HTTP boundary for signed public escrow calls. Admin HTTP remains separate. */
 import { need, parseJSON, exact, Fault } from "../src/core.js";
+import { ERROR_CATALOGUE } from "../src/errors.js";
+const UNKNOWN_CODES=new Set(["ESCROW_UNAVAILABLE","ESCROW_HELD","DURABILITY_UNKNOWN_RESTART_AND_QUERY","OUTCOME_UNKNOWN","UNKNOWN_OUTCOME"]);
+const BAD_REQUEST_CODES=new Set(["ESCROW_COMMAND_EXPIRED","ESCROW_COMMAND_SCHEMA","ESCROW_SIGNATURE","ESCROW_ADDRESS","ESCROW_DOMAIN","ESCROW_IDEMPOTENCY_KEY"]);
 interface PublicEnv { POA_ESCROW_ENABLED?:string;POA_ESCROW_PER_TX?:string;POA_ESCROW_DAILY?:string;PUBLIC_EXPLORER_URL:string; }
 export interface PublicRpc { escrowRead(path:string,query:Record<string,string>):Promise<unknown>;escrowCommand(packet:string,endpoint:string):Promise<unknown>; }
 const headers={"cache-control":"no-store","content-type":"application/json; charset=utf-8","x-content-type-options":"nosniff","referrer-policy":"no-referrer"};
@@ -31,7 +34,10 @@ export async function escrowHttp(request:Request,env:PublicEnv,rpc:()=>PublicRpc
     const bytes=new Uint8Array(size);let offset=0;for(const c of chunks){bytes.set(c,offset);offset+=c.length;}
     const text=new TextDecoder("utf-8",{fatal:true}).decode(bytes);exact(parseJSON(text),["command","signature"]);
     dispatched=true;return reply(200,await rpc().escrowCommand(text,part));
-  }catch(e){const code=e instanceof Fault?e.code:e instanceof Error&&/^ESCROW_[A-Z_]+$/.test(e.message)?e.message:"ESCROW_HELD";
-    const unknown=dispatched&&(code==="ESCROW_UNAVAILABLE"||code==="ESCROW_HELD"||!(e instanceof Fault)&&!(e instanceof Error&&/^ESCROW_[A-Z_]+$/.test(e.message)));
-    return reply(unknown?503:code==="BODY_TOO_LARGE"?413:409,{code,accepted:unknown?"unknown":false,...(unknown?{message:"Keep the exact signed request. Query your signed account; do not create a new request key or payment."}:{})});}
+  }catch(e){
+    const rawCode=e instanceof Fault?e.code:e instanceof Error&&(/^ESCROW_[A-Z_]+$/.test(e.message)||Object.hasOwn(ERROR_CATALOGUE,e.message))?e.message:null;
+    const code=rawCode??"ESCROW_HELD";
+    const unknown=dispatched&&(!rawCode||UNKNOWN_CODES.has(code));
+    const status=unknown?503:code==="BODY_TOO_LARGE"?413:(BAD_REQUEST_CODES.has(code)||!code.startsWith("ESCROW_"))?400:409;
+    return reply(status,{code,accepted:unknown?"unknown":false,...(unknown?{message:"Keep the exact signed request. Query your signed account; do not create a new request key or payment."}:{})});}
 }

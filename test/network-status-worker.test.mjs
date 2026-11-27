@@ -212,4 +212,37 @@ test("monitor: falls back to /api/status when chain status route times out or re
   const degraded = await monitor.getStatus({ bypassCache: true });
   assert.equal(degraded.level, "degraded");
   assert.equal(degraded.hold, false);
+  // During primarySlowUntil cooldown, /v1/network-status flips directly to /api/status without re-hitting the failing primary.
+  assert.deepEqual(seen, ["/chain/poa-mainnet-1/api/status", "/api/status", "/api/status"]);
+});
+
+test("monitor: primary 503 flips to /api/status during cooldown and re-probes primary after expiry", async () => {
+  let clock = 1_000_000;
+  let primary503 = true;
+  const seen = [];
+  const monitor = createNetworkStatusMonitor({
+    now: () => clock,
+    requestMs: 80,
+    fetch: async (url) => {
+      const p = new URL(String(url)).pathname;
+      seen.push(p);
+      if (p === "/chain/poa-mainnet-1/api/status") {
+        if (primary503) return new Response(JSON.stringify({ error: "warming" }), { status: 503, headers: { "content-type": "application/json" } });
+        return okBody();
+      }
+      if (p === "/api/status") {
+        return new Response(JSON.stringify({ epochs_closed: 111, agents_joined: 10000, txs: 5664, final: 5349, checkpoint_height: 1445570 }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return new Response(null, { status: 404 });
+    },
+  });
+  assert.equal((await monitor.getStatus({ bypassCache: true })).level, "online");
+  assert.deepEqual(seen, ["/chain/poa-mainnet-1/api/status", "/api/status"]);
+  clock += 25_000;
+  assert.equal((await monitor.getStatus({ bypassCache: true })).level, "online");
+  assert.deepEqual(seen, ["/chain/poa-mainnet-1/api/status", "/api/status", "/api/status"], "skips warming primary during cooldown");
+  primary503 = false;
+  clock += 65_000;
+  assert.equal((await monitor.getStatus({ bypassCache: true })).level, "online");
+  assert.deepEqual(seen, ["/chain/poa-mainnet-1/api/status", "/api/status", "/api/status", "/chain/poa-mainnet-1/api/status"], "re-probes primary after cooldown");
 });

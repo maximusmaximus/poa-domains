@@ -222,9 +222,17 @@ HTTP 409; retryable: true. Escrow checkpoint details required. Check the documen
 
 HTTP 400; retryable: false. Escrow checkpoint rollback. Check the documented inputs and current state.
 
+## ESCROW_COMMAND_EXPIRED
+
+HTTP 400; retryable: false. The signed escrow command has expired. Sign a fresh command with a future expiry timestamp.
+
 ## ESCROW_COMMAND_EXPIRY
 
 HTTP 400; retryable: false. Escrow command expiry. Check the documented inputs and current state.
+
+## ESCROW_COMMAND_SCHEMA
+
+HTTP 400; retryable: false. The signed escrow command is missing required fields or has an invalid shape. Check the documented schema before signing again.
 
 ## ESCROW_CONSENT_EXPIRING
 
@@ -536,7 +544,7 @@ HTTP 400; retryable: false. Escrow settle not allowed. Check the documented inpu
 
 ## ESCROW_SIGNATURE
 
-HTTP 400; retryable: false. Escrow signature. Check the documented inputs and current state.
+HTTP 400; retryable: false. The escrow command signature is invalid or malformed. Verify the canonical command payload and Ed25519 base58 signature.
 
 ## ESCROW_SIGNER
 

@@ -320,9 +320,21 @@
       "retryable": false
     },
     {
+      "code": "ESCROW_COMMAND_EXPIRED",
+      "httpStatus": 400,
+      "message": "The signed escrow command has expired. Sign a fresh command with a future expiry timestamp.",
+      "retryable": false
+    },
+    {
       "code": "ESCROW_COMMAND_EXPIRY",
       "httpStatus": 400,
       "message": "Escrow command expiry. Check the documented inputs and current state.",
+      "retryable": false
+    },
+    {
+      "code": "ESCROW_COMMAND_SCHEMA",
+      "httpStatus": 400,
+      "message": "The signed escrow command is missing required fields or has an invalid shape. Check the documented schema before signing again.",
       "retryable": false
     },
     {
@@ -790,7 +802,7 @@
     {
       "code": "ESCROW_SIGNATURE",
       "httpStatus": 400,
-      "message": "Escrow signature. Check the documented inputs and current state.",
+      "message": "The escrow command signature is invalid or malformed. Verify the canonical command payload and Ed25519 base58 signature.",
       "retryable": false
     },
     {

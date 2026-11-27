@@ -77,7 +77,7 @@ export class PoaHttpNetwork implements Network {
   private headers(base:Record<string,string>):Record<string,string> {
     const t=this.apiToken?.trim();return t?{...base,Authorization:`Bearer ${t}`}:base;
   }
-  private async get(path:string, limit=2000000, displaySignal?:AbortSignal):Promise<any> {
+  private async get(path:string, limit=2000000, displaySignal?:AbortSignal, suppressHttpLog=false):Promise<any> {
     const r=await this.request(`https://minepoa.com${path}`,{signal:displaySignal ?? AbortSignal.timeout(12000),redirect:"manual",headers:this.headers({Accept:"application/json"})});
     // workerd supports manual, not error. Never follow a redirected node URL.
     if(r.status>=300&&r.status<400){await r.body?.cancel();throw new Error("ESCROW_NODE_REDIRECT");}
@@ -85,8 +85,8 @@ export class PoaHttpNetwork implements Network {
     if(r.status===401||r.status===403){await r.body?.cancel();throw new Error("ESCROW_NODE_AUTH");}
     if(!r.ok){
       await r.body?.cancel();
-      console.error(JSON.stringify({event:"escrow-node-http",path:path.slice(0,64),status:r.status}));
-      throw new Error("ESCROW_NODE_HTTP");
+      if(!suppressHttpLog)console.error(JSON.stringify({event:"escrow-node-http",path:path.slice(0,64),status:r.status}));
+      throw Object.assign(new Error("ESCROW_NODE_HTTP"),{httpStatus:r.status});
     }
     const age=r.headers.get("age");if(age!==null)need(/^\d+$/.test(age)&&Number(age)<=120,"ESCROW_STALE");
     const reader=r.body!.getReader();let size=0;const chunks:Uint8Array[]=[];
@@ -111,6 +111,7 @@ export class PoaHttpNetwork implements Network {
       if(r.timedOutFirst||r.httpFailedFirst)this.primaryReceiptSlowUntil=0;
     }else if(r.timedOutFirst||r.httpFailedFirst){
       this.primaryReceiptSlowUntil=this.clock()+PRIMARY_SLOW_TTL_MS;
+      console.error(JSON.stringify({event:"escrow-primary-cooldown",route:"receipt",reason:r.timedOutFirst?"timeout":"http",ttlMs:PRIMARY_SLOW_TTL_MS}));
     }
     return r.value;
   }
@@ -123,6 +124,7 @@ export class PoaHttpNetwork implements Network {
     startedAt?:number,
   ):Promise<{value:any;refused:boolean;timedOutFirst:boolean;httpFailedFirst:boolean}> {
     let lastErr:unknown;let refused=false;let timedOutFirst=false;let httpFailedFirst=false;
+    let suppressedHttp:{path:string;status:number}|null=null;
     for(let i=0;i<paths.length;i++){
       const path=paths[i]!;
       const isFallbackCapable=i===0&&paths.length>1;
@@ -131,7 +133,7 @@ export class PoaHttpNetwork implements Network {
         if(isFallbackCapable&&firstPathTimeoutMs!==undefined&&firstPathTimeoutMs>0){
           if(displaySignal){
             // Keep one shared AbortSignal across display aliases while still letting a hung primary fall back.
-            const attempt=this.get(path,limit,displaySignal);
+            const attempt=this.get(path,limit,displaySignal,true);
             attempt.catch(()=>{});
             let timer:ReturnType<typeof setTimeout>|undefined;
             const cap=new Promise<never>((_,reject)=>{
@@ -140,21 +142,28 @@ export class PoaHttpNetwork implements Network {
             try{v=await Promise.race([attempt,cap]);}
             finally{clearTimeout(timer);}
           }else{
-            v=await this.get(path,limit,AbortSignal.timeout(firstPathTimeoutMs));
+            v=await this.get(path,limit,AbortSignal.timeout(firstPathTimeoutMs),true);
           }
         }else if(!displaySignal&&i>0&&startedAt!==undefined){
           const remaining=Math.max(1000,12000-Math.max(0,this.clock()-startedAt));
-          v=await this.get(path,limit,AbortSignal.timeout(remaining));
+          v=await this.get(path,limit,AbortSignal.timeout(remaining),isFallbackCapable);
         }else{
-          v=await this.get(path,limit,displaySignal);
+          v=await this.get(path,limit,displaySignal,isFallbackCapable);
         }
         if(v!==null)return {value:v,refused,timedOutFirst,httpFailedFirst};
       }catch(e){
         if(e instanceof Error&&e.message==="ESCROW_NODE_AUTH"){refused=true;lastErr=e;continue;}
-        if(e instanceof Error&&e.message==="ESCROW_NODE_HTTP"){if(isFallbackCapable)httpFailedFirst=true;lastErr=e;continue;}
+        if(e instanceof Error&&e.message==="ESCROW_NODE_HTTP"){
+          if(isFallbackCapable){httpFailedFirst=true;suppressedHttp={path,status:(e as {httpStatus?:number}).httpStatus??0};}
+          else suppressedHttp=null;
+          lastErr=e;continue;
+        }
         if(isFallbackCapable&&isTimeoutError(e)&&!displaySignal?.aborted){timedOutFirst=true;lastErr=e;continue;}
         throw e;
       }
+    }
+    if(suppressedHttp&&lastErr instanceof Error&&lastErr.message==="ESCROW_NODE_HTTP"){
+      console.error(JSON.stringify({event:"escrow-node-http",path:suppressedHttp.path.slice(0,64),status:suppressedHttp.status}));
     }
     if(lastErr)throw lastErr;
     return {value:null,refused,timedOutFirst,httpFailedFirst};
@@ -181,12 +190,19 @@ export class PoaHttpNetwork implements Network {
       // If PoA refuses the chain status route, its public summary is not a substitute: it is a
       // stale digest without a chain id. Hold honestly as "ledger locked" (ESCROW_NODE_AUTH)
       // instead of reporting a misleading network-identity mismatch.
-      let timedOutFirst=false;
       const statusRead=(async()=>{
         try{
           const r=await this.getFirstTracked(statusPaths,2000000,displaySignal,primaryCap,started);
           if(r.refused&&!(r.value&&typeof r.value==="object"&&r.value.chain_id===CHAIN))throw new Error("ESCROW_NODE_AUTH");
-          timedOutFirst=r.timedOutFirst;
+          const fallbackUsed=r.timedOutFirst||r.httpFailedFirst;
+          if(primaryInCooldown){
+            if(fallbackUsed)this.primaryStatusSlowUntil=0;
+          }else if(fallbackUsed){
+            this.primaryStatusSlowUntil=this.clock()+PRIMARY_SLOW_TTL_MS;
+            console.error(JSON.stringify({event:"escrow-primary-cooldown",route:"status",reason:r.timedOutFirst?"timeout":"http",ttlMs:PRIMARY_SLOW_TTL_MS}));
+          }else{
+            this.primaryStatusSlowUntil=0;
+          }
           return r.value;
         }finally{if(display)timing.statusMs=Math.max(0,this.clock()-started);}
       })();
@@ -202,11 +218,6 @@ export class PoaHttpNetwork implements Network {
         [s,f]=settled.map(v=>(v as PromiseFulfilledResult<any>).value);
       }else [s,f]=await Promise.all(pending);
       const observedAt=integer(this.clock());
-      if(primaryInCooldown){
-        if(timedOutFirst)this.primaryStatusSlowUntil=0;
-      }else if(timedOutFirst){
-        this.primaryStatusSlowUntil=observedAt+PRIMARY_SLOW_TTL_MS;
-      }
       need(observedAt>=started && (display || observedAt-started<=12000),"ESCROW_STALE");
     need(f?.chain_id===CHAIN&&s?.K===5&&(s.chain_id===undefined||s.chain_id===CHAIN),"ESCROW_NODE_CHAIN");
     if(f.economics?.K!==undefined)need(integer(f.economics.K)===5,"ESCROW_NODE_CHAIN");
@@ -240,7 +251,6 @@ export class PoaHttpNetwork implements Network {
     const stale=staleFlagBad || !Number.isSafeInteger(asOf) ||
       asOf>observedAt+5000 || observedAt-asOf>120000 || ageInvalid;
     need(!stale,"ESCROW_STALE");
-    if(!primaryInCooldown&&!timedOutFirst)this.primaryStatusSlowUntil=0;
     this.lastHeight=height;
     if(cutoff!==undefined){this.lastCutoff=cutoff;this.lastCutoffHeight=height;}
     const effectiveCutoff=cutoff!==undefined?cutoff:(this.lastCutoffHeight===height?this.lastCutoff:undefined);
