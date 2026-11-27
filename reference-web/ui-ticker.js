@@ -1,5 +1,5 @@
-import { autoScroll } from "./ui-motion.js?v=a145e933754c";
-import { isPoaAuctionAwaitingFirstBid, poaShort, shapeLiveActions } from "./shared.js?v=a145e933754c";
+import { autoScroll } from "./ui-motion.js?v=7b4d1403d6f1";
+import { isPoaAuctionAwaitingFirstBid, poaShort, shapeLiveActions } from "./shared.js?v=7b4d1403d6f1";
 
 export const MAX_RECENT_ACTIONS = 100;
 

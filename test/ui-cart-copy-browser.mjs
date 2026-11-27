@@ -463,22 +463,31 @@ try {
     assert.equal(await pageAddr.evaluate(() => navigator.clipboard.readText()), sampleOwner);
   }
 
-  // Escrow tab: #escrowLimits shortens escrow address + copies full address
+  // Escrow tab: #escrowLimits shortens escrow address (no site actions -> POAScan in new window) + copies full address
   await pageAddr.locator("#tabEscrow").click();
-  await expect(pageAddr.locator("#escrowLimits .poa-addr-text")).toHaveText("poa1...mN2p");
+  const escrowLimitsLink = pageAddr.locator("#escrowLimits a.poa-addr-text");
+  await expect(escrowLimitsLink).toHaveText("poa1...mN2p");
+  await expect(escrowLimitsLink).toHaveAttribute("href", `https://poascan.io/address/${sampleEscrow}`);
+  await expect(escrowLimitsLink).toHaveAttribute("target", "_blank");
+  await expect(escrowLimitsLink).toHaveAttribute("rel", "noopener noreferrer");
   assert.equal((await pageAddr.locator("#escrowLimits").innerText()).includes(sampleEscrow), false);
   await pageAddr.locator("#escrowLimits .poa-copy-btn").click();
   assert.equal(await pageAddr.evaluate(() => navigator.clipboard.readText()), sampleEscrow);
 
-  // Domain page -> Owner profile page shorten & copy full address
+  // Domain page -> Owner profile page shorten & copy full address; on Owner profile, abbreviated address links to POAScan in a new window
   await pageAddr.goto(h.url + "/d/addrcheck");
   await pageAddr.waitForFunction(() => document.body.dataset.registryStatus === "ready");
-  await expect(pageAddr.locator("#domainOwner .poa-addr-text")).toHaveText("poa1...piRf");
+  await expect(pageAddr.locator("#domainOwner a.poa-addr-text")).toHaveText("poa1...piRf");
+  await expect(pageAddr.locator("#domainOwner a.poa-addr-text")).toHaveAttribute("href", `/p/${sampleOwner}`);
   await pageAddr.locator("#domainOwner .poa-copy-btn").click();
   assert.equal(await pageAddr.evaluate(() => navigator.clipboard.readText()), sampleOwner);
   await pageAddr.locator("#domainOwner a.poa-addr-text").click();
   await expect(pageAddr.locator("#ownerMain")).toBeVisible();
-  await expect(pageAddr.locator("#ownerPrincipal .poa-addr-text")).toHaveText("poa1...piRf");
+  const ownerPageAddrLink = pageAddr.locator("#ownerPrincipal a.poa-addr-text");
+  await expect(ownerPageAddrLink).toHaveText("poa1...piRf");
+  await expect(ownerPageAddrLink).toHaveAttribute("href", `https://poascan.io/address/${sampleOwner}`);
+  await expect(ownerPageAddrLink).toHaveAttribute("target", "_blank");
+  await expect(ownerPageAddrLink).toHaveAttribute("rel", "noopener noreferrer");
   assert.equal((await pageAddr.locator("#ownerPrincipal").innerText()).includes(sampleOwner), false);
   await pageAddr.locator("#ownerPrincipal .poa-copy-btn").click();
   assert.equal(await pageAddr.evaluate(() => navigator.clipboard.readText()), sampleOwner);
@@ -941,7 +950,11 @@ try {
   const escrowLink = pageFooter.locator(`#treasuryWallets a[href="https://poascan.io/address/${escrowWallet}"]`);
   const treasuryLink = pageFooter.locator(`#treasuryWallets a[href="https://poascan.io/address/${treasuryWallet}"]`);
   await expect(escrowLink).toHaveText("poa1...piRf");
+  await expect(escrowLink).toHaveAttribute("target", "_blank");
+  await expect(escrowLink).toHaveAttribute("rel", "noopener noreferrer");
   await expect(treasuryLink).toHaveText("poa1...UP7N");
+  await expect(treasuryLink).toHaveAttribute("target", "_blank");
+  await expect(treasuryLink).toHaveAttribute("rel", "noopener noreferrer");
   await pageFooter.locator("#treasuryWallets .poa-copy-btn").first().click();
   assert.equal(await pageFooter.evaluate(() => navigator.clipboard.readText()), escrowWallet);
 
@@ -965,12 +978,15 @@ try {
   await pageFooter.keyboard.press("Escape");
   await expect(pageFooter.locator('#searchResult a.domain-tile.is-registered[href="/d/escrow"]')).toHaveText("escrow");
 
-  // Click the footer [escrow] tiled button -> /d/escrow shows treasury owner, escrow POA address, and description
+  // Click the footer [escrow] tiled button -> /d/escrow shows treasury owner (-> /p/...) and escrow POA address
   await footerEscrowTile.click();
   await expect(pageFooter.locator('#domainTitle a.domain-tile.is-registered[href="/d/escrow"]')).toHaveText("escrow");
-  await expect(pageFooter.locator("#domainOwner")).toContainText("poa1...UP7N");
+  await expect(pageFooter.locator("#domainOwner a.poa-addr-text")).toHaveText("poa1...UP7N");
+  await expect(pageFooter.locator("#domainOwner a.poa-addr-text")).toHaveAttribute("href", `/p/${treasuryWallet}`);
   await expect(pageFooter.locator("#domainProfile")).toContainText("Official PoA Domains Escrow wallet");
-  await expect(pageFooter.locator("#domainProfile")).toContainText("poa1...piRf");
+  // In this fixture escrowWallet also owns addrcheck (has site actions -> links to /p/...)
+  await expect(pageFooter.locator("#domainProfile a.poa-addr-text")).toHaveText("poa1...piRf");
+  await expect(pageFooter.locator("#domainProfile a.poa-addr-text")).toHaveAttribute("href", `/p/${escrowWallet}`);
   await pageFooter.getByRole("button", { name: "Manage escrow" }).click();
   await expect(pageFooter.locator("#manageOwner")).toHaveValue(treasuryWallet);
   await expect(pageFooter.locator('#manageNames a.domain-tile.is-registered[href="/d/escrow"]')).toHaveText("escrow");
@@ -1696,8 +1712,14 @@ try {
   await expect(pagePrimary.locator("#ownerTitle")).toContainText("nebula");
   await expect(pagePrimary.locator("#ownerTitle")).toContainText("⭐ Main domain");
   await expect(pagePrimary.locator("#ownerTitle .domain-header-avatar img")).toBeVisible();
-  await expect(pagePrimary.locator("#ownerPrincipal .poa-addr-text")).toHaveText("poa1...1115");
+  await expect(pagePrimary.locator("#ownerPrincipal a.poa-addr-text")).toHaveText("poa1...1115");
+  await expect(pagePrimary.locator("#ownerPrincipal a.poa-addr-text")).toHaveAttribute("href", `https://poascan.io/address/${mainOwner}`);
+  await expect(pagePrimary.locator("#ownerPrincipal a.poa-addr-text")).toHaveAttribute("target", "_blank");
+  await expect(pagePrimary.locator("#ownerPrincipal a.poa-addr-text")).toHaveAttribute("rel", "noopener noreferrer");
   await expect(pagePrimary.locator("#ownerProfile")).toBeVisible();
+  await expect(pagePrimary.locator("#ownerProfile a.poa-addr-text")).toHaveAttribute("href", `https://poascan.io/address/${mainOwner}`);
+  await expect(pagePrimary.locator("#ownerProfile a.poa-addr-text")).toHaveAttribute("target", "_blank");
+  await expect(pagePrimary.locator("#ownerProfile a.poa-addr-text")).toHaveAttribute("rel", "noopener noreferrer");
   await expect(pagePrimary.locator("#ownerProfile")).toContainText("Nebula builder bio");
   await expect(pagePrimary.locator("#ownerProfile")).toContainText("bc1qw5...f3t4");
   await expect(pagePrimary.locator("#ownerProfile")).toContainText("0x5aAe...eAed");
@@ -1730,9 +1752,10 @@ try {
   await expect(cometManageCard.locator('[data-transfer-error="comet"]')).toContainText("does not have a POA address attached");
   await expect(cometManageCard.locator('[data-transfer-confirm-box="comet"]')).toBeHidden();
 
-  // 2) Default domain address ("peer") resolves to peerOwner -> confirm -> copy transfer prompt
+  // 2) Default domain address ("peer") resolves to peerOwner (has site actions -> /p/peer) -> confirm -> copy transfer prompt
   await recipientInput.fill("peer");
   await expect(cometManageCard.locator('[data-transfer-preview="comet"]')).toContainText("Default domain");
+  await expect(cometManageCard.locator('[data-transfer-preview="comet"] a.poa-addr-text')).toHaveAttribute("href", "/p/peer");
   await cometManageCard.locator('button[data-transfer-review="comet"]').click();
   await expect(cometManageCard.locator('[data-transfer-confirm-box="comet"]')).toBeVisible();
   await expect(cometManageCard.locator('[data-transfer-confirm-summary="comet"]')).toContainText(peerOwner);
@@ -1743,14 +1766,22 @@ try {
   assert.ok(peerXferClip.includes(`"recipient": "${peerOwner}"`));
   assert.ok(peerXferClip.includes("resets all attached profile fields and records"));
 
-  // 3) Domain with attached profile POA ("vault") resolves to vaultTargetPoa
+  // 3) Domain with attached profile POA ("vault") resolves to vaultTargetPoa (no site actions -> POAScan in new window)
   await recipientInput.fill("vault");
   await expect(cometManageCard.locator('[data-transfer-preview="comet"]')).toContainText("POA address");
+  const vaultPreviewLink = cometManageCard.locator('[data-transfer-preview="comet"] a.poa-addr-text');
+  await expect(vaultPreviewLink).toHaveAttribute("href", `https://poascan.io/address/${vaultTargetPoa}`);
+  await expect(vaultPreviewLink).toHaveAttribute("target", "_blank");
+  await expect(vaultPreviewLink).toHaveAttribute("rel", "noopener noreferrer");
   await cometManageCard.locator('button[data-transfer-review="comet"]').click();
   await expect(cometManageCard.locator('[data-transfer-confirm-summary="comet"]')).toContainText(vaultTargetPoa);
   await cometManageCard.locator('button[data-transfer-confirm="comet"]').click();
   const vaultXferClip = await pagePrimary.evaluate(() => navigator.clipboard.readText());
   assert.ok(vaultXferClip.includes(`"recipient": "${vaultTargetPoa}"`));
+  const vaultMetaLink = pagePrimary.locator("#managePromptMeta a.poa-addr-text");
+  await expect(vaultMetaLink).toHaveAttribute("href", `https://poascan.io/address/${vaultTargetPoa}`);
+  await expect(vaultMetaLink).toHaveAttribute("target", "_blank");
+  await expect(vaultMetaLink).toHaveAttribute("rel", "noopener noreferrer");
 
   // 4) Transferring the main domain ("nebula") to a direct POA address warns that main domain will clear
   const nebulaCard = pagePrimary.locator('#manageNames article[data-domain-name="nebula"]');
@@ -1762,6 +1793,21 @@ try {
   const mainXferClip = await pagePrimary.evaluate(() => navigator.clipboard.readText());
   assert.ok(mainXferClip.includes(`"recipient": "${peerOwner}"`));
   assert.ok(mainXferClip.includes('clears "nebula" as my default/main domain address'));
+  await expect(pagePrimary.locator("#managePromptMeta a.poa-addr-text")).toHaveAttribute("href", "/p/peer");
+
+  // Visiting /d/vault verifies an inactive profile POA address (vaultTargetPoa) links to POAScan in a new window
+  await pagePrimary.goto(`${h.url}/d/vault`);
+  await pagePrimary.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  const vaultProfilePoa = pagePrimary.locator("#domainProfile a.poa-addr-text");
+  await expect(vaultProfilePoa).toHaveAttribute("href", `https://poascan.io/address/${vaultTargetPoa}`);
+  await expect(vaultProfilePoa).toHaveAttribute("target", "_blank");
+  await expect(vaultProfilePoa).toHaveAttribute("rel", "noopener noreferrer");
+  const badPoascanLinks = await pagePrimary.evaluate(() =>
+    [...document.querySelectorAll('a[href*="poascan.io"]')]
+      .filter((a) => a.getAttribute("target") !== "_blank" || !/noopener/.test(a.getAttribute("rel") || "") || !/noreferrer/.test(a.getAttribute("rel") || ""))
+      .map((a) => a.outerHTML),
+  );
+  assert.deepEqual(badPoascanLinks, [], "Every poascan.io link must open in a new window with rel=noopener noreferrer");
 
   // 12. Clicking header navigates Home (from /d/<name>, /p/<owner>, or another tab) AND regenerates creative header icons
   const initialSig = await pagePrimary.locator("#siteTitle").getAttribute("data-title-sig");

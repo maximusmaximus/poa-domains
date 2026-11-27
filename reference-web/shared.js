@@ -520,7 +520,7 @@ export function cartParamsForSigner(item, signer) {
  return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
- validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=a145e933754c";
+ validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=7b4d1403d6f1";
 const b58Alphabet =
  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -544,6 +544,21 @@ export function isPoaAddress(value) {
 }
 export function shortenPoaAddress(value) {
  return isPoaAddress(value) ? `${value.slice(0, 4)}...${value.slice(-4)}` : String(value ?? "");
+}
+export const poascanAddressUrl = (a) => `https://poascan.io/address/${encodeURIComponent(a)}`;
+export function hasPoaSiteActions(s, a, m = []) {
+ if (!s || !isPoaAddress(a)) return false;
+ if (s.primaryNames?.[a] || Object.hasOwn(s.nonces ?? {}, a) || Object.hasOwn(s.balances ?? {}, a)) return true;
+ const any = (o, fn) => Object.values(o ?? {}).some(fn);
+ return (
+  any(s.deeds, (d) => d?.owner === a) ||
+  any(s.offers, (o) => o?.owner === a) ||
+  any(s.auctions, (x) => x?.seller === a || x?.high?.payer === a || x?.high?.beneficiary === a) ||
+  any(s.bids, (b) => b?.payer === a || b?.beneficiary === a) ||
+  any(s.credits, (c) => c?.payer === a) ||
+  any(s.receipts, (r) => r?.signer === a || r?.result?.owner === a || r?.result?.recipient === a) ||
+  (Array.isArray(m) && m.some((x) => x?.seller === a || x?.high?.payer === a || x?.bidders?.includes(a) || x?.history?.some((h) => h?.payer === a)))
+ );
 }
 export function makeBody(input, cap) {
  safeObject(input);
