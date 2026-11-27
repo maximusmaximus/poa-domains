@@ -2714,6 +2714,106 @@ try {
     delete h.payload.state.names["🔥"];
   }
 
+  // 13. Mobile domain profile image click zooms into a centered square frame and closes when clicking off (desktop stays hover-only)
+  {
+    const zoomCid = "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku";
+    const zoomDeedId = "deed-mobile-zoom-avatar";
+    const plainDeedId = "deed-mobile-zoom-plain";
+    const tinyPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+    h.payload.state.deeds[zoomDeedId] = {
+      id: zoomDeedId,
+      name: "zoompic",
+      owner: peerOwner,
+      parentId: null,
+      retired: false,
+      version: 2,
+      ownerVersion: 1,
+      rights: { kind: "permanent" },
+      records: [],
+      metadata: [{ cid: zoomCid, document: { schema: "poa-domains.profile.v1", version: 1, name: "zoompic", rightsHash: "f".repeat(64), poa: peerOwner, btc: null, eth: null, description: "zoom bio", image: `ipfs://${zoomCid}` } }],
+    };
+    h.payload.state.names.zoompic = { name: "zoompic", key: "zoompic", activeId: zoomDeedId, auctionId: null };
+    h.payload.state.deeds[plainDeedId] = {
+      id: plainDeedId,
+      name: "noimage",
+      owner: peerOwner,
+      parentId: null,
+      retired: false,
+      version: 1,
+      ownerVersion: 1,
+      rights: { kind: "permanent" },
+      records: [],
+      metadata: [],
+    };
+    h.payload.state.names.noimage = { name: "noimage", key: "noimage", activeId: plainDeedId, auctionId: null };
+
+    const ctxMobZoom = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    const pageMobZoom = await ctxMobZoom.newPage();
+    const mobZoomErrors = [];
+    pageMobZoom.on("pageerror", (e) => mobZoomErrors.push(e.message));
+    await pageMobZoom.route("https://**", (r) => r.abort());
+    await pageMobZoom.route(`**/v1/media/${zoomCid}`, (r) => r.fulfill({ status: 200, contentType: "image/png", body: tinyPng }));
+    await pageMobZoom.goto(`${h.url}/d/zoompic`);
+    await pageMobZoom.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await pageMobZoom.locator("#termsAgreeBtn").tap();
+    const mobAvatar = pageMobZoom.locator("#domainTitle .domain-header-avatar.has-image");
+    await expect(mobAvatar).toBeVisible();
+    await mobAvatar.tap();
+    const backdrop = pageMobZoom.locator("#avatarZoomBackdrop");
+    const frame = pageMobZoom.locator("#avatarZoomFrame");
+    await expect(backdrop).toBeVisible();
+    await expect(backdrop).toHaveClass(/is-open/);
+    await expect(pageMobZoom.locator("#avatarZoomImg")).toHaveAttribute("src", new RegExp(`/v1/media/${zoomCid}$`));
+    await pageMobZoom.waitForTimeout(260);
+    const frameBox = await frame.boundingBox();
+    assert.ok(frameBox && frameBox.width >= 260 && frameBox.width <= 360, `Expected square zoom frame width 260..360, got ${JSON.stringify(frameBox)}`);
+    assert.ok(Math.abs(frameBox.width - frameBox.height) <= 1.5, `Expected clean 1:1 square frame, got ${JSON.stringify(frameBox)}`);
+    assert.ok(Math.abs((frameBox.x + frameBox.width / 2) - 195) <= 2 && Math.abs((frameBox.y + frameBox.height / 2) - 422) <= 2, `Expected viewport-centered frame, got ${JSON.stringify(frameBox)}`);
+    // Clicking inside the zoomed square keeps it open
+    await pageMobZoom.mouse.click(frameBox.x + frameBox.width / 2, frameBox.y + frameBox.height / 2);
+    await expect(backdrop).toBeVisible();
+    // Clicking off the zoomed square closes it cleanly
+    await pageMobZoom.mouse.click(20, 40);
+    await expect(backdrop).toBeHidden();
+    assert.equal(await pageMobZoom.evaluate(() => document.body.classList.contains("avatar-zoom-open")), false);
+    // Domain without a profile image does NOT trigger zoom
+    await pageMobZoom.goto(`${h.url}/d/noimage`);
+    await pageMobZoom.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await pageMobZoom.locator("#domainTitle .domain-header-avatar").tap();
+    assert.equal(await pageMobZoom.locator("#avatarZoomBackdrop:visible").count(), 0);
+    // Domain profile image inside an Explore card also zooms on mobile and closes with Escape
+    await pageMobZoom.goto(`${h.url}/?tab=explore`);
+    await pageMobZoom.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    const cardAvatar = pageMobZoom.locator('#names .domain-header-avatar.has-image[data-avatar-domain="zoompic"]').first();
+    await expect(cardAvatar).toBeVisible();
+    await cardAvatar.tap();
+    await expect(pageMobZoom.locator("#avatarZoomBackdrop")).toBeVisible();
+    await pageMobZoom.keyboard.press("Escape");
+    await expect(pageMobZoom.locator("#avatarZoomBackdrop")).toBeHidden();
+    assert.deepEqual(mobZoomErrors, []);
+    await ctxMobZoom.close();
+
+    // Desktop mouse viewport stays hover-only and does NOT open mobile zoom modal on click
+    const ctxDeskZoom = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const pageDeskZoom = await ctxDeskZoom.newPage();
+    const deskZoomErrors = [];
+    pageDeskZoom.on("pageerror", (e) => deskZoomErrors.push(e.message));
+    await pageDeskZoom.route("https://**", (r) => r.abort());
+    await pageDeskZoom.route(`**/v1/media/${zoomCid}`, (r) => r.fulfill({ status: 200, contentType: "image/png", body: tinyPng }));
+    await pageDeskZoom.goto(`${h.url}/d/zoompic`);
+    await pageDeskZoom.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await pageDeskZoom.locator("#termsAgreeBtn").click();
+    await pageDeskZoom.locator("#domainTitle .domain-header-avatar.has-image").click();
+    assert.equal(await pageDeskZoom.locator("#avatarZoomBackdrop:visible").count(), 0);
+    assert.deepEqual(deskZoomErrors, []);
+    await ctxDeskZoom.close();
+
+    delete h.payload.state.deeds[zoomDeedId];
+    delete h.payload.state.names.zoompic;
+    delete h.payload.state.deeds[plainDeedId];
+    delete h.payload.state.names.noimage;
+  }
+
   console.log("PASS Cart copy regression + full-site UI spacing & alignment audit across desktop (1280) and mobile (390)");
 } finally {
   await h.close();

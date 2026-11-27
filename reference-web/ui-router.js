@@ -1,168 +1,157 @@
-import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, primaryNameForOwner, profileImageMediaPath, readViewQuery, resolveOwnerInput, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=6b0ef9948466";
-import { ui } from "./ui-state.js?v=6b0ef9948466";
-import { add, appendPoaAddress, el, registerAddressNav } from "./ui-core.js?v=6b0ef9948466";
-import { runSearch } from "./ui-search.js?v=6b0ef9948466";
-import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=6b0ef9948466";
-import { updateTabDots } from "./ui-render.js?v=6b0ef9948466";
-import { syncCartShortcutNow } from "./ui-cart.js?v=6b0ef9948466";
-import { renderManagement } from "./ui-manage.js?v=6b0ef9948466";
-
+import { domainPath, extractDomainProfile, findDomainSalesAndAuctions, isPoaAddress, parseDomainPath, parseOwnerPath, primaryNameForOwner, profileImageMediaPath, readViewQuery, resolveOwnerInput, saveTabSeen, shortenPoaAddress, tabWatermarks, viewPath } from "./shared.js?v=1faf16f1702c";
+import { ui } from "./ui-state.js?v=1faf16f1702c";
+import { add, appendPoaAddress, el, registerAddressNav } from "./ui-core.js?v=1faf16f1702c";
+import { runSearch } from "./ui-search.js?v=1faf16f1702c";
+import { renderDomainPage, renderOwnerPage } from "./ui-domain.js?v=1faf16f1702c";
+import { updateTabDots } from "./ui-render.js?v=1faf16f1702c";
+import { syncCartShortcutNow } from "./ui-cart.js?v=1faf16f1702c";
+import { renderManagement } from "./ui-manage.js?v=1faf16f1702c";
 const LAST_POA_KEY = "poadomains.lastPoaAddress.v1";
-
 export function activeUserAddress({ preferEscrowPayer = false } = {}) {
  const payerVal = el("escrowPayer")?.value?.trim() ?? "";
  const manageVal = el("manageOwner")?.value?.trim() ?? "";
  const candidates = preferEscrowPayer
-  ? [payerVal, manageVal, ui.knownOwner, ui.bidderAddress]
-  : [manageVal, ui.knownOwner, ui.bidderAddress, payerVal];
+ ? [payerVal, manageVal, ui.knownOwner, ui.bidderAddress]
+ : [manageVal, ui.knownOwner, ui.bidderAddress, payerVal];
  for (const raw of candidates) {
-  const s = typeof raw === "string" ? raw.trim() : "";
-  if (!s) continue;
-  if (isPoaAddress(s)) return s;
-  const resolved = resolveOwnerInput(ui.latestState, s, ui.cap)?.owner;
-  if (isPoaAddress(resolved)) return resolved;
+ const s = typeof raw === "string" ? raw.trim() : "";
+ if (!s) continue;
+ if (isPoaAddress(s)) return s;
+ const resolved = resolveOwnerInput(ui.latestState, s, ui.cap)?.owner;
+ if (isPoaAddress(resolved)) return resolved;
  }
  return "";
 }
-
 export function focusPublicOwnerField() {
  navigateHome();
  setSectionTab("escrow");
  const input = el("manageOwner");
  if (input) {
-  input.scrollIntoView?.({ block: "center", behavior: "smooth" });
-  input.focus?.({ preventScroll: true });
-  input.select?.();
+ input.scrollIntoView?.({ block: "center", behavior: "smooth" });
+ input.focus?.({ preventScroll: true });
+ input.select?.();
  }
 }
-
 export function renderSelfBidNotice(parent, { kind = "auction" } = {}) {
  const box = add(parent, "div", "", "self-bid-notice");
  box.setAttribute("role", "note");
  const verb = kind === "fixed" ? "buy" : "bid on";
  add(
-  box,
-  "span",
-  `🚫 You can't ${verb} your own domain. Update your public key or domain name in the Public owner address field to ${kind === "fixed" ? "buy" : "bid"} with another account.`,
+ box,
+ "span",
+ `🚫 You can't ${verb} your own domain. Update your public key or domain name in the Public owner address field to ${kind === "fixed" ? "buy" : "bid"} with another account.`,
  );
  const btn = add(box, "button", "👤 Public owner address", "secondary small");
  btn.type = "button";
  btn.addEventListener("click", () => focusPublicOwnerField());
  return box;
 }
-
 export function resolveKnownPoaAddress(preferred = "") {
  const candidates = [
-  preferred,
-  el("manageOwner")?.value,
-  ui.knownOwner,
-  ui.inferredCartOwner,
-  ui.bidderAddress,
+ preferred,
+ el("manageOwner")?.value,
+ ui.knownOwner,
+ ui.inferredCartOwner,
+ ui.bidderAddress,
  ];
  try {
-  candidates.push(globalThis.localStorage?.getItem?.(LAST_POA_KEY));
+ candidates.push(globalThis.localStorage?.getItem?.(LAST_POA_KEY));
  } catch {}
  for (const raw of candidates) {
-  const s = typeof raw === "string" ? raw.trim() : "";
-  if (!s) continue;
-  if (isPoaAddress(s)) return s;
-  const resolved = resolveOwnerInput(ui.latestState, s, ui.cap)?.owner;
-  if (isPoaAddress(resolved)) return resolved;
+ const s = typeof raw === "string" ? raw.trim() : "";
+ if (!s) continue;
+ if (isPoaAddress(s)) return s;
+ const resolved = resolveOwnerInput(ui.latestState, s, ui.cap)?.owner;
+ if (isPoaAddress(resolved)) return resolved;
  }
  return "";
 }
-
 export function notifyOwnerChanged() {
  if (typeof document !== "undefined" && typeof CustomEvent === "function" && typeof document.dispatchEvent === "function") {
-  document.dispatchEvent(new CustomEvent("poa:owner-changed"));
+ document.dispatchEvent(new CustomEvent("poa:owner-changed"));
  }
 }
-
 export function syncEscrowPayerAddress(preferred = "", { force = false } = {}) {
  const addr = resolveKnownPoaAddress(preferred);
  if (!addr) return "";
  try {
-  globalThis.localStorage?.setItem?.(LAST_POA_KEY, addr);
+ globalThis.localStorage?.setItem?.(LAST_POA_KEY, addr);
  } catch {}
  const payer = el("escrowPayer");
  if (!payer) return addr;
  const cur = payer.value.trim();
  if (force || !cur || cur === payer.dataset.autofilledPoa) {
-  payer.value = addr;
-  payer.dataset.autofilledPoa = addr;
-  if (cur !== addr) payer.dispatchEvent(new Event("change", { bubbles: true }));
+ payer.value = addr;
+ payer.dataset.autofilledPoa = addr;
+ if (cur !== addr) payer.dispatchEvent(new Event("change", { bubbles: true }));
  }
  return addr;
 }
-
 /** Open Manage domains tab, prefill the owner address, and focus a specific domain card. */
 export function openManageDomain(name, ownerId) {
  const resolvedOwner = ownerId || (() => {
-  const entry = ui.latestState?.names?.[name];
-  return entry?.activeId ? ui.latestState?.deeds?.[entry.activeId]?.owner : "";
+ const entry = ui.latestState?.names?.[name];
+ return entry?.activeId ? ui.latestState?.deeds?.[entry.activeId]?.owner : "";
  })();
  navigateHome();
  setSectionTab("escrow");
  const ownerField = el("manageOwner");
  if (ownerField && typeof resolvedOwner === "string" && resolvedOwner)
-  ownerField.value = resolvedOwner;
+ ownerField.value = resolvedOwner;
  syncEscrowPayerAddress(resolvedOwner);
  ui.focusedManageDomain = typeof name === "string" && name ? name : null;
  renderManagement({ focusDomain: ui.focusedManageDomain });
  notifyOwnerChanged();
  const target = ui.focusedManageDomain
-  ? [...document.querySelectorAll("#manageNames article.card")].find((c) => c.dataset.domainName === ui.focusedManageDomain)
-  : el("manageDomains");
+ ? [...document.querySelectorAll("#manageNames article.card")].find((c) => c.dataset.domainName === ui.focusedManageDomain)
+ : el("manageDomains");
  target?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
 }
-
 /** Open 🪙 My POA; with a name, prefill it for a POA listing or auction. Your agent signs; nothing is sent here. */
 export function openPoa(name, opts = {}) {
  const mode = opts?.mode === "auction" ? "auction" : "sell";
  const deedOwner = typeof name === "string" && name
-  ? (() => {
-   const entry = ui.latestState?.names?.[name];
-   return entry?.activeId ? ui.latestState?.deeds?.[entry.activeId]?.owner : "";
-  })()
-  : "";
+ ? (() => {
+ const entry = ui.latestState?.names?.[name];
+ return entry?.activeId ? ui.latestState?.deeds?.[entry.activeId]?.owner : "";
+ })()
+ : "";
  const resolvedOwner = isPoaAddress(opts?.owner) ? opts.owner : (isPoaAddress(deedOwner) ? deedOwner : "");
  navigateHome();
  setSectionTab("escrow");
  syncEscrowPayerAddress(resolvedOwner, { force: Boolean(resolvedOwner) });
  if (typeof name === "string" && name) {
-  const field = el("escrowName"), amount = el("escrowAmount"), message = el("escrowMessage");
-  const root = el("escrowPayments");
-  if (field) field.value = name;
-  const buttons = root ? [...root.querySelectorAll('.escrow-step[data-step="1"] .button-row button, .button-row button')] : [];
-  const targetBtn = buttons.find((b) => (mode === "auction" ? /Open my POA auction/ : /List my name/).test(b.textContent ?? ""));
-  if (root) {
-   root.dataset.selectedAction = mode === "auction" ? "open" : "list";
-   for (const b of buttons) b.classList.toggle("is-selected-action", b === targetBtn);
-  }
-  const payerAddr = el("escrowPayer")?.value.trim() ?? "";
-  if (targetBtn && !targetBtn.disabled && isPoaAddress(payerAddr)) {
-   targetBtn.click();
-   if (message) {
-    message.textContent = mode === "auction"
-     ? `🔨 Auction ready for ${name} — adjust the reserve POA amount if needed; code updates live below.`
-     : `🏷️ Sale listing ready for ${name} — adjust the POA price if needed; code updates live below.`;
-   }
-  } else if (message) {
-   message.textContent = mode === "auction"
-    ? `🔨 Auction for ${name}: enter your reserve POA amount, then tap ⏱️ Open my POA auction.`
-    : `🏷️ Sell ${name}: enter your POA price, then tap 🏷️ List my name.`;
-  }
-  root?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
-  if (amount) amount.focus?.({ preventScroll: true });
+ const field = el("escrowName"), amount = el("escrowAmount"), message = el("escrowMessage");
+ const root = el("escrowPayments");
+ if (field) field.value = name;
+ const buttons = root ? [...root.querySelectorAll('.escrow-step[data-step="1"] .button-row button, .button-row button')] : [];
+ const targetBtn = buttons.find((b) => (mode === "auction" ? /Open my POA auction/ : /List my name/).test(b.textContent ?? ""));
+ if (root) {
+ root.dataset.selectedAction = mode === "auction" ? "open" : "list";
+ for (const b of buttons) b.classList.toggle("is-selected-action", b === targetBtn);
+ }
+ const payerAddr = el("escrowPayer")?.value.trim() ?? "";
+ if (targetBtn && !targetBtn.disabled && isPoaAddress(payerAddr)) {
+ targetBtn.click();
+ if (message) {
+ message.textContent = mode === "auction"
+ ? `🔨 Auction ready for ${name} — adjust the reserve POA amount if needed; code updates live below.`
+ : `🏷️ Sale listing ready for ${name} — adjust the POA price if needed; code updates live below.`;
+ }
+ } else if (message) {
+ message.textContent = mode === "auction"
+ ? `🔨 Auction for ${name}: enter your reserve POA amount, then tap ⏱️ Open my POA auction.`
+ : `🏷️ Sell ${name}: enter your POA price, then tap 🏷️ List my name.`;
+ }
+ root?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+ if (amount) amount.focus?.({ preventScroll: true });
  }
 }
-
 export function writeViewURL(path = location.pathname) {
  const next = viewPath(path, ui.lastSearch, ui.activeSectionTab);
  if (next !== location.pathname + location.search)
-  history.pushState(ui.route, "", next);
+ history.pushState(ui.route, "", next);
 }
-
 export function restoreViewFromURL() {
  const view = readViewQuery(location.search), d = parseDomainPath(location.pathname), o = parseOwnerPath(location.pathname);
  ui.lastSearch = view.query;
@@ -174,17 +163,15 @@ export function restoreViewFromURL() {
  applyRoute();
  runSearch(ui.lastSearch, false);
 }
-
 export function isRegisteredDomain(name) {
  if (!name || typeof name !== "string")
-  return false;
+ return false;
  const entry = ui.latestState?.names?.[name];
  if (!entry?.activeId)
-  return false;
+ return false;
  const deed = ui.latestState?.deeds?.[entry.activeId];
  return Boolean(deed && !deed.retired);
 }
-
 // Derived from official Unicode 17.0 CLDR names (web/emoji17-data.mjs) so emoji domain icons without an attached image show their initial letter (e.g. 🔥 -> F).
 const EMOJI_SINGLE_INITIALS = {"1":"🥇","2":"🥈","3":"🥉","A":"😲😧😰😠👿👽👾💢🫀🐜🥑🏺🚑🚗🚛🛺⚓✈🛫🛬🚡⏰🎟🏈🎨🪗🧮🪓⚗🩹🏧⚛♈♒📶🅰🆎","B":"😁💓💔💙🤎🖤👈👉👆👇🧠🦴🫦👶👦🤱👼👤👥🦬🐗🦫🦇🐻🦡🐤🐦🐡🦋🐛🪲💐🌼🍌🫐🫑🥦🫘🍞🥖🥯🥓🌯🥣🧈🍱🎂🍼🍾🍺🧋🧃🏖🏗🧱🏦🌉💈🚅🚌🚲🚏🛎🎈⚾🏀🎳🏸🥊🎯🩲👙🎒🩰🧢🔔🔕🪕🔋📘📚📑🔖🗳✒💼📊💣🪃🏹⚖🛏🛁🧹🧺🪣🫧🚼🛄☣🔙🔆🅱🔵🟤⚫🟦🟫⬛◼◾▪🔲🏴","C":"🥶🤠😕😢😖🤡😹😼😿💥🤞🤙👏🧒👷💑🐱🐈🐮🐄🐪🐿🐔🐊🪸🦀🦗🪳🌸🌵🍒🥥🥕🥒🌰🥐🧀🥩🍳🥫🍚🍛🍪🧁🍫🍬🍮🍸🍻🥂🥤🥢🧭🏕🏛🏪🏰⛪🏙🌆🎠🎪🚧🛶🌙☁⛈🌧🌨🌩🌀🌂☄🎄🎊🎏🏏🥌🔮♣♟🧥👝👑🎛🖱💽🎬📷📸🕯📕🪙💳💹📫📪🖍🗂📅📇📈📉📋🗃⚔🪚🗜⛓🩼🛋🪑🚬⚰🛃🚸🔃🔄♋♑🎦💱✅☑✔❌❎➰©🆑🆒Ⓜ🏁🎌","D":"🫥🤤🥸🫪😞😓💫💨🧏🕵🐶🐕🫏🦌🕊🦆🦤🐲🐉🐬🌳🍡🥟🍩🏜🏝🏚🏬🚚💧🤿♦👗🥁🖥📀🪔💵🗡🧬🩸🚪↘⬇↙🔯🔽🔅➗‼➿💠","E":"😑🤯😡👂🦻👀👁🧝🐑🐘🦅🌲🪹🍆🌽🥚🕗🕣🕚🕦🔌💶✉📧📩🛗🔚⏏⁉✳✴","F":"😂😘😋😛🤭🫢🫣🤨😶🙄🫩😷🤒🤕🤮😵🧐🫤☹😮😳🥹😦😨😱😤🤬🫯🙏💪🦶🧚👪👣🫆🦊🐥🪶🦩🐸🐟🪰🍀🍂🫓🍟🧆🫕🍤🍥🥠🍽🍴🏭⛲🌁🎡🚒⛽⛴🛸🕓🕟🕔🕠🌓🌕🌛🌝🌫🔥🎆🧨🥏🏑⛳🎣🎴🖼🪭🥿🪈📠💾🎞📽🔦🖋📁🗄🧯⚱⏩⏪⏫⏬♀⚜🆓","G":"😀😃😄😆😅😬👺👻😺😸💗💚🩶👧💂🧞🦍🦮🐐🦒🪿🍇🍏🧄🫚🥗🥛🌍🌎🌏🌐🌟🥅🎲👓🥽🧤🎓💎🎸📗⚙♊🟢🟩","H":"🥵😯🙉💘💝💟❣💯🕳🖐🫰🫶🤝🫈🏇🐴🐎🦛🐹🦔🐣🐝🌺🪻🌿🌶🍔🌭🍯☕🛖🏘🏠🏡🏥🏨🛕♨🚄🚥🚁⌛⏳⚡♥👜🥾👠🪮🎧🪉🔨⚒🛠🪝🪦🪬🟰💲⭕","I":"☝🫵🍨🧊🏒⛸📨📥🪪♾🔠🔡🔢🔣🔤ℹ🆔","J":"🪼🫙🏣🏯🎃🎎🕹🃏👖🔰🈁🈂🈷🈶🈯🉐🈹🈚🈲🉑🈸🈴🈳㊗㊙🈺🈵","K":"😗😚😙😽💋💏🐨🦘🥝🔪🕋🛴🪁🪢👘⌨🔑🪯","L":"🤥😭💌🩵🗨🫲🫷🤟🤛🦵🫁🦁🐆🦙🦎🦞🐞🪷🍃🪾🍋🥬🍭🛘🏩🚂🚈🧳🌗🌜🥍🥼💄📢🎚🪘🪫💻💡📒🏷🖇🔒🔏🔐🔗🪜🧴🚮🛅⬅↔↪✝♌♎⏮🔶🔷","M":"🫠🤑🖕🦾🦿👄👨🤶🧙🧜🕺👬🐵🐒🫎🦣🐭🐁🦟🦠🍁🍄🍈🥭🍖🥮🧉🗾⛰🗻🕌🚇🚝🚞🚐🏍🛵🦽🦼🛣🛥🚠🕰🌌🎑🎖🥋🪄🪩🀄👞🪖🔇📣🎼🎵🎶🎤🎹🪇📱📲🎥🔍🔎💰💸📝🧲🔬🪞🪤🗿🚹🕎📴♂✖➖⚕","N":"😐🤢🤓💅👃🥷🪺🏞🌃🕘🕤🌑🌚🪆👔📔📓📰🔩🧿⛔🚳🚭🚯🚱🚷📵🔞⏭📛🆕🆖","O":"👹🧡👌👊👐🧓👴👵🦧🐂🦦🦉🫍🐙🦪🫒🧅🍢🏢🚍🚔🚖🚘🛢🕐🕜🩱💿📖📙📤📬📭📂🗝🔛🕉☦⛎🅾🆗🟠🟧","P":"😔🥳🥺😣💩😾🩷💜🫳🫴🤌🤏🤲🧑👱🧔🙍🙎🙅🙆💁🙋🙇🤦🤷👮🫅🤴👸👳👲🤵👰🤰🫃🫄💆💇🚶🧍🧎🏃🕴👯🧖🧗🤺🏌🏄🚣🏊⛹🏋🚴🚵🤸🤼🤽🤾🤹🧘🛀🛌🫂🐩🐷🐖🐽🐼🐾🐧🦚🦜🪴🌴🍍🍐🍑🥔🥜🫛🥨🥞🍗🍕🍲🍿🥧🫗🏤🛝🚓🛻🚨🛳🪂🎉🎍🏓🎱🧩🪅🎭👛📿📯📟🖨📃📄💷📦📮✏🖊🖌📌📎⛏🧫💊🪠🪧🚰🛂🚫🛐☮♓▶⏯⏸➕〽🅿🟣🟪","R":"🤣😌🤖💞❤🗯🤚✋🫱🫸✊🤜🙌🦝🐏🦏🐀🐰🐇🐓🏵🌹🍎🫜🍘🍙🍠🪨🎢🚃🏎🛼🛤🛟🚀🪐🌈🧧🎀🎗🏉🎽👟⛑💍📻🏮🗞🧾📍🪒🧻🚻☢➡↩⤴⤵🔁🔂◀⏺❓❗♻®🔴🟥🔺🔻🔘","S":"🙂😊😇🥰😍🤩☺🥲😝🤗🤫🫡😏🫨😪😴🤧😎🙁😥😈💀☠😻🙈🙊💖💦💬🤘🤳🎅🦸🦹⛷🏂🗣🦥🦨🦢🐍🦕🐳🦭🦈🐚🦐🦑🐌🕷🕸🦂🌻🌱🌾☘🍓🥪🥙🥘🧂🍜🍝🍣🍦🍧🍰🍶🥄🏔🏟🏫🗽🕍⛩🌄🌅🌇🚉🚙🛹🛑⛵🚤🚢🛩💺🚟🛰⏱🕕🕡🕖🕢☀🌞⭐🌠⛅🌤🌥🌦❄☃⛄🎇✨🏅⚽🥎🎿🛷🎰♠🪡🕶🦺🧣🧦🥻🩳🛍🔈🔉🔊🎙🎷📜🗒🗓📏✂🛡🪛🪏📡💉🩺🚿🧷🧼🧽🛒🔜✡☪♏♐🔀⏹❇🫟🆘🔸🔹","T":"🤔😫💕💭👍👎🦷👅🧌🐯🐅🐫🦃🐢🦖🐠🌷🍊🍅🌮🫔🥡🫖🍵🍹🥃🗼⛺🚆🚊🚋🚎🚕🚜⏲🕛🕧🕑🕝🕒🕞🕙🕥🌡🌪🎋🎫🏆🎾🧸🧵👕🩴🎩🎺🪊☎📞🖲📺🪎📆📐🧰🧪🔭🚽🪥🔝♉⚧🔱™🚩","U":"🙃😒🦄☂☔⛱🔓⬆↗↖↕🔼🆙","V":"🖖✌🧛🌋🚦🏐🎮🎻📹📼♍📳🆚","W":"😉😜🥴😟😩🙀🤍👋✍👩🧕💃👭👫🐺🐃🪽🐋🪱💮🥀🍉🧇🍷🗺🪵💒🛞⌚🌒🌔🌖🌘🌬🌊🎐🎁🔫👚👡👢👒🗑🔧🦯🪟♿🚺🚾⚠☸🛜❔❕〰⚪⬜◻◽▫🔳🏳","X":"🩻","Y":"🥱💛🪀🧶💴☯🟡🟨","Z":"🤪🤐💤🧟🦓"};
 const EMOJI_MULTI_INITIALS = {"A":"🧑‍🎨 🧑‍🚀","B":"🧑‍🩰 🐈‍⬛ 🐦‍⬛ 🍄‍🟫 ⛓‍💥","C":"🧑‍🍳","D":"🧏‍♂ 🧏‍♀","E":"👁‍🗨","F":"😶‍🌫 😮‍💨 😵‍💫 🧑‍🌾 🧑‍🏭 🧑‍🚒","H":"🙂‍↔ 🙂‍↕ ❤‍🔥 🫱‍🫲 🧑‍⚕","J":"🧑‍⚖","L":"🍋‍🟩","M":"❤‍🩹 🧑‍🔧 🧑‍🎄 🧜‍♀","O":"🧑‍💼","P":"🧑‍🦰 🧑‍🦱 🧑‍🦳 🧑‍🦲 🧑‍✈ 🧑‍🍼 🧑‍🦯 🧑‍🦯‍➡ 🧑‍🦼 🧑‍🦼‍➡ 🧑‍🦽 🧑‍🦽‍➡ 🧑‍🐰‍🧑 🧑‍🫯‍🧑 🧑‍🤝‍🧑 🐻‍❄ 🐦‍🔥 🏴‍☠","R":"🏳‍🌈","S":"🧑‍🎓 🧑‍🔬 🧑‍🎤 🐕‍🦺","T":"🧑‍🏫 🧑‍💻 🏳‍⚧"};
@@ -205,51 +192,47 @@ function emojiZwjInitial(k, map) {
 function lookupEmojiInitial(grapheme) {
  const stripped = grapheme.replace(/[\uFE0F\u{1F3FB}-\u{1F3FF}]/gu, "");
  if (!emojiInitialMap) {
-  emojiInitialMap = new Map();
-  for (const [letter, chars] of Object.entries(EMOJI_SINGLE_INITIALS))
-   for (const ch of chars) emojiInitialMap.set(ch, letter);
-  for (const [letter, list] of Object.entries(EMOJI_MULTI_INITIALS))
-   for (const seq of list.split(" ")) emojiInitialMap.set(seq, letter);
+ emojiInitialMap = new Map();
+ for (const [letter, chars] of Object.entries(EMOJI_SINGLE_INITIALS))
+ for (const ch of chars) emojiInitialMap.set(ch, letter);
+ for (const [letter, list] of Object.entries(EMOJI_MULTI_INITIALS))
+ for (const seq of list.split(" ")) emojiInitialMap.set(seq, letter);
  }
  return emojiInitialMap.get(stripped) || emojiZwjInitial(stripped, emojiInitialMap);
 }
-
 export function avatarInitial(name) {
  const raw = String(name ?? "").trim();
  if (!raw) return "?";
  const seg = typeof Intl !== "undefined" && typeof Intl.Segmenter === "function"
-  ? new Intl.Segmenter("en", { granularity: "grapheme" }).segment(raw)[Symbol.iterator]().next().value?.segment
-  : [...raw][0];
+ ? new Intl.Segmenter("en", { granularity: "grapheme" }).segment(raw)[Symbol.iterator]().next().value?.segment
+ : [...raw][0];
  const glyph = seg || "?";
  if (/^[a-z]$/i.test(glyph)) return glyph.toUpperCase();
  return lookupEmojiInitial(glyph) || glyph;
 }
-
 function avatarTone(name) {
  let h = 0;
  const s = String(name ?? "");
  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
  return String(h % 6);
 }
-
 export function domainAvatarMediaPath(name) {
  if (!name || typeof name !== "string") return null;
  const entry = ui.latestState?.names?.[name];
  const deed = entry?.activeId ? ui.latestState?.deeds?.[entry.activeId] : null;
  if (!deed || deed.retired) return null;
  const saleInfo = findDomainSalesAndAuctions({
-  name,
-  deed,
-  state: ui.latestState,
-  escrowMarket: ui.escrowMarket,
-  nowMs: ui.escrowMarketServerTime || Date.now(),
+ name,
+ deed,
+ state: ui.latestState,
+ escrowMarket: ui.escrowMarket,
+ nowMs: ui.escrowMarketServerTime || Date.now(),
  });
  if (saleInfo.listedForSale) return null;
  const extracted = extractDomainProfile(deed);
  if (!extracted || extracted.isDefault) return null;
  return profileImageMediaPath(extracted.profile?.image, deed.name || name);
 }
-
 export function updateDomainAvatarElement(avatarEl, name, mediaPath) {
  if (!avatarEl) return;
  const glyph = avatarInitial(name);
@@ -263,21 +246,20 @@ export function updateDomainAvatarElement(avatarEl, name, mediaPath) {
  avatarEl.append(fallback);
  const resolved = mediaPath === undefined ? domainAvatarMediaPath(name) : mediaPath;
  if (resolved) {
-  const img = document.createElement("img");
-  img.className = "domain-avatar-img";
-  img.src = resolved;
-  img.alt = "";
-  img.addEventListener("error", () => {
-   avatarEl.classList.remove("has-image");
-   img.remove();
-  });
-  avatarEl.classList.add("has-image");
-  avatarEl.append(img);
+ const img = document.createElement("img");
+ img.className = "domain-avatar-img";
+ img.src = resolved;
+ img.alt = "";
+ img.addEventListener("error", () => {
+ avatarEl.classList.remove("has-image");
+ img.remove();
+ });
+ avatarEl.classList.add("has-image");
+ avatarEl.append(img);
  } else {
-  avatarEl.classList.remove("has-image");
+ avatarEl.classList.remove("has-image");
  }
 }
-
 export function createDomainAvatar(name, { size = "sm", mediaPath } = {}) {
  const box = document.createElement("span");
  box.className = `domain-header-avatar domain-header-avatar-${size}`;
@@ -285,7 +267,6 @@ export function createDomainAvatar(name, { size = "sm", mediaPath } = {}) {
  updateDomainAvatarElement(box, name, mediaPath);
  return box;
 }
-
 export function domainHeader(parent, name, { size = "sm", registered, prefix = "", suffix = "", mediaPath } = {}) {
  if (!parent) return { avatar: null, link: null };
  parent.classList.add("domain-heading");
@@ -296,59 +277,57 @@ export function domainHeader(parent, name, { size = "sm", registered, prefix = "
  if (suffix) parent.append(suffix);
  return { avatar, link };
 }
-
 export function nameLink(parent, name, css = "domain-link", opts = {}) {
  if (!name)
-  return add(parent, "span", "—", css);
+ return add(parent, "span", "—", css);
  const a = document.createElement("a");
  a.href = domainPath(name);
  const registered = typeof opts?.registered === "boolean" ? opts.registered : isRegisteredDomain(name);
  a.className = css + " domain-name" + (registered ? " domain-tile is-registered" : "");
  a.textContent = name;
  a.addEventListener("click", (event) => {
-  event.preventDefault();
-  navigateDomain(name);
+ event.preventDefault();
+ navigateDomain(name);
  });
  parent.append(a);
  return a;
 }
-
 export function ownerLink(parent, ownerId, label) {
  const short = isPoaAddress(ownerId) ? shortenPoaAddress(ownerId) : null;
  const isRoleLabel = Boolean(label && !isPoaAddress(label) && label !== short && label !== ownerId.slice(0, 18) + "…" && label !== ownerId);
  if (!isRoleLabel && short) {
-  const wrap = appendPoaAddress(parent, ownerId, { resolvePrimary: true, linkOwner: true });
-  return wrap.children?.[0] ?? wrap;
+ const wrap = appendPoaAddress(parent, ownerId, { resolvePrimary: true, linkOwner: true });
+ return wrap.children?.[0] ?? wrap;
  }
  const primary = !isRoleLabel ? primaryNameForOwner(ui.latestState, ownerId) : null;
  if (primary) {
-  const domLink = document.createElement("a");
-  domLink.href = domainPath(primary);
-  domLink.className = "domain-link owner-primary-link";
-  domLink.title = `Open ${primary} domain page`;
-  domLink.append(createDomainAvatar(primary, { size: "xs" }));
-  const nameSpan = document.createElement("span");
-  nameSpan.className = "domain-name";
-  nameSpan.textContent = primary;
-  domLink.append(nameSpan);
-  domLink.addEventListener("click", (event) => {
-   event.preventDefault();
-   navigateDomain(primary);
-  });
-  const addrLink = document.createElement("a");
-  addrLink.href = "/p/" + encodeURIComponent(primary);
-  addrLink.className = "domain-link poa-addr-text owner-addr-link";
-  addrLink.textContent = ownerId.slice(0, 18) + "…";
-  addrLink.title = `Owner profile (${ownerId})`;
-  addrLink.addEventListener("click", (event) => {
-   event.preventDefault();
-   navigateOwner(primary);
-  });
-  const wrap = document.createElement("span");
-  wrap.className = "poa-addr-inline owner-primary-inline";
-  wrap.append(domLink, addrLink);
-  parent.append(wrap);
-  return domLink;
+ const domLink = document.createElement("a");
+ domLink.href = domainPath(primary);
+ domLink.className = "domain-link owner-primary-link";
+ domLink.title = `Open ${primary} domain page`;
+ domLink.append(createDomainAvatar(primary, { size: "xs" }));
+ const nameSpan = document.createElement("span");
+ nameSpan.className = "domain-name";
+ nameSpan.textContent = primary;
+ domLink.append(nameSpan);
+ domLink.addEventListener("click", (event) => {
+ event.preventDefault();
+ navigateDomain(primary);
+ });
+ const addrLink = document.createElement("a");
+ addrLink.href = "/p/" + encodeURIComponent(primary);
+ addrLink.className = "domain-link poa-addr-text owner-addr-link";
+ addrLink.textContent = ownerId.slice(0, 18) + "…";
+ addrLink.title = `Owner profile (${ownerId})`;
+ addrLink.addEventListener("click", (event) => {
+ event.preventDefault();
+ navigateOwner(primary);
+ });
+ const wrap = document.createElement("span");
+ wrap.className = "poa-addr-inline owner-primary-inline";
+ wrap.append(domLink, addrLink);
+ parent.append(wrap);
+ return domLink;
  }
  const display = isRoleLabel ? label : (ownerId.slice(0, 18) + "…");
  const a = document.createElement("a");
@@ -356,20 +335,74 @@ export function ownerLink(parent, ownerId, label) {
  a.className = "domain-link";
  a.textContent = display;
  a.addEventListener("click", (event) => {
-  event.preventDefault();
-  navigateOwner(ownerId);
+ event.preventDefault();
+ navigateOwner(ownerId);
  });
  parent.append(a);
  return a;
 }
-
 registerAddressNav({ createDomainAvatar, navigateDomain, navigateOwner });
-
+const MOBILE_ZOOM_MQ="(max-width: 720px), (hover: none), (pointer: coarse)";
+let zoomNodes=null,zoomOpener=null,zoomAnim=null,zoomTimer=null;
+const reducedMotion=()=>Boolean(globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+function zoomDelta(srcEl,frame){
+ if(!srcEl?.isConnected||!srcEl.getBoundingClientRect||!frame.getBoundingClientRect)return null;
+ const sr=srcEl.getBoundingClientRect(),dr=frame.getBoundingClientRect();
+ if(!(sr.width>0&&dr.width>0))return null;
+ return`translate(${sr.left+sr.width/2-(dr.left+dr.width/2)}px,${sr.top+sr.height/2-(dr.top+dr.height/2)}px) scale(${Math.max(0.12,Math.min(1,sr.width/dr.width))})`;
+}
+function ensureAvatarZoom(){
+ if(zoomNodes&&zoomNodes.backdrop.isConnected)return zoomNodes;
+ if(typeof document==="undefined"||!document.body)return null;
+ const backdrop=document.createElement("div"),frame=document.createElement("div"),img=document.createElement("img");
+ backdrop.id="avatarZoomBackdrop";backdrop.className="avatar-zoom-backdrop";backdrop.hidden=true;
+ frame.id="avatarZoomFrame";frame.className="avatar-zoom-frame";frame.setAttribute("role","dialog");frame.setAttribute("aria-modal","true");frame.setAttribute("aria-label","Domain profile image");frame.tabIndex=-1;
+ img.id="avatarZoomImg";img.className="avatar-zoom-img";img.alt="";
+ frame.append(img);backdrop.append(frame);
+ backdrop.addEventListener("click",e=>{if(e.target===backdrop)closeAvatarZoom();});
+ document.body.append(backdrop);
+ return(zoomNodes={backdrop,frame,img});
+}
+export function closeAvatarZoom({immediate=false}={}){
+ if(!zoomNodes||zoomNodes.backdrop.hidden)return;
+ const{backdrop,frame}=zoomNodes;
+ clearTimeout(zoomTimer);zoomTimer=null;zoomAnim?.cancel?.();zoomAnim=null;
+ backdrop.classList.remove("is-open");document.body?.classList?.remove("avatar-zoom-open");
+ const finish=()=>{clearTimeout(zoomTimer);zoomTimer=null;zoomAnim?.cancel?.();zoomAnim=null;backdrop.hidden=true;zoomOpener=null;};
+ if(immediate||reducedMotion()||typeof frame.animate!=="function"){finish();return;}
+ const anim=frame.animate([{transform:"translate(0,0) scale(1)",opacity:1},{transform:zoomDelta(zoomOpener,frame)||"scale(0.84)",opacity:0}],{duration:170,easing:"ease-in",fill:"forwards"});
+ zoomAnim=anim;anim.onfinish=finish;zoomTimer=setTimeout(finish,220);
+}
+export function openAvatarZoom(avatarEl){
+ if(!avatarEl?.classList?.contains("has-image"))return false;
+ const srcImg=avatarEl.querySelector?.("img.domain-avatar-img"),src=srcImg?.currentSrc||srcImg?.src||"";
+ const nodes=src?ensureAvatarZoom():null;
+ if(!nodes)return false;
+ const{backdrop,frame,img}=nodes;
+ clearTimeout(zoomTimer);zoomTimer=null;zoomAnim?.cancel?.();zoomAnim=null;
+ const domain=String(avatarEl.dataset?.avatarDomain||"").trim(),alt=domain?`${domain.toUpperCase()} profile image`:"Domain profile image";
+ img.src=src;img.alt=alt;frame.setAttribute("aria-label",alt);zoomOpener=avatarEl;
+ backdrop.hidden=false;backdrop.classList.add("is-open");document.body?.classList?.add("avatar-zoom-open");frame.focus?.({preventScroll:true});
+ if(!reducedMotion()&&typeof frame.animate==="function"){
+  const from=zoomDelta(avatarEl,frame);
+  if(from){const anim=frame.animate([{transform:from,opacity:0.45},{transform:"translate(0,0) scale(1)",opacity:1}],{duration:220,easing:"cubic-bezier(0.2,0.9,0.25,1)"});zoomAnim=anim;anim.onfinish=()=>{if(zoomAnim===anim)zoomAnim=null;};}
+ }
+ return true;
+}
+if(typeof document!=="undefined"&&typeof document.addEventListener==="function"){
+ document.addEventListener("click",e=>{
+  if(e.defaultPrevented||(typeof e.button==="number"&&e.button!==0))return;
+  const avatar=e.target?.closest?.(".domain-header-avatar.has-image");
+  if(!avatar||avatar.closest?.("a")||!globalThis.matchMedia?.(MOBILE_ZOOM_MQ)?.matches)return;
+  e.preventDefault();e.stopPropagation();openAvatarZoom(avatar);
+ });
+ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&zoomNodes&&!zoomNodes.backdrop.hidden){e.preventDefault();closeAvatarZoom();}});
+}
 function closeOverlaysBeforeNavigate() {
+ closeAvatarZoom({ immediate: true });
  if (el("floatingCartPanel") && !el("floatingCartPanel").hidden) el("floatingCartClose")?.click();
  if (el("detailView") && !el("detailView").hidden) el("detailClose")?.click();
 }
-
 export function navigateHome() {
  closeOverlaysBeforeNavigate();
  ui.route = { kind: "home" };
@@ -378,7 +411,6 @@ export function navigateHome() {
  writeViewURL("/");
  applyRoute();
 }
-
 export function navigateDomain(name) {
  closeOverlaysBeforeNavigate();
  ui.route = { kind: "domain", name };
@@ -387,7 +419,6 @@ export function navigateDomain(name) {
  writeViewURL(domainPath(name));
  applyRoute();
 }
-
 export function navigateOwner(ownerId) {
  closeOverlaysBeforeNavigate();
  ui.route = { kind: "owner", ownerId };
@@ -396,7 +427,6 @@ export function navigateOwner(ownerId) {
  writeViewURL("/p/" + encodeURIComponent(ownerId));
  applyRoute();
 }
-
 function syncAdvancedLink() {
  const link = el("advancedLink");
  if (!link) return;
@@ -405,87 +435,85 @@ function syncAdvancedLink() {
  if (on) link.setAttribute("aria-current", "page");
  else link.removeAttribute("aria-current");
 }
-
 export function openAdvanced() {
  const fromSubpage = ui.route.kind !== "home";
  if (fromSubpage) {
-  closeOverlaysBeforeNavigate();
-  ui.route = { kind: "home" };
-  ui.currentDomainName = null;
-  ui.currentOwnerId = null;
-  applyRoute();
+ closeOverlaysBeforeNavigate();
+ ui.route = { kind: "home" };
+ ui.currentDomainName = null;
+ ui.currentOwnerId = null;
+ applyRoute();
  }
  setSectionTab("handoff", true, fromSubpage ? "/" : undefined);
  const section = el("handoffSection");
  section?.scrollIntoView?.({ block: "start" });
  section?.focus?.({ preventScroll: true });
 }
-
 export function applyRoute() {
+ closeAvatarZoom({ immediate: true });
  const home = el("homeMain");
  const domain = el("domainMain");
  const owner = el("ownerMain");
  const tabs = el("sectionTabs");
  if (ui.route.kind === "domain") {
-  home.hidden = true;
-  domain.hidden = false;
-  owner.hidden = true;
-  if (tabs)
-   tabs.hidden = true;
-  if (ui.latestState)
-   renderDomainPage(ui.currentDomainName);
-  ui.escrowUI?.domain(ui.currentDomainName);
+ home.hidden = true;
+ domain.hidden = false;
+ owner.hidden = true;
+ if (tabs)
+ tabs.hidden = true;
+ if (ui.latestState)
+ renderDomainPage(ui.currentDomainName);
+ ui.escrowUI?.domain(ui.currentDomainName);
  }
  else if (ui.route.kind === "owner") {
-  home.hidden = true;
-  domain.hidden = true;
-  owner.hidden = false;
-  if (tabs)
-   tabs.hidden = true;
-  if (ui.latestState)
-   renderOwnerPage(ui.currentOwnerId);
+ home.hidden = true;
+ domain.hidden = true;
+ owner.hidden = false;
+ if (tabs)
+ tabs.hidden = true;
+ if (ui.latestState)
+ renderOwnerPage(ui.currentOwnerId);
  }
  else {
-  home.hidden = false;
-  domain.hidden = true;
-  owner.hidden = true;
-  if (tabs)
-   tabs.hidden = false;
+ home.hidden = false;
+ domain.hidden = true;
+ owner.hidden = true;
+ if (tabs)
+ tabs.hidden = false;
  }
  syncAdvancedLink();
 }
-
 export function setSectionTab(tabId, markSeen = true, path = location.pathname) {
  ui.activeSectionTab = tabId;
  if (markSeen)
-  writeViewURL(path);
+ writeViewURL(path);
  const tabBtns = [...document.querySelectorAll(".section-tab")];
  const hasActiveTab = tabBtns.some((b) => b.getAttribute("data-tab") === tabId);
  tabBtns.forEach((btn, idx) => {
-  const on = btn.getAttribute("data-tab") === tabId;
-  btn.classList.toggle("is-active", on);
-  btn.setAttribute("aria-selected", on ? "true" : "false");
-  btn.tabIndex = on || (!hasActiveTab && idx === 0) ? 0 : -1;
+ const on = btn.getAttribute("data-tab") === tabId;
+ btn.classList.toggle("is-active", on);
+ btn.setAttribute("aria-selected", on ? "true" : "false");
+ btn.tabIndex = on || (!hasActiveTab && idx === 0) ? 0 : -1;
  });
  for (const section of document.querySelectorAll("main#homeMain > section[data-section]")) {
-  const on = section.getAttribute("data-section") === tabId;
-  section.classList.toggle("is-active-section", on);
-  section.hidden = !on;
+ const on = section.getAttribute("data-section") === tabId;
+ section.classList.toggle("is-active-section", on);
+ section.hidden = !on;
  }
  syncAdvancedLink();
  if (tabId === "escrow") {
-  const ownerField = el("manageOwner");
-  if (ownerField && !ownerField.value.trim() && ui.knownOwner) {
-   ownerField.value = ui.knownOwner;
-   renderManagement();
-  }
-  syncEscrowPayerAddress();
+ const ownerField = el("manageOwner");
+ if (ownerField && !ownerField.value.trim() && ui.knownOwner) {
+ ownerField.value = ui.knownOwner;
+ renderManagement();
+ }
+ syncEscrowPayerAddress();
  }
  syncCartShortcutNow();
  if (markSeen && ui.latestState) {
-  const marks = tabWatermarks(ui.latestState);
-  ui.tabSeen = { ...ui.tabSeen, [tabId]: marks[tabId] ?? ui.latestState.sequence ?? 0 };
-  saveTabSeen(globalThis.localStorage, ui.tabSeen);
-  updateTabDots(ui.latestState);
+ const marks = tabWatermarks(ui.latestState);
+ ui.tabSeen = { ...ui.tabSeen, [tabId]: marks[tabId] ?? ui.latestState.sequence ?? 0 };
+ saveTabSeen(globalThis.localStorage, ui.tabSeen);
+ updateTabDots(ui.latestState);
  }
 }
