@@ -1,13 +1,13 @@
-import { publicNameUnavailable } from "./shared.js?v=bc6ae7df7f28";
-import { registryUnit } from "./shared.js?v=bc6ae7df7f28";
-import { actionLabel } from "./ui-copy.js?v=bc6ae7df7f28";
-import { createInlineInfo } from "./ui-help.js?v=bc6ae7df7f28";
-import { trapDialog } from "./ui-a11y.js?v=bc6ae7df7f28";
-import { ui } from "./ui-state.js?v=bc6ae7df7f28";
-import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, cartSummary, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=bc6ae7df7f28";
-import { add, appendTextWithPoaAddress, el, endpointBase } from "./ui-core.js?v=bc6ae7df7f28";
-import { activeUserAddress, domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=bc6ae7df7f28";
-import { updateManagedDomainsBadge } from "./ui-render.js?v=bc6ae7df7f28";
+import { publicNameUnavailable } from "./shared.js?v=6392e78aa9c6";
+import { registryUnit } from "./shared.js?v=6392e78aa9c6";
+import { actionLabel } from "./ui-copy.js?v=6392e78aa9c6";
+import { createInlineInfo } from "./ui-help.js?v=6392e78aa9c6";
+import { trapDialog } from "./ui-a11y.js?v=6392e78aa9c6";
+import { ui } from "./ui-state.js?v=6392e78aa9c6";
+import { acknowledgeCartItem, buildAgentCartHandoff, renderAgentCartHandoff, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff, poaOnlyMode, poaShort, poaMinimumNextBid, findOpenPoaAuctionByName, updatedAge, buildCartItem, cartReview, cartSummary, editCartAmount, inspectName, minimumNextBid, rootAuctionPolicy, saveCart, saveKnownOwner, shouldHoldTransactions, validPrincipal } from "./shared.js?v=6392e78aa9c6";
+import { add, appendTextWithPoaAddress, el, endpointBase } from "./ui-core.js?v=6392e78aa9c6";
+import { activeUserAddress, domainHeader, openManageDomain, syncEscrowPayerAddress } from "./ui-router.js?v=6392e78aa9c6";
+import { updateManagedDomainsBadge } from "./ui-render.js?v=6392e78aa9c6";
 
 export function cartCopyBlocked() {
  return ui.refreshing || ui.lastLoadedAt === null || ui.registryReadFailed || ui.cart.some(item => item.validationError || item.needsReview) || (ui.networkStatus.lastKnown !== true && shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level)) || !!ui.networkStatus.hold;
@@ -317,35 +317,41 @@ function poaCartTotalShort(items) {
 }
 
 export function renderCartExpectations() {
- const show = Boolean(ui.cap && poaOnlyMode(ui.cap) && ui.cart.length > 0);
+ const poaMode = Boolean(ui.cap && poaOnlyMode(ui.cap));
+ const hasItems = ui.cart.length > 0;
  const inlineBox = el("cartExpectations");
  const floatingBox = el("floatingCartExpectations");
  if (inlineBox)
-  inlineBox.hidden = !show;
+  inlineBox.hidden = !poaMode;
  if (floatingBox)
-  floatingBox.hidden = !show;
+  floatingBox.hidden = !poaMode;
  const lead = el("cartExpectLead");
  const list = el("cartExpectList");
- if (show) {
-  const total = poaCartTotalShort(ui.cart);
+ if (poaMode) {
+  const total = hasItems ? poaCartTotalShort(ui.cart) : null;
   const bidCount = ui.cart.filter((x) => x.action === "poaBid").length;
   const buyCount = ui.cart.filter((x) => x.action === "poaBuy").length;
   const newCount = ui.cart.length - bidCount - buyCount;
   const depCount = ui.cart.filter((x) => Boolean(x.useDeposit ?? x.params?.useDeposit)).length;
   const count = `${ui.cart.length} ${ui.cart.length === 1 ? "item" : "items"}`;
   if (lead) {
-   const parts = [];
-   if (bidCount) parts.push(`${bidCount} ${bidCount === 1 ? "auction bid" : "auction bids"}`);
-   if (buyCount) parts.push(`${buyCount} ${buyCount === 1 ? "fixed buy" : "fixed buys"}`);
-   if (newCount) parts.push(`${newCount} new`);
-   const depSuffix = depCount ? ` · ${depCount} using deposit` : "";
-   lead.textContent = bidCount > 0 || buyCount > 0
-    ? (total
-     ? `For ${count} (ceiling ${total} POA across ${parts.join(" + ")}${depSuffix}) — nothing is paid or bid until you approve your agent.`
-     : `For ${count} — nothing is paid or bid until you approve your agent.`)
-    : (total
-     ? `For ${ui.cart.length} ${ui.cart.length === 1 ? "name" : "names"} (${total} POA total${depSuffix}) — nothing is paid or minted until you approve your agent.`
-     : `For ${ui.cart.length} ${ui.cart.length === 1 ? "name" : "names"} — nothing is paid or minted until you approve your agent.`);
+   lead.hidden = !hasItems;
+   if (!hasItems) {
+    lead.textContent = "";
+   } else {
+    const parts = [];
+    if (bidCount) parts.push(`${bidCount} ${bidCount === 1 ? "auction bid" : "auction bids"}`);
+    if (buyCount) parts.push(`${buyCount} ${buyCount === 1 ? "fixed buy" : "fixed buys"}`);
+    if (newCount) parts.push(`${newCount} new`);
+    const depSuffix = depCount ? ` · ${depCount} using deposit` : "";
+    lead.textContent = bidCount > 0 || buyCount > 0
+     ? (total
+      ? `For ${count} (ceiling ${total} POA across ${parts.join(" + ")}${depSuffix}) — nothing is paid or bid until you approve your agent.`
+      : `For ${count} — nothing is paid or bid until you approve your agent.`)
+     : (total
+      ? `For ${ui.cart.length} ${ui.cart.length === 1 ? "name" : "names"} (${total} POA total${depSuffix}) — nothing is paid or minted until you approve your agent.`
+      : `For ${ui.cart.length} ${ui.cart.length === 1 ? "name" : "names"} — nothing is paid or minted until you approve your agent.`);
+   }
   }
   if (list) {
    const mode = bidCount > 0 || buyCount > 0 ? (newCount > 0 ? "mixed" : "auction") : "new";

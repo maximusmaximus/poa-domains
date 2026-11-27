@@ -68,7 +68,7 @@ code{overflow-wrap:anywhere;}
 details{margin:1.5rem 0;}
 summary{cursor:pointer;}
 #mode{padding:1rem;border:1px solid #c99d54;border-radius:0.5rem;background:#302a1c;}
-#exampleNotice,#freshness{font-size:0.9rem;color:#b4cad6;}
+#exampleNotice{font-size:0.9rem;color:#b4cad6;}
 button[hidden]{display:none;}
 #example{margin:0.5rem 0;}
 h2,h3,h4{color:#9cffe0;overflow-wrap:anywhere;}
@@ -322,7 +322,7 @@ button.box-close{margin:0;}
 @media(max-width:600px){#searchInput{min-height:60px;font-size:1.2rem;}}
 .github-mark{flex:none;vertical-align:middle;}
 .footer-links a{display:inline-flex;align-items:center;gap:.45rem;}
-#cartAnchor.cart-empty>h4,#cartAnchor.cart-empty>#cartPrompt,#cartAnchor.cart-empty>#cartHandoffMeta,#cartAnchor.cart-empty>#cartExpectations{display:none;}
+#cartAnchor.cart-empty>h4,#cartAnchor.cart-empty>#cartPrompt,#cartAnchor.cart-empty>#cartHandoffMeta{display:none;}
 :root{--ui-space:12px;--ui-tight:8px;}
 .site-top{display:block;}
 header{margin-block:0;}
@@ -397,11 +397,11 @@ main#homeMain,main#homeMain>section,.ideas{min-width:0;max-width:100%;box-sizing
 .cart-escrow-title{display:block;min-width:0;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .cart-escrow-reason{display:block;color:#f2dcd8;font-weight:400;margin-top:.2rem;}
 .cart-escrow-hint{display:block;color:#bdd0de;font-weight:400;font-size:.82rem;margin-top:.35rem;}
-.cart-expectations{margin-top:.85rem;padding:.8rem .9rem;background:#09131a;border:1px solid #31535c;border-radius:.45rem;font-size:.88rem;line-height:1.45;overflow-wrap:anywhere;}
-.cart-expectations h4,.cart-expectations .cart-expect-title{margin:0 0 .35rem;font-size:.92rem;}
+.cart-expectations,.info-meta-block{margin-top:.75rem;padding:.7rem .8rem;background:#09131a;border:1px solid #31535c;border-radius:.45rem;font-size:.86rem;line-height:1.45;overflow-wrap:anywhere;}
+.cart-expectations h4,.cart-expectations .cart-expect-title,.info-meta-heading{margin:0 0 .35rem;font-size:.9rem;font-weight:700;color:#9cffe0;}
 .cart-expectations p{margin:0 0 .45rem;}
-.cart-expect-steps{margin:0;padding-left:1.25rem;}
-.cart-expect-steps li{margin:.3rem 0;}
+.cart-expect-steps,.info-meta-list{margin:0;padding-left:1.2rem;}
+.cart-expect-steps li,.info-meta-list li{margin:.28rem 0;}
 .cart-expectations-compact{margin:.6rem 0 .45rem;padding:.6rem .75rem;font-size:.82rem;}
 .poa-search-expect{margin:.45rem 0 .65rem;font-size:.88rem;line-height:1.4;}
 .poa-addr-inline{display:inline-flex;align-items:center;gap:.3rem;max-width:100%;vertical-align:middle;}

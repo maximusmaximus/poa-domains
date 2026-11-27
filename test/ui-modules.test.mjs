@@ -686,20 +686,26 @@ test('owner profile, domain page, ownerLink primary rendering, and Manage main-d
    receipts: {},
   };
 
-  // 1. applySiteTitle initial + creative remix preserves #siteHomeBtn and updates signature
+  // 1. applySiteTitle refreshes creatively on every site visit, persists last signature, and preserves #siteHomeBtn
   const headerHost = makeNode('header');
   headerHost.append(byId.get('siteTitle'));
-  const initTitle = renderMod.applySiteTitle();
-  assert.equal(initTitle.text, '🅿️🅾️🅰️D🅾️Ⓜ️🅰️INS');
+  const classicTitle = renderMod.applySiteTitle({ creative: false });
+  assert.equal(classicTitle.text, '🅿️🅾️🅰️D🅾️Ⓜ️🅰️INS');
   const homeBtn = byId.get('siteHomeBtn');
   assert.ok(homeBtn && homeBtn.parentNode === headerHost);
   assert.equal(byId.get('siteTitle').children.length, 10);
-  const remix1 = renderMod.applySiteTitle({ creative: true });
+  delete byId.get('siteTitle').dataset.titleSig;
+  const visit1 = renderMod.applySiteTitle();
   assert.equal(byId.get('siteHomeBtn'), homeBtn);
   assert.equal(byId.get('siteTitle').children.length, 10);
-  assert.notEqual(byId.get('siteTitle').dataset.titleSig, `${initTitle.text}|flat|blue`);
+  assert.equal(store.get('poadomains.siteTitleSig.v1'), visit1.signature);
+  // Simulating a brand-new site visit (fresh DOM without titleSig, same localStorage) picks a different banner
+  delete byId.get('siteTitle').dataset.titleSig;
+  const visit2 = renderMod.applySiteTitle();
+  assert.notEqual(visit2.signature, visit1.signature);
+  assert.equal(byId.get('siteTitle').children.length, 10);
   const remix2 = renderMod.applySiteTitle({ creative: true });
-  assert.notEqual(remix2.signature, remix1.signature);
+  assert.notEqual(remix2.signature, visit2.signature);
 
   // 2. ownerLink & appendPrincipal render main domain (/d/<primary>) + abbreviated Owner Profile link (/p/<primary>) + POA copy button
   const linkBox = makeNode('p');

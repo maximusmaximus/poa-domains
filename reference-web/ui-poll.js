@@ -1,18 +1,18 @@
-import { publicNameUnavailable } from "./shared.js?v=bc6ae7df7f28";
-import { createInlineInfo, installHelp } from "./ui-help.js?v=bc6ae7df7f28";
-import { renderManagement } from "./ui-manage.js?v=bc6ae7df7f28";
-import { actionLabel } from "./ui-copy.js?v=bc6ae7df7f28";
-import { activePoaFixedListings, findOpenPoaAuctionByName, isOwnDomainOrListing, poaMinimumNextBid, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, SELF_BID_MESSAGE, SELF_BUY_MESSAGE, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=bc6ae7df7f28";
-import { ui } from "./ui-state.js?v=bc6ae7df7f28";
-import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=bc6ae7df7f28";
-import { createPoaCopyButton } from "./ui-copy.js?v=bc6ae7df7f28";
-import { addToCart, persistCart, renderCart, renderCartEscrowStatus, setCartItemUseDeposit, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=bc6ae7df7f28";
-import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=bc6ae7df7f28";
-import { renderDomainPage } from "./ui-domain.js?v=bc6ae7df7f28";
-import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=bc6ae7df7f28";
-import { renderIdeas } from "./ui-ideas.js?v=bc6ae7df7f28";
-import { mountEscrow } from "./escrow.js?v=bc6ae7df7f28";
-import { activeUserAddress, applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, renderSelfBidNotice, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=bc6ae7df7f28";
+import { publicNameUnavailable } from "./shared.js?v=6392e78aa9c6";
+import { createInlineInfo, installHelp } from "./ui-help.js?v=6392e78aa9c6";
+import { renderManagement } from "./ui-manage.js?v=6392e78aa9c6";
+import { actionLabel } from "./ui-copy.js?v=6392e78aa9c6";
+import { activePoaFixedListings, findOpenPoaAuctionByName, isOwnDomainOrListing, poaMinimumNextBid, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, cartMinimum, cartSummary, formatCountdown, formatDuration, isNetworkBannerDismissed, isPoaAddress, networkBannerColor, networkBannerCopy, recheckCartItem, registryViewState, rootAuctionPolicy, SALE_FIELDS_WARNING, SELF_BID_MESSAGE, SELF_BUY_MESSAGE, shortenPoaAddress, shouldHoldTransactions, updatedAge } from "./shared.js?v=6392e78aa9c6";
+import { ui } from "./ui-state.js?v=6392e78aa9c6";
+import { el, endpointBase, enhancePoaAddressesIn, json, staticURL } from "./ui-core.js?v=6392e78aa9c6";
+import { createPoaCopyButton } from "./ui-copy.js?v=6392e78aa9c6";
+import { addToCart, persistCart, renderCart, renderCartEscrowStatus, setCartItemUseDeposit, updateHandoffAge, updateCartCopyState, updatePromptText } from "./ui-cart.js?v=6392e78aa9c6";
+import { render, renderAuctions, renderMarketplace, renderTicker, updateLiveAuctionsBadge, updateTabDots } from "./ui-render.js?v=6392e78aa9c6";
+import { renderDomainPage } from "./ui-domain.js?v=6392e78aa9c6";
+import { runSearch, updateSearchSuggestions } from "./ui-search.js?v=6392e78aa9c6";
+import { renderIdeas } from "./ui-ideas.js?v=6392e78aa9c6";
+import { mountEscrow } from "./escrow.js?v=6392e78aa9c6";
+import { activeUserAddress, applyRoute, createDomainAvatar, isRegisteredDomain, nameLink, navigateHome, renderSelfBidNotice, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=6392e78aa9c6";
 
 if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
  document.addEventListener("poa:owner-changed", () => {
@@ -940,12 +940,6 @@ export function renderTreasuryFooter() {
   link.setAttribute("aria-label", `${label} address ${shortenPoaAddress(wallet.address)} on POAScan`);
   wrap.append(link, createPoaCopyButton(wallet.address));
   item.append(wrap);
-  if (typeof wallet.balance === "string" && /^[0-9]+\.[0-9]{6}$/.test(wallet.balance)) {
-   const bal = document.createElement("span");
-   bal.className = "treasury-bal muted";
-   bal.textContent = ` (${poaShort(wallet.balance)} POA)`;
-   item.append(bal);
-  }
   walletsEl.append(item);
  }
  walletsEl.hidden = false;

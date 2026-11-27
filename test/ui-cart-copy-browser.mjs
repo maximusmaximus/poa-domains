@@ -32,10 +32,16 @@ try {
   await expect(page.locator("#info-searchResult")).toContainText("reaches PoA finality");
   await page.locator("#addToCartBtn").click();
   await expect(page.locator("#copyCartPrompt")).toBeEnabled();
-  await expect(page.locator("#cartExpectations")).toBeVisible();
-  await expect(page.locator("#cartExpectLead")).toContainText("1 name (100 POA total)");
-  await expect(page.locator("#cartExpectations")).toContainText("Instant permanent mint");
-  await expect(page.locator("#cartExpectations")).toContainText("Verify ownership right away");
+  // "What happens after your agent sends POA" lives inside Cart's ℹ️ popover, not inline on the page
+  await expect(page.locator("#cartExpectations")).toBeHidden();
+  assert.ok(!(await page.locator("#cartAnchor").innerText()).includes("What happens after your agent sends POA"));
+  await page.locator("#help-cartAnchor").click();
+  await expect(page.locator("#info-cartAnchor #cartExpectations")).toBeVisible();
+  await expect(page.locator("#info-cartAnchor #cartExpectLead")).toContainText("1 name (100 POA total)");
+  await expect(page.locator("#info-cartAnchor #cartExpectations")).toContainText("Instant permanent mint");
+  await expect(page.locator("#info-cartAnchor #cartExpectations")).toContainText("Verify ownership right away");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#cartExpectations")).toBeHidden();
   const expectedPrompt = await page.locator("#cartPrompt").textContent();
   assert.match(expectedPrompt, /poa-domains\.poa-checkout\.v1/);
 
@@ -49,8 +55,13 @@ try {
   await page.locator("#advancedLink").click();
   await page.locator("#floatingCartBtn").click();
   await expect(page.locator("#floatingCartPanel")).toBeVisible();
-  await expect(page.locator("#floatingCartExpectations")).toBeVisible();
-  await expect(page.locator("#floatingCartExpectations")).toContainText("mints permanently to your address immediately");
+  // Floating cart expectations also live inside its ℹ️ popover, not inline
+  await expect(page.locator("#floatingCartExpectations")).toBeHidden();
+  await page.locator("#help-floatingCartPanel").click();
+  await expect(page.locator("#info-floatingCartPanel #floatingCartExpectations")).toBeVisible();
+  await expect(page.locator("#info-floatingCartPanel #floatingCartExpectations")).toContainText("mints permanently to your address immediately");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#floatingCartExpectations")).toBeHidden();
   await page.locator("#copyCheckoutBtn").click();
   await expect(page.locator("#floatingCartStatus")).toHaveText("✅ Request copied — nothing sent");
   const clipFloating = await page.evaluate(() => navigator.clipboard.readText());
@@ -957,6 +968,8 @@ try {
   await expect(treasuryLink).toHaveText("poa1...UP7N");
   await expect(treasuryLink).toHaveAttribute("target", "_blank");
   await expect(treasuryLink).toHaveAttribute("rel", "noopener noreferrer");
+  await expect(pageFooter.locator("#treasuryWallets .treasury-bal")).toHaveCount(0);
+  await expect(pageFooter.locator("#treasuryWallets")).not.toContainText("POA");
   await pageFooter.locator("#treasuryWallets .poa-copy-btn").first().click();
   assert.equal(await pageFooter.evaluate(() => navigator.clipboard.readText()), escrowWallet);
 
@@ -1205,7 +1218,11 @@ try {
   // Switch to Find/Cart: verify highest bid inputs, ceiling total, auction expectations & copied prompt nuances
   await pageAuc.locator("#tabFind").click();
   await expect(pageAuc.locator("#cartCount")).toHaveText("2");
-  await expect(pageAuc.locator("#cartExpectations")).toContainText("First bid starts the timer");
+  await expect(pageAuc.locator("#cartExpectations")).toBeHidden();
+  await pageAuc.locator("#help-cartAnchor").click();
+  await expect(pageAuc.locator("#info-cartAnchor #cartExpectations")).toBeVisible();
+  await expect(pageAuc.locator("#info-cartAnchor #cartExpectations")).toContainText("First bid starts the timer");
+  await pageAuc.keyboard.press("Escape");
   await expect(pageAuc.locator("#copyCartPrompt")).toBeEnabled();
   await pageAuc.locator("#copyCartPrompt").click();
   const auctionPrompt = await pageAuc.evaluate(() => navigator.clipboard.readText());
@@ -1811,20 +1828,41 @@ try {
   );
   assert.deepEqual(badPoascanLinks, [], "Every poascan.io link must open in a new window with rel=noopener noreferrer");
 
-  // 12. Clicking header navigates Home (from /d/<name>, /p/<owner>, or another tab) AND regenerates creative header icons
+  // 12. POADOMAINS banner refreshes on every site visit AND clicking header navigates Home + remixes
   const initialSig = await pagePrimary.locator("#siteTitle").getAttribute("data-title-sig");
-  assert.equal(await pagePrimary.locator("#siteTitle").textContent(), "🅿️🅾️🅰️D🅾️Ⓜ️🅰️INS");
+  assert.ok(initialSig && initialSig.length > 0, "initial visit must generate creative title signature");
+  assert.equal(await pagePrimary.locator("#siteTitle .title-glyph").count(), 10);
+  await pagePrimary.reload();
+  await pagePrimary.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+  const reloadSig = await pagePrimary.locator("#siteTitle").getAttribute("data-title-sig");
+  assert.notEqual(reloadSig, initialSig, "revisiting/reloading the site must refresh POADOMAINS banner");
   assert.equal(await pagePrimary.locator("#siteTitle .title-glyph").count(), 10);
   await pagePrimary.goto(`${h.url}/d/nebula`);
   await pagePrimary.waitForFunction(() => document.body.dataset.registryStatus === "ready");
   await expect(pagePrimary.locator("#domainMain")).toBeVisible();
+  const domainVisitSig = await pagePrimary.locator("#siteTitle").getAttribute("data-title-sig");
+  assert.notEqual(domainVisitSig, reloadSig, "navigating to a fresh page visit must refresh POADOMAINS banner");
   await pagePrimary.locator("#siteHomeBtn").click();
   await expect(pagePrimary.locator("#homeMain")).toBeVisible();
   await expect(pagePrimary.locator("#domainMain")).toBeHidden();
   await expect(pagePrimary.locator("#tabFind")).toHaveAttribute("aria-selected", "true");
   const remixSig1 = await pagePrimary.locator("#siteTitle").getAttribute("data-title-sig");
-  assert.notEqual(remixSig1, initialSig, "clicking header must regenerate creative title icons");
+  assert.notEqual(remixSig1, domainVisitSig, "clicking header must regenerate creative title icons");
   assert.equal(await pagePrimary.locator("#siteTitle .title-glyph").count(), 10);
+
+  // Explore hides registry snapshot banner inline and organizes it inside Explore's ℹ️ popover
+  await pagePrimary.locator("#tabExplore").click();
+  await expect(pagePrimary.locator("#explorerSection")).toBeVisible();
+  await expect(pagePrimary.locator("#freshness")).toBeHidden();
+  const exploreVisibleText = await pagePrimary.locator("#explorerSection").innerText();
+  assert.ok(!/LIVE REGISTRY DATA|LOCAL REGISTRY DATA|Public view only/i.test(exploreVisibleText), "Explore must not display snapshot line inline");
+  await pagePrimary.locator("#help-explorerSection").click();
+  await expect(pagePrimary.locator("#info-explorerSection #freshness")).toBeVisible();
+  await expect(pagePrimary.locator("#info-explorerSection #freshness .info-meta-heading")).toContainText(/REGISTRY DATA/);
+  await expect(pagePrimary.locator("#info-explorerSection #freshness .info-meta-list")).toContainText("As of:");
+  await expect(pagePrimary.locator("#info-explorerSection #freshness .info-meta-list")).toContainText("Sequence:");
+  await expect(pagePrimary.locator("#info-explorerSection #freshness .info-meta-list")).toContainText("Finality:");
+  await pagePrimary.keyboard.press("Escape");
 
   // From another tab (Auctions), clicking header returns to Home Find tab and regenerates again
   await pagePrimary.locator("#tabAuctions").click();
@@ -2309,7 +2347,18 @@ try {
     await expect(pageGeom.locator("#domainListing a.owner-addr-link").first()).toHaveAttribute("href", "/p/peer");
     await expect(pageGeom.locator("#domainListing .self-bid-notice")).toBeVisible();
     await expect(pageGeom.locator("#escrowDomain .self-bid-notice")).toBeVisible();
-    // Footer credit pulls main domain (army) + avatar icon + abbreviated Owner Profile link + POA copy icon
+    // Footer credit puts line break after "made with ❤️ in SF by" and pulls main domain (army) + avatar icon + Owner Profile link + POA copy icon
+    await expect(pageGeom.locator(".footer-credit br")).toHaveCount(1);
+    const creditBreakOk = await pageGeom.evaluate(() => {
+      const p = document.querySelector(".footer-credit");
+      const owner = document.querySelector("#footerCreditOwner");
+      if (!p || !owner) return false;
+      const range = document.createRange();
+      range.setStart(p.firstChild, 0);
+      range.setEnd(p.firstChild, p.firstChild.textContent.length);
+      return owner.getBoundingClientRect().top >= range.getBoundingClientRect().bottom - 2;
+    });
+    assert.equal(creditBreakOk, true, "Footer credit owner must appear on a new line below 'made with ❤️ in SF by'");
     await expect(pageGeom.locator("#footerCreditOwner a.owner-primary-link")).toHaveAttribute("href", "/d/army");
     await expect(pageGeom.locator("#footerCreditOwner a.owner-primary-link .domain-name")).toHaveText("army");
     await expect(pageGeom.locator("#footerCreditOwner a.owner-primary-link .domain-header-avatar-xs img")).toHaveAttribute("src", `/v1/media/${mockAvatarCid}`);

@@ -25,13 +25,13 @@ import {
  resolveDomainView,
  resolveOwnerInput,
  unavailableKey,
-} from "./shared.js?v=bc6ae7df7f28";
-import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=bc6ae7df7f28";
-import { createInlineInfo } from "./ui-help.js?v=bc6ae7df7f28";
-import { ui } from "./ui-state.js?v=bc6ae7df7f28";
-import { add, appendPoaAddress, appendPrincipal, appendTextWithPoaAddress, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=bc6ae7df7f28";
-import { activeUserAddress, domainHeader, nameLink, openManageDomain, openPoa, ownerLink, renderSelfBidNotice } from "./ui-router.js?v=bc6ae7df7f28";
-import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=bc6ae7df7f28";
+} from "./shared.js?v=6392e78aa9c6";
+import { actionLabel, copyText, createPoaCopyButton, flashCopied } from "./ui-copy.js?v=6392e78aa9c6";
+import { createInlineInfo } from "./ui-help.js?v=6392e78aa9c6";
+import { ui } from "./ui-state.js?v=6392e78aa9c6";
+import { add, appendPoaAddress, appendPrincipal, appendTextWithPoaAddress, el, namedText, ownershipView, person, statusLabel } from "./ui-core.js?v=6392e78aa9c6";
+import { activeUserAddress, domainHeader, nameLink, openManageDomain, openPoa, ownerLink, renderSelfBidNotice } from "./ui-router.js?v=6392e78aa9c6";
+import { addDetailToCart, addToCart, setFloatingCartOpen } from "./ui-cart.js?v=6392e78aa9c6";
 
 function appendCopyableValue(parent, value, ariaLabel, { shorten = true } = {}) {
  const wrap = document.createElement("span");

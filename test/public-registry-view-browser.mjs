@@ -22,7 +22,10 @@ for(const [name,launcher]of [['chromium',chromium],['firefox',firefox],['webkit'
  await expect(page.locator('#tabEscrow .tab-dot')).toHaveAttribute('title',/Registry snapshot ready; POA payments are checked separately/);
  await expect(page.locator('#tabHandoff')).toHaveCount(0);
  await expect(page.locator('#siteFooter #advancedLink')).toHaveText('Advanced');
- assert.equal(await page.locator('#siteTitle').textContent(),'🅿️🅾️🅰️D🅾️Ⓜ️🅰️INS');
+ await expect(page.locator('#siteTitle .title-glyph')).toHaveCount(10);
+ await expect(page.locator('#siteTitle')).toHaveAttribute('aria-label','poadomains');
+ assert.ok((await page.locator('#siteTitle').getAttribute('data-title-sig')||'').length>0);
+ assert.ok(!/[ℹ❗💲]/u.test(await page.locator('#siteTitle').textContent()||''));
  const measure=()=>page.evaluate(()=>{
   const rect=n=>{const r=n.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width};};
   const tabs=document.querySelector('#sectionTabs'),section=document.querySelector('#searchSection'),strip=document.querySelector('#ideasStrip'),row=document.querySelector('.ideas-masonry'),help=document.querySelector('#ideasHeading > .module-info');

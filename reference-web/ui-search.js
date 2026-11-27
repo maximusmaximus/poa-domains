@@ -1,13 +1,13 @@
-import { copyText } from "./ui-copy.js?v=bc6ae7df7f28";
-import { publicNameUnavailable } from "./shared.js?v=bc6ae7df7f28";
-import { isOwnDomainOrListing, registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, activePoaFixedListings, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=bc6ae7df7f28";
-import { ui } from "./ui-state.js?v=bc6ae7df7f28";
-import { activeUserAddress, domainHeader, nameLink, navigateDomain, openManageDomain, openPoa, ownerLink, renderSelfBidNotice, writeViewURL } from "./ui-router.js?v=bc6ae7df7f28";
-import { add, appendPrincipal, appendTextWithPoaAddress, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=bc6ae7df7f28";
-import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=bc6ae7df7f28";
-import { addToCart } from "./ui-cart.js?v=bc6ae7df7f28";
-import { suggestNames } from "./ideas-generator.js?v=bc6ae7df7f28";
-import { logSubmittedSearch } from "./ui-search-log.js?v=bc6ae7df7f28";
+import { copyText } from "./ui-copy.js?v=6392e78aa9c6";
+import { publicNameUnavailable } from "./shared.js?v=6392e78aa9c6";
+import { isOwnDomainOrListing, registryUnit, poaOnlyMode, poaNewNamePrice, poaAmount, poaToMicros, poaShort, poaMinimumNextBid, isPoaAuctionAwaitingFirstBid, findOpenPoaAuctionByName, activePoaFixedListings, poaAuctionOutbidStatus, buildSubnamePurchasePrompt, formatCountdown } from "./shared.js?v=6392e78aa9c6";
+import { ui } from "./ui-state.js?v=6392e78aa9c6";
+import { activeUserAddress, domainHeader, nameLink, navigateDomain, openManageDomain, openPoa, ownerLink, renderSelfBidNotice, writeViewURL } from "./ui-router.js?v=6392e78aa9c6";
+import { add, appendPrincipal, appendTextWithPoaAddress, el, endpointBase, json, person, variantOwner } from "./ui-core.js?v=6392e78aa9c6";
+import { compactAmount, formatClock, formatDuration, inspectName, minimumNextBid, nameErrorReason, rootAuctionPolicy } from "./shared.js?v=6392e78aa9c6";
+import { addToCart } from "./ui-cart.js?v=6392e78aa9c6";
+import { suggestNames } from "./ideas-generator.js?v=6392e78aa9c6";
+import { logSubmittedSearch } from "./ui-search-log.js?v=6392e78aa9c6";
 
 let activeSuggestionIdx = -1;
 let currentSuggestions = [];
