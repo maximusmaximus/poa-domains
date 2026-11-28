@@ -5,17 +5,22 @@ import {uiHarness} from './fixtures/ui-harness.mjs';
 import {safeObject} from '../reference-web/shared.js';
 for(const [name,launcher] of [['chromium',chromium],['firefox',firefox],['webkit',webkit]]){
  const h=await uiHarness('mainnet'),browser=await launcher.launch(),context=await browser.newContext({viewport:{width:390,height:844}}),errors=[],requests=[];
- const state=h.payload.state,owner='poa1'+'1'.repeat(32),parent='a'.repeat(64),child='b'.repeat(64),auction='c'.repeat(64),receipt='d'.repeat(64);
+ const state=h.payload.state,owner='poa1'+'1'.repeat(32),parent='a'.repeat(64),child='b'.repeat(64),auction='c'.repeat(64),receipt='d'.repeat(64),receiptDomain='e'.repeat(64);
  state.time=1000000; // Match the fixture clock; auction opening times must never be negative.
- for(const [id,domain,parentId] of [[parent,'nexus',null],[child,'seed.nexus',parent]]){state.names[domain]={name:domain,generation:1,activeId:id,auctionId:null,version:1};state.deeds[id]={id,name:domain,parentId,generation:1,owner,version:1,ownerVersion:1,rights:{kind:'permanent'},records:[],metadata:[{cid:'synthetic-local-metadata'}]};}
+ for(const [id,domain,parentId] of [[parent,'nexus',null],[child,'seed.nexus',parent],[receiptDomain,'receipt',null]]){state.names[domain]={name:domain,generation:1,activeId:id,auctionId:null,version:1};state.deeds[id]={id,name:domain,parentId,generation:1,owner,version:1,ownerVersion:1,rights:{kind:'permanent'},records:[],metadata:[{cid:'synthetic-local-metadata'}]};}
  state.auctions[auction]={id:auction,name:'nexus',status:'cancelled',reserve:'1000',asset:'POA',openAt:state.time-100,window:60,quiet:60,high:null,version:1};
- state.credits.local={amount:'10',payer:owner,auctionId:auction,asset:'POA',version:1};state.receipts[receipt]={intentId:receipt,requestId:'local-link-regression',sequence:1,time:state.time,status:'succeeded',signer:owner,result:{name:'seed.nexus',deedId:child}};state.sequence=1;safeObject(h.payload);
+ state.credits.local={amount:'10',payer:owner,auctionId:auction,asset:'POA',version:1};state.receipts[receipt]={intentId:receipt,requestId:'local-link-regression',sequence:1,time:state.time,status:'succeeded',signer:owner,result:{name:'seed.nexus',deedId:child}};state.sequence=2;
+ h.payload.history=[
+  {sequence:1,time:state.time-50,intentId:receipt,requestId:'local-link-regression',action:'issueSubname',name:'seed.nexus',parent:'nexus',deedId:child,actor:owner,recipient:owner,amount:'50000000',asset:'POA',isPoaMicros:true},
+  {sequence:2,time:state.time,intentId:'f'.repeat(64),requestId:'meta-nexus',action:'setMetadata',name:'nexus',deedId:parent,actor:owner,recipient:null,amount:null,asset:null,metadataVersion:2,profileFields:['avatar','bio','POA']},
+ ];
+ safeObject(h.payload);
  try{
   await context.route('**/*',r=>{const q=r.request();requests.push(q.method()+' '+q.url());return new URL(q.url()).origin===h.url&&q.method()==='GET'?r.continue():r.abort();});
   const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(h.url);await page.waitForFunction(()=>['ready','error'].includes(document.body.dataset.registryStatus));await page.locator('#termsAgreeBtn').click();assert.equal(await page.locator('body').getAttribute('data-registry-status'),'ready');
   await expect(page.locator('#history h4 a[href="/d/seed.nexus"]')).toHaveCount(1);await expect(page.locator('#balances .badge-ok a[href="/d/nexus"]')).toHaveCount(1);
   await page.locator('#searchInput').fill('new.nexus');await page.locator('#searchBtn').click();await expect(page.locator('#searchResult p a[href="/d/nexus"]')).toHaveCount(1);
-  await page.locator('#searchResult p a[href="/d/nexus"]').click();await expect(page.locator('#domainMain')).toBeVisible();assert.ok(await page.locator('#domainHistory a[href="/d/nexus"]').count());
+  await page.locator('#searchResult p a[href="/d/nexus"]').click();await expect(page.locator('#domainMain')).toBeVisible();assert.ok(await page.locator('#domainHistory a[href="/d/nexus"]').count());await expect(page.locator('#domainHistory a[href="/d/receipt"]')).toHaveCount(0);await expect(page.locator('#domainHistory')).toContainText('Profile updated');await expect(page.locator('#domainHistory')).toContainText('Updated avatar, bio, POA (v2)');await expect(page.locator('#domainHistory')).toContainText('Subdomain minted');await expect(page.locator('#domainHistory a[href="/d/seed.nexus"]')).toHaveCount(1);
   await expect(page.locator('#domainOwner .poa-addr-text')).toHaveText('poa1...1111');
   await expect(page.locator('#domainOwner .poa-copy-btn')).toHaveAttribute('data-copy-address',owner);
   await page.locator('#domainOwner a.poa-addr-text').click();await expect(page.locator('#ownerMain')).toBeVisible();

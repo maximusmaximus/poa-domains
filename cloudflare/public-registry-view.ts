@@ -152,6 +152,13 @@ function isPublicProtocolReceipt(e: Engine, value: unknown): boolean {
   }
   return hasPublicProtocolDomains(e);
 }
+function isPublicHistoryEntry(e: Engine, value: unknown, treasuryPublic: boolean): boolean {
+  if (!value || typeof value !== "object") return false;
+  const h = value as { intentId?: unknown; deedId?: unknown };
+  if (typeof h.intentId === "string" && hiddenReceiptSet.has(h.intentId)) return false;
+  if (typeof h.deedId === "string" && hiddenDeedSet.has(h.deedId)) return false;
+  return !hiddenReference(h, treasuryPublic ? e.config.treasury : undefined);
+}
 function hasPublicProtocolDomains(e: Engine): boolean {
   const s = e.snapshot();
   for (const name of protocolDomainSet) {
@@ -235,6 +242,9 @@ export function publicRegistryRoute(e: Engine, call: RegistryCall, options: Regi
       if (Object.keys(filteredPrimary).length) state.primaryNames = filteredPrimary;
       else delete state.primaryNames;
     }
+    if (Array.isArray(data.history)) {
+      data.history = data.history.filter((entry: unknown) => isPublicHistoryEntry(e, entry, treasuryPublic));
+    }
     data.publicView={filtered:true,policy:PUBLIC_VIEW_POLICY,stateHashScope:"complete-stored-state",sequenceScope:"complete-stored-state"};
   } else if(call.path==="/v1/capabilities") {
     // No internal-unit fields on the production view: new accounts start empty and pay in POA.
@@ -256,6 +266,11 @@ export function publicRegistryRoute(e: Engine, call: RegistryCall, options: Regi
     const at=q.cursor?values.findIndex(v=>v.id===q.cursor!.split(":").at(-1))+1:0;
     data.items=values.slice(at,at+data.limit);
     data.nextCursor=at+data.limit<values.length?`v1:${kind}:${data.sequence}:${data.stateHash}:${data.items.at(-1).id}`:null;
+  } else if(call.path.startsWith("/v1/names/")) {
+    if (Array.isArray(data.history)) {
+      data.history = data.history.filter((entry: unknown) => isPublicHistoryEntry(e, entry, treasuryPublic));
+    }
+    if (hiddenReference(data, treasuryPublic ? e.config.treasury : undefined)) return denied(call);
   } else if(hiddenReference(data)) {
     const allowedProtocolResponse =
       isPublicProtocolDeed(e, data.deed) ||

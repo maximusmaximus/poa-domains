@@ -181,6 +181,32 @@ export interface Receipt {
   code: string;
   result: any;
 }
+/** Derived, non-consensus public action history built deterministically from committed journal entries. */
+export interface RegistryHistoryEntry {
+  sequence: number;
+  time: number;
+  intentId: string;
+  requestId: string;
+  action: string;
+  name: string | null;
+  parent?: string | null;
+  deedId: string | null;
+  actor: string;
+  recipient: string | null;
+  amount: string | null;
+  asset: string | null;
+  isPoaMicros?: boolean;
+  auctionId?: string | null;
+  offerId?: string | null;
+  metadataVersion?: number;
+  recordsVersion?: number;
+  recordsCount?: number;
+  recordTypes?: string[];
+  profileFields?: string[];
+  clearedPrimary?: boolean;
+  replacedPrimary?: string | null;
+  expiry?: number | null;
+}
 export interface State {
   revision: string;
   configHash: string;

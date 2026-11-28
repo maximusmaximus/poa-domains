@@ -51,6 +51,7 @@ import {
   Auction,
   Offer,
   Receipt,
+  RegistryHistoryEntry,
   Rights,
   rights,
   rightsHash,
@@ -117,6 +118,7 @@ export class Engine {
   private state: State;
   private storage?: Persistence;
   private stopped = false;
+  private historyLog: RegistryHistoryEntry[] = [];
   constructor(
     config: unknown,
     private clock: Clock,
@@ -178,6 +180,151 @@ export class Engine {
   }
   receipt(id: string): Receipt | null {
     return structuredClone(this.state.receipts[id] ?? null);
+  }
+  /** Derived chronological history of committed succeeded actions (newest-last; non-consensus). */
+  history(): RegistryHistoryEntry[] {
+    return structuredClone(this.historyLog);
+  }
+  /** Derived committed history entries involving a canonical domain name (as subject or parent). */
+  historyForName(name: string): RegistryHistoryEntry[] {
+    return structuredClone(this.historyLog.filter((h) => h.name === name || h.parent === name));
+  }
+  private deriveHistoryEntry(
+    prev: State,
+    next: State,
+    b: Body,
+    receipt: Receipt,
+  ): RegistryHistoryEntry {
+    const p = b.params as Obj;
+    const res = receipt.result as Record<string, any>;
+    const base: RegistryHistoryEntry = {
+      sequence: receipt.sequence,
+      time: receipt.time,
+      intentId: receipt.intentId,
+      requestId: receipt.requestId,
+      action: b.action,
+      name: null,
+      deedId: null,
+      actor: b.signer,
+      recipient: null,
+      amount: null,
+      asset: null,
+    };
+    switch (b.action as Action | keyof typeof ESCROW_ONLY_ACTIONS | keyof typeof TREASURY_ONLY_ACTIONS) {
+      case "issueFromTreasury": {
+        const deed = next.deeds[res.deedId]!;
+        return { ...base, name: deed.name, deedId: deed.id, recipient: res.owner, amount: p.price, asset: p.asset, isPoaMicros: true };
+      }
+      case "issueSubname": {
+        const parentDeed = prev.deeds[p.parentDeedId]!;
+        return { ...base, name: res.name, parent: parentDeed.name, deedId: res.deedId, recipient: res.owner, amount: p.price, asset: p.asset, isPoaMicros: true };
+      }
+      case "issueTreasuryInventory":
+      case "issueReserved":
+        return { ...base, name: res.name, deedId: res.deedId, recipient: res.owner };
+      case "escrowSettle":
+        return { ...base, name: res.name, deedId: res.deedId, actor: res.seller, recipient: res.owner, amount: p.price, asset: "POA", isPoaMicros: true, auctionId: res.auctionId };
+      case "transfer": {
+        const deed = next.deeds[res.deedId]!;
+        return { ...base, name: deed.name, deedId: deed.id, recipient: res.owner };
+      }
+      case "setMetadata": {
+        const prevDeed = prev.deeds[p.expectedDeedId]!;
+        const nextDeed = next.deeds[p.expectedDeedId]!;
+        const doc = p.metadata.document as Record<string, unknown>;
+        const profileFields: string[] = [];
+        if (doc.schema === PROFILE_SCHEMA_V1) {
+          const resetAt = prevDeed.profileResetAt ?? 0;
+          let prevDoc: Record<string, unknown> | null = null;
+          for (let i = prevDeed.metadata.length - 1; i >= resetAt; i--) {
+            const d0 = prevDeed.metadata[i]!.document as unknown as Record<string, unknown>;
+            if (d0.schema === PROFILE_SCHEMA_V1) { prevDoc = d0; break; }
+          }
+          const checks: [string, string][] = [["image", "avatar"], ["description", "bio"], ["poa", "POA"], ["btc", "BTC"], ["eth", "ETH"]];
+          if (prevDoc) {
+            for (const [k, label] of checks) if (doc[k] !== prevDoc[k]) profileFields.push(label);
+          }
+          if (!profileFields.length) {
+            for (const [k, label] of checks) if (doc[k]) profileFields.push(label);
+          }
+        }
+        return { ...base, name: nextDeed.name, deedId: nextDeed.id, metadataVersion: res.metadataVersion, ...(profileFields.length ? { profileFields } : {}) };
+      }
+      case "setRecords": {
+        const nextDeed = next.deeds[p.expectedDeedId]!;
+        const recs = p.records as { type: string }[];
+        const recordTypes = [...new Set(recs.map((r) => r.type))].sort();
+        return { ...base, name: nextDeed.name, deedId: nextDeed.id, recordsVersion: res.recordsVersion, recordsCount: recs.length, ...(recordTypes.length ? { recordTypes } : {}) };
+      }
+      case "setPrimaryName": {
+        const prevPrimary = prev.primaryNames?.[b.signer] ?? null;
+        if (p.name === null) {
+          const prevDeedId = prevPrimary ? prev.names[prevPrimary]!.activeId : null;
+          return { ...base, name: prevPrimary, deedId: prevDeedId, clearedPrimary: true };
+        }
+        return {
+          ...base,
+          name: res.primaryName,
+          deedId: res.deedId,
+          clearedPrimary: false,
+          ...(prevPrimary && prevPrimary !== res.primaryName ? { replacedPrimary: prevPrimary } : {}),
+        };
+      }
+      case "announceAuction": {
+        const auc = next.auctions[res.auctionId]!;
+        return { ...base, name: auc.name, deedId: auc.deedId, amount: p.reserve, asset: p.asset, auctionId: auc.id };
+      }
+      case "bid": {
+        const auc = next.auctions[p.auctionId]!;
+        return { ...base, name: auc.name, deedId: auc.deedId, recipient: p.beneficiary !== b.signer ? p.beneficiary : null, amount: p.amount, asset: p.asset, auctionId: auc.id };
+      }
+      case "finalize": {
+        const prevAuc = prev.auctions[p.auctionId]!;
+        return { ...base, name: prevAuc.name, deedId: res.deedId, actor: prevAuc.seller, recipient: res.owner, amount: prevAuc.high!.amount, asset: prevAuc.asset, auctionId: prevAuc.id };
+      }
+      case "closeNoBid":
+      case "cancelAuction": {
+        const prevAuc = prev.auctions[p.auctionId]!;
+        return { ...base, name: prevAuc.name, deedId: prevAuc.deedId, auctionId: prevAuc.id };
+      }
+      case "withdrawRefund": {
+        const auc = next.auctions[p.auctionId]!;
+        return { ...base, name: auc.name, amount: res.amount, asset: res.asset, auctionId: auc.id };
+      }
+      case "createChildOffer": {
+        const parentDeed = next.deeds[p.parentDeedId]!;
+        return { ...base, name: parentDeed.name, deedId: parentDeed.id, amount: p.price, asset: p.asset, offerId: res.offerId };
+      }
+      case "fillChildOffer": {
+        const prevOffer = prev.offers[p.offerId]!;
+        const parentDeed = prev.deeds[prevOffer.parentId]!;
+        return { ...base, name: res.name, parent: parentDeed.name, deedId: res.deedId, actor: prevOffer.owner, recipient: b.signer, amount: p.amount, asset: p.asset, offerId: prevOffer.id };
+      }
+      case "sellFixed": {
+        const deed = next.deeds[p.expectedDeedId]!;
+        return { ...base, name: deed.name, deedId: deed.id, amount: p.price, asset: p.asset, offerId: res.offerId };
+      }
+      case "buyFixed": {
+        const prevOffer = prev.offers[p.offerId]!;
+        const deed = next.deeds[res.deedId]!;
+        return { ...base, name: deed.name, deedId: deed.id, actor: prevOffer.owner, recipient: b.signer, amount: p.amount, asset: p.asset, offerId: prevOffer.id };
+      }
+      case "cancelOffer": {
+        const prevOffer = prev.offers[p.offerId]!;
+        const parentDeed = prev.deeds[prevOffer.parentId]!;
+        return { ...base, name: parentDeed.name, deedId: parentDeed.id, offerId: prevOffer.id };
+      }
+      case "renewLease": {
+        const deed = next.deeds[p.expectedDeedId]!;
+        return { ...base, name: deed.name, deedId: deed.id, amount: p.amount, asset: p.asset, expiry: res.expiry };
+      }
+      case "expireLease":
+      case "revokeChild": {
+        const deed = next.deeds[p.expectedDeedId]!;
+        const parentDeed = deed.parentId ? prev.deeds[deed.parentId]! : null;
+        return { ...base, name: deed.name, ...(parentDeed ? { parent: parentDeed.name } : {}), deedId: deed.id };
+      }
+    }
   }
   nextNonce(id: string): number {
     principal(id);
@@ -359,7 +506,11 @@ export class Engine {
       this.stopped = true;
       throw new Fault("DURABILITY_UNKNOWN_RESTART_AND_QUERY");
     }
+    const prev = this.state;
     this.state = next;
+    if (status === "succeeded") {
+      this.historyLog.push(this.deriveHistoryEntry(prev, next, b, receipt));
+    }
     return structuredClone(receipt);
   }
   private asset(id: unknown): string {

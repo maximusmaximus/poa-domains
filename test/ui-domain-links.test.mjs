@@ -8,8 +8,8 @@ test('human domain prose links complete names, parents and history without parti
  namedText(node,text,['nexus','seed.nexus','🚀']);
  assert.deepEqual(parts.filter(v=>typeof v==='object').map(v=>[v.textContent,v.href]),[['nexus','/d/nexus'],['seed.nexus','/d/seed.nexus'],['nexus','/d/nexus'],['🚀','/d/'+encodeURIComponent('🚀')]]);
  assert.equal(parts.map(v=>typeof v==='string'?v:v.textContent).join(''),text);
- const source=readFileSync('reference-web/ui-render.js','utf8');assert.match(source,/namedText\(add\(card, "h4", ""\), label\)/);assert.match(source,/nameLink\(refundLine, a.name\)/);
- assert.match(readFileSync('reference-web/ui-search.js','utf8'),/nameLink\(kind,info.parent\)/);assert.match(readFileSync('reference-web/ui-domain.js','utf8'),/namedText\(add\(card,"p",""\),row.text\)/);
+ const source=readFileSync('reference-web/ui-render.js','utf8');assert.match(source,/nameLink\(h4,m\.name\)/);assert.match(source,/nameLink\(refundLine, a.name\)/);
+ assert.match(readFileSync('reference-web/ui-search.js','utf8'),/nameLink\(kind,info.parent\)/);assert.match(readFileSync('reference-web/ui-domain.js','utf8'),/nameLink\(main,link\)/);
  }finally{globalThis.document=prior;}
 });
 test('Pages declares its enforceable meta policies and keeps GitHub/Mirror links in the footer with logos',()=>{
