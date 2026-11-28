@@ -22,7 +22,8 @@ export function readName(e: Engine, raw: string) {
   const name=normalizeName(decoded!,e.normalizationMode).canonical,s=e.snapshot(),entry=s.names[name];
   need(entry,"NOT_FOUND");
   return {name,entry,deed:entry.activeId?s.deeds[entry.activeId]:null,
-    auction:entry.auctionId?s.auctions[entry.auctionId]:null,ownershipConflict:e.ownershipConflict(name),...readContext(e)};
+    auction:entry.auctionId?s.auctions[entry.auctionId]:null,ownershipConflict:e.ownershipConflict(name),
+    history:e.historyForName(name),...readContext(e)};
 }
 export function readAuction(e: Engine, raw: string) {
   const auction=e.snapshot().auctions[resourceId(raw)]; need(auction,"RESOURCE_NOT_FOUND");

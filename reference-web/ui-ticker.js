@@ -1,5 +1,5 @@
-import { autoScroll, itemStep } from "./ui-motion.js?v=633111790deb";
-import { isPoaAuctionAwaitingFirstBid, poaShort, primaryNameForOwner, shapeLiveActions } from "./shared.js?v=633111790deb";
+import { autoScroll, itemStep } from "./ui-motion.js?v=de815674e5a1";
+import { isPoaAuctionAwaitingFirstBid, poaShort, primaryNameForOwner, shapeLiveActions } from "./shared.js?v=de815674e5a1";
 export const MAX_RECENT_ACTIONS=100;
 export const MAX_EXPLORE_ACTIONS=500;
 const toMs=ts=>{const n=Number(ts);return!Number.isFinite(n)||n<=0?0:n<1e12?n*1000:n;};
@@ -8,48 +8,50 @@ function receiptActionLabel(r,name){
  const res=r?.result;
  if(r?.status==="succeeded"&&res&&typeof res==="object"){
   if(typeof res.primaryName==="string"&&res.primaryName)return`⭐ Main domain · ${res.primaryName}`;
-  if(Object.prototype.hasOwnProperty.call(res,"primaryName")&&res.primaryName===null)return`Main domain cleared · #${r.sequence}`;
-  if(res.metadataVersion!=null)return`🪪 Profile updated · #${r.sequence}`;
-  if(res.recordsVersion!=null)return`🗂️ Records updated · #${r.sequence}`;
+  if(Object.prototype.hasOwnProperty.call(res,"primaryName")&&res.primaryName===null)return name?`⭐ Main domain cleared · ${name}`:`Main domain cleared · #${r.sequence}`;
+  if(res.metadataVersion!=null)return name?`🪪 Profile updated · ${name}`:`🪪 Profile updated · #${r.sequence}`;
+  if(res.recordsVersion!=null)return name?`🗂️ Records updated · ${name}`:`🗂️ Records updated · #${r.sequence}`;
  }
  return(name?name+" · ":"")+"Registry action #"+r.sequence+" · "+r.status;
 }
-export function receiptDisplay(r,state,fb=""){
- const res=r?.result,req=String(r?.requestId||"");
+export function receiptDisplay(r,state,fb="",h=null){
+ const res=r?.result,req=String(r?.requestId||""),hName=h?.name||fb||"";
  if(r?.status==="succeeded"&&res&&typeof res==="object"){
-  if(typeof res.primaryName==="string"&&res.primaryName)return{icon:"⭐",verb:"Main domain",name:res.primaryName,actor:res.signer||r.signer||"",recipient:""};
-  if(Object.prototype.hasOwnProperty.call(res,"primaryName")&&res.primaryName===null)return{icon:"⭐",verb:"Main domain cleared",name:fb,actor:r.signer||"",recipient:""};
-  if(res.metadataVersion!=null)return{icon:"🪪",verb:"Profile updated",name:fb,actor:r.signer||"",recipient:""};
-  if(res.recordsVersion!=null)return{icon:"🗂️",verb:"Records updated",name:fb,actor:r.signer||"",recipient:""};
-  if(res.offerId)return{icon:"🤝",verb:"Offer published",name:fb,actor:r.signer||"",recipient:""};
+  if(typeof res.primaryName==="string"&&res.primaryName)return{icon:"⭐",verb:"Main domain",name:res.primaryName,actor:res.signer||r.signer||"",recipient:"",detail:h?.replacedPrimary?`Replaced ${h.replacedPrimary}`:""};
+  if(Object.prototype.hasOwnProperty.call(res,"primaryName")&&res.primaryName===null)return{icon:"⭐",verb:"Main domain cleared",name:hName,actor:r.signer||"",recipient:"",detail:""};
+  if(res.metadataVersion!=null){const fields=Array.isArray(h?.profileFields)&&h.profileFields.length?h.profileFields.join(", "):"";return{icon:"🪪",verb:"Profile updated",name:hName,actor:r.signer||"",recipient:"",detail:fields?`Updated ${fields} (v${res.metadataVersion})`:`v${res.metadataVersion}`};}
+  if(res.recordsVersion!=null){const cnt=typeof h?.recordsCount==="number"?h.recordsCount:null;return{icon:"🗂️",verb:"Records updated",name:hName,actor:r.signer||"",recipient:"",detail:cnt===0?`Cleared (v${res.recordsVersion})`:cnt!==null?`${cnt} ${cnt===1?"record":"records"} (v${res.recordsVersion})`:`v${res.recordsVersion}`};}
+  if(res.offerId)return{icon:"🤝",verb:"Offer published",name:hName,actor:r.signer||"",recipient:"",detail:""};
   if(res.deedId){
-   const d=state?.deeds?.[res.deedId],name=res.name??d?.name??fb??"",owner=res.owner||d?.owner||"";
-   if(req.startsWith("treasury-inventory-"))return{icon:"🏛️",verb:"Treasury minted",name,actor:owner||r.signer||"",recipient:""};
-   if(req.startsWith("protocol-domain-"))return{icon:"🏛️",verb:"Protocol minted",name,actor:owner||r.signer||"",recipient:""};
-   const from=res.seller||r.signer||"";
-   if(from&&owner&&from!==owner)return{icon:"🤝",verb:/^(?:treasury-(?:settle|repair)-|escrow-settle-)/.test(req)||res.seller?"Handover":"Transferred",name,actor:from,recipient:owner};
-   if(res.name&&(d?.parentId||String(res.name).includes(".")))return{icon:"🌱",verb:"Child purchase",name,actor:owner||r.signer||"",recipient:""};
-   return{icon:"🎉",verb:"Registered",name,actor:owner||r.signer||"",recipient:""};
+   const d=state?.deeds?.[res.deedId],name=res.name??d?.name??hName??"",owner=res.owner||d?.owner||"";
+   if(req.startsWith("treasury-inventory-"))return{icon:"🏛️",verb:"Treasury minted",name,actor:owner||r.signer||"",recipient:"",detail:""};
+   if(req.startsWith("protocol-domain-"))return{icon:"🏛️",verb:"Protocol minted",name,actor:owner||r.signer||"",recipient:"",detail:""};
+   const from=h?.action==="escrowSettle"?(h.actor||res.seller||r.signer||""):(res.seller||r.signer||"");
+   if(from&&owner&&from!==owner)return{icon:"🤝",verb:/^(?:treasury-(?:settle|repair)-|escrow-settle-)/.test(req)||res.seller||h?.action==="escrowSettle"?"Sold via escrow":"Transferred",name,actor:from,recipient:owner,detail:""};
+   if(res.name&&(d?.parentId||String(res.name).includes(".")))return{icon:"🌱",verb:"Subdomain registered",name,actor:owner||r.signer||"",recipient:"",detail:""};
+   return{icon:"🎉",verb:"Registered",name,actor:owner||r.signer||"",recipient:"",detail:""};
   }
-  if(res.auctionId)return{icon:"🔨",verb:"Auction announced",name:fb,actor:r.signer||"",recipient:""};
+  if(res.auctionId)return{icon:"🔨",verb:"Auction announced",name:hName,actor:r.signer||"",recipient:"",detail:""};
  }
- return{icon:r?.status==="rejected"?"⚠️":"🧾",verb:r?.status==="rejected"?"Rejected":"Registry action",name:fb,actor:r?.signer||"",recipient:""};
+ return{icon:r?.status==="rejected"?"⚠️":"🧾",verb:r?.status==="rejected"?"Rejected":"Registry action",name:hName,actor:r?.signer||"",recipient:"",detail:""};
 }
-export function recentActions(state,escrowMarket=[],limit=MAX_RECENT_ACTIONS){
- const receiptById=new Map(),seqTime=new Map();
+export function recentActions(state,escrowMarket=[],limit=MAX_RECENT_ACTIONS,history=[]){
+ const receiptById=new Map(),seqTime=new Map(),histBySeq=new Map();
+ for(const h of Array.isArray(history)?history:[]){if(h&&h.sequence>0)histBySeq.set(h.sequence,h);}
  for(const r of Object.values(state?.receipts??{})){const id="receipt:"+(r.intentId??r.sequence);receiptById.set(id,r);if(r?.sequence!=null&&Number(r.time)>0)seqTime.set(r.sequence,Number(r.time));}
  const shaped=shapeLiveActions(state,Number.MAX_SAFE_INTEGER),seen=new Set(),reg=[];
  for(const raw of shaped){
-  seen.add(raw.id);const r=receiptById.get(raw.id);let item=raw;
+  seen.add(raw.id);const r=receiptById.get(raw.id),h=r?.sequence?histBySeq.get(r.sequence):null;let item=raw;
   if(r?.status==="succeeded"&&typeof r.result?.primaryName==="string"&&r.result.primaryName)item={...raw,name:r.result.primaryName,label:`⭐ Main domain · ${r.result.primaryName}`};
   const rawAt=item.kind==="offer"||item.kind==="offer-active"||item.kind==="auction-upcoming"?(seqTime.get(item.sequence)??0):(item.at||seqTime.get(item.sequence)||0);
-  const m=r?receiptDisplay(r,state,item.name||""):(item.kind==="bid"?{icon:"🏷️",verb:"Bid"}:item.kind?.startsWith("auction")?{icon:"🔨",verb:item.kind==="auction-final"?"Auction closed":item.kind==="auction-upcoming"?"Auction scheduled":"Auction live"}:item.kind?.startsWith("offer")?{icon:"🤝",verb:"Offer"}:{icon:"🧾",verb:"Activity"});
+  const m=r?receiptDisplay(r,state,item.name||"",h):(item.kind==="bid"?{icon:"🏷️",verb:"Bid"}:item.kind?.startsWith("auction")?{icon:"🔨",verb:item.kind==="auction-final"?"Auction closed":item.kind==="auction-upcoming"?"Auction scheduled":"Auction live"}:item.kind?.startsWith("offer")?{icon:"🤝",verb:"Offer"}:{icon:"🧾",verb:"Activity"});
   const actor=m.actor||r?.signer||r?.result?.owner||(r?.result?.deedId&&state?.deeds?.[r.result.deedId]?.owner)||"";
-  reg.push({...item,icon:m.icon,verb:m.verb,amount:"",recipient:m.recipient||"",actor,category:actionCategory(item.kind),atMs:toMs(rawAt)});
+  reg.push({...item,name:m.name||item.name||"",icon:m.icon,verb:m.verb,amount:"",recipient:m.recipient||"",actor,category:actionCategory(item.kind),atMs:toMs(rawAt)});
  }
  for(const[id,r]of receiptById){
   if(seen.has(id))continue;
-  const fb=r.result?.name??(typeof r.result?.primaryName==="string"?r.result.primaryName:"")??(r.result?.deedId&&state?.deeds?.[r.result.deedId]?.name)??"",at=r.time??0,m=receiptDisplay(r,state,fb||"");
+  const h=r?.sequence?histBySeq.get(r.sequence):null;
+  const fb=h?.name??r.result?.name??(typeof r.result?.primaryName==="string"?r.result.primaryName:"")??(r.result?.deedId&&state?.deeds?.[r.result.deedId]?.name)??"",at=r.time??0,m=receiptDisplay(r,state,fb||"",h);
   const cat=r.result&&(r.result.primaryName!==undefined||r.result.metadataVersion!=null||r.result.recordsVersion!=null||r.result.deedId)?"domain":"other";
   reg.push({id,name:m.name||"",sequence:r.sequence??0,at,icon:m.icon,verb:m.verb,amount:"",recipient:m.recipient||"",actor:m.actor||"",category:cat,atMs:toMs(at),label:receiptActionLabel(r,m.name||"")});
  }
@@ -74,8 +76,8 @@ export function recentActions(state,escrowMarket=[],limit=MAX_RECENT_ACTIONS){
 }
 let signature="",topActionId="",scrollCount=0,openAllHandler=null,targetHandler=null;
 const wiredStrips=new WeakSet();
-export function drawTicker(state,escrowMarket=[],onOpenAll=null,onSelectTarget=null){
- const strip=document.getElementById("liveTicker"),track=document.getElementById("liveTickerTrack"),items=recentActions(state,escrowMarket),key=JSON.stringify(items),active=document.activeElement;
+export function drawTicker(state,escrowMarket=[],onOpenAll=null,onSelectTarget=null,history=[]){
+ const strip=document.getElementById("liveTicker"),track=document.getElementById("liveTickerTrack"),items=recentActions(state,escrowMarket,MAX_RECENT_ACTIONS,history),key=JSON.stringify(items),active=document.activeElement;
  if(onOpenAll)openAllHandler=onOpenAll;
  if(onSelectTarget)targetHandler=onSelectTarget;
  if(strip&&!wiredStrips.has(strip)){

@@ -38,7 +38,7 @@ export function registryRoute(e: Engine, call: RegistryCall, options: RegistryRo
     if(call.path.startsWith('/v1/names/')) return ok(readName(e,call.path.slice('/v1/names/'.length)));
     if(call.path.startsWith('/v1/auctions/')) return ok(readAuction(e,call.path.slice('/v1/auctions/'.length)));
     if(call.path.startsWith('/v1/offers/')) return ok(readOffer(e,call.path.slice('/v1/offers/'.length)));
-    if(call.path==='/v1/state') return ok({state:e.snapshot(),stateHash:e.stateHash(),observedServerTime:e.observedTime(),durability:e.durability(),finality:'registry-committed'});
+    if(call.path==='/v1/state') return ok({state:e.snapshot(),history:e.history(),stateHash:e.stateHash(),observedServerTime:e.observedTime(),durability:e.durability(),finality:'registry-committed'});
     if(call.path==='/v1/resolve') return ok(e.resolve(normalizeName(call.query.name,e.normalizationMode).canonical));
     if(call.path==='/v1/nonce') return ok({nonce:e.nextNonce(call.query.signer??'')});
     if(call.path.startsWith('/v1/receipts/')) {

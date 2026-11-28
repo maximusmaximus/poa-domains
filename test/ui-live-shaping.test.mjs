@@ -891,3 +891,81 @@ test("footer FAQ | DOCS link, Wait Time info button slot, mobile cart corner scr
   assert.match(webHtml, /100 POA/);
   assert.match(webHtml, /1,000 POA/);
 });
+
+test("historyForTarget merges journal-derived history and escrow lifecycle without bogus receipt labels", () => {
+  const alice = "poa12XVYtPngbDsm1igG9GPeWPXAHDFTZ1bBLuSwhjqBrQ5U";
+  const bob = "poa15kUYz7V59rd1zY12bp1Kvnx5HWjYhTeS6o74uu9KUXCC";
+  const treasury = "poa1GHppB8pYZ43gK8yBzR1RJhzfWjzrJn29q96ykwngUP7N";
+  const state = {
+    time: 1795860000,
+    names: {
+      maxi: { name: "maxi", activeId: "deed-maxi" },
+      ai: { name: "ai", activeId: "deed-ai" },
+      receipt: { name: "receipt", activeId: "deed-receipt" },
+    },
+    deeds: {
+      "deed-maxi": { id: "deed-maxi", name: "maxi", owner: alice, version: 2 },
+      "deed-ai": { id: "deed-ai", name: "ai", owner: bob, version: 3 },
+      "deed-receipt": { id: "deed-receipt", name: "receipt", owner: bob, version: 1 },
+    },
+    auctions: {},
+    bids: {},
+    receipts: {
+      r327: { intentId: "r327", requestId: "issue-maxi-1", signer: alice, sequence: 327, time: 1795762610, status: "succeeded", result: { deedId: "deed-maxi", owner: alice } },
+      r328: { intentId: "r328", requestId: "meta-maxi-1", signer: alice, sequence: 328, time: 1795763614, status: "succeeded", result: { metadataVersion: 2 } },
+    },
+  };
+  const backendHistory = [
+    { sequence: 327, time: 1795762610, intentId: "r327", requestId: "issue-maxi-1", action: "issueFromTreasury", name: "maxi", deedId: "deed-maxi", actor: alice, recipient: alice, amount: "100000000", asset: "POA", isPoaMicros: true },
+    { sequence: 328, time: 1795763614, intentId: "r328", requestId: "meta-maxi-1", action: "setMetadata", name: "maxi", deedId: "deed-maxi", actor: alice, recipient: null, amount: null, asset: null, metadataVersion: 2, profileFields: ["avatar", "bio", "POA"] },
+    { sequence: 22, time: 1795594448, intentId: "r22", requestId: "treasury-inventory-ai-v1", action: "issueTreasuryInventory", name: "ai", deedId: "deed-ai", actor: treasury, recipient: treasury, amount: null, asset: null },
+    { sequence: 332, time: 1795792140, intentId: "r332", requestId: "treasury-settle-011372ae8c045645dd62a0c64dd11632", action: "transfer", name: "ai", deedId: "deed-ai", actor: treasury, recipient: bob, amount: null, asset: null },
+  ];
+  const escrowMarket = [
+    {
+      id: "011372ae8c045645dd62a0c64dd1163200000000000000000000000000000000",
+      name: "ai",
+      kind: "auction",
+      status: "COMPLETE",
+      seller: treasury,
+      price: "1000.000000",
+      high: { amount: "1464.100004", payer: bob },
+      history: [
+        { at: 1795594448809, event: "Auction queued; timer starts on first bid" },
+        { at: 1795771223260, event: "Auction started (first bid)", amount: "1000.000000", payer: alice },
+        { at: 1795771237435, event: "Bid placed", amount: "1464.100004", payer: bob },
+        { at: 1795792140731, event: "Payment and title complete" },
+      ],
+    },
+  ];
+
+  // maxi: includes BOTH profile update (#328) and registration (#327) with exact price, zero "receipt #" text
+  const maxiView = resolveDomainView(state, "maxi", new Set(), null, { history: backendHistory, escrowMarket });
+  assert.equal(maxiView.history.length, 2);
+  assert.equal(maxiView.history[0].sequence, 328);
+  assert.equal(maxiView.history[0].title, "Profile updated");
+  assert.match(maxiView.history[0].detail, /avatar, bio, POA/);
+  assert.equal(maxiView.history[1].sequence, 327);
+  assert.equal(maxiView.history[1].title, "Registered");
+  assert.equal(maxiView.history[1].amountText, "100 POA");
+  assert.ok(maxiView.history.every((r) => !/\breceipt\b/i.test(r.title) && !/\breceipt\b/i.test(r.text)));
+
+  // ai: merges escrow bids + auction queued + registry mint + deduplicated enriched settlement
+  const aiRows = historyForTarget(state, { name: "ai", history: backendHistory, escrowMarket });
+  assert.equal(aiRows.length, 5, "deduplicates Payment and title complete against #332 transfer");
+  assert.equal(aiRows[0].sequence, 332);
+  assert.equal(aiRows[0].title, "Auction won & settled");
+  assert.equal(aiRows[0].amountText, "1,464.100004 POA");
+  assert.equal(aiRows[0].actor, treasury);
+  assert.equal(aiRows[0].recipient, bob);
+  assert.ok(aiRows.some((r) => r.title === "Bid placed" && r.amountText === "1,464.100004 POA"));
+  assert.ok(aiRows.some((r) => r.title === "Auction started (first bid)" && r.amountText === "1,000 POA"));
+  assert.ok(aiRows.some((r) => r.title === "Auction queued"));
+  assert.ok(aiRows.some((r) => r.title === "Treasury inventory minted" && r.sequence === 22));
+
+  // Legacy fallback (without backend history array): never emits "receipt #327"
+  const fallbackRows = historyForTarget(state, { name: "maxi" });
+  assert.equal(fallbackRows.length, 1);
+  assert.equal(fallbackRows[0].title, "Registered");
+  assert.ok(!/\breceipt\b/i.test(fallbackRows[0].text));
+});
