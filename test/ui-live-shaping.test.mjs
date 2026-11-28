@@ -853,3 +853,19 @@ test("displayAccountLabel and validateAccountOrDomainInput validate POA keys, do
   assert.equal(priv.ok, false);
   assert.match(priv.error, /Never paste a private key/i);
 });
+
+test("spinning logo emoji intro markup and CSS animation invariants", () => {
+  const html = readFileSync(new URL("../reference-web/index.html", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../reference-web/style.css", import.meta.url), "utf8");
+  assert.match(html, /<div id="siteIntro" class="site-intro" aria-hidden="true">/);
+  assert.match(html, /<div id="siteIntroRing" class="site-intro-ring">/);
+  const glyphs = html.match(/<span class="intro-glyph">/g) ?? [];
+  assert.equal(glyphs.length, 10, "intro ring must contain 10 equally spaced logo emoji slots");
+  // Ensure strict CSP compliance (no inline style attributes on intro markup)
+  const introMarkup = html.match(/<div id="siteIntro"[\s\S]*?<\/div><\/div><\/div>/)?.[0] ?? "";
+  assert.ok(introMarkup.length > 0 && !/style=/.test(introMarkup), "intro markup must have zero inline style attributes");
+  assert.match(css, /@keyframes intro-spin\{to\{transform:rotate\(360deg\)\}\}/);
+  assert.match(css, /\.site-intro\.is-opening\{opacity:0\}/);
+  assert.match(css, /\.site-intro\.is-opening \.site-intro-stage\{transform:scale\(11\);opacity:0\}/);
+  assert.match(css, /\.site-intro\{display:none\}/);
+});
