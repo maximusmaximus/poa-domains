@@ -35,6 +35,7 @@ import {
   tabHasNew,
   computeClientWaitTime,
   resolveWaitTimeTelemetry,
+  formatWaitTimeEmoji,
   formatWaitTimeMinutes,
   formatWaitTimeTooltip,
   buildCartPauseNotice,
@@ -378,6 +379,11 @@ test("wait time telemetry formatting, fallback, and tooltip breakdown", () => {
   assert.equal(formatWaitTimeMinutes({ averageMs: 20_000, totalSamples: 1 }), "< 1 Minute");
   assert.equal(formatWaitTimeMinutes({ averageMs: 60_000, totalSamples: 2 }), "1 Minute");
   assert.equal(formatWaitTimeMinutes({ averageMs: 20 * 60_000, totalSamples: 5 }), "20 Minutes");
+  assert.equal(formatWaitTimeEmoji(null), "—");
+  assert.equal(formatWaitTimeEmoji({ averageMs: null, totalSamples: 0 }), "—");
+  assert.equal(formatWaitTimeEmoji({ averageMs: 20_000, totalSamples: 1 }), "< 1️⃣ Minute");
+  assert.equal(formatWaitTimeEmoji({ averageMs: 60_000, totalSamples: 2 }), "1️⃣ Minute");
+  assert.equal(formatWaitTimeEmoji({ averageMs: 20 * 60_000, totalSamples: 5 }), "2️⃣0️⃣ Minutes");
   const server = {
     averageMs: 20 * 60_000,
     averageMinutes: 20,
@@ -876,6 +882,8 @@ test("footer FAQ | DOCS link, Wait Time info button slot, mobile cart corner scr
   const webHtml = readFileSync(new URL("../web/index.html", import.meta.url), "utf8");
   assert.match(html, /<span>FAQ \| DOCS<\/span>/);
   assert.match(html, /id="waitTimeInfoSlot"/);
+  assert.match(html, /id="waitTimeSr"/);
+  assert.match(html, /id="footerCreditDivider" class="footer-divider"/);
   assert.match(html, /<div class="floating-cart-scrim" aria-hidden="true"><\/div>/);
   assert.match(css, /\.floating-cart-scrim\{display:block;position:fixed;right:0;bottom:0;width:6rem;height:6rem;z-index:49;pointer-events:none;background:radial-gradient\(circle closest-side at 100% 100%,#000 0,#000d 45%,#0000\)\}/);
   assert.match(webHtml, /How much does a domain cost, and what are the fees\?/);
