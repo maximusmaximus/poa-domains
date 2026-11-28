@@ -383,7 +383,7 @@ export class PoaRegistry extends DurableObject<Env> {
     exact(keys, [...ROLES]);
     const bootstrap: Bootstrap = { format: "poa-do-sqlite-v1", config: b.registry.config as Config, policyHash: b.registry.policyHash, principals: b.registry.principals, keys };
     const sql = this.ctx.storage.sql;
-    if (escrow) replayEscrow(escrow.rows, escrow.policy);
+    if (escrow) replayEscrow(escrow.rows, escrow.policy, escrow.checkpoint);
     this.ctx.storage.transactionSync(() => {
       sql.exec("DELETE FROM journal"); sql.exec("DELETE FROM bootstrap");
       sql.exec("DROP TABLE IF EXISTS escrow_covered_tx_cache");
@@ -485,10 +485,12 @@ export class PoaRegistry extends DurableObject<Env> {
     need(String(this.env.POA_ESCROW_ENABLED)==="true","ESCROW_DISABLED");
     const escrow=this.escrow();
     if(path==="capabilities"){
-      const freshness=await escrow.readiness(),s=escrow.state();const configured=String(this.env.POA_ESCROW_NETWORK_WRITES)==="approved-v1"&&!!this.env.POA_ESCROW_KEY&&(this.env.ESCROW_ADMIN_TOKEN?.length??0)>=32;
-      return {enabled:true,paused:s.paused,held:s.paused||!!s.halt||freshness.held||!configured,
-        holdReason:s.halt??(s.paused?"POA payments paused":!configured?"POA payments held for operator setup":freshness.reason),
+      const freshness=await escrow.readiness(),s=escrow.state(),capacity=escrow.capacity();
+      const configured=String(this.env.POA_ESCROW_NETWORK_WRITES)==="approved-v1"&&!!this.env.POA_ESCROW_KEY&&(this.env.ESCROW_ADMIN_TOKEN?.length??0)>=32;
+      return {enabled:true,paused:s.paused,held:s.paused||!!s.halt||freshness.held||!configured||!capacity.admissionOpen,
+        holdReason:s.halt??(s.paused?"POA payments paused":!configured?"POA payments held for operator setup":!capacity.admissionOpen?"POA checkout temporarily at capacity; withdrawals remain open":freshness.reason),
         instantSettlement:escrow.instantSettlement(),
+        capacity,
         address:escrow.policy.wallet,limits:{perTransaction:escrow.policy.perTx,daily:escrow.policy.daily},newNameCheckout:newNameCheckout(this.env),subnameSales:subnameSales(this.env),freshness,serverTime:Date.now(),registryId:this.engine.registryId};
     }
     if(path==="intent")return escrow.depositView(query.id!,query.txid);
@@ -522,7 +524,10 @@ export class PoaRegistry extends DurableObject<Env> {
   private escrowTitleLocked(packet?: unknown): boolean {
     const sql = this.ctx.storage.sql;
     if (!sql.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='escrow_journal'").toArray().length) return false;
-    const row = sql.exec<{record:string}>("SELECT record FROM escrow_journal ORDER BY sequence DESC LIMIT 1").toArray()[0];
+    let row = sql.exec<{record:string}>("SELECT record FROM escrow_journal ORDER BY sequence DESC LIMIT 1").toArray()[0];
+    if (!row && sql.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='escrow_checkpoint'").toArray().length) {
+      row = sql.exec<{record:string}>("SELECT record FROM escrow_checkpoint WHERE id=1").toArray()[0];
+    }
     if (!row) return false;
     const state = JSON.parse(row.record).state as import("./escrow.js").State;
     if (packet === undefined) return Object.values(state.auctions).some(a => a.status === "OPEN" || a.status === "SETTLING");

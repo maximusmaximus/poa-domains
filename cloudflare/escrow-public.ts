@@ -1,5 +1,5 @@
 /** Sanitized public views and payer-authenticated commands. Never exports a journal or signing material. */
-import { Escrow, State } from "./escrow.js";
+import { Escrow, EscrowArchiveStore, State } from "./escrow.js";
 import { verifyCommand, address, decimal, micros } from "./escrow-codec.js";
 import { exact, need, parseJSON } from "../src/core.js";
 const PUBLIC_ACTIONS=new Set(["intent","detect","withdraw","open","list","bid","buy","cancel","expire","settle","repair-title","issue","list-sub","cancel-sub","buy-sub","view"]);
@@ -170,7 +170,7 @@ export function marketView(s: State, name?: string, autoSettleDefault = false, m
       createdAt:a.createdAt??null,startedAt,awaitingFirstBid,autoSettle,
       high:a.high?{payer:a.high.payer,amount:decimal(highMicros!)}:null,
       bidders,
-      settlement:st?.status??null,
+      settlement:st?.status??(a.status==="COMPLETE"?"COMPLETE":null),
       history:(a.history??[{event:a.status,at:a.createdAt??0}]).slice(-100).map(h=>({...h,...(h.amount?{amount:decimal(BigInt(h.amount))}:{})})),
     };
   });
@@ -181,12 +181,22 @@ export function subnameView(s: State, parent?: string) {
     sold:l.sold.slice(-100).map(x=>({name:x.name,buyer:x.buyer,at:x.at})),
   }));
 }
-export function accountView(s:State,payer:string){address(payer);
+export function accountView(s:State,payer:string,archive?:EscrowArchiveStore){address(payer);
   const lockedMicros=Object.values(s.auctions).reduce((sum,a)=>a.status==="OPEN"&&a.high?.payer===payer?sum+BigInt(a.high.amount):sum,0n);
+  const liveDeposits=Object.entries(s.deposits).filter(([,d])=>d.payer===payer).map(([id,d])=>({intent:id,amount:d.amount,status:d.tx?"final":"waiting",txid:d.tx,createdAt:d.createdAt??null}));
+  const liveDepIds=new Set(liveDeposits.map(d=>d.intent));
+  const archivedDeposits=archive&&liveDeposits.length<100
+    ? archive.listDeposits(payer,100-liveDeposits.length).filter(d=>!liveDepIds.has(d.intent)).map(d=>({intent:d.intent,amount:d.amount,status:"final",txid:d.tx,createdAt:d.createdAt}))
+    : [];
+  const liveRefunds=Object.values(s.payments).filter(p=>p.kind==="refund"&&p.to===payer).map(p=>({id:p.id,amount:decimal(BigInt(p.amount)),status:p.status,txid:p.txid,day:p.day}));
+  const liveRefundIds=new Set(liveRefunds.map(r=>r.id));
+  const archivedRefunds=archive&&liveRefunds.length<100
+    ? archive.listRefunds(payer,100-liveRefunds.length).filter(r=>!liveRefundIds.has(r.id)).map(r=>({id:r.id,amount:decimal(BigInt(r.amount)),status:r.status,txid:r.txid,day:r.day}))
+    : [];
   return {
     payer,available:decimal(BigInt(s.available[payer]??"0")),lockedInAuctions:decimal(lockedMicros),
-    deposits:Object.entries(s.deposits).filter(([,d])=>d.payer===payer).slice(-100).map(([id,d])=>({intent:id,amount:d.amount,status:d.tx?"final":"waiting",txid:d.tx,createdAt:d.createdAt??null})),
-    refunds:Object.values(s.payments).filter(p=>p.kind==="refund"&&p.to===payer).slice(-100).map(p=>({id:p.id,amount:decimal(BigInt(p.amount)),status:p.status,txid:p.txid,day:p.day})),
+    deposits:[...archivedDeposits,...liveDeposits].slice(-100),
+    refunds:[...archivedRefunds,...liveRefunds].slice(-100),
   };
 }
 export async function publicCommand(getEscrow:()=>Escrow,packetText:string,registryId:string,endpoint:string,now=Date.now(),operational=true){
@@ -196,9 +206,9 @@ export async function publicCommand(getEscrow:()=>Escrow,packetText:string,regis
   const expected:Record<string,string>={intent:"intent",withdraw:"withdraw",account:"view"};
   if(expected[endpoint])need(c.action===expected[endpoint],"ESCROW_ENDPOINT_ACTION");
   const escrow=getEscrow();
-  if(c.action==="view"){exact(c.params,[]);return {action:c.action,account:accountView(escrow.state(),c.actor)};}
+  if(c.action==="view"){exact(c.params,[]);return {action:c.action,account:accountView(escrow.state(),c.actor,escrow.journal.archive)};}
   need(operational,"ESCROW_OPERATOR_SETUP_HELD");
   if(c.action==="intent")need(micros(c.params.amount)<=micros(escrow.policy.perTx),"ESCROW_PAYOUT_LIMIT");
   const result=await escrow.command(c);
-  return {action:c.action,result,account:accountView(escrow.state(),c.actor)};
+  return {action:c.action,result,account:accountView(escrow.state(),c.actor,escrow.journal.archive)};
 }

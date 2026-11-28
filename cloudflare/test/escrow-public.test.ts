@@ -239,3 +239,20 @@ test('queued legacy 1h standard auctions report 3h in marketView and start a 3h 
  assert.equal(live.quiet,10800000);
  assert.equal(live.closes,bidStart+10800000);
 });
+
+test('escrow capacity telemetry exposes sanitized aggregate counters without leaking addresses or txids',async()=>{
+ const e=fixture();
+ await e.escrow.pause(false);
+ await fund(e,3,'5.000000','cap-fund');
+ const cap=e.escrow.capacity();
+ assert.equal(typeof cap.sequence,'number');
+ assert.equal(cap.checkpointSequence,0);
+ assert.equal(cap.retainedRows,cap.sequence);
+ assert.equal(cap.admissionOpen,true);
+ assert.equal(cap.compacting,false);
+ assert.equal(cap.foldedTransactions,0);
+ assert.ok(cap.remainingForAdmission>0&&cap.remainingForWork>0);
+ const raw=JSON.stringify(cap);
+ assert.ok(!raw.includes('poa1'));
+ assert.ok(!raw.includes(who(3)));
+});
