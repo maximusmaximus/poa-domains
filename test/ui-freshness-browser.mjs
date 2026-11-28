@@ -60,9 +60,9 @@ try {
   await expect(p.getByRole('button',{name:'Review changed item'})).toBeDisabled(); await amount.fill('4000');
   await expect(p.locator('#copyCartPrompt')).toBeDisabled(); await p.getByRole('button',{name:'Review changed item'}).click();
   await expect(p.locator('#copyCartPrompt')).toBeEnabled(); assert.match(await p.locator('#cartPrompt').innerText(),/"expectedVersion":\s*3/);
-  h.stateStatus=500; await poll(h,p); await expect(p.locator('#registryError')).toBeVisible(); await expect(p.locator('#copyCartPrompt')).toBeDisabled();
-  await p.locator('#advancedLink').click(); await p.locator('#floatingCartBtn').click(); await expect(p.locator('#copyCheckoutBtn')).toBeDisabled(); await p.locator('#floatingCartClose').click(); await p.locator('#tabFind').click();
-  h.stateStatus=200; await p.locator('#registryRetry').click(); await ready(p); await expect(p.locator('#copyCartPrompt')).toBeEnabled();
+  h.stateStatus=500; await poll(h,p); await expect(p.locator('#registryError')).toBeVisible(); await expect(p.locator('#copyCartPrompt')).toBeEnabled(); await expect(p.locator('#cartPrompt')).toContainText('CHECKOUT TEMPORARILY PAUSED'); await expect(p.locator('#cartPrompt')).toContainText('Telemetry check-back stat');
+  await p.locator('#advancedLink').click(); await p.locator('#floatingCartBtn').click(); await expect(p.locator('#copyCheckoutBtn')).toBeEnabled(); await expect(p.locator('#floatingCartPrompt')).toContainText('CHECKOUT TEMPORARILY PAUSED'); await p.locator('#floatingCartClose').click(); await p.locator('#tabFind').click();
+  h.stateStatus=200; await p.locator('#registryRetry').click(); await ready(p); await expect(p.locator('#copyCartPrompt')).toBeEnabled(); await expect(p.locator('#cartPrompt')).not.toContainText('CHECKOUT TEMPORARILY PAUSED');
  },h=>h.payload.state=auctionState());
  await scenario('typing/focus/caret survive registry and network polls, including unsubmitted cart/search drafts',async(h,p)=>{
   await p.goto(h.url+'/?q=alpha'); await ready(p); await p.locator('#addToCartBtn').click();
