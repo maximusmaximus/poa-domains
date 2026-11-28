@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { sign, verify, createPublicKey, createPrivateKey } from "node:crypto";
 import { base58 } from "../../src/native-crypto.js";
 import { canonical } from "../../src/core.js";
-import { Escrow, PILOT_ADMISSION_LIMIT, PILOT_JOURNAL_LIMIT, REVIEWED_CREDITS, SQLiteEscrowJournal, invariant, nextEntry, recoveryReserve, replay, restoreEscrow, reviewedCredit } from "../escrow.js";
+import { COMPACTED_ADMISSION_LIMIT, COMPACTED_JOURNAL_LIMIT, COMPACT_KEEP_TAIL, COMPACT_TRIGGER_ROWS, Escrow, PILOT_ADMISSION_LIMIT, PILOT_JOURNAL_LIMIT, REVIEWED_CREDITS, SQLiteEscrowJournal, exportEscrow, invariant, nextEntry, recoveryReserve, replay, restoreEscrow, reviewedCredit } from "../escrow.js";
+import { accountView } from "../escrow-public.js";
 import { CHAIN, WorkerSecretSigner, digest, micros, decimal, txid, verifyCommand, verifyTransfer } from "../escrow-codec.js";
 import { PoaHttpNetwork, MAINNET_ENGINE_SHA256, MAINNET_PARAMS_SHA256, PILOT_PER_TX, PILOT_DAILY, type CoveredTxCache } from "../escrow-network.js";
 import { MockNetwork, MemoryJournal, policy, who, key, seed, signer, command, depositBody, root, parents } from "./escrow-fixture.js";
@@ -1874,12 +1875,16 @@ test("reconcileAt skips unsubmitted SIGNED and post-cutoff UNKNOWN payouts so un
  assert.equal(lastCutIds.includes(pay.txid!),true,"at-or-before-cutoff UNKNOWN payout included in cut()");
 });
 
-test("SQLiteEscrowJournal uses verified tip fast-path, paged streaming replay on upgrade/restore, and fails closed on tampering",()=>{
+function mockSQLiteStorage() {
  const journalRows=new Map<number,string>();
  let policyRow:string|undefined;
  let headRow:{policy:string;sequence:number;checksum:string}|undefined;
- const getHead=()=>headRow;
- let singleRowReads=0,pageReads=0,fullScans=0;
+ let checkpointRow:{sequence:number;record:string}|undefined;
+ const reqArchive=new Map<string,{rk:string;fingerprint:string;result:string}>();
+ const txArchive=new Map<string,{txid:string;kind:string;sender_nonce:string|null;memo:string|null;amount:string;height:number}>();
+ const depArchive=new Map<string,{intent:string;payer:string;amount:string;tx:string;created_at:number|null;final_at:number|null}>();
+ const refArchive=new Map<string,{id:string;payer:string;amount:string;status:string;txid:string|null;day:string|null;seq:number}>();
+ const metrics={singleRowReads:0,pageReads:0,fullScans:0};
  const cursor=<T,>(items:T[])=>({
   toArray:()=>items,
   one:()=>{if(!items.length)throw new Error("EMPTY");return items[0]!;},
@@ -1890,7 +1895,12 @@ test("SQLiteEscrowJournal uses verified tip fast-path, paged streaming replay on
   sql:{
    exec:(q:string,...args:any[])=>{
     if(q.startsWith("CREATE TABLE"))return cursor([]);
-    if(q.startsWith("DROP TABLE")){journalRows.clear();policyRow=undefined;headRow=undefined;return cursor([]);}
+    if(q.startsWith("DROP TABLE")){
+     journalRows.clear();policyRow=undefined;headRow=undefined;checkpointRow=undefined;
+     reqArchive.clear();txArchive.clear();depArchive.clear();refArchive.clear();
+     return cursor([]);
+    }
+    if(q.includes("FROM sqlite_master"))return cursor(policyRow?[{name:"escrow_policy"}]:[]);
     if(q.includes("FROM escrow_policy"))return cursor(policyRow?[{value:policyRow}]:[]);
     if(q.includes("INSERT OR REPLACE INTO escrow_policy")){policyRow=String(args[0]);return cursor([]);}
     if(q.includes("COUNT(*) AS n FROM escrow_journal"))return cursor([{n:journalRows.size}]);
@@ -1903,19 +1913,30 @@ test("SQLiteEscrowJournal uses verified tip fast-path, paged streaming replay on
      headRow={policy:String(args[0]),sequence:Number(args[1]),checksum:String(args[2])};
      return cursor([]);
     }
-    if(q.includes("WHERE sequence = ?")){
-     singleRowReads++;
+    if(q.includes("SELECT sequence FROM escrow_checkpoint"))return cursor(checkpointRow?[{sequence:checkpointRow.sequence}]:[]);
+    if(q.includes("SELECT sequence, record FROM escrow_checkpoint"))return cursor(checkpointRow?[checkpointRow]:[]);
+    if(q.includes("INSERT OR REPLACE INTO escrow_checkpoint")){
+     checkpointRow={sequence:Number(args[0]),record:String(args[1])};
+     return cursor([]);
+    }
+    if(q.includes("DELETE FROM escrow_journal WHERE sequence <= ?")){
+     const cutoff=Number(args[0]);
+     for(const k of [...journalRows.keys()])if(k<=cutoff)journalRows.delete(k);
+     return cursor([]);
+    }
+    if(q.includes("FROM escrow_journal WHERE sequence = ?")){
+     metrics.singleRowReads++;
      const rec=journalRows.get(Number(args[0]));
      return cursor(rec?[{record:rec}]:[]);
     }
-    if(q.includes("WHERE sequence > ?")){
-     pageReads++;
+    if(q.includes("FROM escrow_journal WHERE sequence > ?")){
+     metrics.pageReads++;
      const after=Number(args[0]),lim=Number(args[1]);
      const items=[...journalRows.entries()].filter(([seq])=>seq>after).sort((a,b)=>a[0]-b[0]).slice(0,lim).map(([sequence,record])=>({sequence,record}));
      return cursor(items);
     }
     if(q.includes("SELECT record FROM escrow_journal ORDER BY sequence")){
-     fullScans++;
+     metrics.fullScans++;
      const items=[...journalRows.entries()].sort((a,b)=>a[0]-b[0]).map(([,record])=>({record}));
      return cursor(items);
     }
@@ -1923,34 +1944,95 @@ test("SQLiteEscrowJournal uses verified tip fast-path, paged streaming replay on
      journalRows.set(Number(args[0]),String(args[1]));
      return cursor([]);
     }
+    if(q.includes("FROM escrow_request_archive WHERE rk = ?")){
+     const row=reqArchive.get(String(args[0]));
+     return cursor(row?[{fingerprint:row.fingerprint,result:row.result}]:[]);
+    }
+    if(q.includes("FROM escrow_request_archive ORDER BY rk ASC")){
+     return cursor([...reqArchive.values()].sort((a,b)=>a.rk.localeCompare(b.rk)));
+    }
+    if(q.includes("INSERT OR REPLACE INTO escrow_request_archive")){
+     reqArchive.set(String(args[0]),{rk:String(args[0]),fingerprint:String(args[1]),result:String(args[2])});
+     return cursor([]);
+    }
+    if(q.includes("FROM escrow_archived_txs WHERE txid = ?")){
+     const tx=String(args[0]),sn=String(args[1]),memo=args.length>2?String(args[2]):undefined;
+     const hit=[...txArchive.values()].find(r=>r.txid===tx||r.sender_nonce===sn||(memo!==undefined&&r.memo===memo));
+     return cursor(hit?[{txid:hit.txid}]:[]);
+    }
+    if(q.includes("FROM escrow_archived_txs ORDER BY txid ASC")){
+     return cursor([...txArchive.values()].sort((a,b)=>a.txid.localeCompare(b.txid)));
+    }
+    if(q.includes("INSERT OR REPLACE INTO escrow_archived_txs")){
+     txArchive.set(String(args[0]),{txid:String(args[0]),kind:String(args[1]),sender_nonce:args[2]??null,memo:args[3]??null,amount:String(args[4]),height:Number(args[5])});
+     return cursor([]);
+    }
+    if(q.includes("FROM escrow_archived_deposits WHERE intent = ?")){
+     const r=depArchive.get(String(args[0]));
+     return cursor(r?[r]:[]);
+    }
+    if(q.includes("FROM escrow_archived_deposits WHERE payer = ?")){
+     const payer=String(args[0]),lim=Number(args[1]);
+     const rows=[...depArchive.values()].filter(r=>r.payer===payer).sort((a,b)=>(b.final_at??b.created_at??0)-(a.final_at??a.created_at??0)).slice(0,lim);
+     return cursor(rows);
+    }
+    if(q.includes("FROM escrow_archived_deposits ORDER BY intent ASC")){
+     return cursor([...depArchive.values()].sort((a,b)=>a.intent.localeCompare(b.intent)));
+    }
+    if(q.includes("INSERT OR REPLACE INTO escrow_archived_deposits")){
+     depArchive.set(String(args[0]),{intent:String(args[0]),payer:String(args[1]),amount:String(args[2]),tx:String(args[3]),created_at:args[4]??null,final_at:args[5]??null});
+     return cursor([]);
+    }
+    if(q.includes("FROM escrow_archived_refunds WHERE payer = ?")){
+     const payer=String(args[0]),lim=Number(args[1]);
+     const rows=[...refArchive.values()].filter(r=>r.payer===payer).sort((a,b)=>b.seq-a.seq).slice(0,lim);
+     return cursor(rows);
+    }
+    if(q.includes("FROM escrow_archived_refunds ORDER BY seq ASC")){
+     return cursor([...refArchive.values()].sort((a,b)=>a.seq-b.seq||a.id.localeCompare(b.id)));
+    }
+    if(q.includes("INSERT OR REPLACE INTO escrow_archived_refunds")){
+     refArchive.set(String(args[0]),{id:String(args[0]),payer:String(args[1]),amount:String(args[2]),status:String(args[3]),txid:args[4]??null,day:args[5]??null,seq:Number(args[6])});
+     return cursor([]);
+    }
     throw new Error(`Unexpected SQL: ${q}`);
    },
   },
  } as unknown as DurableObjectStorage;
+ return {
+  storage, journalRows, metrics,
+  getHead:()=>headRow, setHead:(h:typeof headRow)=>{headRow=h;},
+  getCheckpoint:()=>checkpointRow, setCheckpoint:(c:typeof checkpointRow)=>{checkpointRow=c;},
+  reqArchive, txArchive, depArchive, refArchive,
+ };
+}
+
+test("SQLiteEscrowJournal uses verified tip fast-path, paged streaming replay on upgrade/restore, and fails closed on tampering",()=>{
+ const m=mockSQLiteStorage(),{storage,journalRows,metrics}=m;
 
  // Append 20 entries (> page size 16) via SQLiteEscrowJournal.
  const j1=new SQLiteEscrowJournal(storage,policy);
  assert.equal(j1.load().sequence,0);
  for(let i=0;i<20;i++)j1.append("pause",{paused:i%2===0},s=>{s.paused=i%2===0;});
  assert.equal(journalRows.size,20);
- assert.equal(getHead()?.sequence,20);
+ assert.equal(m.getHead()?.sequence,20);
 
  // Cold boot with verified head intact reads ONLY 1 row (no full scan, no pagination).
- singleRowReads=0;pageReads=0;fullScans=0;
+ metrics.singleRowReads=0;metrics.pageReads=0;metrics.fullScans=0;
  const j2=new SQLiteEscrowJournal(storage,policy);
  const loadedFast=j2.load();
  assert.equal(loadedFast.sequence,20);
- assert.equal(singleRowReads,1,"cold boot fast-path reads only the latest row");
- assert.equal(pageReads,0);assert.equal(fullScans,0);
+ assert.equal(metrics.singleRowReads,1,"cold boot fast-path reads only the latest row");
+ assert.equal(metrics.pageReads,0);assert.equal(metrics.fullScans,0);
 
  // Upgrade path (missing verified head): streams in pages of 16 (2 pages for 20 rows) and populates verified head.
- headRow=undefined;
- singleRowReads=0;pageReads=0;fullScans=0;
+ m.setHead(undefined);
+ metrics.singleRowReads=0;metrics.pageReads=0;metrics.fullScans=0;
  const j3=new SQLiteEscrowJournal(storage,policy);
  assert.equal(j3.load().sequence,20);
- assert.equal(pageReads,2,"20 rows stream across 2 pages of 16 without full-table toArray()");
- assert.equal(fullScans,0);
- assert.equal(getHead()?.sequence,20,"verified head saved after streaming replay");
+ assert.equal(metrics.pageReads,2,"20 rows stream across 2 pages of 16 without full-table toArray()");
+ assert.equal(metrics.fullScans,0);
+ assert.equal(m.getHead()?.sequence,20,"verified head saved after streaming replay");
 
  // Tampering with tip row fails closed even when verified head matches sequence.
  const origTip=journalRows.get(20)!;
@@ -1964,7 +2046,7 @@ test("SQLiteEscrowJournal uses verified tip fast-path, paged streaming replay on
  const archive={policy,rows:j3.rows()};
  restoreEscrow(storage,archive);
  assert.equal(journalRows.size,21);
- assert.equal(getHead()?.sequence,21);
+ assert.equal(m.getHead()?.sequence,21);
  assert.equal(new SQLiteEscrowJournal(storage,policy).load().halt,"RESTORED_ARCHIVE_READ_ONLY");
 });
 
@@ -2246,4 +2328,242 @@ test("zero-handover instant settlement: fixed-price buy & closed auctions settle
  assert.ok(commits.some((c:any)=>c.packet.body.action==="escrowSettle"),"journal recorded escrowSettle commits");
  for (const c of commits) replayed.replay(c);
  assert.equal(replayed.stateHash(),engine.stateHash(),"Engine replay of escrowSettle commits is byte-identical");
+});
+
+test("SQLiteEscrowJournal rolling checkpoint compaction upgrades legacy journals, stays bounded, and fails closed on tampering",()=>{
+ // 1. Upgrade path without verified_head: 180 uncompacted legacy rows compact on first load() to COMPACT_KEEP_TAIL.
+ const m=mockSQLiteStorage(),{storage,journalRows,metrics}=m;
+ const seedRows=(target:ReturnType<typeof mockSQLiteStorage>,count:number,withHead:boolean)=>{
+  const jInit=new SQLiteEscrowJournal(target.storage,policy);
+  let st=jInit.load();
+  let prev=digest(["escrow-genesis/v1",st.policy]);
+  for(let i=0;i<count;i++){
+   const e=nextEntry(st,prev,"pause",{paused:i%2===0},s=>{s.paused=i%2===0;},policy,{checkpointSequence:0,hardLimit:COMPACTED_JOURNAL_LIMIT});
+   target.journalRows.set(e.sequence,canonical(e));
+   st=e.state;prev=e.checksum;
+  }
+  if(withHead)target.setHead({policy:st.policy,sequence:st.sequence,checksum:prev});
+  return {st,prev};
+ };
+ seedRows(m,180,false);
+ assert.equal(journalRows.size,180);
+ const jUpgrade=new SQLiteEscrowJournal(storage,policy);
+ assert.equal(jUpgrade.load().sequence,180);
+ assert.equal(journalRows.size,COMPACT_KEEP_TAIL,"legacy journal compacts to hot tail on load");
+ assert.equal(m.getCheckpoint()?.sequence,180-COMPACT_KEEP_TAIL);
+ assert.deepEqual(jUpgrade.capacityInfo(),{
+  checkpointSequence:180-COMPACT_KEEP_TAIL,
+  retainedRows:COMPACT_KEEP_TAIL,
+  admissionLimit:COMPACTED_ADMISSION_LIMIT,
+  hardLimit:COMPACTED_JOURNAL_LIMIT,
+  compacting:true,
+ });
+
+ // 2. Fast-path upgrade (verified_head already present on legacy 180-row DB) also compacts atomically on load().
+ const mFast=mockSQLiteStorage();
+ seedRows(mFast,180,true);
+ const jFast=new SQLiteEscrowJournal(mFast.storage,policy);
+ assert.equal(jFast.load().sequence,180);
+ assert.equal(mFast.journalRows.size,COMPACT_KEEP_TAIL);
+ assert.equal(mFast.getCheckpoint()?.sequence,180-COMPACT_KEEP_TAIL);
+
+ // 3. Appending 260 more entries keeps retained rows permanently <= COMPACT_TRIGGER_ROWS.
+ for(let i=0;i<260;i++){
+  jUpgrade.append("pause",{paused:i%2===1},s=>{s.paused=i%2===1;});
+  assert.ok(journalRows.size<=COMPACT_TRIGGER_ROWS,`retained rows ${journalRows.size} exceeded trigger`);
+ }
+ assert.equal(jUpgrade.load().sequence,440);
+ assert.ok((m.getCheckpoint()?.sequence??0)>=440-COMPACT_TRIGGER_ROWS);
+
+ // 4. Cold boot with verified head reads only 1 row; without verified head replays ONLY from checkpoint.
+ metrics.singleRowReads=0;metrics.pageReads=0;metrics.fullScans=0;
+ const jCold=new SQLiteEscrowJournal(storage,policy);
+ assert.equal(jCold.load().sequence,440);
+ assert.equal(metrics.singleRowReads,1);
+ assert.equal(metrics.pageReads,0);
+ assert.equal(metrics.fullScans,0);
+
+ m.setHead(undefined);
+ metrics.singleRowReads=0;metrics.pageReads=0;metrics.fullScans=0;
+ const jReplay=new SQLiteEscrowJournal(storage,policy);
+ assert.equal(jReplay.load().sequence,440);
+ assert.ok(metrics.pageReads<=Math.ceil((COMPACT_TRIGGER_ROWS+1)/16),"replay starts from checkpoint, not genesis");
+ assert.equal(metrics.fullScans,0);
+
+ // 5. Export + restore round-trip preserves checkpoint + tail; tampered checkpoint fails closed.
+ const exported=exportEscrow(storage)!;
+ assert.ok(exported.checkpoint && exported.checkpoint.sequence>0);
+ assert.ok(exported.rows.length<=COMPACT_TRIGGER_ROWS);
+ const mRestored=mockSQLiteStorage();
+ restoreEscrow(mRestored.storage,exported);
+ const jRestored=new SQLiteEscrowJournal(mRestored.storage,policy);
+ const restoredState=jRestored.load();
+ assert.equal(restoredState.sequence,441);
+ assert.equal(restoredState.paused,true);
+ assert.equal(restoredState.halt,"RESTORED_ARCHIVE_READ_ONLY");
+
+ const badExport=structuredClone(exported);
+ badExport.checkpoint!.state.paused=!badExport.checkpoint!.state.paused;
+ assert.throws(()=>restoreEscrow(mockSQLiteStorage().storage,badExport),/ESCROW_JOURNAL_CORRUPT/);
+
+ // 6. Tampering with stored checkpoint row fails closed on replay.
+ const origCp=m.getCheckpoint()!;
+ const badCp=JSON.parse(origCp.record);
+ badCp.state.paused=!badCp.state.paused;
+ m.setCheckpoint({sequence:origCp.sequence,record:JSON.stringify(badCp)});
+ m.setHead(undefined);
+ assert.throws(()=>new SQLiteEscrowJournal(storage,policy).load(),/ESCROW_JOURNAL_CORRUPT/);
+});
+
+test("SQLite-backed Escrow admits intents, issues, listings, auctions, and subnames cleanly past PILOT_JOURNAL_LIMIT (2000)",async()=>{
+ const m=mockSQLiteStorage();
+ const jBoot=new SQLiteEscrowJournal(m.storage,policy);
+ let st=jBoot.load();
+ let prev=digest(["escrow-genesis/v1",st.policy]);
+ // Seed directly to sequence 1990 (well past old PILOT_ADMISSION_LIMIT=1900 and within 10 rows of PILOT_JOURNAL_LIMIT=2000).
+ for(let i=0;i<1990;i++){
+  const e=nextEntry(st,prev,"pause",{paused:i%2===0},s=>{s.paused=i%2===0;},policy,{checkpointSequence:0,hardLimit:COMPACTED_JOURNAL_LIMIT});
+  if(e.sequence>=1990-COMPACT_KEEP_TAIL)m.journalRows.set(e.sequence,canonical(e));
+  if(e.sequence===1990-COMPACT_KEEP_TAIL-1)m.setCheckpoint({sequence:e.sequence,record:canonical(e)});
+  st=e.state;prev=e.checksum;
+ }
+ m.setHead({policy:st.policy,sequence:st.sequence,checksum:prev});
+
+ const journal=new SQLiteEscrowJournal(m.storage,policy);
+ const net=new MockNetwork();
+ const issued:Record<string,string>={};
+ const subIssued:Record<string,string>={};
+ const titles={
+  terms:()=>({reserve:"1.000000",window:1000,quiet:1000}),
+  validate:()=>{},
+  commit:()=>{},
+  issueTerms:(name:string)=>{assert.ok(!issued[name]);return {price:"2000000"};},
+  validateIssue:()=>{},
+  issue:(p:any)=>{issued[p.body.params.name]=p.body.signer;},
+  subTerms:()=>({parentDeedId:"a".repeat(64),ownerVersion:1}),
+  validateSub:()=>{},
+  issueSub:(p:any)=>{subIssued[p.body.params.name]=p.body.signer;},
+ };
+ const e=new Escrow(journal,net,signer(),titles,policy,()=>net.now,()=>true,()=>{},()=>true,()=>true);
+ await e.pause(false);
+
+ const capBefore=e.capacity();
+ assert.equal(capBefore.compacting,true);
+ assert.equal(capBefore.admissionOpen,true);
+ assert.equal(capBefore.checkpointSequence,1990-COMPACT_KEEP_TAIL-1);
+ assert.ok(capBefore.retainedRows<=COMPACT_KEEP_TAIL+2);
+ assert.ok(capBefore.remainingForAdmission>80000);
+
+ // Execute every admission path across the old 2,000-entry boundary!
+ const intent=await e.command(command(who(3),"past2k-intent","intent",{amount:"10.000000"})) as any;
+ const depTx=net.add(depositBody(3,policy.wallet,"10.000000",intent.intent,1),5,true);
+ await e.command(command(who(3),"past2k-detect","detect",{intent:intent.intent,txid:depTx}));
+ for(let i=0;i<4;i++){
+  const nm=`emoji${i}`;
+  await e.command(command(who(3),`past2k-issue-${i}`,"issue",{name:nm,amount:"2.000000",registration:registration(3,nm)}));
+ }
+ const listed=await e.command(command(who(2),"past2k-list","list",{name:"listed2k",price:"5.000000"})) as any;
+ await e.command(command(who(2),"past2k-cancel","cancel",{auction:listed.auction}));
+ await e.command(command(who(2),"past2k-open","open",{name:"auc2k",reserve:"2.000000"}));
+ await e.command(command(who(2),"past2k-listsub","list-sub",{parent:"parent2k",price:"1.000000"}));
+ for(let i=0;i<6;i++)await e.tick();
+ await e.reconcile();
+
+ assert.ok(e.state().sequence>PILOT_JOURNAL_LIMIT,`expected sequence > 2000, got ${e.state().sequence}`);
+ assert.equal(e.capacity().admissionOpen,true);
+ assert.ok(m.journalRows.size<=COMPACT_TRIGGER_ROWS);
+ invariant(e.state());
+});
+
+test("checkpoint-covered state folding bounds live State, preserves exact reconciliation/daily caps/idempotency/archive views, and round-trips backup/restore",async()=>{
+ const tightPolicy={...policy,perTx:"10.000000",daily:"25.000000"};
+ const m=mockSQLiteStorage();
+ const journal=new SQLiteEscrowJournal(m.storage,tightPolicy);
+ const net=new MockNetwork();
+ const titles={terms:()=>({reserve:"1.000000",window:1000,quiet:1000}),validate:()=>{},commit:()=>{}};
+ const e=new Escrow(journal,net,signer(),titles,tightPolicy,()=>net.now,()=>true);
+ await e.pause(false);
+
+ // Fund who(3) with 3 deposits (10 + 10 + 5 = 25 POA) and who(4) with 1 deposit (2 POA), all checkpoint-covered.
+ const fundOne=async(actor:number,amount:string,tag:string,nonce:number)=>{
+  const r=await e.command(command(who(actor),`i-${tag}`,"intent",{amount})) as any;
+  const body=depositBody(actor,tightPolicy.wallet,amount,r.intent,nonce);
+  const id=net.add(body,5,true);
+  await e.command(command(who(actor),`d-${tag}`,"detect",{intent:r.intent,txid:id}));
+  return {intent:r.intent as string,id,body,reqResult:r};
+ };
+ const d1=await fundOne(3,"10.000000","d1",1);
+ await fundOne(3,"10.000000","d2",2);
+ await fundOne(3,"5.000000","d3",3);
+ await fundOne(4,"2.000000","d4",1);
+
+ // Withdraw 10 + 10 = 20 POA for who(3) and 2 POA for who(4) (draining who(4) to "0"), all finalized & covered.
+ await e.command(command(who(3),"w1","withdraw",{amount:"10.000000"}));
+ await e.command(command(who(3),"w2","withdraw",{amount:"10.000000"}));
+ await e.command(command(who(4),"w4","withdraw",{amount:"2.000000"}));
+ for(let i=0;i<12;i++)await e.tick();
+ assert.equal(e.state().available[who(3)],"5000000");
+ assert.equal(e.state().available[who(4)],"0");
+ assert.equal(Object.values(e.state().payments).filter(p=>p.status==="FINAL").length,3);
+
+ // Explicitly fold covered history.
+ const folded=await e.compactState();
+ assert.equal(folded,true);
+ const sAfter=e.state();
+ assert.ok(sAfter.folded,"s.folded populated");
+ assert.equal(sAfter.folded!.height,net.height);
+ assert.equal(sAfter.folded!.creditedCount,4);
+ assert.equal(sAfter.folded!.paymentCount,2,"keeps newest 1 FINAL payment for lastOut");
+ assert.equal(Object.keys(sAfter.payments).length,1);
+ assert.equal(Object.keys(sAfter.deposits).length,0);
+ assert.equal(Object.keys(sAfter.credited).length,0);
+ assert.equal(Object.keys(sAfter.requests).length,0);
+ assert.equal(sAfter.available[who(4)],undefined,"zero available entry pruned on fold");
+ assert.equal(sAfter.available[who(3)],"5000000");
+ assert.equal(e.capacity().foldedTransactions,6);
+ invariant(sAfter);
+
+ // 1. Reconciliation stays exact at current height AND higher height, and fails closed if height regresses below folded.height.
+ await e.reconcile();
+ net.height+=5;
+ await e.reconcile();
+ net.height=sAfter.folded!.height-1;
+ await assert.rejects(e.reconcile(),/ESCROW_UNALIGNED_CUT/);
+ net.height=sAfter.folded!.height+5;
+
+ // 2. Daily payout cap still counts folded same-day payouts (22 POA already sent today, daily cap 25 -> 4 POA fails).
+ await e.command(command(who(3),"w-over","withdraw",{amount:"4.000000"}));
+ await assert.rejects(e.tick(),/ESCROW_PAYOUT_LIMIT/);
+
+ // 3. Lifetime idempotency works via archived requests (replay returns exact prior result; mismatch throws conflict).
+ const seqBeforeReplay=e.state().sequence;
+ const replayedReq=await e.command(command(who(3),"i-d1","intent",{amount:"10.000000"}));
+ assert.deepEqual(replayedReq,d1.reqResult);
+ assert.equal(e.state().sequence,seqBeforeReplay,"archived idempotent replay writes no new row");
+ await assert.rejects(e.command(command(who(3),"i-d1","intent",{amount:"9.000000"})),/ESCROW_IDEMPOTENCY_CONFLICT/);
+
+ // 4. Lifetime deposit replay guard rejects archived sender:nonce even with a new intent memo.
+ const freshIntent=await e.command(command(who(3),"i-dup","intent",{amount:"10.000000"})) as any;
+ const replayNonceTx=net.add(depositBody(3,tightPolicy.wallet,"10.000000",freshIntent.intent,d1.body.nonce),5,true);
+ await assert.rejects(e.command(command(who(3),"d-dup","detect",{intent:freshIntent.intent,txid:replayNonceTx})),/ESCROW_DEPOSIT_DUPLICATE/);
+
+ // 5. depositView() and accountView() seamlessly serve archived finalized deposits & refunds.
+ const dv=await e.depositView(d1.intent) as any;
+ assert.equal(dv.status,"final");
+ assert.equal(dv.txid,d1.id);
+ const av=accountView(e.state(),who(3),journal.archive);
+ assert.ok(av.deposits.some(d=>d.intent===d1.intent&&d.status==="final"));
+ assert.ok(av.refunds.some(r=>r.id===`withdraw-${who(3)}:w1`&&r.status==="FINAL"));
+
+ // 6. Backup export + restore preserves s.folded and all 4 archive tables.
+ const exported=exportEscrow(m.storage)!;
+ assert.ok(exported.archived && exported.archived.requests.length>0 && exported.archived.txs.length>0 && exported.archived.deposits.length>0 && exported.archived.refunds.length>0);
+ const m2=mockSQLiteStorage();
+ restoreEscrow(m2.storage,exported);
+ const j2=new SQLiteEscrowJournal(m2.storage,tightPolicy);
+ const sRestored=j2.load();
+ assert.deepEqual(sRestored.folded,sAfter.folded);
+ assert.ok(j2.archive.getDeposit(d1.intent)?.tx===d1.id);
+ assert.ok(j2.archive.getRequest(`${who(3)}:i-d1`)!==null);
+ assert.equal(j2.archive.hasTxConflict(d1.id,d1.body.from,d1.body.nonce,d1.body.memo),true);
 });
