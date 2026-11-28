@@ -968,4 +968,67 @@ test("historyForTarget merges journal-derived history and escrow lifecycle witho
   assert.equal(fallbackRows.length, 1);
   assert.equal(fallbackRows[0].title, "Registered");
   assert.ok(!/\breceipt\b/i.test(fallbackRows[0].text));
+
+  // Exercise all remaining registry action types, escrow lifecycle events, and fallback receipt variants
+  const allActions = [
+    { sequence: 1, time: 1795700001, intentId: "a1", requestId: "r1", action: "issueReserved", name: "demo", deedId: "d1", actor: treasury, recipient: treasury },
+    { sequence: 2, time: 1795700002, intentId: "a2", requestId: "r2", action: "issueSubname", name: "sub.demo", parent: "demo", deedId: "d2", actor: bob, recipient: bob, amount: "50000000", asset: "POA", isPoaMicros: true },
+    { sequence: 3, time: 1795700003, intentId: "a3", requestId: "r3", action: "escrowSettle", name: "demo", deedId: "d1", actor: alice, recipient: bob, amount: "200000000", asset: "POA", isPoaMicros: true, auctionId: "auc-demo" },
+    { sequence: 4, time: 1795700004, intentId: "a4", requestId: "r4", action: "transfer", name: "demo", deedId: "d1", actor: bob, recipient: alice },
+    { sequence: 5, time: 1795700005, intentId: "a5", requestId: "r5", action: "setRecords", name: "demo", deedId: "d1", actor: alice, recordsVersion: 1, recordsCount: 2, recordTypes: ["service", "wallet"] },
+    { sequence: 6, time: 1795700006, intentId: "a6", requestId: "r6", action: "setRecords", name: "demo", deedId: "d1", actor: alice, recordsVersion: 2, recordsCount: 0 },
+    { sequence: 7, time: 1795700007, intentId: "a7", requestId: "r7", action: "setPrimaryName", name: "demo", deedId: "d1", actor: alice, clearedPrimary: false, replacedPrimary: "maxi" },
+    { sequence: 8, time: 1795700008, intentId: "a8", requestId: "r8", action: "setPrimaryName", name: "demo", deedId: "d1", actor: alice, clearedPrimary: true },
+    { sequence: 9, time: 1795700009, intentId: "a9", requestId: "r9", action: "announceAuction", name: "demo", actor: alice, amount: "100", asset: "POA", auctionId: "reg-auc" },
+    { sequence: 10, time: 1795700010, intentId: "a10", requestId: "r10", action: "bid", name: "demo", actor: bob, recipient: alice, amount: "120", asset: "POA", auctionId: "reg-auc" },
+    { sequence: 11, time: 1795700011, intentId: "a11", requestId: "r11", action: "finalize", name: "demo", actor: alice, recipient: bob, amount: "120", asset: "POA", auctionId: "reg-auc" },
+    { sequence: 12, time: 1795700012, intentId: "a12", requestId: "r12", action: "closeNoBid", name: "demo", actor: alice, auctionId: "reg-auc2" },
+    { sequence: 13, time: 1795700013, intentId: "a13", requestId: "r13", action: "cancelAuction", name: "demo", actor: alice, auctionId: "reg-auc3" },
+    { sequence: 14, time: 1795700014, intentId: "a14", requestId: "r14", action: "withdrawRefund", name: "demo", actor: bob, amount: "10", asset: "POA", auctionId: "reg-auc" },
+    { sequence: 15, time: 1795700015, intentId: "a15", requestId: "r15", action: "createChildOffer", name: "demo", actor: alice, amount: "50", asset: "POA", offerId: "off1" },
+    { sequence: 16, time: 1795700016, intentId: "a16", requestId: "r16", action: "fillChildOffer", name: "kid.demo", parent: "demo", actor: alice, recipient: bob, amount: "50", asset: "POA", offerId: "off1" },
+    { sequence: 17, time: 1795700017, intentId: "a17", requestId: "r17", action: "sellFixed", name: "demo", actor: alice, amount: "99", asset: "POA", offerId: "off2" },
+    { sequence: 18, time: 1795700018, intentId: "a18", requestId: "r18", action: "buyFixed", name: "demo", actor: alice, recipient: bob, amount: "99", asset: "POA", offerId: "off2" },
+    { sequence: 19, time: 1795700019, intentId: "a19", requestId: "r19", action: "cancelOffer", name: "demo", actor: alice, offerId: "off2" },
+    { sequence: 20, time: 1795700020, intentId: "a20", requestId: "r20", action: "revokeChild", name: "demo", actor: alice },
+  ];
+  const allEscrow = [
+    {
+      id: "fixed-demo", name: "demo", kind: "fixed", status: "COMPLETE", seller: alice, price: "200.000000", high: { amount: "200.000000", payer: bob },
+      history: [
+        { at: 1795700100000, event: "Listed for POA" },
+        { at: 1795700101000, event: "Purchase paid; automatic settlement queued", amount: "200.000000", payer: bob },
+        { at: 1795700102000, event: "Purchase reserved; seller handover needed", amount: "200.000000", payer: bob },
+        { at: 1795700103000, event: "Auction won; automatic settlement queued" },
+        { at: 1795700104000, event: "Seller handover signed; settling" },
+        { at: 1795700105000, event: "Payment and title complete" },
+      ],
+    },
+    {
+      id: "cancel-demo", name: "demo", kind: "fixed", status: "CANCELLED", seller: alice, price: "150.000000",
+      history: [
+        { at: 1795700200000, event: "Cancelled; original payer refund due" },
+        { at: 1795700201000, event: "Expired; original payer refund due" },
+        { at: 1795700202000, event: "Custom escrow note" },
+      ],
+    },
+  ];
+  const demoRows = historyForTarget(state, { name: "demo", history: allActions, escrowMarket: allEscrow });
+  assert.ok(demoRows.length >= 28);
+  const subRows = historyForTarget(state, { name: "sub.demo", history: allActions });
+  assert.equal(subRows[0].title, "Subdomain registered");
+  const fallbackState = {
+    time: 1795860000,
+    deeds: { d1: { id: "d1", name: "demo", owner: bob }, dSub: { id: "dSub", name: "a.demo", owner: bob, parentId: "d1" } },
+    auctions: {}, bids: {},
+    receipts: {
+      f1: { intentId: "f1", requestId: "treasury-inventory-demo", signer: treasury, sequence: 1, time: 100, status: "succeeded", result: { deedId: "d1", owner: treasury } },
+      f2: { intentId: "f2", requestId: "protocol-domain-demo", signer: treasury, sequence: 2, time: 101, status: "succeeded", result: { deedId: "d1", owner: treasury } },
+      f3: { intentId: "f3", requestId: "treasury-settle-demo", signer: treasury, sequence: 3, time: 102, status: "succeeded", result: { deedId: "d1", owner: bob } },
+      f4: { intentId: "f4", requestId: "prim-demo", signer: bob, sequence: 4, time: 103, status: "succeeded", result: { primaryName: "demo", signer: bob } },
+      f5: { intentId: "f5", requestId: "sub-demo", signer: bob, sequence: 5, time: 104, status: "succeeded", result: { deedId: "dSub", name: "a.demo", owner: bob } },
+    },
+  };
+  assert.equal(historyForTarget(fallbackState, { name: "demo" }).length, 4);
+  assert.equal(historyForTarget(fallbackState, { name: "a.demo" })[0].title, "Subdomain registered");
 });

@@ -196,7 +196,7 @@ export class Engine {
     receipt: Receipt,
   ): RegistryHistoryEntry {
     const p = b.params as Obj;
-    const res = receipt.result as Record<string, any> | null;
+    const res = receipt.result as Record<string, any>;
     const base: RegistryHistoryEntry = {
       sequence: receipt.sequence,
       time: receipt.time,
@@ -212,295 +212,118 @@ export class Engine {
     };
     switch (b.action as Action | keyof typeof ESCROW_ONLY_ACTIONS | keyof typeof TREASURY_ONLY_ACTIONS) {
       case "issueFromTreasury": {
-        const deedId = typeof res?.deedId === "string" ? res.deedId : null;
-        const deed = deedId ? next.deeds[deedId] : null;
-        return {
-          ...base,
-          name: deed?.name ?? (typeof p.name === "string" ? p.name : null),
-          deedId,
-          recipient: typeof res?.owner === "string" ? res.owner : b.signer,
-          amount: typeof p.price === "string" ? p.price : null,
-          asset: typeof p.asset === "string" ? p.asset : "POA",
-          isPoaMicros: true,
-        };
+        const deed = next.deeds[res.deedId]!;
+        return { ...base, name: deed.name, deedId: deed.id, recipient: res.owner, amount: p.price, asset: p.asset, isPoaMicros: true };
       }
       case "issueSubname": {
-        const deedId = typeof res?.deedId === "string" ? res.deedId : null;
-        const parentDeed = typeof p.parentDeedId === "string" ? prev.deeds[p.parentDeedId] : null;
-        return {
-          ...base,
-          name: typeof res?.name === "string" ? res.name : (typeof p.name === "string" ? p.name : null),
-          parent: parentDeed?.name ?? null,
-          deedId,
-          recipient: typeof res?.owner === "string" ? res.owner : b.signer,
-          amount: typeof p.price === "string" ? p.price : null,
-          asset: typeof p.asset === "string" ? p.asset : "POA",
-          isPoaMicros: true,
-        };
+        const parentDeed = prev.deeds[p.parentDeedId]!;
+        return { ...base, name: res.name, parent: parentDeed.name, deedId: res.deedId, recipient: res.owner, amount: p.price, asset: p.asset, isPoaMicros: true };
       }
       case "issueTreasuryInventory":
-      case "issueReserved": {
-        const deedId = typeof res?.deedId === "string" ? res.deedId : null;
-        return {
-          ...base,
-          name: typeof res?.name === "string" ? res.name : (typeof p.name === "string" ? p.name : null),
-          deedId,
-          recipient: typeof res?.owner === "string" ? res.owner : b.signer,
-        };
-      }
-      case "escrowSettle": {
-        const deedId = typeof res?.deedId === "string" ? res.deedId : null;
-        return {
-          ...base,
-          name: typeof res?.name === "string" ? res.name : (typeof p.name === "string" ? p.name : null),
-          deedId,
-          actor: typeof res?.seller === "string" ? res.seller : (typeof p.seller === "string" ? p.seller : b.signer),
-          recipient: typeof res?.owner === "string" ? res.owner : (typeof p.recipient === "string" ? p.recipient : null),
-          amount: typeof p.price === "string" ? p.price : null,
-          asset: "POA",
-          isPoaMicros: true,
-          auctionId: typeof res?.auctionId === "string" ? res.auctionId : (typeof p.auctionId === "string" ? p.auctionId : null),
-        };
-      }
+      case "issueReserved":
+        return { ...base, name: res.name, deedId: res.deedId, recipient: res.owner };
+      case "escrowSettle":
+        return { ...base, name: res.name, deedId: res.deedId, actor: res.seller, recipient: res.owner, amount: p.price, asset: "POA", isPoaMicros: true, auctionId: res.auctionId };
       case "transfer": {
-        const deedId = typeof res?.deedId === "string" ? res.deedId : (typeof p.expectedDeedId === "string" ? p.expectedDeedId : null);
-        const deed = deedId ? next.deeds[deedId] : null;
-        return {
-          ...base,
-          name: deed?.name ?? (typeof p.name === "string" ? p.name : null),
-          deedId,
-          recipient: typeof res?.owner === "string" ? res.owner : (typeof p.recipient === "string" ? p.recipient : null),
-        };
+        const deed = next.deeds[res.deedId]!;
+        return { ...base, name: deed.name, deedId: deed.id, recipient: res.owner };
       }
       case "setMetadata": {
-        const deedId = typeof p.expectedDeedId === "string" ? p.expectedDeedId : null;
-        const prevDeed = deedId ? prev.deeds[deedId] : null;
-        const nextDeed = deedId ? next.deeds[deedId] : null;
-        const doc = (p.metadata as { document?: Record<string, unknown> } | undefined)?.document;
+        const prevDeed = prev.deeds[p.expectedDeedId]!;
+        const nextDeed = next.deeds[p.expectedDeedId]!;
+        const doc = p.metadata.document as Record<string, unknown>;
         const profileFields: string[] = [];
-        if (doc && doc.schema === PROFILE_SCHEMA_V1) {
-          const resetAt = prevDeed?.profileResetAt ?? 0;
+        if (doc.schema === PROFILE_SCHEMA_V1) {
+          const resetAt = prevDeed.profileResetAt ?? 0;
           let prevDoc: Record<string, unknown> | null = null;
-          if (prevDeed) {
-            for (let i = prevDeed.metadata.length - 1; i >= resetAt; i--) {
-              const d0 = prevDeed.metadata[i]?.document as Record<string, unknown> | undefined;
-              if (d0?.schema === PROFILE_SCHEMA_V1) { prevDoc = d0; break; }
-            }
+          for (let i = prevDeed.metadata.length - 1; i >= resetAt; i--) {
+            const d0 = prevDeed.metadata[i]!.document as Record<string, unknown>;
+            if (d0.schema === PROFILE_SCHEMA_V1) { prevDoc = d0; break; }
           }
-          const checks: [string, string][] = [
-            ["image", "avatar"],
-            ["description", "bio"],
-            ["poa", "POA"],
-            ["btc", "BTC"],
-            ["eth", "ETH"],
-          ];
+          const checks: [string, string][] = [["image", "avatar"], ["description", "bio"], ["poa", "POA"], ["btc", "BTC"], ["eth", "ETH"]];
           if (prevDoc) {
-            for (const [k, label] of checks) {
-              if ((doc[k] ?? null) !== (prevDoc[k] ?? null)) profileFields.push(label);
-            }
+            for (const [k, label] of checks) if (doc[k] !== prevDoc[k]) profileFields.push(label);
           }
           if (!profileFields.length) {
-            for (const [k, label] of checks) {
-              if (typeof doc[k] === "string" && doc[k].length > 0) profileFields.push(label);
-            }
+            for (const [k, label] of checks) if (doc[k]) profileFields.push(label);
           }
         }
-        return {
-          ...base,
-          name: nextDeed?.name ?? (typeof p.name === "string" ? p.name : null),
-          deedId,
-          metadataVersion: typeof res?.metadataVersion === "number" ? res.metadataVersion : undefined,
-          ...(profileFields.length ? { profileFields } : {}),
-        };
+        return { ...base, name: nextDeed.name, deedId: nextDeed.id, metadataVersion: res.metadataVersion, ...(profileFields.length ? { profileFields } : {}) };
       }
       case "setRecords": {
-        const deedId = typeof p.expectedDeedId === "string" ? p.expectedDeedId : null;
-        const nextDeed = deedId ? next.deeds[deedId] : null;
-        const recs = Array.isArray(p.records) ? (p.records as { type?: unknown }[]) : [];
-        const recordTypes = [...new Set(recs.map((r) => String(r?.type ?? "")).filter(Boolean))].sort();
-        return {
-          ...base,
-          name: nextDeed?.name ?? (typeof p.name === "string" ? p.name : null),
-          deedId,
-          recordsVersion: typeof res?.recordsVersion === "number" ? res.recordsVersion : undefined,
-          recordsCount: recs.length,
-          ...(recordTypes.length ? { recordTypes } : {}),
-        };
+        const nextDeed = next.deeds[p.expectedDeedId]!;
+        const recs = p.records as { type: string }[];
+        const recordTypes = [...new Set(recs.map((r) => r.type))].sort();
+        return { ...base, name: nextDeed.name, deedId: nextDeed.id, recordsVersion: res.recordsVersion, recordsCount: recs.length, ...(recordTypes.length ? { recordTypes } : {}) };
       }
       case "setPrimaryName": {
         const prevPrimary = prev.primaryNames?.[b.signer] ?? null;
         if (p.name === null) {
-          const prevDeedId = prevPrimary ? prev.names[prevPrimary]?.activeId ?? null : null;
-          return {
-            ...base,
-            name: prevPrimary,
-            deedId: prevDeedId,
-            clearedPrimary: true,
-          };
+          const prevDeedId = prevPrimary ? prev.names[prevPrimary]!.activeId : null;
+          return { ...base, name: prevPrimary, deedId: prevDeedId, clearedPrimary: true };
         }
-        const primaryName = typeof res?.primaryName === "string" ? res.primaryName : (typeof p.name === "string" ? p.name : null);
         return {
           ...base,
-          name: primaryName,
-          deedId: typeof res?.deedId === "string" ? res.deedId : (typeof p.expectedDeedId === "string" ? p.expectedDeedId : null),
+          name: res.primaryName,
+          deedId: res.deedId,
           clearedPrimary: false,
-          ...(prevPrimary && prevPrimary !== primaryName ? { replacedPrimary: prevPrimary } : {}),
+          ...(prevPrimary && prevPrimary !== res.primaryName ? { replacedPrimary: prevPrimary } : {}),
         };
       }
       case "announceAuction": {
-        const auctionId = typeof res?.auctionId === "string" ? res.auctionId : null;
-        const auc = auctionId ? next.auctions[auctionId] : null;
-        return {
-          ...base,
-          name: auc?.name ?? (typeof p.name === "string" ? p.name : null),
-          deedId: auc?.deedId ?? (typeof p.expectedDeedId === "string" ? p.expectedDeedId : null),
-          amount: typeof p.reserve === "string" ? p.reserve : null,
-          asset: typeof p.asset === "string" ? p.asset : null,
-          auctionId,
-        };
+        const auc = next.auctions[res.auctionId]!;
+        return { ...base, name: auc.name, deedId: auc.deedId, amount: p.reserve, asset: p.asset, auctionId: auc.id };
       }
       case "bid": {
-        const auctionId = typeof p.auctionId === "string" ? p.auctionId : null;
-        const auc = auctionId ? next.auctions[auctionId] : null;
-        const ben = typeof p.beneficiary === "string" && p.beneficiary !== b.signer ? p.beneficiary : null;
-        return {
-          ...base,
-          name: auc?.name ?? null,
-          deedId: auc?.deedId ?? null,
-          recipient: ben,
-          amount: typeof p.amount === "string" ? p.amount : null,
-          asset: typeof p.asset === "string" ? p.asset : null,
-          auctionId,
-        };
+        const auc = next.auctions[p.auctionId]!;
+        return { ...base, name: auc.name, deedId: auc.deedId, recipient: p.beneficiary !== b.signer ? p.beneficiary : null, amount: p.amount, asset: p.asset, auctionId: auc.id };
       }
       case "finalize": {
-        const auctionId = typeof p.auctionId === "string" ? p.auctionId : null;
-        const prevAuc = auctionId ? prev.auctions[auctionId] : null;
-        return {
-          ...base,
-          name: prevAuc?.name ?? null,
-          deedId: typeof res?.deedId === "string" ? res.deedId : null,
-          actor: prevAuc?.seller ?? b.signer,
-          recipient: typeof res?.owner === "string" ? res.owner : null,
-          amount: prevAuc?.high?.amount ?? null,
-          asset: prevAuc?.asset ?? null,
-          auctionId,
-        };
+        const prevAuc = prev.auctions[p.auctionId]!;
+        return { ...base, name: prevAuc.name, deedId: res.deedId, actor: prevAuc.seller, recipient: res.owner, amount: prevAuc.high!.amount, asset: prevAuc.asset, auctionId: prevAuc.id };
       }
       case "closeNoBid":
       case "cancelAuction": {
-        const auctionId = typeof p.auctionId === "string" ? p.auctionId : null;
-        const prevAuc = auctionId ? prev.auctions[auctionId] : null;
-        return {
-          ...base,
-          name: prevAuc?.name ?? null,
-          deedId: prevAuc?.deedId ?? null,
-          auctionId,
-        };
+        const prevAuc = prev.auctions[p.auctionId]!;
+        return { ...base, name: prevAuc.name, deedId: prevAuc.deedId, auctionId: prevAuc.id };
       }
       case "withdrawRefund": {
-        const auctionId = typeof p.auctionId === "string" ? p.auctionId : null;
-        const auc = auctionId ? next.auctions[auctionId] : null;
-        return {
-          ...base,
-          name: auc?.name ?? null,
-          amount: typeof res?.amount === "string" ? res.amount : (typeof p.amount === "string" ? p.amount : null),
-          asset: typeof res?.asset === "string" ? res.asset : (typeof p.asset === "string" ? p.asset : null),
-          auctionId,
-        };
+        const auc = next.auctions[p.auctionId]!;
+        return { ...base, name: auc.name, amount: res.amount, asset: res.asset, auctionId: auc.id };
       }
       case "createChildOffer": {
-        const parentDeed = typeof p.parentDeedId === "string" ? next.deeds[p.parentDeedId] : null;
-        return {
-          ...base,
-          name: parentDeed?.name ?? (typeof p.parent === "string" ? p.parent : null),
-          deedId: parentDeed?.id ?? (typeof p.parentDeedId === "string" ? p.parentDeedId : null),
-          amount: typeof p.price === "string" ? p.price : null,
-          asset: typeof p.asset === "string" ? p.asset : null,
-          offerId: typeof res?.offerId === "string" ? res.offerId : null,
-        };
+        const parentDeed = next.deeds[p.parentDeedId]!;
+        return { ...base, name: parentDeed.name, deedId: parentDeed.id, amount: p.price, asset: p.asset, offerId: res.offerId };
       }
       case "fillChildOffer": {
-        const offerId = typeof p.offerId === "string" ? p.offerId : null;
-        const prevOffer = offerId ? prev.offers[offerId] : null;
-        const parentDeed = prevOffer ? prev.deeds[prevOffer.parentId] : null;
-        return {
-          ...base,
-          name: typeof res?.name === "string" ? res.name : null,
-          parent: parentDeed?.name ?? null,
-          deedId: typeof res?.deedId === "string" ? res.deedId : null,
-          actor: prevOffer?.owner ?? b.signer,
-          recipient: b.signer,
-          amount: typeof p.amount === "string" ? p.amount : null,
-          asset: typeof p.asset === "string" ? p.asset : null,
-          offerId,
-        };
+        const prevOffer = prev.offers[p.offerId]!;
+        const parentDeed = prev.deeds[prevOffer.parentId]!;
+        return { ...base, name: res.name, parent: parentDeed.name, deedId: res.deedId, actor: prevOffer.owner, recipient: b.signer, amount: p.amount, asset: p.asset, offerId: prevOffer.id };
       }
       case "sellFixed": {
-        const deedId = typeof p.expectedDeedId === "string" ? p.expectedDeedId : null;
-        const deed = deedId ? next.deeds[deedId] : null;
-        return {
-          ...base,
-          name: deed?.name ?? (typeof p.name === "string" ? p.name : null),
-          deedId,
-          amount: typeof p.price === "string" ? p.price : null,
-          asset: typeof p.asset === "string" ? p.asset : null,
-          offerId: typeof res?.offerId === "string" ? res.offerId : null,
-        };
+        const deed = next.deeds[p.expectedDeedId]!;
+        return { ...base, name: deed.name, deedId: deed.id, amount: p.price, asset: p.asset, offerId: res.offerId };
       }
       case "buyFixed": {
-        const offerId = typeof p.offerId === "string" ? p.offerId : null;
-        const prevOffer = offerId ? prev.offers[offerId] : null;
-        const deedId = typeof res?.deedId === "string" ? res.deedId : (prevOffer?.parentId ?? null);
-        const deed = deedId ? next.deeds[deedId] : null;
-        return {
-          ...base,
-          name: deed?.name ?? null,
-          deedId,
-          actor: prevOffer?.owner ?? b.signer,
-          recipient: b.signer,
-          amount: typeof p.amount === "string" ? p.amount : null,
-          asset: typeof p.asset === "string" ? p.asset : null,
-          offerId,
-        };
+        const prevOffer = prev.offers[p.offerId]!;
+        const deed = next.deeds[res.deedId]!;
+        return { ...base, name: deed.name, deedId: deed.id, actor: prevOffer.owner, recipient: b.signer, amount: p.amount, asset: p.asset, offerId: prevOffer.id };
       }
       case "cancelOffer": {
-        const offerId = typeof p.offerId === "string" ? p.offerId : null;
-        const prevOffer = offerId ? prev.offers[offerId] : null;
-        const parentDeed = prevOffer ? prev.deeds[prevOffer.parentId] : null;
-        return {
-          ...base,
-          name: parentDeed?.name ?? null,
-          deedId: prevOffer?.parentId ?? null,
-          offerId,
-        };
+        const prevOffer = prev.offers[p.offerId]!;
+        const parentDeed = prev.deeds[prevOffer.parentId]!;
+        return { ...base, name: parentDeed.name, deedId: parentDeed.id, offerId: prevOffer.id };
       }
       case "renewLease": {
-        const deedId = typeof p.expectedDeedId === "string" ? p.expectedDeedId : null;
-        const deed = deedId ? next.deeds[deedId] : null;
-        return {
-          ...base,
-          name: deed?.name ?? (typeof p.name === "string" ? p.name : null),
-          deedId,
-          amount: typeof p.amount === "string" ? p.amount : null,
-          asset: typeof p.asset === "string" ? p.asset : null,
-          expiry: typeof res?.expiry === "number" ? res.expiry : null,
-        };
+        const deed = next.deeds[p.expectedDeedId]!;
+        return { ...base, name: deed.name, deedId: deed.id, amount: p.amount, asset: p.asset, expiry: res.expiry };
       }
       case "expireLease":
       case "revokeChild": {
-        const deedId = typeof p.expectedDeedId === "string" ? p.expectedDeedId : null;
-        const deed = deedId ? next.deeds[deedId] : null;
-        const parentDeed = deed?.parentId ? prev.deeds[deed.parentId] : null;
-        return {
-          ...base,
-          name: deed?.name ?? (typeof p.name === "string" ? p.name : null),
-          ...(parentDeed ? { parent: parentDeed.name } : {}),
-          deedId,
-        };
+        const deed = next.deeds[p.expectedDeedId]!;
+        const parentDeed = deed.parentId ? prev.deeds[deed.parentId]! : null;
+        return { ...base, name: deed.name, ...(parentDeed ? { parent: parentDeed.name } : {}), deedId: deed.id };
       }
-      default:
-        return base;
     }
   }
   nextNonce(id: string): number {
