@@ -8,6 +8,10 @@ import { need } from "../src/core.js";
 import { State, TitleStore } from "./escrow.js";
 import { poaNewNamePriceMicros } from "../src/new-name-prices.js";
 
+/** Standard POA auction window & anti-sniping quiet period (3 hours); premium stays 24 hours. */
+export const STANDARD_POA_AUCTION_MS = 10800000;
+export const PREMIUM_POA_AUCTION_MS = 86400000;
+
 /**
  * Scope escrow title locks to ONLY the specific domains (plus their emoji ownership classes,
  * active deeds, offers, and parent-mutating child actions) currently OPEN or SETTLING in escrow,
@@ -187,7 +191,8 @@ export function registryTitles(e: Engine, treasuryKey?: KeyObject): TitleStore {
         need(d && d.owner === seller && !d.lock && d.rights.kind === "permanent" && !d.retired, "ESCROW_TITLE");
         need(!Object.values(s.offers).some(o => o.parentId === d.id && !o.cancelled && o.uses < o.maxUses), "ESCROW_ENCUMBERED_TITLE");
         const premium = normalizeName(name, e.normalizationMode).tier === "premium";
-        return { reserve: "0.000001", window: premium ? 86400000 : 3600000, quiet: premium ? 86400000 : 3600000, deedId: d.id, ownerVersion: d.ownerVersion };
+        const dur = premium ? PREMIUM_POA_AUCTION_MS : STANDARD_POA_AUCTION_MS;
+        return { reserve: "0.000001", window: dur, quiet: dur, deedId: d.id, ownerVersion: d.ownerVersion };
       },
       validate: (packet: Packet, name, seller, buyer) => {
         need(packet.body.action === "transfer" && packet.body.signer === seller && packet.body.params.name === name &&

@@ -1,17 +1,17 @@
-import { installHelp } from "./ui-help.js?v=ed5254dbdbf4";
-import { wireManagement } from "./ui-manage.js?v=ed5254dbdbf4";
-import { bindTabKeys } from "./ui-a11y.js?v=ed5254dbdbf4";
-import { applySiteTitle, closeDetail, renderAuctions, setAuctionTab, wireExploreTabs } from "./ui-render.js?v=ed5254dbdbf4";
-import { ui } from "./ui-state.js?v=ed5254dbdbf4";
-import { canonical, digest, dismissNetworkBanner, instructions, isPoaAddress, loadBidderAddress, loadCart, loadKnownOwner, loadTabSeen, makeBody, parsePublicJSON, recheckCartItem, resolveOwnerInput, saveBidderAddress, shouldHoldTransactions } from "./shared.js?v=ed5254dbdbf4";
-import { activeUserAddress, navigateHome, notifyOwnerChanged, openAdvanced, openPoa, restoreViewFromURL, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=ed5254dbdbf4";
-import { el, endpointBase } from "./ui-core.js?v=ed5254dbdbf4";
-import { clearHandoff, copyDomainListingPrompt, copySubnameListing, isTermsGateOpen, setFeedbackModalOpen, wireFeedbackModal, wireTermsGate } from "./ui-handoff.js?v=ed5254dbdbf4";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=ed5254dbdbf4";
-import { submitSearchQuery, wireSearchAutocomplete } from "./ui-search.js?v=ed5254dbdbf4";
-import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=ed5254dbdbf4";
-import { copyText, flashCopied, selectElementText } from "./ui-copy.js?v=ed5254dbdbf4";
-import { cartCopyBlocked, cartPauseState, downloadCartJSON, clearAllCart, persistCart, renderCart, renderCurrentCartHandoff, setFloatingCartOpen } from "./ui-cart.js?v=ed5254dbdbf4";
+import { installHelp } from "./ui-help.js?v=41d7adc244c5";
+import { wireBidderInput, wireManagement } from "./ui-manage.js?v=41d7adc244c5";
+import { bindTabKeys } from "./ui-a11y.js?v=41d7adc244c5";
+import { applySiteTitle, closeDetail, renderAuctions, setAuctionTab, wireExploreTabs } from "./ui-render.js?v=41d7adc244c5";
+import { ui } from "./ui-state.js?v=41d7adc244c5";
+import { canonical, digest, dismissNetworkBanner, instructions, isPoaAddress, loadBidderAddress, loadCart, loadKnownOwner, loadTabSeen, makeBody, parsePublicJSON, recheckCartItem, resolveOwnerInput, saveBidderAddress, shouldHoldTransactions } from "./shared.js?v=41d7adc244c5";
+import { activeUserAddress, navigateHome, notifyOwnerChanged, openAdvanced, openPoa, restoreViewFromURL, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=41d7adc244c5";
+import { el, endpointBase } from "./ui-core.js?v=41d7adc244c5";
+import { clearHandoff, copyDomainListingPrompt, copySubnameListing, isTermsGateOpen, setFeedbackModalOpen, wireFeedbackModal, wireTermsGate } from "./ui-handoff.js?v=41d7adc244c5";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=41d7adc244c5";
+import { submitSearchQuery, wireSearchAutocomplete } from "./ui-search.js?v=41d7adc244c5";
+import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=41d7adc244c5";
+import { copyText, flashCopied, selectElementText } from "./ui-copy.js?v=41d7adc244c5";
+import { cartCopyBlocked, cartPauseState, downloadCartJSON, clearAllCart, persistCart, renderCart, renderCurrentCartHandoff, setFloatingCartOpen } from "./ui-cart.js?v=41d7adc244c5";
 try {
  ui.statusPanelDismissed = false; // New page visits show status; closing lasts for this page only.
  applySiteTitle();
@@ -25,22 +25,7 @@ try {
  ui.tabSeen = loadTabSeen(globalThis.localStorage);
  ui.bidderAddress = loadBidderAddress(globalThis.localStorage);
  ui.knownOwner = loadKnownOwner(globalThis.localStorage);
- const bidderInput = el("auctionsBidderInput");
- if (bidderInput) {
- bidderInput.value = ui.bidderAddress;
- const onBidderChange = () => {
- const v = bidderInput.value.trim();
- const resolved = isPoaAddress(v)
- ? v
- : (ui.latestState ? resolveOwnerInput(ui.latestState, v, ui.cap)?.owner : "");
- ui.bidderAddress = isPoaAddress(resolved) ? resolved : "";
- saveBidderAddress(globalThis.localStorage, ui.bidderAddress);
- if (ui.bidderAddress) syncEscrowPayerAddress(ui.bidderAddress);
- notifyOwnerChanged();
- };
- bidderInput.addEventListener("input", onBidderChange);
- bidderInput.addEventListener("change", onBidderChange);
- }
+ wireBidderInput();
  restoreViewFromURL();
  const keys = () => {
  el("keys").textContent = JSON.stringify(ui.cap?.actions?.[el("action").value] ?? {});

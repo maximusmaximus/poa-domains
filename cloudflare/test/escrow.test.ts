@@ -2196,14 +2196,16 @@ test("zero-handover instant settlement: fixed-price buy & closed auctions settle
  await e.command(command(who(3),"bid-beta-1","bid",{auction:oAuc.auction,amount:"10.000000"}));
  await e.command(command(who(4),"bid-beta-2","bid",{auction:oAuc.auction,amount:"12.000000"}));
  assert.equal(e.state().available[who(3)],"180000000","outbid bidder got instant credit back");
- net.now+=3600001; // past 1h standard window for beta!
+ assert.equal(e.state().auctions[oAuc.auction]!.window,10800000,"standard POA auction runs 3h window");
+ assert.equal(e.state().auctions[oAuc.auction]!.quiet,10800000,"standard POA auction runs 3h quiet");
+ net.now+=10800001; // past 3h standard window for beta!
  // Post-close won auto-settle auction CANNOT be cancelled by seller OR expired by anyone!
  await assert.rejects(e.command(command(who(2),"rug-beta","cancel",{auction:oAuc.auction})),/ESCROW_CANCEL_NOT_ALLOWED/);
  await assert.rejects(e.command(command(who(3),"snipe-beta","expire",{auction:oAuc.auction})),/ESCROW_CANCEL_NOT_ALLOWED/);
  // Treasury auction also settles automatically with ONE single payout (fee=0)!
  const oTrez=await e.command(command(who(5),"open-trez","open",{name:"trez",reserve:"5.000000"})) as any;
  await e.command(command(who(3),"bid-trez","bid",{auction:oTrez.auction,amount:"10.000000"}));
- net.now+=3600001; // past trez window too
+ net.now+=10800001; // past 3h trez window too
 
  // Inject crashes across every phase (before-submit, after-submit, after-payout, before-title) and recover with fresh Escrow instances!
  for (const point of ["before-submit","after-submit","after-payout","before-title"]) {

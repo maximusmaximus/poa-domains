@@ -74,6 +74,7 @@ export async function uiHarness(profile = "fixture", options = {}) {
     }
     if (u.pathname === "/v1/escrow/capabilities") return json(h.escrowCap ?? { enabled: false });
     if (u.pathname === "/v1/escrow/market") return json(h.escrowMarket ?? { items: [], serverTime: Date.now() });
+    if (u.pathname === "/v1/escrow/subnames") return json(h.escrowSubnames ?? { items: [], serverTime: Date.now() });
     if (u.pathname.startsWith("/v1/")) return json({ code: "NOT_FOUND" }, 404);
     const pathname = u.pathname === "/" || /^\/(d|p)\/[^/]+$/.test(u.pathname) ? "/index.html" : u.pathname === "/terms" ? "/terms.html" : u.pathname;
     const file = resolve(root, "." + pathname);

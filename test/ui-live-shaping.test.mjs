@@ -566,6 +566,8 @@ import {
   formatPoaCompact,
   computeExplorerMarketData,
   sortLeaderboard,
+  displayAccountLabel,
+  validateAccountOrDomainInput,
 } from "../reference-web/shared.js";
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -653,6 +655,20 @@ test("served UI HTML has no visible xero emoji phrasing", () => {
   assert.ok(html.includes('id="explorePanelLeaderboard"'));
   assert.ok(html.includes('id="leaderboard"'));
   assert.ok(html.includes('id="leaderboardSort"'));
+  assert.ok(html.includes('id="auctionsBidderClear"'));
+  assert.ok(html.includes('id="manageOwnerClear"'));
+  assert.ok(html.includes('id="manageTabs"'));
+  assert.ok(html.includes('id="manageTabAll"'));
+  assert.ok(html.includes('id="manageTabListed"'));
+  assert.ok(html.includes('id="manageTabSubdomains"'));
+  assert.ok(html.includes('id="manageListedTabSale"'));
+  assert.ok(html.includes('id="manageListedTabAuction"'));
+  assert.ok(html.includes('id="manageSubdomainsContent"'));
+  const helpJs = readFileSync(resolve(root, "reference-web/ui-help.js"), "utf8");
+  assert.ok(
+    helpJs.includes("Automatic settlement: escrow pays seller + fee on-chain and commits title once funded or closed (zero seller handover step)."),
+    "ui-help.js must contain exact automatic settlement guidance",
+  );
 });
 
 test("formatPoaCompact formats whole and fractional POA cleanly", () => {
@@ -724,6 +740,7 @@ test("computeExplorerMarketData computes POA sales stats, top buyers/sellers, an
   assert.equal(data.isPoa, true);
   assert.equal(data.ownedCount, 7);
   assert.equal(data.uniqueOwners, 4);
+  assert.equal(data.uniqueUsers, 3); // whale, collector, seller (excludes protocol treasury)
   assert.equal(data.mintCount, 3);
   assert.equal(data.mintVolumeLabel, "300 POA");
   assert.equal(data.marketSalesCount, 2);
@@ -787,4 +804,52 @@ test("computeExplorerMarketData computes non-POA registry sales stats cleanly", 
   assert.equal(data.activeFixedCount, 1);
   assert.equal(sortLeaderboard(data.sellers, "volume")[0].count, 2);
   assert.equal(sortLeaderboard(data.buyers, "volume")[0].owner, "ed25519:buyer1");
+  assert.equal(data.uniqueUsers, 3);
+});
+
+test("displayAccountLabel and validateAccountOrDomainInput validate POA keys, domains, and Main domain auto-load", () => {
+  const whale = "poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf";
+  const plain = "poa1" + "1".repeat(31) + "2";
+  const state = {
+    names: {
+      nebula: { activeId: "d1" },
+      comet: { activeId: "d2" },
+    },
+    deeds: {
+      d1: { id: "d1", name: "nebula", owner: whale },
+      d2: { id: "d2", name: "comet", owner: plain },
+    },
+    primaryNames: { [whale]: "nebula" },
+  };
+  assert.equal(displayAccountLabel(state, whale), "nebula");
+  assert.equal(displayAccountLabel(state, plain), plain);
+  assert.equal(displayAccountLabel(state, ""), "");
+
+  assert.equal(validateAccountOrDomainInput(state, "").empty, true);
+  const byAddrMain = validateAccountOrDomainInput(state, whale);
+  assert.equal(byAddrMain.ok, true);
+  assert.equal(byAddrMain.kind, "address");
+  assert.equal(byAddrMain.owner, whale);
+  assert.equal(byAddrMain.primaryDomain, "nebula");
+
+  const byAddrPlain = validateAccountOrDomainInput(state, plain);
+  assert.equal(byAddrPlain.ok, true);
+  assert.equal(byAddrPlain.primaryDomain, null);
+
+  const byDomain = validateAccountOrDomainInput(state, "comet");
+  assert.equal(byDomain.ok, true);
+  assert.equal(byDomain.kind, "domain");
+  assert.equal(byDomain.owner, plain);
+
+  const badPoa = validateAccountOrDomainInput(state, "poa1notvalid0OIl");
+  assert.equal(badPoa.ok, false);
+  assert.match(badPoa.error, /Invalid POA public key format/i);
+
+  const unreg = validateAccountOrDomainInput(state, "unclaimedname");
+  assert.equal(unreg.ok, false);
+  assert.match(unreg.error, /not registered yet/i);
+
+  const priv = validateAccountOrDomainInput(state, "-----BEGIN PRIVATE KEY-----");
+  assert.equal(priv.ok, false);
+  assert.match(priv.error, /Never paste a private key/i);
 });

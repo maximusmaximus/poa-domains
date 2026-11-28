@@ -874,7 +874,16 @@ export class Escrow {
             }
           } else if(!prevHigh){
             a.startedAt=now;
-            a.closes=awaitingFirstBid?now+(a.window??a.quiet):Math.max(a.closes,now+a.quiet);
+            let effWindow=a.window??a.quiet,effQuiet=a.quiet;
+            if(awaitingFirstBid){
+              try{
+                const freshTerms=this.titles.terms(a.name,a.seller);
+                if(freshTerms.window>effWindow)effWindow=freshTerms.window;
+                if(freshTerms.quiet>effQuiet)effQuiet=freshTerms.quiet;
+                a.window=effWindow;a.quiet=effQuiet;
+              }catch{/* keep recorded auction terms if mocked title store rejects */}
+            }
+            a.closes=awaitingFirstBid?now+effWindow:Math.max(a.closes,now+effQuiet);
             (a.history??=[]).push({event:"Auction started (first bid)",at:now,amount:String(n),payer:c.actor});
           } else {
             a.closes=Math.max(a.closes,now+a.quiet);

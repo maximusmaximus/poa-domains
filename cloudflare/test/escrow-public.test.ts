@@ -215,3 +215,27 @@ test('waitTimeTelemetry computes rolling average purchase and sale completion ti
  assert.ok(!serialized.includes(who(3)));
  assert.ok(!serialized.includes(who(4)));
 });
+
+test('queued legacy 1h standard auctions report 3h in marketView and start a 3h timer on first bid',async()=>{
+ let curWindow=3600000;
+ const net=new MockNetwork(),journal=new MemoryJournal(policy);
+ const titles={terms:()=>({reserve:'1.000000',window:curWindow,quiet:curWindow}),validate:()=>{},commit:()=>{}};
+ const e={net,journal,escrow:new Escrow(journal,net,signer(),titles,policy,()=>net.now,()=>true)};
+ await e.escrow.pause(false);
+ await fund(e,3,'5.000000','fund-3h');
+ const opened:any=await call(e,2,'open',{name:'queued3h',reserve:'2.000000'},'open-queued3h');
+ const id=opened.result.auction;
+ assert.equal(e.escrow.state().auctions[id]!.window,3600000);
+ const before=marketView(e.escrow.state(),'queued3h',true,10800000)[0]!;
+ assert.equal(before.awaitingFirstBid,true);
+ assert.equal(before.window,10800000);
+ assert.equal(before.quiet,10800000);
+ curWindow=10800000;
+ const bidStart=net.now;
+ await call(e,3,'bid',{auction:id,amount:'2.000000'},'first-bid-3h');
+ const live=marketView(e.escrow.state(),'queued3h',true,10800000)[0]!;
+ assert.equal(live.awaitingFirstBid,false);
+ assert.equal(live.window,10800000);
+ assert.equal(live.quiet,10800000);
+ assert.equal(live.closes,bidStart+10800000);
+});
