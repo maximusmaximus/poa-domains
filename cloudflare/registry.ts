@@ -1,7 +1,7 @@
 import { AUDITED_REGISTRY, publicRegistryRoute } from "./public-registry-view.js";
 import { registryRoute, type RegistryCall, type RegistryReply } from "../src/registry-routes.js";
 import { marketView, publicCommand, subnameView, waitTimeTelemetry } from "./escrow-public.js";
-import { escrowPacketBlocked, registryTitles } from "./escrow-titles.js";
+import { escrowPacketBlocked, registryTitles, STANDARD_POA_AUCTION_MS } from "./escrow-titles.js";
 import { backupCommittedProfile } from "./profiles-storage.js";
 import { validPoaAddr } from "./treasury.js";
 import { DurableObject } from "cloudflare:workers";
@@ -494,7 +494,7 @@ export class PoaRegistry extends DurableObject<Env> {
     if(path==="intent")return escrow.depositView(query.id!,query.txid);
     if(path==="market"||path==="domain"){
       const es=escrow.state();
-      const base={items:marketView(es,path==="domain"?query.name:undefined,escrow.instantSettlement()),serverTime:Date.now()};
+      const base={items:marketView(es,path==="domain"?query.name:undefined,escrow.instantSettlement(),STANDARD_POA_AUCTION_MS),serverTime:Date.now()};
       if(path==="market"){
         const snap=this.engine.snapshot();
         return {...base,telemetry:{waitTime:waitTimeTelemetry(es,{treasury:this.engine.config.treasury,receipts:snap.receipts})}};

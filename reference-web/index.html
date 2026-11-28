@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=90139be24273" />
+    <link rel="stylesheet" href="/style.css?v=7e890da03cf8" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -91,11 +91,11 @@
           <button id="searchBtn" type="button">Check</button>
           <ul id="searchSuggestions" class="search-suggestions" role="listbox" aria-label="Search results and suggested names" hidden></ul>
         </div>
-        <p data-info-description id="searchHelpText" class="muted">Enter a name or emoji, then select 🔍 to check its registry availability. Add a result to your planning cart or open its page. No payment is sent.</p>
-        <p data-info-description id="searchPrivacy" class="muted">Submitted name searches are saved without IP or account details to improve suggestions. Query text is saved: do not enter personal information, wallet addresses or keys.</p>
+        <p data-info-description id="searchHelpText" class="muted">🔍 Enter a name or emoji, then select 🔍 to check its registry availability. 🛒 Add a result to your planning cart or open its page. 🛡️ No payment is sent.</p>
+        <p data-info-description id="searchPrivacy" class="muted">📊 Submitted name searches are saved without IP or account details to improve suggestions. 🔒 Query text is saved: do not enter personal information, wallet addresses or keys.</p>
         <p data-info-description id="searchLogStatus" class="muted" role="status" aria-live="polite"></p>
         <p id="searchResultStatus" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
-        <p data-info-description id="searchLastChecked" class="muted">Results below are for the last name you checked. Press Check after editing.</p>
+        <p data-info-description id="searchLastChecked" class="muted">🔎 Results below are for the last name you checked. 🔄 Press Check after editing.</p>
         <div id="searchResult" class="search-result"></div>
 
         <div id="cartAnchor" class="cart-panel cart-empty">
@@ -130,11 +130,15 @@
 
       <section id="auctionsSection" data-section="auctions" role="tabpanel" aria-labelledby="tabAuctions" tabindex="0" hidden>
         <h2>🏷️ Auctions</h2>
-        <p data-info-description class="howto">Past · Current · Upcoming. Queued inventory auctions start their timer when the first bid is placed. Tap a name for history.</p>
+        <p data-info-description class="howto">🗂️ Past · Current · Upcoming. ⏱️ Queued inventory auctions start their 3h timer when the first bid is placed. 📜 Tap a name for history.</p>
         <p id="auctionsStartNote" class="escrow-balance-note" role="note">⏱️ An auction starts with the first bid.</p>
         <div id="auctionsBidderBar" class="auctions-bidder-bar" hidden>
           <label for="auctionsBidderInput">👤 Track your bids</label>
-          <input id="auctionsBidderInput" type="text" autocomplete="off" placeholder="poa1… address or domain name" maxlength="80" />
+          <span class="input-clear-wrap">
+            <input id="auctionsBidderInput" type="text" autocomplete="off" placeholder="poa1… address or domain name" maxlength="80" />
+            <button type="button" id="auctionsBidderClear" class="field-clear-btn" aria-label="Clear tracked account" title="Clear" hidden>✕</button>
+          </span>
+          <span id="auctionsBidderStatus" class="field-inline-status" role="alert" aria-live="polite" hidden></span>
         </div>
         <div class="auction-tabs" role="tablist" aria-label="Auction filters">
           <button type="button" class="auction-tab is-active" role="tab" aria-selected="true" data-auction-tab="current" id="auctionTabCurrent" aria-controls="auctions" tabindex="0">Current</button>
@@ -240,8 +244,8 @@
         <h2 id="handoffHeading">⚙️ Advanced</h2>
         <p data-info-description class="howto">Give your agent a clear request — this page does not sign, pay or register a name.</p>
         <ol class="handoff-steps"><li>🔍 Find a name and add it to your planning cart.</li><li>🛒 Check each POA price, then copy the cart request or download its JSON.</li><li>🤖 Give it to your agent. Ask it to check prices and ownership again, preview the action, and ask for your approval before sending anything.</li></ol>
-        <p data-info-description>Why? Your agent needs the exact name, POA price and current registry version. A copied request is not a payment or proof of ownership.</p>
-        <details id="advancedHandoff"><summary>Advanced: build one unsigned action by hand</summary><p data-info-description>For agents and experienced users. Public addresses and data only. Never paste a private key. Machine field names below match the API; times are Unix timestamps, not a countdown.</p>
+        <p data-info-description>💡 Why? Your agent needs the exact name, POA price and current registry version. 🛡️ A copied request is not a payment or proof of ownership.</p>
+        <details id="advancedHandoff"><summary>Advanced: build one unsigned action by hand</summary><p data-info-description>🤖 For agents and experienced users. 🌐 Public addresses and data only — never paste a private key. ⏱️ Machine field names below match the API; times are Unix timestamps, not a countdown.</p>
         <button type="button" id="example" hidden>Load example</button>
         <p id="exampleNotice"></p>
         <form id="handoff">
@@ -272,11 +276,34 @@
       <section id="escrowSection" data-section="escrow" role="tabpanel" aria-labelledby="tabEscrow" tabindex="0" hidden>
         <div id="manageDomains" class="manage-domains">
           <h2>🌱 Manage domains and subdomains</h2>
-          <p data-info-description>View a public owner address. This is not a wallet connection or proof that you own it.</p>
-          <div id="manageOwnerLabelRow" class="field-label-row"><label for="manageOwner">Public owner address</label></div><div class="search-bar"><input id="manageOwner" autocomplete="off" placeholder="poa1… address or domain name" /><button id="manageLookup" type="button">View names</button></div>
+          <p data-info-description>👀 View a public owner address. 🔒 This is not a wallet connection or proof that you own it.</p>
+          <div id="manageOwnerLabelRow" class="field-label-row"><label for="manageOwner">Public owner address</label></div><div class="search-bar"><span class="input-clear-wrap"><input id="manageOwner" autocomplete="off" placeholder="poa1… address or domain name" /><button type="button" id="manageOwnerClear" class="field-clear-btn" aria-label="Clear public owner address" title="Clear" hidden>✕</button></span><button id="manageLookup" type="button">View names</button></div>
           <div id="manageOwnerNotice" class="muted has-info" role="status" aria-live="polite" hidden></div>
-          <p data-info-description>Open a name to view it, edit its public profile (addresses, bio, and avatar), or prepare a sale or subdomain request for its owner's agent. Retiring a subdomain needs both the child holder and parent owner. Nothing is sent from these controls.</p>
-          <div id="manageNames" class="cards"></div>
+          <p data-info-description>🪪 Open a name to view it, edit its public profile (addresses, bio, and avatar), or prepare a sale or subdomain request for its owner's agent. 🤝 Retiring a subdomain needs both the child holder and parent owner. 🛡️ Nothing is sent from these controls.</p>
+          <div id="manageTabs" class="manage-tabs" role="tablist" aria-label="Manage domains sections">
+            <button type="button" class="manage-tab is-active" role="tab" aria-selected="true" data-manage-tab="all" id="manageTabAll" aria-controls="managePanelAll" tabindex="0">🏷️ All</button>
+            <button type="button" class="manage-tab" role="tab" aria-selected="false" data-manage-tab="listed" id="manageTabListed" aria-controls="managePanelListed" tabindex="-1">💰 Currently Listed</button>
+            <button type="button" class="manage-tab" role="tab" aria-selected="false" data-manage-tab="subdomains" id="manageTabSubdomains" aria-controls="managePanelSubdomains" tabindex="-1">🌿 Sub Domains</button>
+          </div>
+          <div id="managePanelAll" class="manage-panel" data-manage-panel="all" role="tabpanel" aria-labelledby="manageTabAll">
+            <div id="manageNames" class="cards"></div>
+          </div>
+          <div id="managePanelListed" class="manage-panel" data-manage-panel="listed" role="tabpanel" aria-labelledby="manageTabListed" hidden>
+            <div id="manageListedSubtabs" class="manage-subtabs" role="tablist" aria-label="Currently listed filters">
+              <button type="button" class="manage-listed-subtab is-active" role="tab" aria-selected="true" data-listed-subtab="sale" id="manageListedTabSale" aria-controls="manageListedPanelSale" tabindex="0">🏷️ For Sale</button>
+              <button type="button" class="manage-listed-subtab" role="tab" aria-selected="false" data-listed-subtab="auction" id="manageListedTabAuction" aria-controls="manageListedPanelAuction" tabindex="-1">🔥 For Auction</button>
+            </div>
+            <div id="manageListedPanelSale" class="manage-listed-panel" data-listed-panel="sale" role="tabpanel" aria-labelledby="manageListedTabSale">
+              <div id="manageListedSaleList" class="cards"></div>
+            </div>
+            <div id="manageListedPanelAuction" class="manage-listed-panel" data-listed-panel="auction" role="tabpanel" aria-labelledby="manageListedTabAuction" hidden>
+              <div id="manageListedAuctionList" class="cards"></div>
+            </div>
+          </div>
+          <div id="managePanelSubdomains" class="manage-panel" data-manage-panel="subdomains" role="tabpanel" aria-labelledby="manageTabSubdomains" hidden>
+            <div id="manageSubdomainsHead" class="explore-panel-head"><h3>🌿 Sub Domains</h3></div>
+            <div id="manageSubdomainsContent"></div>
+          </div>
           <div id="managePromptPanel" class="agent-prompt-panel" hidden>
             <div class="agent-prompt-header">
               <h3>🤖 Agent prompt</h3>
@@ -305,11 +332,11 @@
         <div id="domainListing" class="card" hidden></div>
         <div id="domainActions" class="button-row"></div>
         <div id="domainOwnerTools" class="owner-tools" hidden>
-          <div id="poaSellTools" hidden><h3>🏷️ Sell or auction</h3><p data-info-description class="howto">List or auction your name in 🪙 My POA. Listing or auctioning pauses profile fields and drops them on transfer (archived on this page). Your agent signs; nothing submits here.</p><div id="poaSellActions" class="button-row"><button type="button" id="poaSellBtn">🏷️ Sell</button><button type="button" id="poaAuctionBtn" class="secondary">🔨 Auction</button></div>
-          <div id="poaSubnameTools"><h3>🧩 Sell subnames</h3><p data-info-description class="howto">Set one POA price for new subnames like shop.yourname. Buyers pay with POA checkout and your share is paid out to you from escrow. Your agent signs; nothing submits here.</p><label>Subname price (POA) <input id="subnamePriceInput" inputmode="decimal" placeholder="10" aria-label="Subname price" /></label><button type="button" id="poaSubnameBtn">🧩 Copy agent request</button><pre id="subnamePromptBox" class="prompt-box" hidden></pre><p id="subnamePromptStatus" class="muted" role="status"></p></div></div>
+          <div id="poaSellTools" hidden><h3>🏷️ Sell or auction</h3><p data-info-description class="howto">🪙 List or auction your name in 🪙 My POA. ⏸️ Listing or auctioning pauses profile fields and drops them on transfer (archived on this page). 🤖 Your agent signs; nothing submits here.</p><div id="poaSellActions" class="button-row"><button type="button" id="poaSellBtn">🏷️ Sell</button><button type="button" id="poaAuctionBtn" class="secondary">🔨 Auction</button></div>
+          <div id="poaSubnameTools"><h3>🧩 Sell subnames</h3><p data-info-description class="howto">🏷️ Set one POA price for new subnames like shop.yourname. 🪙 Buyers pay with POA checkout and your share is paid out to you from escrow. 🤖 Your agent signs; nothing submits here.</p><label>Subname price (POA) <input id="subnamePriceInput" inputmode="decimal" placeholder="10" aria-label="Subname price" /></label><button type="button" id="poaSubnameBtn">🧩 Copy agent request</button><pre id="subnamePromptBox" class="prompt-box" hidden></pre><p id="subnamePromptStatus" class="muted" role="status"></p></div></div>
           <div id="unitSellTools">
           <h3>💰 Sell</h3>
-          <p data-info-description class="howto">Owners list, change price, or unlist. Listing pauses profile fields and drops them on transfer (archived on this page). Copy a prompt for your agent — nothing submits here.</p>
+          <p data-info-description class="howto">🏷️ Owners list, change price, or unlist. ⏸️ Listing pauses profile fields and drops them on transfer (archived on this page). 🤖 Copy a prompt for your agent — nothing submits here.</p>
           <label>
             Price
             <input id="listPriceInput" inputmode="numeric" placeholder="2500" aria-label="List price" />
@@ -514,6 +541,6 @@
       </details>
     </div>
 
-    <script type="module" src="/app.js?v=ed5254dbdbf4"></script>
+    <script type="module" src="/app.js?v=41d7adc244c5"></script>
   </body>
 </html>

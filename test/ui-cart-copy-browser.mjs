@@ -3139,6 +3139,7 @@ try {
     await expect(pageLb.locator("#stats")).toContainText("top sale");
     await expect(pageLb.locator("#stats")).toContainText("250 POA");
     await expect(pageLb.locator("#stats")).toContainText("floor price (2 listed)");
+    await expect(pageLb.locator("#stats")).toContainText("unique users");
 
     // Open 🏆 Leaderboard tab and verify Top Buyers & Top Sellers
     await expect(pageLb.locator("#exploreTabLeaderboard")).toContainText("Leaderboard");
@@ -3191,6 +3192,141 @@ try {
     h.payload.state.deeds = prevDeeds;
     h.payload.state.names = prevNames;
     h.payload.state.receipts = prevReceipts;
+  }
+
+  // 3h auction timer, Main-domain auto-prefill, inside-right ✕ clear + validation, Manage tabs (All / Currently Listed / Sub Domains), & Automatic settlement info boxes
+  {
+    const prevMarket = h.escrowMarket;
+    const prevSubs = h.escrowSubnames;
+    const prevEscrowCap = h.escrowCap;
+    const prevDeeds = { ...h.payload.state.deeds };
+    const prevNames = { ...h.payload.state.names };
+    const prevPrimary = { ...(h.payload.state.primaryNames || {}) };
+    const uxMain = "poa1" + "1".repeat(31) + "8";
+    const uxOther = "poa1" + "1".repeat(31) + "9";
+    const nowMs = Date.now();
+    h.payload.state.deeds["ux-d-root"] = { id: "ux-d-root", name: "voyager", owner: uxMain, parentId: null, retired: false, version: 1, ownerVersion: 1, rights: { kind: "permanent" }, records: [], metadata: [] };
+    h.payload.state.deeds["ux-d-sale"] = { id: "ux-d-sale", name: "beacon", owner: uxMain, parentId: null, retired: false, version: 1, ownerVersion: 1, rights: { kind: "permanent" }, records: [], metadata: [] };
+    h.payload.state.deeds["ux-d-auc"] = { id: "ux-d-auc", name: "zenith", owner: uxMain, parentId: null, retired: false, version: 1, ownerVersion: 1, rights: { kind: "permanent" }, records: [], metadata: [] };
+    h.payload.state.deeds["ux-d-sub"] = { id: "ux-d-sub", name: "app.voyager", owner: uxOther, parentId: "ux-d-root", retired: false, version: 1, ownerVersion: 1, rights: { kind: "permanent" }, records: [], metadata: [] };
+    h.payload.state.deeds["ux-d-other"] = { id: "ux-d-other", name: "quasar", owner: uxOther, parentId: null, retired: false, version: 1, ownerVersion: 1, rights: { kind: "permanent" }, records: [], metadata: [] };
+    h.payload.state.names.voyager = { name: "voyager", key: "voyager", activeId: "ux-d-root", auctionId: null };
+    h.payload.state.names.beacon = { name: "beacon", key: "beacon", activeId: "ux-d-sale", auctionId: null };
+    h.payload.state.names.zenith = { name: "zenith", key: "zenith", activeId: "ux-d-auc", auctionId: null };
+    h.payload.state.names["app.voyager"] = { name: "app.voyager", key: "app.voyager", activeId: "ux-d-sub", auctionId: null };
+    h.payload.state.names.quasar = { name: "quasar", key: "quasar", activeId: "ux-d-other", auctionId: null };
+    h.payload.state.primaryNames = { ...prevPrimary, [uxMain]: "voyager" };
+
+    h.escrowCap = { ...(prevEscrowCap || {}), enabled: true, held: false };
+    h.escrowMarket = {
+      serverTime: nowMs,
+      items: [
+        { id: "ux-fixed-1", kind: "fixed", name: "beacon", seller: uxMain, status: "OPEN", price: "350.000000", minimumNextBid: "350.000000", closes: 0, window: 10800000, quiet: 10800000, awaitingFirstBid: false, autoSettle: true, high: null, bidders: [], history: [] },
+        { id: "ux-auc-1", kind: "auction", name: "zenith", seller: uxMain, status: "OPEN", price: "200.000000", minimumNextBid: "200.000000", closes: 0, window: 10800000, quiet: 10800000, awaitingFirstBid: true, autoSettle: true, high: null, bidders: [], history: [] },
+        { id: "ux-auc-live", kind: "auction", name: "quasar", seller: uxOther, status: "OPEN", price: "100.000000", minimumNextBid: "165.000001", closes: nowMs + 10800000, window: 10800000, quiet: 10800000, awaitingFirstBid: false, autoSettle: true, high: { payer: uxMain, amount: "150.000000" }, bidders: [uxMain], history: [] },
+      ],
+    };
+    h.escrowSubnames = {
+      serverTime: nowMs,
+      items: [{ id: "e".repeat(64), parent: "voyager", seller: uxMain, price: "25.000000", status: "OPEN", createdAt: nowMs - 1000, sold: [{ name: "app.voyager", buyer: uxOther, at: nowMs - 500 }] }],
+    };
+
+    const ctxNew = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const pageNew = await ctxNew.newPage();
+    const newErrors = [];
+    pageNew.on("pageerror", (e) => newErrors.push(e.message));
+    await pageNew.route("https://**", (r) => r.abort());
+    await pageNew.goto(`${h.url}/?tab=escrow`);
+    await pageNew.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await pageNew.locator("#termsAgreeBtn").click();
+
+    // 1) Pasting a POA pub key with a Main domain auto-loads the Main domain into #manageOwner and shows inside-right ✕
+    await pageNew.locator("#manageOwner").fill(uxMain);
+    await expect(pageNew.locator("#manageOwner")).toHaveValue("voyager");
+    await expect(pageNew.locator("#manageOwnerClear")).toBeVisible();
+    await expect(pageNew.locator('#manageNames article[data-domain-name="voyager"]')).toBeVisible();
+
+    // 2) Manage tabs: All, Currently Listed (subtabs For Sale + For Auction), Sub Domains (Existing + Listing Tools + ℹ️)
+    await expect(pageNew.locator("#manageTabAll")).toContainText("All (3)");
+    await expect(pageNew.locator("#manageTabListed")).toContainText("Currently Listed (2)");
+    await expect(pageNew.locator("#manageTabSubdomains")).toContainText("Sub Domains (1)");
+
+    await pageNew.locator("#manageTabListed").click();
+    await expect(pageNew.locator("#managePanelListed")).toBeVisible();
+    await expect(pageNew.locator("#manageListedTabSale")).toContainText("For Sale (1)");
+    await expect(pageNew.locator("#manageListedTabAuction")).toContainText("For Auction (1)");
+    await expect(pageNew.locator('#manageListedSaleList article[data-listed-domain="beacon"]')).toBeVisible();
+    await pageNew.locator("#manageListedTabAuction").click();
+    await expect(pageNew.locator('#manageListedAuctionList article[data-listed-auction="zenith"]')).toBeVisible();
+    await expect(pageNew.locator('#manageListedAuctionList article[data-listed-auction="zenith"]')).toContainText("3h timer");
+
+    await pageNew.locator("#manageTabSubdomains").click();
+    await expect(pageNew.locator("#managePanelSubdomains")).toBeVisible();
+    await expect(pageNew.locator('#manageExistingSubdomains article[data-issued-subdomain="app.voyager"]')).toBeVisible();
+    await expect(pageNew.locator('#manageSubdomainListingTools article[data-subname-root="voyager"]')).toContainText("Active listing: 25 POA");
+    await pageNew.locator('#manageSubdomainListingTools button[data-subname-list-btn="voyager"]').click();
+    await expect(pageNew.locator("#managePrompt")).toContainText("list-sub");
+    await pageNew.locator("#help-manage-subdomains-info").click();
+    await expect(pageNew.locator("#info-manage-subdomains-info")).toBeVisible();
+    await expect(pageNew.locator("#info-manage-subdomains-info")).toContainText("Automatic settlement: escrow pays seller + fee on-chain and commits title once funded or closed (zero seller handover step).");
+    await pageNew.keyboard.press("Escape");
+
+    // 3) Top-right ℹ️ on Manage Domains & Escrow Payments includes exact Automatic Settlement sentence & multi-paragraph emoji formatting
+    await pageNew.locator("#help-manageDomains").click();
+    await expect(pageNew.locator("#info-manageDomains")).toBeVisible();
+    await expect(pageNew.locator("#info-manageDomains")).toContainText("Automatic settlement: escrow pays seller + fee on-chain and commits title once funded or closed (zero seller handover step).");
+    assert.ok((await pageNew.locator("#info-manageDomains p").count()) >= 3, "Multi-sentence info box should split into emoji paragraphs");
+    await pageNew.keyboard.press("Escape");
+
+    // 4) Clicking Auctions auto-prefills Track your bids with the user's Main domain ("voyager"), shows 3h timer on Upcoming, and tracks Leading badge
+    await pageNew.locator("#tabAuctions").click();
+    await expect(pageNew.locator("#auctionsBidderInput")).toHaveValue("voyager");
+    await expect(pageNew.locator("#auctionsBidderClear")).toBeVisible();
+    await expect(pageNew.locator('#auctions article[data-auction-id="ux-auc-live"] .auction-leading-badge')).toBeVisible();
+    await pageNew.locator("#auctionTabUpcoming").click();
+    await expect(pageNew.locator('#auctions article[data-auction-id="ux-auc-1"]')).toContainText("3h timer");
+    await pageNew.locator("#auctionTabCurrent").click();
+
+    // 5) Clicking inside-right ✕ on Track your bids clears the field and removes tracked Leading badge below; bad POA key fails validation
+    await pageNew.locator("#auctionsBidderClear").click();
+    await expect(pageNew.locator("#auctionsBidderInput")).toHaveValue("");
+    await expect(pageNew.locator("#auctionsBidderClear")).toBeHidden();
+    await expect(pageNew.locator('#auctions article[data-auction-id="ux-auc-live"] .auction-leading-badge')).toHaveCount(0);
+    await pageNew.locator("#auctionsBidderInput").fill("poa1badaddress0OIl");
+    await pageNew.locator("#auctionsBidderInput").press("Enter");
+    await expect(pageNew.locator("#auctionsBidderStatus")).toBeVisible();
+    await expect(pageNew.locator("#auctionsBidderInput")).toHaveAttribute("aria-invalid", "true");
+    // Pasting valid POA address with Main domain swaps to Main domain and restores Leading badge
+    await pageNew.locator("#auctionsBidderInput").fill(uxMain);
+    await expect(pageNew.locator("#auctionsBidderInput")).toHaveValue("voyager");
+    await expect(pageNew.locator('#auctions article[data-auction-id="ux-auc-live"] .auction-leading-badge')).toBeVisible();
+
+    // 6) Clicking inside-right ✕ on Manage Public owner address clears ALL data below; bad key shows validation; pasting new owner loads new owner
+    await pageNew.locator("#tabEscrow").click();
+    await pageNew.locator("#manageTabAll").click();
+    await pageNew.locator("#manageOwnerClear").click();
+    await expect(pageNew.locator("#manageOwner")).toHaveValue("");
+    await expect(pageNew.locator("#manageOwnerClear")).toBeHidden();
+    await expect(pageNew.locator("#manageNames article.card")).toHaveCount(0);
+    await expect(pageNew.locator("#managePromptPanel")).toBeHidden();
+    await pageNew.locator("#manageOwner").fill("poa1badaddress0OIl");
+    await pageNew.locator("#manageLookup").click();
+    await expect(pageNew.locator("#manageOwner")).toHaveAttribute("aria-invalid", "true");
+    await expect(pageNew.locator("#manageNames")).toContainText("Invalid POA public key format");
+    // Pasting uxOther loads uxOther's domain ("quasar") cleanly
+    await pageNew.locator("#manageOwner").fill(uxOther);
+    await expect(pageNew.locator('#manageNames article[data-domain-name="quasar"]')).toBeVisible();
+    await expect(pageNew.locator("#manageOwner")).toHaveValue(uxOther);
+
+    assert.deepEqual(newErrors, []);
+    await ctxNew.close();
+
+    h.escrowMarket = prevMarket;
+    h.escrowSubnames = prevSubs;
+    h.escrowCap = prevEscrowCap;
+    h.payload.state.deeds = prevDeeds;
+    h.payload.state.names = prevNames;
+    h.payload.state.primaryNames = prevPrimary;
   }
 
   console.log("PASS Cart copy regression + full-site UI spacing & alignment audit across desktop (1280) and mobile (390)");

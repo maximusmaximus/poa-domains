@@ -145,7 +145,7 @@ export function waitTimeTelemetry(s: State, registry?: WaitTimeRegistryInput): W
     windowPerType: WAIT_TIME_WINDOW_PER_TYPE,
   };
 }
-export function marketView(s: State, name?: string, autoSettleDefault = false) {
+export function marketView(s: State, name?: string, autoSettleDefault = false, minQueuedWindowMs = 0) {
   return Object.values(s.auctions).filter(a=>name===undefined||a.name===name).slice(-500).map(a=>{
     const reserveMicros=BigInt(a.reserve);
     const highMicros=a.high?BigInt(a.high.amount):null;
@@ -159,10 +159,14 @@ export function marketView(s: State, name?: string, autoSettleDefault = false) {
     const startedAt=a.startedAt??(kind!=="fixed"&&a.high!==null?(a.history?.find(h=>h.amount)?.at??a.createdAt??null):null);
     const st=s.settlements[a.id];
     const autoSettle=Boolean(a.autoSettle||st?.auto||(autoSettleDefault&&a.status==="OPEN"));
+    const rawWin=a.window??a.quiet,rawQuiet=a.quiet;
+    const bumpQueued=awaitingFirstBid&&minQueuedWindowMs>0&&rawWin===3600000;
+    const viewWindow=bumpQueued?Math.max(rawWin,minQueuedWindowMs):rawWin;
+    const viewQuiet=bumpQueued?Math.max(rawQuiet,minQueuedWindowMs):rawQuiet;
     return {
       id:a.id,name:a.name,seller:a.seller,kind,price:decimal(reserveMicros),
       minimumNextBid:decimal(effectiveMin),
-      status:a.status,closes:openFixed?0:a.closes,window:a.window??a.quiet,quiet:a.quiet,
+      status:a.status,closes:openFixed?0:a.closes,window:viewWindow,quiet:viewQuiet,
       createdAt:a.createdAt??null,startedAt,awaitingFirstBid,autoSettle,
       high:a.high?{payer:a.high.payer,amount:decimal(highMicros!)}:null,
       bidders,

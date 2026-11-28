@@ -318,8 +318,8 @@ test("Escrow seedInventoryAuctions + MCP POA auction tools: atomic 100-auction o
   assert.equal(b1Withdraw.account.refunds.length, 1);
   assert.equal(b1Withdraw.account.refunds[0].amount, "200.000000");
 
-  // Advance clock past auction close, settle via Treasury-signed transfer + MCP settle command -> Bidder 2 owns "defi"!
-  advanceMs(3600000 + 5000);
+  // Advance clock past 3h standard auction close, settle via Treasury-signed transfer + MCP settle command -> Bidder 2 owns "defi"!
+  advanceMs(10800000 + 5000);
   const defiDeed = engine.resolve("defi").deed;
   const transferPacket = makeSignedPacket(
     engine,
@@ -378,7 +378,7 @@ test("Escrow seedInventoryAuctions + MCP POA auction tools: atomic 100-auction o
   const aiAuc = (await callTool(19, "list_poa_auctions", { name: "ai" })).items[0];
   const botsAuc = (await callTool(20, "list_poa_auctions", { name: "bots" })).items[0];
   await callTool(21, "submit_escrow_command", signEscrowCommand(bidder2, "b2_bid_bots", "bid", { auction: botsAuc.id, amount: "100.000000" }));
-  advanceMs(3600000 + 5000);
+  advanceMs(10800000 + 5000);
   const settlePlan = buildTreasuryAutoHandover({
     engine,
     treasuryKey: treasury.key,
