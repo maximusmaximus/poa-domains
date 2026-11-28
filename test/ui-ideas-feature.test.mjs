@@ -79,6 +79,21 @@ test('the ticker merges registry seconds and escrow milliseconds newest-first, l
  assert.equal(hand.verb,'Handover');assert.equal(hand.actor,'poa1Treas');assert.equal(hand.recipient,'poa1Buyer');
  const child=receiptDisplay({status:'succeeded',signer:'poa1Buyer',requestId:'child-1',result:{deedId:'d2',name:'sub.ai',owner:'poa1Buyer'}},st);
  assert.equal(child.verb,'Child purchase');
+ const metaHist=receiptDisplay({status:'succeeded',signer:'poa1Buyer',requestId:'m1',result:{metadataVersion:2}},st,'',{name:'ai',profileFields:['avatar','bio']});
+ assert.equal(metaHist.name,'ai');assert.match(metaHist.detail,/avatar, bio/);
+ const recHist=receiptDisplay({status:'succeeded',signer:'poa1Buyer',requestId:'r1',result:{recordsVersion:1}},st,'',{name:'ai',recordsCount:2});
+ assert.equal(recHist.name,'ai');assert.match(recHist.detail,/2 records/);
+ const recClr=receiptDisplay({status:'succeeded',signer:'poa1Buyer',requestId:'r2',result:{recordsVersion:2}},st,'',{name:'ai',recordsCount:0});
+ assert.match(recClr.detail,/Cleared/);
+ const primClr=receiptDisplay({status:'succeeded',signer:'poa1Buyer',requestId:'p1',result:{primaryName:null}},st,'',{name:'ai'});
+ assert.equal(primClr.name,'ai');assert.equal(primClr.verb,'Main domain cleared');
+ const primRep=receiptDisplay({status:'succeeded',signer:'poa1Buyer',requestId:'p2',result:{primaryName:'ai',signer:'poa1Buyer'}},st,'',{name:'ai',replacedPrimary:'old'});
+ assert.match(primRep.detail,/Replaced old/);
+ const escSettle=receiptDisplay({status:'succeeded',signer:'poa1Treas',requestId:'escrow-settle-1',result:{deedId:'d1',name:'ai',seller:'poa1Seller',owner:'poa1Buyer'}},st,'',{action:'escrowSettle',actor:'poa1Seller'});
+ assert.equal(escSettle.actor,'poa1Seller');assert.equal(escSettle.verb,'Handover');
+ const withHist=recentActions({time:baseSec+1280,names:{},deeds,receipts,offers},market,MAX_EXPLORE_ACTIONS,[{sequence:127,name:'moon',action:'setMetadata',profileFields:['bio']}]);
+ assert.equal(withHist.find(x=>x.id==='receipt:r-127').name,'moon');
+ assert.match(withHist.find(x=>x.id==='receipt:r-127').label,/Profile updated · moon/);
 });
 
 test('v3 keeps headerless masonry, flat closable status and always-visible corner help',()=>{

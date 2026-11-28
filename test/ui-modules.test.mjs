@@ -800,6 +800,19 @@ test('owner profile, domain page, ownerLink primary rendering, and Manage main-d
   assert.equal(byId.get('poaSellActions').hidden, true);
   assert.equal(byId.get('poaSellSaleWarn')?.hidden, true);
 
+  // 3b. renderHistoryCards covers empty state, registry transfer, escrow badge, detail text, subname link, and timestamp formats
+  const histBox = byId.get('domainHistory');
+  domainMod.renderHistoryCards(null, []);
+  domainMod.renderHistoryCards(histBox, [], 'Nothing recorded');
+  assert.ok(collectText(histBox).includes('Nothing recorded'));
+  domainMod.renderHistoryCards(histBox, [
+   { icon: '🤝', title: 'Sold via escrow', name: 'nebula', amountText: '1,250 POA', sequence: 42, detail: 'Automatic payout', actor: ownerA, recipient: ownerB, atMs: 1795792140000 },
+   { icon: '🌱', title: 'Subdomain minted', name: 'nebula', subname: 'sub.nebula', source: 'escrow', sequence: 0, actor: ownerB, actorLabel: 'Buyer', at: 1795792000 },
+   { icon: '🪪', kind: 'profile', name: 'nebula', sequence: 0, source: 'registry', at: 0 },
+  ]);
+  const histText = collectText(histBox);
+  assert.ok(histText.includes('Sold via escrow') && histText.includes('1,250 POA') && histText.includes('#42') && histText.includes('Escrow') && histText.includes('sub.nebula'));
+
   // 4. Manage domains: wireManagement, lookup by domain name, main domain buttons, and Transfer review/confirm/cancel
   ui.escrowMarket = [];
   manageMod.wireManagement();
