@@ -139,6 +139,11 @@ export function checkoutPlan(expected, liveBindings) {
 // network-facts advertised engine a3bbef40… / params b6c2f50e… (unchanged). Release current is v0.136-t3.
 // Structural diff against the 746671f8 surface snapshot: 0 breaking, 0 review, 0 informational. No structural differences.
 // Canonical encoding, signBody/verifyBody, txidOf, transfer body and receipt code unchanged.
+// Full download of client/poa.mjs hashed on the box on Nov 27 2026 while
+// network-facts advertised engine e49793ee… / params 52f04a5b…. Release current is v0.137-bundle.
+// Structural diff in poa-domains #170: 0 breaking, 0 review, 1 informational (new export `_s5bSnapStatsGet`).
+// Full download of /client/poa.mjs (495615 bytes) hashed on the box on Nov 27 2026 while
+// network-facts advertised engine d515ed56… / params 34ed5d1e….
 export const REPIN_CLIENT_EVIDENCE = Object.freeze({
   "e01abd959dd0439dd89af8e8c187d1bed3897deb2a855a615e7dfa2d0222f1fb": true,
   "92658c61bc75d24572b8eef6182af27436a4f00019854718dcf0de3c6d2b54f6": true,
@@ -153,6 +158,8 @@ export const REPIN_CLIENT_EVIDENCE = Object.freeze({
   "50464775560a94f49bbe4dae92b932c8fa7cf2c9239f2abdd31020d24c107511": true,
   "746671f800a25ec365912e887bdb78251bae4be52453d6bd0ae505e7287f14ed": true,
   "a3bbef40d39a4041ae5690b88eecfde15eb88c76efcc88044dae2839d0561de6": true,
+  "e49793ee340be7a9a069bc024f3d5d796f341a2f8d0045ecb94caec3b4e0dc90": true,
+  "d515ed564dc2a42d0060900c7a7ac50e2723a9b38a00dce67139cdff5bbe5247": true,
 });
 export function hasReviewedClientEvidence(engineSha256, root = process.cwd()) {
   if (REPIN_CLIENT_EVIDENCE[engineSha256] === true) return true;
