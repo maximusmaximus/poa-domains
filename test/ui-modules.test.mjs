@@ -65,7 +65,7 @@ test('all UI modules load without booting a browser, and shared copy guards rema
   Object.assign(ui,{refreshing:false,lastLoadedAt:1000000,registryReadFailed:false,cart:[],networkStatus:{level:'online',hold:false}});
   assert.equal(cart.cartCopyBlocked(),false);
   for(const item of [{validationError:'invalid'},{needsReview:true}]){ui.cart=[item];assert.equal(cart.cartCopyBlocked(),true);}
-  ui.cart=[];ui.networkStatus.hold=true;assert.equal(cart.cartCopyBlocked(),true);
+  ui.cart=[];ui.networkStatus.hold=true;assert.equal(cart.cartCopyBlocked(),false);assert.equal(cart.cartPauseState().paused,true);assert.match(cart.cartPauseState().pauseNotice,/CHECKOUT TEMPORARILY PAUSED/);
   assert.match(core.statusLabel('available'),/🟢/);assert.equal(core.statusLabel('owned'),'Owned');assert.equal(core.statusLabel('custom'),'custom');
   ui.details={roles:{buyer:'fixture-public-id'}};assert.equal(core.person('fixture-public-id'),'Demo buyer');assert.match(core.person('other-public-identity'),/…$/);
   const samplePoa='poa1jHQCeVa5Px8zUovaVytLin8eL1yw3RPStW1sAtCpiRf';

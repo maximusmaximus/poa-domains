@@ -304,6 +304,8 @@ try {
     await (await import("/ui-poll.js" + q)).refreshNetworkStatus();
   });
   await expect(pageEscrow.locator("#floatingCartStatus")).toContainText("Held until the PoA network is back");
+  await expect(pageEscrow.locator("#copyCheckoutBtn")).toBeEnabled();
+  await expect(pageEscrow.locator("#copyCartPrompt")).toBeEnabled();
   assertNoBounce(baseFloat, await snapFloat(), "floating:network-down");
   h.networkStatus = { level: "online", hold: false, message: "🟢 PoA network Online", livePoA: false };
   await pageEscrow.evaluate(async () => {
@@ -313,6 +315,39 @@ try {
   await expect(pageEscrow.locator("#floatingCartStatus")).toHaveText("");
   assertNoBounce(baseFloat, await snapFloat(), "floating:network-online");
   h.networkStatus = undefined;
+  // Escrow paused (ESCROW_PROTOCOL_CHANGED) + Wait Time telemetry: copy still works and includes auto-unpause + telemetry check-back stat.
+  h.escrowMarket = {
+    items: [],
+    telemetry: {
+      waitTime: {
+        averageMs: 20 * 60_000,
+        averageMinutes: 20,
+        purchaseAverageMs: 5 * 60_000,
+        purchaseAverageMinutes: 5,
+        purchaseSamples: 6,
+        saleAverageMs: 35 * 60_000,
+        saleAverageMinutes: 35,
+        saleSamples: 6,
+        totalSamples: 12,
+        windowPerType: 50,
+      },
+    },
+    serverTime: Date.now(),
+  };
+  await pageEscrow.evaluate(async () => {
+    const q = new URL(document.querySelector('script[src*="app.js"]').src).search;
+    await (await import("/ui-poll.js" + q)).refreshEscrowMarket();
+  });
+  await expect(pageEscrow.locator("#copyCheckoutBtn")).toBeEnabled();
+  await pageEscrow.locator("#copyCheckoutBtn").click();
+  const pausedCopied = await pageEscrow.locator("#floatingCartPrompt").innerText();
+  assert.match(pausedCopied, /CHECKOUT TEMPORARILY PAUSED/);
+  assert.match(pausedCopied, /run the steps below automatically/);
+  assert.match(pausedCopied, /Latest Wait Time is 20 Minutes/);
+  assert.match(pausedCopied, /Purchases: 5 min \(6\)/);
+  assert.match(pausedCopied, /Sales: 35 min \(6\)/);
+  assert.match(pausedCopied, /Check back in ~5 min/);
+  h.escrowMarket = undefined;
   await pageEscrow.locator("#floatingCartClose").click();
 
   // Manage domains (#escrowHeld) and /d/<name> (#escrowDomain) stay stationary across escrow hold toggles

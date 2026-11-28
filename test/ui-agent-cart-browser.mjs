@@ -150,10 +150,15 @@ try {
     await refreshRegistry();
   });
   await expect(page.locator("#registryError")).toBeVisible();
-  await blocked();
+  // Registry read failure with an existing snapshot keeps cart copy working with paused-retry guidance and valid JSON.
+  await ready();
+  await expect(page.locator("#cartPrompt")).toContainText("CHECKOUT TEMPORARILY PAUSED");
+  await expect(page.locator("#cartPrompt")).toContainText("Telemetry check-back stat");
+  assert.ok(validate(await payload()), ajv.errorsText(validate.errors));
   h.stateStatus = 200;
   await page.locator("#registryRetry").click();
   await ready();
+  await expect(page.locator("#cartPrompt")).not.toContainText("CHECKOUT TEMPORARILY PAUSED");
   // Exercise the same network-hold predicate as the poller, without changing any live setting.
   await page.evaluate(async () => {
     const query = new URL(document.querySelector('script[src*="app.js"]').src)
@@ -163,7 +168,10 @@ try {
     ui.networkStatus = { level: "down", hold: true };
     await updatePromptText();
   });
-  await blocked();
+  await ready();
+  await expect(page.locator("#cartPrompt")).toContainText("CHECKOUT TEMPORARILY PAUSED");
+  await expect(page.locator("#cartPrompt")).toContainText("PoA network is down");
+  assert.ok(validate(await payload()), ajv.errorsText(validate.errors));
   await page.locator("#tabEscrow").click();
   await expect(page.locator("#escrowPayments h2")).toHaveText("🪙 My POA");
   assert.equal(await page.locator("#siteFooter").count(), 1);

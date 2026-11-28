@@ -81,7 +81,7 @@ for(const [name,launcher]of [['chromium',chromium],['firefox',firefox],['webkit'
  h.networkStatus={level:'down',hold:false,lastKnown:true,ageMs:420000,stale:true,message:'🔴 PoA network Down — actions held ⏸️ until the network is back',livePoA:false};
  await page.reload();await expect(page.locator('#networkStatusText')).toHaveText('🔴 PoA network Down · actions held · 🕰️');await expect(page.locator('#networkStatusBar')).toHaveAttribute('data-stale','true');
  await expect(page.locator('#networkStatusDetail')).toContainText('Last checked 7 min ago');await expect(page.locator('#copyCartPrompt')).toBeEnabled();
- h.networkStatus={level:'down',hold:true,message:'🔴 PoA network Down — actions held ⏸️ until the network is back',livePoA:false};await page.reload();await expect(page.locator('#copyCartPrompt')).toBeDisabled();await expect(page.locator('#networkStatusBar')).toHaveAttribute('data-stale','false');
+ h.networkStatus={level:'down',hold:true,message:'🔴 PoA network Down — actions held ⏸️ until the network is back',livePoA:false};await page.reload();await expect(page.locator('#copyCartPrompt')).toBeEnabled();await expect(page.locator('#cartPrompt')).toContainText('CHECKOUT TEMPORARILY PAUSED');await expect(page.locator('#cartPrompt')).toContainText('Telemetry check-back stat');await expect(page.locator('#networkStatusBar')).toHaveAttribute('data-stale','false');
  h.networkStatus=undefined;await page.reload();
  await page.locator('#tabFind').click();await page.evaluate(()=>{localStorage.clear();});
  assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.close();}

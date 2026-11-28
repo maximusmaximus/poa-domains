@@ -37,6 +37,9 @@ import {
   resolveWaitTimeTelemetry,
   formatWaitTimeMinutes,
   formatWaitTimeTooltip,
+  buildCartPauseNotice,
+  buildPoaCheckoutHandoff,
+  renderPoaCheckoutHandoff,
   loadTabSeen,
   saveTabSeen,
   TAB_SEEN_KEY,
@@ -412,6 +415,33 @@ test("wait time telemetry formatting, fallback, and tooltip breakdown", () => {
   assert.equal(fallback.totalSamples, 2);
   assert.equal(fallback.averageMinutes, 10);
   assert.equal(formatWaitTimeMinutes(resolveWaitTimeTelemetry({ serverTelemetry: null, escrowMarket: market })), "10 Minutes");
+  // Paused cart notice + telemetry check-back guidance
+  assert.equal(buildCartPauseNotice({}), null);
+  const paused = buildCartPauseNotice({
+    escrowHeld: true,
+    escrowReason: "PoA protocol update pending review.",
+    waitTime: server,
+    endpoint: "https://poadomains.link",
+  });
+  assert.match(paused, /CHECKOUT TEMPORARILY PAUSED/);
+  assert.match(paused, /PoA protocol update pending review/);
+  assert.match(paused, /https:\/\/poadomains\.link\/v1\/escrow\/capabilities/);
+  assert.match(paused, /Latest Wait Time is 20 Minutes/);
+  assert.match(paused, /Check back in ~5 min/);
+  const noSamplesPaused = buildCartPauseNotice({ networkHeld: true, networkLevel: "down", waitTime: null, endpoint: "https://poadomains.link" });
+  assert.match(noSamplesPaused, /PoA network is down/);
+  assert.match(noSamplesPaused, /Check back in ~2–5 min/);
+  const hex = "a".repeat(64);
+  const sampleHandoff = buildPoaCheckoutHandoff(
+    [{ name: "alpha", action: "poaCheckout", amount: "100.000000", tier: "standard" }],
+    { chainId: "poa-mainnet-1", revision: "poa-mainnet-v1", genesisHash: hex, registryId: hex, policyHash: hex, normalizationHash: hex, poaOnly: { status: "on" } },
+    "https://poadomains.link",
+    { state: { sequence: 1 }, stateHash: hex },
+  );
+  const renderedPaused = renderPoaCheckoutHandoff(sampleHandoff, { pauseNotice: paused });
+  assert.ok(renderedPaused.startsWith("⏸️ CHECKOUT TEMPORARILY PAUSED"));
+  assert.match(renderedPaused, /poll until held === false and paused === false/);
+  assert.doesNotMatch(renderedPaused, /If it is held or paused, stop and tell me/);
 });
 
 test("domain and owner path helpers round-trip", () => {
