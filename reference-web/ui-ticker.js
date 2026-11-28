@@ -1,5 +1,5 @@
-import { autoScroll, itemStep } from "./ui-motion.js?v=de815674e5a1";
-import { isPoaAuctionAwaitingFirstBid, poaShort, primaryNameForOwner, shapeLiveActions } from "./shared.js?v=de815674e5a1";
+import { autoScroll, itemStep } from "./ui-motion.js?v=718d654ae15a";
+import { isPoaAuctionAwaitingFirstBid, poaShort, primaryNameForOwner, shapeLiveActions } from "./shared.js?v=718d654ae15a";
 export const MAX_RECENT_ACTIONS=100;
 export const MAX_EXPLORE_ACTIONS=500;
 const toMs=ts=>{const n=Number(ts);return!Number.isFinite(n)||n<=0?0:n<1e12?n*1000:n;};
@@ -27,8 +27,8 @@ export function receiptDisplay(r,state,fb="",h=null){
    if(req.startsWith("treasury-inventory-"))return{icon:"🏛️",verb:"Treasury minted",name,actor:owner||r.signer||"",recipient:"",detail:""};
    if(req.startsWith("protocol-domain-"))return{icon:"🏛️",verb:"Protocol minted",name,actor:owner||r.signer||"",recipient:"",detail:""};
    const from=h?.action==="escrowSettle"?(h.actor||res.seller||r.signer||""):(res.seller||r.signer||"");
-   if(from&&owner&&from!==owner)return{icon:"🤝",verb:/^(?:treasury-(?:settle|repair)-|escrow-settle-)/.test(req)||res.seller||h?.action==="escrowSettle"?"Sold via escrow":"Transferred",name,actor:from,recipient:owner,detail:""};
-   if(res.name&&(d?.parentId||String(res.name).includes(".")))return{icon:"🌱",verb:"Subdomain registered",name,actor:owner||r.signer||"",recipient:"",detail:""};
+   if(from&&owner&&from!==owner)return{icon:"🤝",verb:/^(?:treasury-(?:settle|repair)-|escrow-settle-)/.test(req)||res.seller||h?.action==="escrowSettle"?"Handover":"Transferred",name,actor:from,recipient:owner,detail:""};
+   if(res.name&&(d?.parentId||String(res.name).includes(".")))return{icon:"🌱",verb:"Child purchase",name,actor:owner||r.signer||"",recipient:"",detail:""};
    return{icon:"🎉",verb:"Registered",name,actor:owner||r.signer||"",recipient:"",detail:""};
   }
   if(res.auctionId)return{icon:"🔨",verb:"Auction announced",name:hName,actor:r.signer||"",recipient:"",detail:""};
