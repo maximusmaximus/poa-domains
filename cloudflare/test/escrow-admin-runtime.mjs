@@ -5,7 +5,7 @@ import { Miniflare, convertV4MiniflareOptions, Log, LogLevel } from "miniflare";
 import { resolve } from "node:path";
 const root=resolve(import.meta.dirname,"../.."),token="local-test-admin-".padEnd(32,"x");
 const wallet="poa1"+"1".repeat(32),cutoff=Math.floor(Date.now()/1000)-60;
-const engine="e49793ee340be7a9a069bc024f3d5d796f341a2f8d0045ecb94caec3b4e0dc90",params="52f04a5b2c08d569f1d50d90de9c6d3d173cc9a641f31daebe4f57a3df93a902";
+const engine="d515ed564dc2a42d0060900c7a7ac50e2723a9b38a00dce67139cdff5bbe5247",params="34ed5d1ec7d828a16e17d9359da20aab035a9ec4b03a57ba1c35e360a93a38f4";
 const bundle=await build({entryPoints:[resolve(root,"cloudflare/worker.ts")],bundle:true,write:false,format:"esm",platform:"node",target:"es2022",external:["cloudflare:workers","node:*"],alias:{"#poa-unicode-data":resolve(root,"cloudflare/unicode-data.ts")},loader:{".txt":"text"}});
 let passed=0,mockReads=0,denied=0,redirect=false,stale=false;
 async function outbound(req){
