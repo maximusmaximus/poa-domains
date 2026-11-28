@@ -2554,6 +2554,14 @@ try {
     await pageGeom.waitForFunction(() => document.body.dataset.registryStatus === "ready");
     await expect(pageGeom.locator("#ownerMain")).toBeVisible();
     await expect(pageGeom.locator("#ownerHomeLink")).toHaveCount(0);
+    // Active auction ("nebula") shows 🔨 icon on both #ownerTitle and #ownerNames, non-listed ("comet") shows none
+    const ownerNebulaCard = pageGeom.locator("#ownerNames article.card", { has: pageGeom.locator("h4", { hasText: "nebula" }) });
+    const ownerCometCard = pageGeom.locator("#ownerNames article.card", { has: pageGeom.locator("h4", { hasText: "comet" }) });
+    await expect(ownerNebulaCard.locator(".owner-sale-badge")).toBeVisible();
+    await expect(ownerNebulaCard.locator(".owner-sale-badge")).toHaveText("🔨");
+    await expect(ownerNebulaCard.locator(".owner-sale-badge")).toHaveAttribute("data-sale-kind", "auction");
+    await expect(ownerCometCard.locator(".owner-sale-badge")).toHaveCount(0);
+    await expect(pageGeom.locator("#ownerTitle .owner-sale-badge")).toBeVisible();
     await auditUiGeometry(pageGeom, `${vp.name}:owner-profile-page`);
 
     assert.deepEqual(geomErrors, [], `Page errors on ${vp.name}: ${JSON.stringify(geomErrors)}`);

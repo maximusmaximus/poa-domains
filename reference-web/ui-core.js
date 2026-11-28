@@ -1,6 +1,6 @@
-import { createPoaCopyButton, decorateEmojiButton } from "./ui-copy.js?v=738473ae987c";
-import { buildOwnershipIndex, domainPath, hasPoaSiteActions, isPoaAddress, ownershipConflict, poascanAddressUrl, primaryNameForOwner, safeObject, shortenPoaAddress } from "./shared.js?v=738473ae987c";
-import { ui } from "./ui-state.js?v=738473ae987c";
+import { createPoaCopyButton, decorateEmojiButton } from "./ui-copy.js?v=0faa1d6560e6";
+import { buildOwnershipIndex, domainPath, hasPoaSiteActions, isPoaAddress, ownershipConflict, poascanAddressUrl, primaryNameForOwner, safeObject, shortenPoaAddress } from "./shared.js?v=0faa1d6560e6";
+import { ui } from "./ui-state.js?v=0faa1d6560e6";
 let addressNav = null;
 export function registerAddressNav(nav) { addressNav = nav; }
 export const el = (id) => document.getElementById(id);
