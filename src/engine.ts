@@ -237,7 +237,7 @@ export class Engine {
           const resetAt = prevDeed.profileResetAt ?? 0;
           let prevDoc: Record<string, unknown> | null = null;
           for (let i = prevDeed.metadata.length - 1; i >= resetAt; i--) {
-            const d0 = prevDeed.metadata[i]!.document as Record<string, unknown>;
+            const d0 = prevDeed.metadata[i]!.document as unknown as Record<string, unknown>;
             if (d0.schema === PROFILE_SCHEMA_V1) { prevDoc = d0; break; }
           }
           const checks: [string, string][] = [["image", "avatar"], ["description", "bio"], ["poa", "POA"], ["btc", "BTC"], ["eth", "ETH"]];
