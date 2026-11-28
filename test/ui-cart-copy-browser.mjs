@@ -3329,6 +3329,82 @@ try {
     h.payload.state.primaryNames = prevPrimary;
   }
 
+  // Spinning logo emoji circle intro: renders 10 equally spaced emojis over faded backdrop while loading, expands beyond viewport & fades cleanly on load, and respects prefers-reduced-motion
+  {
+    const ctxIntro = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const pageIntro = await ctxIntro.newPage();
+    const introErrors = [];
+    pageIntro.on("pageerror", (e) => introErrors.push(e.message));
+    await pageIntro.route("https://**", (r) => r.abort());
+    await pageIntro.goto(h.url);
+    await pageIntro.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    if (await pageIntro.locator("#termsAgreeBtn").isVisible()) await pageIntro.locator("#termsAgreeBtn").click();
+
+    let releaseState;
+    const stateHeld = new Promise((r) => { releaseState = r; });
+    await pageIntro.route("**/v1/state**", async (route) => {
+      await stateHeld;
+      await route.continue();
+    });
+
+    await pageIntro.reload({ waitUntil: "domcontentloaded" });
+    await pageIntro.waitForFunction(() => document.querySelectorAll("#siteIntroRing .intro-glyph").length === 10);
+    await pageIntro.waitForTimeout(120);
+
+    const spinMetrics = await pageIntro.evaluate(() => {
+      const intro = document.getElementById("siteIntro");
+      const glyphs = [...document.querySelectorAll("#siteIntroRing .intro-glyph")];
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const pts = glyphs.map((g) => {
+        const r = g.getBoundingClientRect();
+        const x = r.left + r.width / 2;
+        const y = r.top + r.height / 2;
+        return {
+          text: g.textContent?.trim() || "",
+          radius: Math.hypot(x - cx, y - cy),
+          angle: (Math.atan2(y - cy, x - cx) * 180 / Math.PI + 360) % 360,
+        };
+      });
+      const angles = pts.map((p) => p.angle).sort((a, b) => a - b);
+      const diffs = angles.map((a, i) => (i === angles.length - 1 ? 360 - a + angles[0] : angles[i + 1] - a));
+      return {
+        present: !!intro,
+        ariaHidden: intro?.getAttribute("aria-hidden"),
+        pointerEvents: intro ? getComputedStyle(intro).pointerEvents : "",
+        count: pts.length,
+        allNonEmpty: pts.every((p) => p.text.length > 0),
+        minR: Math.min(...pts.map((p) => p.radius)),
+        maxR: Math.max(...pts.map((p) => p.radius)),
+        minDiff: Math.min(...diffs),
+        maxDiff: Math.max(...diffs),
+        overflowX: document.documentElement.scrollWidth - window.innerWidth,
+      };
+    });
+    assert.equal(spinMetrics.present, true);
+    assert.equal(spinMetrics.ariaHidden, "true");
+    assert.equal(spinMetrics.pointerEvents, "none");
+    assert.equal(spinMetrics.count, 10);
+    assert.equal(spinMetrics.allNonEmpty, true);
+    assert.ok(spinMetrics.minR >= 70 && spinMetrics.maxR - spinMetrics.minR < 2, `intro ring radii should match (${spinMetrics.minR}..${spinMetrics.maxR})`);
+    assert.ok(spinMetrics.minDiff >= 34 && spinMetrics.maxDiff <= 38, `intro ring should be equally spaced at 36deg (${spinMetrics.minDiff}..${spinMetrics.maxDiff})`);
+    assert.equal(spinMetrics.overflowX, 0);
+
+    // Release state -> page loads in background -> triggers .is-opening expansion & cleanly removes #siteIntro
+    releaseState();
+    await pageIntro.waitForFunction(() => document.getElementById("siteIntro")?.classList.contains("is-opening"), { timeout: 5000 });
+    await pageIntro.waitForFunction(() => !document.getElementById("siteIntro"), { timeout: 3000 });
+    assert.equal(await pageIntro.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), 0);
+
+    // prefers-reduced-motion: reduce dismisses intro immediately with zero animation delay
+    await pageIntro.unroute("**/v1/state**");
+    await pageIntro.emulateMedia({ reducedMotion: "reduce" });
+    await pageIntro.reload({ waitUntil: "domcontentloaded" });
+    await pageIntro.waitForFunction(() => !document.getElementById("siteIntro"), { timeout: 2000 });
+    assert.deepEqual(introErrors, []);
+    await ctxIntro.close();
+  }
+
   console.log("PASS Cart copy regression + full-site UI spacing & alignment audit across desktop (1280) and mobile (390)");
 } finally {
   await h.close();
