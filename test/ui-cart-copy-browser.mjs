@@ -3078,6 +3078,121 @@ try {
     delete h.payload.state.names.noimage;
   }
 
+  // Explore top sales stats & 🏆 Leaderboard tab (Top Buyers & Top Sellers: domains vs POA + sort toggle)
+  {
+    const prevMarket = h.escrowMarket;
+    const prevEscrowCap = h.escrowCap;
+    const prevDeeds = { ...h.payload.state.deeds };
+    const prevNames = { ...h.payload.state.names };
+    const prevReceipts = { ...h.payload.state.receipts };
+    const lbWhale = "poa13s4u9V5Y8m8fJ2c7k9W4t6P2x8N5r1Q3h6V9m2Z4a7B";
+    const lbCollector = "poa14t5v9W6Z9n9gK3d8m9X5u7Q3y9P6s2R4j7W8n3A5b8C";
+    const lbSellerBig = "poa15u6w9X7a8p8hL4e9n8Y6v8R4z8Q7t3S5k8X9p4B6c9D";
+    const lbSellerVol = "poa16v7x9Y8b9q9jM5f8p9Z7w9S5a9R8u4T6m9Y8q5C7d8E";
+    const nowMs = Date.now();
+    for (const [id, name, owner] of [
+      ["lb-d-ai", "ai", lbWhale],
+      ["lb-d-1", "alpha", lbCollector],
+      ["lb-d-2", "beta", lbCollector],
+      ["lb-d-3", "gamma", lbCollector],
+      ["lb-d-4", "delta", lbWhale],
+      ["lb-d-5", "omega", lbCollector],
+    ]) {
+      h.payload.state.deeds[id] = {
+        id, name, owner, parentId: null, retired: false, version: 1, ownerVersion: 1,
+        rights: { kind: "permanent" }, records: [], metadata: [],
+      };
+      h.payload.state.names[name] = { name, key: name, activeId: id, auctionId: null };
+    }
+    h.payload.state.receipts = {
+      ...prevReceipts,
+      "lb-r1": { status: "succeeded", sequence: 9001, signer: lbCollector, result: { deedId: "lb-d-1", owner: lbCollector } },
+      "lb-r2": { status: "succeeded", sequence: 9002, signer: lbCollector, result: { deedId: "lb-d-2", owner: lbCollector } },
+      "lb-r3": { status: "succeeded", sequence: 9003, signer: lbCollector, result: { deedId: "lb-d-3", owner: lbCollector } },
+    };
+    h.escrowCap = { ...(prevEscrowCap || {}), enabled: true, held: false };
+    h.escrowMarket = {
+      serverTime: nowMs,
+      items: [
+        { id: "lb-a1", kind: "auction", name: "ai", seller: lbSellerBig, status: "COMPLETE", price: "500.000000", high: { payer: lbWhale, amount: "1500.000000" }, closes: nowMs - 30000, history: [] },
+        { id: "lb-a2", kind: "fixed", name: "delta", seller: lbSellerVol, status: "COMPLETE", price: "300.000000", high: { payer: lbWhale, amount: "300.000000" }, closes: nowMs - 20000, history: [] },
+        { id: "lb-a3", kind: "fixed", name: "omega", seller: lbSellerVol, status: "COMPLETE", price: "200.000000", high: { payer: lbCollector, amount: "200.000000" }, closes: nowMs - 10000, history: [] },
+        { id: "lb-f1", kind: "fixed", name: "beta", seller: lbCollector, status: "OPEN", price: "450.000000", high: null, closes: 0, history: [] },
+        { id: "lb-f2", kind: "fixed", name: "gamma", seller: lbCollector, status: "OPEN", price: "250.000000", high: null, closes: nowMs + 60000, history: [] },
+      ],
+    };
+
+    const ctxLb = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const pageLb = await ctxLb.newPage();
+    const lbErrors = [];
+    pageLb.on("pageerror", (e) => lbErrors.push(e.message));
+    await pageLb.route("https://**", (r) => r.abort());
+    await pageLb.goto(`${h.url}/?tab=explore`);
+    await pageLb.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    await pageLb.locator("#termsAgreeBtn").click();
+    await expect(pageLb.locator("#stats > div")).toHaveCount(8);
+    await expect(pageLb.locator("#stats")).toContainText("2,300 POA");
+    await expect(pageLb.locator("#stats")).toContainText("total POA volume");
+    await expect(pageLb.locator("#stats")).toContainText("2,000 POA");
+    await expect(pageLb.locator("#stats")).toContainText("market sales (3)");
+    await expect(pageLb.locator("#stats")).toContainText("1,500 POA");
+    await expect(pageLb.locator("#stats")).toContainText("top sale");
+    await expect(pageLb.locator("#stats")).toContainText("250 POA");
+    await expect(pageLb.locator("#stats")).toContainText("floor price (2 listed)");
+
+    // Open 🏆 Leaderboard tab and verify Top Buyers & Top Sellers
+    await expect(pageLb.locator("#exploreTabLeaderboard")).toContainText("Leaderboard");
+    await pageLb.locator("#exploreTabLeaderboard").click();
+    await expect(pageLb.locator("#explorePanelLeaderboard")).toBeVisible();
+    const buyersCard = pageLb.locator("#leaderboard > .card").nth(0);
+    const sellersCard = pageLb.locator("#leaderboard > .card").nth(1);
+    await expect(buyersCard).toContainText("Top Buyers");
+    await expect(sellersCard).toContainText("Top Sellers");
+
+    // Default sort: 💰 By POA (Whale 1,800 POA > Collector 500 POA; SellerBig 1,500 POA > SellerVol 500 POA)
+    await expect(buyersCard.locator("li").nth(0)).toContainText("1,800 POA");
+    await expect(buyersCard.locator("li").nth(0)).toContainText("2 domains spent");
+    await expect(buyersCard.locator("li").nth(1)).toContainText("500 POA");
+    await expect(buyersCard.locator("li").nth(1)).toContainText("4 domains spent");
+    await expect(sellersCard.locator("li").nth(0)).toContainText("1,500 POA");
+    await expect(sellersCard.locator("li").nth(0)).toContainText("1 domain sold");
+    await expect(sellersCard.locator("li").nth(1)).toContainText("500 POA");
+    await expect(sellersCard.locator("li").nth(1)).toContainText("2 domains sold");
+
+    // Switch sort to 🏷️ By Domains -> Collector (4 domains) overtakes Whale (2 domains), SellerVol (2) overtakes SellerBig (1)
+    await pageLb.locator('#leaderboardSort [data-lb-sort="count"]').click();
+    await expect(buyersCard.locator("li").nth(0)).toContainText("4 domains");
+    await expect(buyersCard.locator("li").nth(0)).toContainText("spent 500 POA");
+    await expect(buyersCard.locator("li").nth(1)).toContainText("2 domains");
+    await expect(buyersCard.locator("li").nth(1)).toContainText("spent 1,800 POA");
+    await expect(sellersCard.locator("li").nth(0)).toContainText("2 domains");
+    await expect(sellersCard.locator("li").nth(0)).toContainText("sold 500 POA");
+    await expect(sellersCard.locator("li").nth(1)).toContainText("1 domain");
+    await expect(sellersCard.locator("li").nth(1)).toContainText("sold 1,500 POA");
+
+    // Clicking top sale domain link navigates directly to /d/ai
+    await pageLb.locator('#stats a[href="/d/ai"]').click();
+    await expect(pageLb.locator("#domainMain")).toBeVisible();
+    assert.equal(new URL(pageLb.url()).pathname, "/d/ai");
+
+    // Clicking a leaderboard owner link navigates to /p/<addr>
+    await pageLb.locator("#siteHomeBtn").click();
+    await pageLb.locator("#tabExplore").click();
+    await pageLb.locator("#exploreTabLeaderboard").click();
+    await sellersCard.locator(`a[href="/p/${lbSellerVol}"]`).click();
+    await expect(pageLb.locator("#ownerMain")).toBeVisible();
+    assert.equal(new URL(pageLb.url()).pathname, `/p/${lbSellerVol}`);
+
+    assert.deepEqual(lbErrors, []);
+    await ctxLb.close();
+
+    h.escrowMarket = prevMarket;
+    h.escrowCap = prevEscrowCap;
+    h.payload.state.deeds = prevDeeds;
+    h.payload.state.names = prevNames;
+    h.payload.state.receipts = prevReceipts;
+  }
+
   console.log("PASS Cart copy regression + full-site UI spacing & alignment audit across desktop (1280) and mobile (390)");
 } finally {
   await h.close();

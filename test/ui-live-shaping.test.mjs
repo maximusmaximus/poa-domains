@@ -563,6 +563,9 @@ import {
   clearNetworkBannerDismiss,
   htmlHasVisibleXeroEmoji,
   NETWORK_BANNER_DISMISS_KEY,
+  formatPoaCompact,
+  computeExplorerMarketData,
+  sortLeaderboard,
 } from "../reference-web/shared.js";
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -646,4 +649,142 @@ test("served UI HTML has no visible xero emoji phrasing", () => {
   assert.ok(html.includes('id="sectionTabs"'));
   assert.ok(html.includes("skip-link"));
   assert.ok(html.includes("siteFooter"));
+  assert.ok(html.includes('id="exploreTabLeaderboard"'));
+  assert.ok(html.includes('id="explorePanelLeaderboard"'));
+  assert.ok(html.includes('id="leaderboard"'));
+  assert.ok(html.includes('id="leaderboardSort"'));
+});
+
+test("formatPoaCompact formats whole and fractional POA cleanly", () => {
+  assert.equal(formatPoaCompact(0n), "0");
+  assert.equal(formatPoaCompact(-5000000n), "0");
+  assert.equal(formatPoaCompact(100000000n), "100");
+  assert.equal(formatPoaCompact(87299000000n), "87,299");
+  assert.equal(formatPoaCompact(1464100000n), "1,464.1");
+  assert.equal(formatPoaCompact(1464250000n), "1,464.25");
+});
+
+test("computeExplorerMarketData computes POA sales stats, top buyers/sellers, and guards against self-transfer mint double-counts", () => {
+  const treasury = "poa1Treasury11111111111111111111111111111111111";
+  const whale = "poa1Whale11111111111111111111111111111111111111";
+  const collector = "poa1Collect111111111111111111111111111111111111";
+  const seller = "poa1Seller1111111111111111111111111111111111111";
+  const cap = {
+    revision: "poa-mainnet-v1",
+    poaOnly: { status: "on", newNames: { standard: "100.000000", premium: "1000.000000" } },
+    escrow: { enabled: true },
+  };
+  const state = {
+    time: 1700000000,
+    names: {
+      treasury: { activeId: "d-t" },
+      ai: { activeId: "d-ai" },
+      alpha: { activeId: "d-1" },
+      beta: { activeId: "d-2" },
+      gamma: { activeId: "d-3" },
+      delta: { activeId: "d-4" },
+      sub: { activeId: "d-sub" },
+    },
+    deeds: {
+      "d-t": { id: "d-t", name: "treasury", owner: treasury, parentId: null },
+      "d-ai": { id: "d-ai", name: "ai", owner: whale, parentId: null },
+      "d-1": { id: "d-1", name: "alpha", owner: collector, parentId: null },
+      "d-2": { id: "d-2", name: "beta", owner: collector, parentId: null },
+      "d-3": { id: "d-3", name: "gamma", owner: collector, parentId: null },
+      "d-4": { id: "d-4", name: "delta", owner: seller, parentId: null },
+      "d-sub": { id: "d-sub", name: "x.alpha", owner: collector, parentId: "d-1" },
+    },
+    receipts: {
+      // Treasury inventory mint (has result.name) -> NOT counted as buyer mint
+      r0: { status: "succeeded", sequence: 1, signer: treasury, result: { deedId: "d-ai", name: "ai", owner: treasury } },
+      // Collector mints 3 standard names (100 POA each = 300 POA)
+      r1: { status: "succeeded", sequence: 2, signer: collector, result: { deedId: "d-1", owner: collector } },
+      r2: { status: "succeeded", sequence: 3, signer: collector, result: { deedId: "d-2", owner: collector } },
+      r3: { status: "succeeded", sequence: 4, signer: collector, result: { deedId: "d-3", owner: collector } },
+      // Later self-transfer of d-1 must NOT double-count as another mint
+      r3b: { status: "succeeded", sequence: 5, signer: collector, result: { deedId: "d-1", owner: collector } },
+      // Subname deed must NOT count as root mint
+      r4: { status: "succeeded", sequence: 6, signer: collector, result: { deedId: "d-sub", owner: collector } },
+    },
+  };
+  const nowMs = 1700000000000;
+  const escrowMarket = [
+    // Whale buys 1 big market auction: ai for 1,500 POA from treasury
+    { id: "a1", kind: "auction", name: "ai", seller: treasury, status: "COMPLETE", price: "500.000000", high: { payer: whale, amount: "1500.000000" }, closes: nowMs - 10000 },
+    // Whale also buys 1 fixed listing: delta for 300 POA from seller
+    { id: "a2", kind: "fixed", name: "delta", seller, status: "COMPLETE", price: "300.000000", high: { payer: whale, amount: "300.000000" }, closes: nowMs - 5000 },
+    // Active fixed listings for floor calculation
+    { id: "f1", kind: "fixed", name: "gamma", seller: collector, status: "OPEN", price: "450.000000", high: null, closes: 0 },
+    { id: "f2", kind: "fixed", name: "beta", seller: collector, status: "OPEN", price: "250.000000", high: null, closes: nowMs + 60000 },
+    // Active open auction
+    { id: "o1", kind: "auction", name: "alpha", seller: collector, status: "OPEN", price: "100.000000", high: null, closes: 0 },
+  ];
+
+  const data = computeExplorerMarketData({ state, escrowMarket, cap, nowMs });
+  assert.equal(data.isPoa, true);
+  assert.equal(data.ownedCount, 7);
+  assert.equal(data.uniqueOwners, 4);
+  assert.equal(data.mintCount, 3);
+  assert.equal(data.mintVolumeLabel, "300 POA");
+  assert.equal(data.marketSalesCount, 2);
+  assert.equal(data.marketVolumeLabel, "1,800 POA");
+  assert.equal(data.totalVolumeLabel, "2,100 POA");
+  assert.equal(data.avgMarketSaleLabel, "900 POA");
+  assert.equal(data.topSale?.name, "ai");
+  assert.equal(data.topSale?.amountLabel, "1,500 POA");
+  assert.equal(data.floorLabel, "250 POA");
+  assert.equal(data.activeFixedCount, 2);
+  assert.equal(data.openAuctionCount, 1);
+
+  // Buyers: whale spent 1,800 POA across 2 domains; collector spent 300 POA across 3 domains
+  const byPoa = sortLeaderboard(data.buyers, "volume");
+  assert.equal(byPoa[0].owner, whale);
+  assert.equal(byPoa[0].count, 2);
+  assert.equal(byPoa[0].amountLabel, "1,800 POA");
+  assert.equal(byPoa[0].avgLabel, "900 POA");
+  assert.equal(byPoa[1].owner, collector);
+  assert.equal(byPoa[1].count, 3);
+  assert.equal(byPoa[1].amountLabel, "300 POA");
+
+  const byDomains = sortLeaderboard(data.buyers, "count");
+  assert.equal(byDomains[0].owner, collector);
+  assert.equal(byDomains[0].count, 3);
+  assert.equal(byDomains[1].owner, whale);
+  assert.equal(byDomains[1].count, 2);
+
+  // Sellers: treasury sold 1 for 1,500 POA; seller sold 1 for 300 POA
+  const sellersByPoa = sortLeaderboard(data.sellers, "volume");
+  assert.equal(sellersByPoa[0].owner, treasury);
+  assert.equal(sellersByPoa[0].amountLabel, "1,500 POA");
+  assert.equal(sellersByPoa[1].owner, seller);
+  assert.equal(sellersByPoa[1].amountLabel, "300 POA");
+});
+
+test("computeExplorerMarketData computes non-POA registry sales stats cleanly", () => {
+  const state = {
+    time: 1000,
+    names: { orbit: { activeId: "d1" }, nova: { activeId: "d2" } },
+    deeds: {
+      d1: { id: "d1", name: "orbit", owner: "ed25519:buyer1" },
+      d2: { id: "d2", name: "nova", owner: "ed25519:seller1" },
+    },
+    auctions: {
+      a1: { id: "a1", name: "orbit", seller: "ed25519:seller1", status: "finalized", high: { payer: "ed25519:buyer1", amount: "500" } },
+      a2: { id: "a2", name: "nova", seller: "ed25519:seller1", status: "live", high: null },
+    },
+    offers: {
+      o1: { id: "o1", kind: "resale", owner: "ed25519:seller1", parentId: "d2", price: "250", uses: 1, maxUses: 2, cancelled: false, validUntil: 2000 },
+    },
+    receipts: {
+      r1: { status: "succeeded", signer: "ed25519:buyer2", result: { offerId: "o1", deedId: "d2" } },
+    },
+  };
+  const data = computeExplorerMarketData({ state, escrowMarket: [], cap: { revision: "local-dev" } });
+  assert.equal(data.isPoa, false);
+  assert.equal(data.marketSalesCount, 2);
+  assert.equal(data.topSale?.name, "orbit");
+  assert.equal(data.openAuctionCount, 1);
+  assert.equal(data.activeFixedCount, 1);
+  assert.equal(sortLeaderboard(data.sellers, "volume")[0].count, 2);
+  assert.equal(sortLeaderboard(data.buyers, "volume")[0].owner, "ed25519:buyer1");
 });
