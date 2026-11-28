@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=b75d3a7b6e0f" />
+    <link rel="stylesheet" href="/style.css?v=be52b1c301a7" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -27,7 +27,7 @@
     </div>
 
     <div id="recentActions" class="ticker-shell">
-    <div id="liveTicker" class="live-ticker" role="region" aria-label="Recent registry actions" title="Recent actions — click or scroll to view the last 500 actions in Explore" tabindex="0">
+    <div id="liveTicker" class="live-ticker" role="region" aria-label="Recent registry actions" title="Recent actions — click an item to open its domain or account, or scroll to view the last 500 actions in Explore" tabindex="0">
       <div id="liveTickerTrack" class="live-ticker-track">
         <span class="ticker-empty muted">No recent registry actions</span>
       </div>
@@ -72,7 +72,7 @@
           <div id="ideasStrip" class="ideas-strip" role="group" aria-label="Name ideas"></div>
           <p id="ideasStatus" class="ideas-status" role="status" aria-live="polite"></p>
         </div>
-        <div class="search-label"><label id="searchLabel" for="searchInput">Check Availability</label><span id="searchHelp"></span></div>
+        <label id="searchLabel" class="visually-hidden" for="searchInput">Check Availability</label>
         <div class="search-bar">
           <div class="search-combo">
             <span id="searchAutofill" class="search-autofill" aria-hidden="true" hidden></span>
@@ -86,6 +86,7 @@
               aria-controls="searchSuggestions"
               aria-describedby="searchHelpText searchPrivacy"
             />
+            <span id="searchHelp"></span>
           </div>
           <button id="searchBtn" type="button">Check</button>
           <ul id="searchSuggestions" class="search-suggestions" role="listbox" aria-label="Search results and suggested names" hidden></ul>
@@ -497,6 +498,6 @@
       </details>
     </div>
 
-    <script type="module" src="/app.js?v=0faa1d6560e6"></script>
+    <script type="module" src="/app.js?v=967395abc779"></script>
   </body>
 </html>
