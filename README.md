@@ -25,6 +25,16 @@ Permanent text and Unicode 17 emoji domain names, public profiles, and agent-fir
 
 ---
 
+## Wait Time Telemetry
+
+The explorer footer shows a live **`Wait Time:`** metric (in minutes) directly below **`Domains Served:`**, computed from completed purchase and sale telemetry returned by `GET /v1/escrow/market` (`telemetry.waitTime`):
+
+- **Purchase time:** Measured from the buyer's on-chain POA deposit transfer timestamp (falling back to deposit intent time) to domain issuance (`issueFromTreasury` new-name mints and `buy-sub` subnames). Active checkout sessions are matched up to 24 hours for a deposit's first spend (and 30 minutes for multi-name batch reuse) so idle pre-funded balances spent days later do not skew the average.
+- **Sale time:** Measured for completed fixed-price listings (from payment reserved/paid) and won auctions (from auction close) until final settlement (`Payment and title complete`).
+- **Rolling average & privacy:** Pools up to the **50 most recent completed purchases** and **50 most recent completed sales**, averages their completion durations, and displays whole minutes (`< 1 Minute`, `1 Minute`, `N Minutes`, or `—` when no samples exist). Hovering shows the purchase vs. sale breakdown. Only aggregate counts and averages are exposed—never wallet addresses, transaction IDs, or private journal rows.
+
+---
+
 ## Quick Start (Local Development)
 
 Requires **Node.js `22.15+`** (tested on Node 24) and `curl`.

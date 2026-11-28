@@ -5,7 +5,7 @@ import { sign } from 'node:crypto';
 import { canonical } from '../../src/core.js';
 import { base58 } from '../../src/native-crypto.js';
 import { Escrow, invariant } from '../escrow.js';
-import { publicCommand, accountView, marketView } from '../escrow-public.js';
+import { publicCommand, accountView, marketView, waitTimeTelemetry } from '../escrow-public.js';
 import { escrowHttp } from '../escrow-http.js';
 import { MemoryJournal, MockNetwork, policy, signer, who, key, command, depositBody } from './escrow-fixture.js';
 const packet=(actor:number,action:string,params:Record<string,unknown>,id='public-1',changes={})=>{const c={...command(who(actor),id,action,params),expires:1800001800,...changes};return JSON.stringify({command:c,signature:base58(sign(null,Buffer.from(canonical(c)),key(actor)))});};
@@ -131,4 +131,87 @@ test('display readiness backs off 15s on ESCROW_STALE / ESCROW_NODE_HTTP / ESCRO
  const h3=await e.escrow.readiness();assert.equal(h3.held,true);assert.equal(h3.code,'ESCROW_PROTOCOL_CHANGED');assert.equal(probes,4);
  e.net.now+=14999;assert.equal((await e.escrow.readiness()).code,'ESCROW_PROTOCOL_CHANGED');assert.equal(probes,4);
  e.net.now+=2;mode='ok';assert.equal((await e.escrow.readiness()).held,false);assert.equal(probes,5);
+});
+test('waitTimeTelemetry computes rolling average purchase and sale completion times without leaking addresses or txids',async()=>{
+ const e=fixture();await e.escrow.pause(false);
+ const empty=waitTimeTelemetry(e.escrow.state(),{treasury:policy.treasury,receipts:{}});
+ assert.equal(empty.totalSamples,0);assert.equal(empty.averageMs,null);assert.equal(empty.averageMinutes,null);
+ assert.equal(empty.purchaseSamples,0);assert.equal(empty.saleSamples,0);
+
+ // Fund buyer who(3) at T0, mint first purchase at T0+6m, batch-mint second at T0+10m,
+ // and spend leftover balance at T0+2h (ignored as stale >30m batch reuse).
+ const t0=e.net.now;
+ await fund(e,3,'50.000000','wt-fund-1');
+ const receipts:Record<string,{signer:string;time:number;status:string;result:Record<string,unknown>}>={
+  r1:{signer:who(3),time:Math.floor((t0+6*60_000)/1000),status:'succeeded',result:{deedId:'d1',owner:who(3)}},
+  r2:{signer:who(3),time:Math.floor((t0+10*60_000)/1000),status:'succeeded',result:{deedId:'d2',owner:who(3)}},
+  r3:{signer:who(3),time:Math.floor((t0+120*60_000)/1000),status:'succeeded',result:{deedId:'d3',owner:who(3)}},
+  // Treasury seed and seller-signed transfer receipts must never count as buyer purchases.
+  rT:{signer:policy.treasury,time:Math.floor((t0+2*60_000)/1000),status:'succeeded',result:{deedId:'dT',owner:policy.treasury}},
+  rXfer:{signer:who(2),time:Math.floor((t0+4*60_000)/1000),status:'succeeded',result:{deedId:'dX',owner:who(3)}},
+ };
+ const t1=t0+30*60_000;
+ e.net.now=t1;
+ await fund(e,4,'20.000000','wt-fund-2');
+ const s2=e.escrow.state();
+ s2.subListings={
+  sub1:{
+   id:'sub1',parent:'root',parentDeedId:'dp',ownerVersion:1,seller:who(2),price:'1000000',status:'OPEN',createdAt:t0,
+   sold:[{name:'a.root',buyer:who(4),at:t1+8*60_000,payments:['p1']}],
+  },
+ };
+ s2.auctions={
+  aFixed:{
+   id:'aFixed',name:'pizza',seller:who(2),reserve:'1000000',kind:'fixed',closes:t0+1000,quiet:3600000,high:{payer:who(3),amount:'1000000'},status:'COMPLETE',
+   history:[
+    {event:'Listed for POA',at:t0},
+    {event:'Purchase paid; automatic settlement queued',at:t0+1000},
+    {event:'Payment and title complete',at:t0+1000+14*60_000},
+   ],
+  },
+  aAuc:{
+   id:'aAuc',name:'ai',seller:who(2),reserve:'1000000',kind:'auction',closes:t0+5000,quiet:3600000,high:{payer:who(4),amount:'1000000'},status:'COMPLETE',
+   history:[
+    {event:'Auction started (first bid)',at:t0},
+    {event:'Payment and title complete',at:t0+5000+26*60_000},
+   ],
+  },
+  aOpen:{
+   id:'aOpen',name:'open',seller:who(2),reserve:'1000000',kind:'fixed',closes:0,quiet:3600000,high:null,status:'OPEN',
+   history:[{event:'Listed for POA',at:t0}],
+  },
+ };
+ const wt=waitTimeTelemetry(s2,{treasury:policy.treasury,receipts});
+ // Purchases: 6m, 10m, 8m -> avg 8m, count 3. Sales: 14m, 26m -> avg 20m, count 2. Combined: (6+10+8+14+26)/5 = 12.8m.
+ assert.equal(wt.purchaseSamples,3);
+ assert.equal(wt.purchaseAverageMinutes,8);
+ assert.equal(wt.saleSamples,2);
+ assert.equal(wt.saleAverageMinutes,20);
+ assert.equal(wt.totalSamples,5);
+ assert.equal(wt.averageMinutes,12.8);
+ assert.equal(wt.windowPerType,50);
+ // Verify rolling window keeps only the 50 most recent sales (drops an old 500-min outlier).
+ const sWindow=e.escrow.state();
+ sWindow.auctions={
+  oldSlow:{
+   id:'oldSlow',name:'old',seller:who(2),reserve:'1000000',kind:'fixed',closes:t0,quiet:3600000,high:{payer:who(3),amount:'1000000'},status:'COMPLETE',
+   history:[{event:'Purchase paid; automatic settlement queued',at:t0},{event:'Payment and title complete',at:t0+500*60_000}],
+  },
+ };
+ for(let i=0;i<50;i++){
+  const base=t0+1000*60_000+i*10_000;
+  sWindow.auctions['fast-'+i]={
+   id:'fast-'+i,name:'f'+i,seller:who(2),reserve:'1000000',kind:'fixed',closes:base,quiet:3600000,high:{payer:who(3),amount:'1000000'},status:'COMPLETE',
+   history:[{event:'Purchase paid; automatic settlement queued',at:base},{event:'Payment and title complete',at:base+2*60_000}],
+  };
+ }
+ const wtWin=waitTimeTelemetry(sWindow,{treasury:policy.treasury,receipts:{}});
+ assert.equal(wtWin.saleSamples,50);
+ assert.equal(wtWin.saleAverageMinutes,2);
+ assert.equal(wtWin.averageMinutes,2);
+ // Zero sensitive data leakage in serialized telemetry.
+ const serialized=JSON.stringify(wt);
+ assert.ok(!serialized.includes('poa1'));
+ assert.ok(!serialized.includes(who(3)));
+ assert.ok(!serialized.includes(who(4)));
 });
