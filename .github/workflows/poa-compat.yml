@@ -30,7 +30,7 @@ jobs:
       # and its auto-merge triggers main CI + worker-gated-production deploy.
       - id: app
         if: ${{ vars.POA_COMPAT_APP_ID != '' }}
-        uses: actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b # v2.1.1
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
           app-id: ${{ vars.POA_COMPAT_APP_ID }}
           private-key: ${{ secrets.POA_COMPAT_APP_PRIVATE_KEY }}
