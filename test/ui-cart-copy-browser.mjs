@@ -3557,12 +3557,56 @@ try {
       "https://maximusmaximus.github.io/poa-domains/",
     );
 
-    // 5) On desktop (1280px), mobile cart scrim is hidden
+    // 5) On desktop (1280px), corner cart scrim remains visible behind the floating cart button and extends past it
     await pagePol.setViewportSize({ width: 1280, height: 800 });
-    assert.equal(
-      await pagePol.evaluate(() => getComputedStyle(document.querySelector(".floating-cart-scrim")).display),
-      "none",
-    );
+    const desktopScrim = await pagePol.evaluate(() => {
+      const scrim = document.querySelector(".floating-cart-scrim");
+      const btn = document.getElementById("floatingCartBtn");
+      const sr = scrim?.getBoundingClientRect();
+      const br = btn?.getBoundingClientRect();
+      return {
+        display: scrim ? getComputedStyle(scrim).display : null,
+        scrimW: sr?.width ?? 0,
+        btnRightEdgeFromCorner: br ? window.innerWidth - br.left : 0,
+      };
+    });
+    assert.equal(desktopScrim.display, "block");
+    assert.ok(desktopScrim.scrimW > desktopScrim.btnRightEdgeFromCorner + 10, `desktop scrim (${desktopScrim.scrimW}px) should extend past circular cart button (${desktopScrim.btnRightEdgeFromCorner}px)`);
+
+    // 6) Large /v1/state history (>256 entries) loads cleanly, and floating cart icon pops up on first domain search and expands on click
+    const prevHist = h.payload.history;
+    h.payload.history = Array.from({ length: 320 }, (_, i) => ({
+      sequence: i + 1,
+      time: 1795800000 + i,
+      intentId: String(i).padStart(64, "0"),
+      requestId: `bulk-hist-${i}`,
+      action: "issueFromTreasury",
+      name: "ai",
+      parent: null,
+      deedId: "tile-d-ai",
+      actor: tileOwner,
+      recipient: tileOwner,
+      amount: "100000000",
+      asset: "POA",
+      isPoaMicros: true,
+    }));
+    try {
+      await pagePol.goto(h.url);
+      await pagePol.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+      await expect(pagePol.locator("#registryError")).toBeHidden();
+      await expect(pagePol.locator("#floatingCartBtn")).toBeHidden();
+      await pagePol.locator("#searchInput").fill("ai");
+      await pagePol.locator("#searchBtn").click();
+      await expect(pagePol.locator("#floatingCartBtn")).toBeVisible();
+      assert.equal(await pagePol.evaluate(() => getComputedStyle(document.querySelector(".floating-cart-scrim")).display), "block");
+      await pagePol.locator("#floatingCartBtn").click();
+      await expect(pagePol.locator("#floatingCartPanel")).toBeVisible();
+      await pagePol.locator("#floatingCartClose").click();
+      await expect(pagePol.locator("#floatingCartPanel")).toBeHidden();
+      await expect(pagePol.locator("#floatingCartBtn")).toBeVisible();
+    } finally {
+      h.payload.history = prevHist;
+    }
 
     assert.deepEqual(polErrors, []);
     await ctxPol.close();
