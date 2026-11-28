@@ -1,17 +1,17 @@
-import { installHelp } from "./ui-help.js?v=0509a4048c73";
-import { wireManagement } from "./ui-manage.js?v=0509a4048c73";
-import { bindTabKeys } from "./ui-a11y.js?v=0509a4048c73";
-import { applySiteTitle, closeDetail, renderAuctions, setAuctionTab, wireExploreTabs } from "./ui-render.js?v=0509a4048c73";
-import { ui } from "./ui-state.js?v=0509a4048c73";
-import { canonical, digest, dismissNetworkBanner, instructions, isPoaAddress, loadBidderAddress, loadCart, loadKnownOwner, loadTabSeen, makeBody, parsePublicJSON, recheckCartItem, resolveOwnerInput, saveBidderAddress, shouldHoldTransactions } from "./shared.js?v=0509a4048c73";
-import { activeUserAddress, navigateHome, notifyOwnerChanged, openAdvanced, openPoa, restoreViewFromURL, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=0509a4048c73";
-import { el, endpointBase } from "./ui-core.js?v=0509a4048c73";
-import { clearHandoff, copyDomainListingPrompt, copySubnameListing, isTermsGateOpen, setFeedbackModalOpen, wireFeedbackModal, wireTermsGate } from "./ui-handoff.js?v=0509a4048c73";
-import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=0509a4048c73";
-import { submitSearchQuery, wireSearchAutocomplete } from "./ui-search.js?v=0509a4048c73";
-import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=0509a4048c73";
-import { copyText, flashCopied, selectElementText } from "./ui-copy.js?v=0509a4048c73";
-import { cartCopyBlocked, downloadCartJSON, clearAllCart, persistCart, renderCart, renderCurrentCartHandoff, setFloatingCartOpen } from "./ui-cart.js?v=0509a4048c73";
+import { installHelp } from "./ui-help.js?v=e37fe42f0724";
+import { wireManagement } from "./ui-manage.js?v=e37fe42f0724";
+import { bindTabKeys } from "./ui-a11y.js?v=e37fe42f0724";
+import { applySiteTitle, closeDetail, renderAuctions, setAuctionTab, wireExploreTabs } from "./ui-render.js?v=e37fe42f0724";
+import { ui } from "./ui-state.js?v=e37fe42f0724";
+import { canonical, digest, dismissNetworkBanner, instructions, isPoaAddress, loadBidderAddress, loadCart, loadKnownOwner, loadTabSeen, makeBody, parsePublicJSON, recheckCartItem, resolveOwnerInput, saveBidderAddress, shouldHoldTransactions } from "./shared.js?v=e37fe42f0724";
+import { activeUserAddress, navigateHome, notifyOwnerChanged, openAdvanced, openPoa, restoreViewFromURL, setSectionTab, syncEscrowPayerAddress } from "./ui-router.js?v=e37fe42f0724";
+import { el, endpointBase } from "./ui-core.js?v=e37fe42f0724";
+import { clearHandoff, copyDomainListingPrompt, copySubnameListing, isTermsGateOpen, setFeedbackModalOpen, wireFeedbackModal, wireTermsGate } from "./ui-handoff.js?v=e37fe42f0724";
+import { loadRegistry, pageStatus, refreshRegistry, renderNetworkStatus, updateFreshness } from "./ui-poll.js?v=e37fe42f0724";
+import { submitSearchQuery, wireSearchAutocomplete } from "./ui-search.js?v=e37fe42f0724";
+import { renderIdeas, updateIdeaContext } from "./ui-ideas.js?v=e37fe42f0724";
+import { copyText, flashCopied, selectElementText } from "./ui-copy.js?v=e37fe42f0724";
+import { cartCopyBlocked, cartPauseState, downloadCartJSON, clearAllCart, persistCart, renderCart, renderCurrentCartHandoff, setFloatingCartOpen } from "./ui-cart.js?v=e37fe42f0724";
 try {
  ui.statusPanelDismissed = false; // New page visits show status; closing lasts for this page only.
  applySiteTitle();
@@ -84,10 +84,6 @@ try {
  el("clearCart").addEventListener("click", clearAllCart);
  el("downloadCartJSON").addEventListener("click", downloadCartJSON);
  el("copyCartPrompt").addEventListener("click", async () => {
- if (shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level) || ui.networkStatus.hold) {
- el("cartStatus").textContent = "Held ⏸️ until the PoA network is back";
- return;
- }
  if (!ui.cart.length || cartCopyBlocked() || ui.handoffPending || !ui.handoffData)
  return;
  const text = renderCurrentCartHandoff();
@@ -95,7 +91,7 @@ try {
  const res = await copyText(text, el("cartPrompt"));
  if (res.ok) {
  flashCopied(el("copyCartPrompt"));
- el("cartStatus").textContent = "✅ Copied";
+ el("cartStatus").textContent = cartPauseState().paused ? "✅ Copied — tells agent to run when unpaused" : "✅ Copied";
  el("cartStatus").dataset.copiedFor = String(ui.cart.length);
  } else {
  el("cartStatus").textContent = res.selected ? "📋 Press Ctrl/Cmd+C to copy the selected prompt." : "📋 Copy from the prompt box above.";
@@ -113,10 +109,6 @@ try {
  el("floatingCartClear").addEventListener("click", clearAllCart);
  el("floatingDownloadCartJSON")?.addEventListener("click", downloadCartJSON);
  el("copyCheckoutBtn").addEventListener("click", async () => {
- if (shouldHoldTransactions(ui.networkStatus.lastKnown === true ? "checking" : ui.networkStatus.level) || ui.networkStatus.hold) {
- el("floatingCartStatus").textContent = "Held ⏸️ until the PoA network is back";
- return;
- }
  if (!ui.cart.length || !ui.cap || cartCopyBlocked() || ui.handoffPending || !ui.handoffData)
  return;
  const text = renderCurrentCartHandoff();
@@ -125,7 +117,7 @@ try {
  if (fp) { fp.textContent = text; fp.hidden = false; }
  if (res.ok) {
  flashCopied(el("copyCheckoutBtn"));
- el("floatingCartStatus").textContent = "✅ Request copied — nothing sent";
+ el("floatingCartStatus").textContent = cartPauseState().paused ? "✅ Copied — tells agent to run when unpaused" : "✅ Request copied — nothing sent";
  } else {
  if (fp) selectElementText(fp);
  el("floatingCartStatus").textContent = "📋 Press Ctrl/Cmd+C to copy the selected request.";

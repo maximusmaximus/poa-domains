@@ -520,7 +520,7 @@ export function cartParamsForSigner(item, signer) {
  return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
- validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=0509a4048c73";
+ validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=e37fe42f0724";
 const b58Alphabet =
  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -2439,6 +2439,30 @@ export function formatWaitTimeTooltip(waitTime) {
   parts.push(`Sales: ${fmtShort(waitTime.saleAverageMs)} (${waitTime.saleSamples})`);
  }
  return parts.join(" · ");
+}
+export function buildCartPauseNotice({ networkHeld = false, networkLevel = "", escrowHeld = false, escrowReason = "", registryReadFailed = false, waitTime = null, endpoint = "" } = {}) {
+ if (!networkHeld && !escrowHeld && !registryReadFailed) return null;
+ const reasons = [];
+ if (escrowHeld) reasons.push(escrowReason || "POA checkout temporarily paused");
+ if (networkHeld) reasons.push(`PoA network is ${networkLevel || "down"} (writes held)`);
+ if (registryReadFailed) reasons.push("registry refresh temporarily unavailable");
+ const origin = String(endpoint || "").replace(/\/+$/, "");
+ const capsUrl = origin ? `${origin}/v1/escrow/capabilities` : "/v1/escrow/capabilities";
+ const netUrl = origin ? `${origin}/v1/network-status` : "/v1/network-status";
+ const hasTelemetry = Boolean(waitTime && waitTime.totalSamples > 0 && Number.isFinite(waitTime.averageMs) && waitTime.averageMs >= 0);
+ const waitLabel = hasTelemetry ? formatWaitTimeMinutes(waitTime) : "";
+ const waitMins = hasTelemetry ? Math.max(1, Math.round(waitTime.averageMs / 60000)) : null;
+ const checkBackMin = waitMins === null ? 2 : Math.min(15, Math.max(2, Math.round(waitMins / 4)));
+ const breakdown = hasTelemetry ? formatWaitTimeTooltip(waitTime) : "";
+ const telemetryLine = hasTelemetry
+  ? `Telemetry check-back stat: Latest Wait Time is ${waitLabel} (${breakdown}). Check back in ~${checkBackMin} min (poll every 2 min until unpaused; once open, expect ~${waitLabel} average completion).`
+  : "Telemetry check-back stat: No completed Wait Time samples yet. Check back in ~2–5 min (poll every 2 min until unpaused).";
+ return [
+  "⏸️ CHECKOUT TEMPORARILY PAUSED — QUEUE & RUN WHEN IT UNPAUSES",
+  `Status: ${reasons.join("; ")}. Checkout is expected to unpause soon.`,
+  `Agent instruction: Do NOT send POA or submit writes while paused. Wait and poll ${capsUrl} and ${netUrl} until held === false, paused === false, and level !== "down", then re-verify availability/prices and run the steps below automatically.`,
+  telemetryLine,
+ ].join("\n");
 }
 export const TERMS_DOMAIN = "poa-domains.terms.v1";
 export const TERMS_VERSION = "2026-11-24.v1";
