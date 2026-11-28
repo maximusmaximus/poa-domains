@@ -869,3 +869,17 @@ test("spinning logo emoji intro markup and CSS animation invariants", () => {
   assert.match(css, /\.site-intro\.is-opening \.site-intro-stage\{transform:scale\(11\);opacity:0\}/);
   assert.match(css, /\.site-intro\{display:none\}/);
 });
+
+test("footer FAQ | DOCS link, Wait Time info button slot, mobile cart corner scrim, and FAQ pricing/fees", () => {
+  const html = readFileSync(new URL("../reference-web/index.html", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../reference-web/style.css", import.meta.url), "utf8");
+  const webHtml = readFileSync(new URL("../web/index.html", import.meta.url), "utf8");
+  assert.match(html, /<span>FAQ \| DOCS<\/span>/);
+  assert.match(html, /id="waitTimeInfoSlot"/);
+  assert.match(html, /<div class="floating-cart-scrim" aria-hidden="true"><\/div>/);
+  assert.match(css, /\.floating-cart-scrim\{display:block;position:fixed;right:0;bottom:0;width:6rem;height:6rem;z-index:49;pointer-events:none;background:radial-gradient\(circle closest-side at 100% 100%,#000 0,#000d 45%,#0000\)\}/);
+  assert.match(webHtml, /How much does a domain cost, and what are the fees\?/);
+  assert.match(webHtml, /2\.5% \(250 bps\)/);
+  assert.match(webHtml, /100 POA/);
+  assert.match(webHtml, /1,000 POA/);
+});
