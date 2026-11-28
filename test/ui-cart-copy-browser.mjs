@@ -2314,8 +2314,12 @@ try {
     const searchGeom = await pageGeom.evaluate(() => {
       const inp = document.getElementById("searchInput");
       const btn = document.getElementById("searchBtn");
+      const info = document.getElementById("help-searchSection");
+      const lbl = document.getElementById("searchLabel");
       const ir = inp.getBoundingClientRect();
       const br = btn.getBoundingClientRect();
+      const hr = info.getBoundingClientRect();
+      const lr = lbl.getBoundingClientRect();
       const is = getComputedStyle(inp);
       const bs = getComputedStyle(btn);
       return {
@@ -2326,10 +2330,14 @@ try {
         rBR: is.borderBottomRightRadius,
         rTL: bs.borderTopLeftRadius,
         rBL: bs.borderBottomLeftRadius,
+        labelHidden: lr.width <= 1 && lr.height <= 1,
+        infoInsideInput: hr.left > ir.left && hr.right < ir.right && hr.top > ir.top && hr.bottom < ir.bottom,
+        infoBeforeBtn: hr.right < br.left && br.left - hr.right >= 4,
       };
     });
     assert.ok(searchGeom.gapX <= 1 && searchGeom.diffTop <= 1 && searchGeom.diffHeight <= 1, `Main search input & button must connect inline (${vp.name}): ${JSON.stringify(searchGeom)}`);
     assert.deepEqual([searchGeom.rTR, searchGeom.rBR, searchGeom.rTL, searchGeom.rBL], ["0px", "0px", "0px", "0px"], `Connected seam must have square edges (${vp.name}): ${JSON.stringify(searchGeom)}`);
+    assert.ok(searchGeom.labelHidden && searchGeom.infoInsideInput && searchGeom.infoBeforeBtn, `Check Availability label must be hidden and info icon positioned far-right inside search input before search button (${vp.name}): ${JSON.stringify(searchGeom)}`);
 
     // 2) Auctions tab (Current live auction + Upcoming queued auction)
     await pageGeom.locator("#tabAuctions").click();
@@ -2718,8 +2726,9 @@ try {
     const liveDeedId = "ticker-deed-live-116";
     h.payload.state.deeds[liveDeedId] = { id: liveDeedId, name: "brandnewlive", owner: peerOwner, parentId: null, retired: false, version: 1, ownerVersion: 1, rights: { kind: "permanent" }, records: [], metadata: [] };
     h.payload.state.names.brandnewlive = { name: "brandnewlive", key: "brandnewlive", activeId: liveDeedId, auctionId: null };
+    h.payload.state.receipts["tr-117"] = { intentId: "tr-117", sequence: 1117, time: baseSec + 1190, status: "succeeded", signer: peerOwner, result: { primaryName: null } };
     h.payload.state.receipts["tr-116"] = { intentId: "tr-116", sequence: 1116, time: baseSec + 1200, status: "succeeded", result: { deedId: liveDeedId, owner: peerOwner } };
-    h.payload.state.sequence = 1116;
+    h.payload.state.sequence = 1117;
     h.payload.state.time = baseSec + 1200;
     h.payload.observedServerTime = baseSec + 1200;
     await expect(pageTicker.locator("#liveTickerTrack .ticker-chip").first()).toContainText("brandnewlive", { timeout: 9000 });
@@ -2731,8 +2740,22 @@ try {
       return cs.maskImage || cs.webkitMaskImage || "";
     });
     assert.match(tickerMask, /linear-gradient.*(?:transparent|rgba\(0,\s*0,\s*0,\s*0\))/i, `Expected left/right gradient fade mask on #liveTicker, got ${tickerMask}`);
-    // Clicking #liveTicker opens Explore -> Last 500 Actions nicely grouped by day with filters
-    await pageTicker.locator("#liveTickerTrack .ticker-chip").first().click();
+    // Clicking a domain-related chip navigates to that domain page (/d/<name>)
+    await pageTicker.locator('#liveTickerTrack .ticker-chip[data-target-kind="domain"]').first().click();
+    await expect(pageTicker.locator("#domainMain")).toBeVisible();
+    await expect(pageTicker.locator("#domainTitle")).toContainText("brandnewlive");
+    assert.equal(new URL(pageTicker.url()).pathname, "/d/brandnewlive");
+    // Clicking an account-related chip navigates to that account's Owner Profile (/p/<owner>)
+    const acctChip = pageTicker.locator('#liveTickerTrack .ticker-chip[data-target-kind="owner"]').first();
+    await expect(acctChip).toBeVisible();
+    await acctChip.click();
+    await expect(pageTicker.locator("#ownerMain")).toBeVisible();
+    assert.ok(new URL(pageTicker.url()).pathname.startsWith("/p/"), `Expected /p/ route for account chip, got ${pageTicker.url()}`);
+    // Return home and verify pressing Enter on #liveTicker opens Explore -> Last 500 Actions nicely grouped by day with filters
+    await pageTicker.locator("header").click();
+    await expect(pageTicker.locator("#homeMain")).toBeVisible();
+    await pageTicker.locator("#liveTicker").focus();
+    await pageTicker.keyboard.press("Enter");
     await expect(pageTicker.locator("#tabExplore")).toHaveAttribute("aria-selected", "true");
     await expect(pageTicker.locator("#exploreTabActions")).toHaveAttribute("aria-selected", "true");
     await expect(pageTicker.locator("#explorePanelActions")).toBeVisible();

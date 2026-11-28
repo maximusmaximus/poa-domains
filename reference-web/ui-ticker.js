@@ -1,5 +1,5 @@
-import { autoScroll, itemStep } from "./ui-motion.js?v=0faa1d6560e6";
-import { isPoaAuctionAwaitingFirstBid, poaShort, shapeLiveActions } from "./shared.js?v=0faa1d6560e6";
+import { autoScroll, itemStep } from "./ui-motion.js?v=967395abc779";
+import { isPoaAuctionAwaitingFirstBid, poaShort, primaryNameForOwner, shapeLiveActions } from "./shared.js?v=967395abc779";
 export const MAX_RECENT_ACTIONS=100;
 export const MAX_EXPLORE_ACTIONS=500;
 const toMs=ts=>{const n=Number(ts);return!Number.isFinite(n)||n<=0?0:n<1e12?n*1000:n;};
@@ -72,14 +72,15 @@ export function recentActions(state,escrowMarket=[],limit=MAX_RECENT_ACTIONS){
  const cap=Number.isInteger(limit)&&limit>0?limit:MAX_RECENT_ACTIONS;
  return merged.slice(0,cap);
 }
-let signature="",topActionId="",scrollCount=0,openAllHandler=null;
+let signature="",topActionId="",scrollCount=0,openAllHandler=null,targetHandler=null;
 const wiredStrips=new WeakSet();
-export function drawTicker(state,escrowMarket=[],onOpenAll=null){
+export function drawTicker(state,escrowMarket=[],onOpenAll=null,onSelectTarget=null){
  const strip=document.getElementById("liveTicker"),track=document.getElementById("liveTickerTrack"),items=recentActions(state,escrowMarket),key=JSON.stringify(items),active=document.activeElement;
  if(onOpenAll)openAllHandler=onOpenAll;
+ if(onSelectTarget)targetHandler=onSelectTarget;
  if(strip&&!wiredStrips.has(strip)){
   wiredStrips.add(strip);
-  strip.addEventListener("click",e=>{if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();scrollCount=0;openAllHandler?.();});
+  strip.addEventListener("click",e=>{if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;const chip=e.target?.closest?.(".ticker-chip[data-target-kind]");e.preventDefault();scrollCount=0;if(chip&&targetHandler){targetHandler({kind:chip.dataset.targetKind,value:chip.dataset.targetValue});return;}openAllHandler?.();});
   strip.addEventListener("keydown",e=>{if(e.target===strip&&(e.key==="Enter"||e.key===" ")){e.preventDefault();scrollCount=0;openAllHandler?.();}});
  }
  if(!strip||!track||key===signature||Boolean(active&&track?.contains(active)&&active.matches?.(":focus-visible")))return;
@@ -88,18 +89,25 @@ export function drawTicker(state,escrowMarket=[],onOpenAll=null){
  document.getElementById("recentActions").classList.toggle("is-empty",!items.length);
  if(!items.length){const e=document.createElement("span");e.className="ticker-empty muted";e.textContent="No recent registry actions";track.append(e);return;}
  for(const item of items){
-  const chip=document.createElement(item.name?"a":"span");
+  const targetOwner=!item.name?(item.actor||item.recipient||""):"";
+  const chip=document.createElement(item.name||targetOwner?"a":"span");
   chip.className=item.kind?.startsWith("escrow-")?"ticker-chip ticker-chip-auction":"ticker-chip";
   chip.dataset.actionId=item.id;chip.draggable=false;
   const label=String(item.label).replace(/settled/g,"recorded").replace(/ · live · /g," · registry auction · ");
   if(item.name){
    chip.href="/d/"+encodeURIComponent(item.name);
+   chip.dataset.targetKind="domain";chip.dataset.targetValue=item.name;
    const sep=label.indexOf(" · "+item.name),at=sep>=0?sep+3:label.indexOf(item.name);
    chip.append(document.createTextNode(at<0?"":label.slice(0,at)));
    const name=document.createElement("span"),activeId=state?.names?.[item.name]?.activeId;
    name.className=activeId&&state?.deeds?.[activeId]&&!state.deeds[activeId].retired?"domain-name domain-tile-inline is-registered":"domain-name";
    name.textContent=item.name;
    chip.append(name,document.createTextNode(at<0?" · "+label:label.slice(at+item.name.length)));
+  }else if(targetOwner){
+   const slug=primaryNameForOwner(state,targetOwner)||targetOwner;
+   chip.href="/p/"+encodeURIComponent(slug);
+   chip.dataset.targetKind="owner";chip.dataset.targetValue=slug;
+   chip.textContent=label;
   }else chip.textContent=label;
   track.append(chip);
  }
