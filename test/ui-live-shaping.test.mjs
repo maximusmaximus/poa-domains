@@ -19,6 +19,8 @@ import {
   partitionAuctions,
   shapeLiveActions,
   historyForTarget,
+  safeObject,
+  parsePublicJSON,
   buildAgentCheckoutHandoff,
   loadCart,
   saveCart,
@@ -885,11 +887,33 @@ test("footer FAQ | DOCS link, Wait Time info button slot, mobile cart corner scr
   assert.match(html, /id="waitTimeSr"/);
   assert.match(html, /id="footerCreditDivider" class="footer-divider"/);
   assert.match(html, /<div class="floating-cart-scrim" aria-hidden="true"><\/div>/);
-  assert.match(css, /\.floating-cart-scrim\{display:block;position:fixed;right:0;bottom:0;width:6rem;height:6rem;z-index:49;pointer-events:none;background:radial-gradient\(circle closest-side at 100% 100%,#000 0,#000d 45%,#0000\)\}/);
+  assert.match(css, /\.floating-cart-scrim\{position:fixed;right:0;bottom:0;width:6\.8rem;height:6\.8rem;z-index:49;pointer-events:none;background:radial-gradient\(circle closest-side at 100% 100%,#000 0,#000d 45%,#0000\)\}/);
+  assert.match(css, /@media\(max-width:600px\)\{\.floating-cart-scrim\{width:6rem;height:6rem\}/);
   assert.match(webHtml, /How much does a domain cost, and what are the fees\?/);
   assert.match(webHtml, /2\.5% \(250 bps\)/);
   assert.match(webHtml, /100 POA/);
   assert.match(webHtml, /1,000 POA/);
+});
+
+test("safeObject accepts large /v1/state history arrays (>256) while parsePublicJSON keeps strict 256-element cap", () => {
+  const largeHistory = Array.from({ length: 600 }, (_, i) => ({
+    sequence: i + 1,
+    time: 1795800000 + i,
+    intentId: String(i).padStart(64, "0"),
+    requestId: `req-${i}`,
+    action: "issueFromTreasury",
+    name: `name${i}`,
+    parent: null,
+    deedId: String(i + 1).padStart(64, "a"),
+    actor: "poa12XVYtPngbDsm1igG9GPeWPXAHDFTZ1bBLuSwhjqBrQ5U",
+    recipient: "poa12XVYtPngbDsm1igG9GPeWPXAHDFTZ1bBLuSwhjqBrQ5U",
+    amount: "100000000",
+    asset: "POA",
+    isPoaMicros: true,
+  }));
+  assert.doesNotThrow(() => safeObject({ state: { sequence: 600 }, history: largeHistory }));
+  assert.throws(() => safeObject({ privateKey: "nope" }), /Secret or unsafe field/);
+  assert.throws(() => parsePublicJSON("[" + "0,".repeat(256) + "0]"), /Size/);
 });
 
 test("historyForTarget merges journal-derived history and escrow lifecycle without bogus receipt labels", () => {
