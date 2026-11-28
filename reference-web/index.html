@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=8f5a332666f0" />
+    <link rel="stylesheet" href="/style.css?v=90139be24273" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -158,6 +158,7 @@
         <div id="stats" class="stats"></div>
         <div class="explore-tabs" role="tablist" aria-label="Explore sections">
           <button type="button" class="explore-tab is-active" role="tab" aria-selected="true" data-explore-tab="names" id="exploreTabNames" aria-controls="explorePanelNames" tabindex="0">🏷️ Names</button>
+          <button type="button" class="explore-tab" role="tab" aria-selected="false" data-explore-tab="leaderboard" id="exploreTabLeaderboard" aria-controls="explorePanelLeaderboard" tabindex="-1">🏆 Leaderboard</button>
           <button type="button" class="explore-tab" role="tab" aria-selected="false" data-explore-tab="actions" id="exploreTabActions" aria-controls="explorePanelActions" tabindex="-1">⚡ Last 500 Actions</button>
           <button type="button" class="explore-tab" role="tab" aria-selected="false" data-explore-tab="offers" id="exploreTabOffers" aria-controls="explorePanelOffers" tabindex="-1">🤝 Offers</button>
           <button type="button" class="explore-tab" role="tab" aria-selected="false" data-explore-tab="history" id="exploreTabHistory" aria-controls="explorePanelHistory" tabindex="-1">📜 History</button>
@@ -168,6 +169,16 @@
         <div id="explorePanelNames" class="explore-panel" data-explore-panel="names" role="tabpanel" aria-labelledby="exploreTabNames">
           <h3>🏷️ Registered Names</h3>
           <div id="names" class="cards"></div>
+        </div>
+        <div id="explorePanelLeaderboard" class="explore-panel" data-explore-panel="leaderboard" role="tabpanel" aria-labelledby="exploreTabLeaderboard" hidden>
+          <div class="explore-panel-head">
+            <h3>🏆 Leaderboard</h3>
+            <div id="leaderboardSort" class="actions-filters" role="group" aria-label="Sort leaderboard">
+              <button type="button" class="action-filter is-active" data-lb-sort="volume" aria-pressed="true">💰 By POA</button>
+              <button type="button" class="action-filter" data-lb-sort="count" aria-pressed="false">🏷️ By Domains</button>
+            </div>
+          </div>
+          <div id="leaderboard" class="cards"></div>
         </div>
         <div id="explorePanelActions" class="explore-panel" data-explore-panel="actions" role="tabpanel" aria-labelledby="exploreTabActions" hidden>
           <div class="explore-panel-head">
@@ -503,6 +514,6 @@
       </details>
     </div>
 
-    <script type="module" src="/app.js?v=e37fe42f0724"></script>
+    <script type="module" src="/app.js?v=ed5254dbdbf4"></script>
   </body>
 </html>

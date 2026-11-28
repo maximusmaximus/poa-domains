@@ -10,7 +10,7 @@ test("every main, auction and explore tab has a unique explicit panel, labelled 
   const tabs = [...html.matchAll(/<button[^>]*role="tab"[^>]*>/g)].map(
     (x) => x[0],
   );
-  assert.equal(tabs.length, 15);
+  assert.equal(tabs.length, 16);
   assert.equal(tabs.filter((x) => x.includes('tabindex="0"')).length, 3);
   assert.ok(!html.includes('id="tabHandoff"'));
   assert.ok(html.includes('id="advancedLink"'));
