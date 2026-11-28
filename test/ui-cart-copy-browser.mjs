@@ -949,12 +949,47 @@ try {
     });
   });
 
+  await pageFooter.route("**/v1/escrow/market", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        items: [],
+        telemetry: {
+          waitTime: {
+            averageMs: 20 * 60_000,
+            averageMinutes: 20,
+            purchaseAverageMs: 5 * 60_000,
+            purchaseAverageMinutes: 5,
+            purchaseSamples: 6,
+            saleAverageMs: 35 * 60_000,
+            saleAverageMinutes: 35,
+            saleSamples: 6,
+            totalSamples: 12,
+            windowPerType: 50,
+          },
+        },
+        serverTime: Date.now(),
+      }),
+    });
+  });
+
   await pageFooter.goto(h.url + "/");
   await pageFooter.waitForFunction(() => document.body.dataset.registryStatus === "ready");
   await pageFooter.locator("#termsAgreeBtn").click();
-  await expect(pageFooter.locator("#domainsServedFooter")).toContainText("Number of Domains Served:");
+  await expect(pageFooter.locator("#domainsServedFooter")).toContainText("Domains Served:");
+  await expect(pageFooter.locator("#domainsServedFooter")).not.toContainText("Number of");
   await expect(pageFooter.locator("#domainsServedCount")).toHaveText("0️⃣0️⃣0️⃣0️⃣0️⃣5️⃣");
   await expect(pageFooter.locator("#domainsServedSr")).toHaveText("5");
+  await expect(pageFooter.locator("#waitTimeFooter")).toContainText("Wait Time:");
+  await expect(pageFooter.locator("#waitTimeValue")).toHaveText("20 Minutes");
+  await expect(pageFooter.locator("#waitTimeFooter")).toHaveAttribute("title", /Purchases: 5 min \(6\).*Sales: 35 min \(6\)/);
+  await expect(pageFooter.locator("#siteFooter .footer-divider")).toBeVisible();
+  const waitBox = await pageFooter.locator("#waitTimeFooter").boundingBox();
+  const servedBox = await pageFooter.locator("#domainsServedFooter").boundingBox();
+  const divBox = await pageFooter.locator("#siteFooter .footer-divider").boundingBox();
+  assert.ok(waitBox && servedBox && divBox && waitBox.y >= servedBox.y + servedBox.height - 1, "Wait Time must sit below Domains Served");
+  assert.ok(divBox.y >= waitBox.y + waitBox.height - 1, "Footer divider must sit below Wait Time");
   await expect(pageFooter.locator("#treasuryTotal")).toHaveText("🪙 201 POA");
   await expect(pageFooter.locator("#poascanHomeLink")).toHaveCount(0);
   await expect(pageFooter.locator('#treasuryFooter a[href="https://poascan.io/"]')).toHaveCount(0);

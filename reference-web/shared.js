@@ -520,7 +520,7 @@ export function cartParamsForSigner(item, signer) {
  return params;
 }
 export { buildAgentCartHandoff, buildAgentCartPrompt, buildAgentCheckoutHandoff, renderAgentCartHandoff,
- validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=967395abc779";
+ validateAgentCartHandoff, AGENT_CART_SCHEMA, buildPoaCheckoutHandoff, renderPoaCheckoutHandoff } from "./agent-cart.js?v=0509a4048c73";
 const b58Alphabet =
  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function validPrincipal(s) {
@@ -2359,6 +2359,86 @@ const EMOJI_DIGITS = ["0\uFE0F\u20E3", "1\uFE0F\u20E3", "2\uFE0F\u20E3", "3\uFE0
 export function formatEmojiCounter(count, digits = 6) {
  const n = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
  return String(n).padStart(digits, "0").replace(/[0-9]/g, (d) => EMOJI_DIGITS[Number(d)]);
+}
+const CLIENT_WAIT_WINDOW = 50;
+const CLIENT_MAX_SALE_MS = 7 * 24 * 60 * 60 * 1000;
+export function computeClientWaitTime(escrowMarket) {
+ const rows = [];
+ for (const a of Array.isArray(escrowMarket) ? escrowMarket : []) {
+  if (!a || a.status !== "COMPLETE") continue;
+  const history = Array.isArray(a.history) ? a.history : [];
+  let doneMs = null;
+  for (let i = history.length - 1; i >= 0; i--) {
+   const h = history[i];
+   if (h && typeof h.event === "string" && /complete/i.test(h.event) && Number.isFinite(h.at) && h.at > 0) {
+    doneMs = h.at;
+    break;
+   }
+  }
+  if (doneMs === null) continue;
+  let startMs = null;
+  if (a.kind === "fixed") {
+   const buyEv = history.find((h) => h && typeof h.event === "string" && /Purchase paid|Purchase reserved/i.test(h.event) && Number.isFinite(h.at) && h.at > 0);
+   startMs = buyEv?.at ?? (Number.isFinite(a.closes) && a.closes > 0 ? a.closes : null);
+  } else {
+   startMs = Number.isFinite(a.closes) && a.closes > 0 ? a.closes : null;
+  }
+  if (startMs === null || doneMs < startMs) continue;
+  const durationMs = doneMs - startMs;
+  if (durationMs <= CLIENT_MAX_SALE_MS) rows.push({ doneMs, durationMs });
+ }
+ rows.sort((a, b) => a.doneMs - b.doneMs);
+ const recent = rows.slice(-CLIENT_WAIT_WINDOW).map((r) => r.durationMs);
+ const averageMs = recent.length ? Math.round(recent.reduce((sum, v) => sum + v, 0) / recent.length) : null;
+ const averageMinutes = averageMs === null ? null : Math.round((averageMs / 60000) * 10) / 10;
+ return {
+  averageMs,
+  averageMinutes,
+  purchaseAverageMs: null,
+  purchaseAverageMinutes: null,
+  purchaseSamples: 0,
+  saleAverageMs: averageMs,
+  saleAverageMinutes: averageMinutes,
+  saleSamples: recent.length,
+  totalSamples: recent.length,
+  windowPerType: CLIENT_WAIT_WINDOW,
+ };
+}
+export function resolveWaitTimeTelemetry({ serverTelemetry = null, escrowMarket = null } = {}) {
+ if (
+  serverTelemetry &&
+  typeof serverTelemetry === "object" &&
+  Number.isInteger(serverTelemetry.totalSamples) &&
+  serverTelemetry.totalSamples >= 0 &&
+  (serverTelemetry.averageMs === null || (Number.isFinite(serverTelemetry.averageMs) && serverTelemetry.averageMs >= 0))
+ ) {
+  return serverTelemetry;
+ }
+ return computeClientWaitTime(escrowMarket);
+}
+export function formatWaitTimeMinutes(waitTime) {
+ if (!waitTime || !(waitTime.totalSamples > 0) || !Number.isFinite(waitTime.averageMs) || waitTime.averageMs < 0) return "—";
+ const mins = Math.round(waitTime.averageMs / 60000);
+ if (mins < 1) return "< 1 Minute";
+ if (mins === 1) return "1 Minute";
+ return `${mins} Minutes`;
+}
+export function formatWaitTimeTooltip(waitTime) {
+ if (!waitTime || !(waitTime.totalSamples > 0) || !Number.isFinite(waitTime.averageMs)) {
+  return "Average purchase and sale completion time from live escrow telemetry.";
+ }
+ const fmtShort = (ms) => {
+  const m = Math.round(ms / 60000);
+  return m < 1 ? "< 1 min" : `${m} min`;
+ };
+ const parts = [`Average completion time across ${waitTime.totalSamples} recent ${waitTime.totalSamples === 1 ? "transaction" : "transactions"}`];
+ if (waitTime.purchaseSamples > 0 && Number.isFinite(waitTime.purchaseAverageMs)) {
+  parts.push(`Purchases: ${fmtShort(waitTime.purchaseAverageMs)} (${waitTime.purchaseSamples})`);
+ }
+ if (waitTime.saleSamples > 0 && Number.isFinite(waitTime.saleAverageMs)) {
+  parts.push(`Sales: ${fmtShort(waitTime.saleAverageMs)} (${waitTime.saleSamples})`);
+ }
+ return parts.join(" · ");
 }
 export const TERMS_DOMAIN = "poa-domains.terms.v1";
 export const TERMS_VERSION = "2026-11-24.v1";

@@ -33,6 +33,10 @@ import {
   buildListingPrompt,
   tabWatermarks,
   tabHasNew,
+  computeClientWaitTime,
+  resolveWaitTimeTelemetry,
+  formatWaitTimeMinutes,
+  formatWaitTimeTooltip,
   loadTabSeen,
   saveTabSeen,
   TAB_SEEN_KEY,
@@ -342,6 +346,11 @@ test("home HTML: skip link first, one-row tabs, ideas strip, footer links, no to
   const footer = html.slice(html.indexOf('id="siteFooter"'));
   assert.ok(footer.includes("https://github.com/maximusmaximus/poa-domains"));
   assert.ok(footer.includes("https://maximusmaximus.github.io/poa-domains/"));
+  assert.ok(footer.includes(">Domains Served:<"));
+  assert.ok(!footer.includes("Number of Domains Served"));
+  assert.ok(footer.includes('id="waitTimeFooter"'));
+  assert.ok(footer.includes('id="waitTimeValue"'));
+  assert.ok(footer.includes('class="footer-divider"'));
   assert.ok(footer.includes('id="advancedLink"'));
   assert.ok(footer.includes(">Advanced</a>"));
   assert.ok(footer.includes("poa12XVYtPngbDsm1igG9GPeWPXAHDFTZ1bBLuSwhjqBrQ5U"));
@@ -358,6 +367,51 @@ test("home HTML: skip link first, one-row tabs, ideas strip, footer links, no to
   assert.match(css, /scrollbar-width:\s*none/);
   assert.ok(!/text-align:\s*justify/.test(css));
   assert.match(css, /\.skip-link:focus/);
+});
+
+test("wait time telemetry formatting, fallback, and tooltip breakdown", () => {
+  assert.equal(formatWaitTimeMinutes(null), "—");
+  assert.equal(formatWaitTimeMinutes({ averageMs: null, totalSamples: 0 }), "—");
+  assert.equal(formatWaitTimeMinutes({ averageMs: 20_000, totalSamples: 1 }), "< 1 Minute");
+  assert.equal(formatWaitTimeMinutes({ averageMs: 60_000, totalSamples: 2 }), "1 Minute");
+  assert.equal(formatWaitTimeMinutes({ averageMs: 20 * 60_000, totalSamples: 5 }), "20 Minutes");
+  const server = {
+    averageMs: 20 * 60_000,
+    averageMinutes: 20,
+    purchaseAverageMs: 4 * 60_000,
+    purchaseAverageMinutes: 4,
+    purchaseSamples: 10,
+    saleAverageMs: 36 * 60_000,
+    saleAverageMinutes: 36,
+    saleSamples: 10,
+    totalSamples: 20,
+    windowPerType: 50,
+  };
+  assert.deepEqual(resolveWaitTimeTelemetry({ serverTelemetry: server, escrowMarket: [] }), server);
+  assert.match(formatWaitTimeTooltip(server), /20 recent transactions/);
+  assert.match(formatWaitTimeTooltip(server), /Purchases: 4 min \(10\)/);
+  assert.match(formatWaitTimeTooltip(server), /Sales: 36 min \(10\)/);
+  const market = [
+    {
+      kind: "fixed",
+      status: "COMPLETE",
+      closes: 1_000,
+      history: [
+        { event: "Purchase paid; automatic settlement queued", at: 1_000 },
+        { event: "Payment and title complete", at: 1_000 + 4 * 60_000 },
+      ],
+    },
+    {
+      kind: "auction",
+      status: "COMPLETE",
+      closes: 2_000,
+      history: [{ event: "Payment and title complete", at: 2_000 + 16 * 60_000 }],
+    },
+  ];
+  const fallback = computeClientWaitTime(market);
+  assert.equal(fallback.totalSamples, 2);
+  assert.equal(fallback.averageMinutes, 10);
+  assert.equal(formatWaitTimeMinutes(resolveWaitTimeTelemetry({ serverTelemetry: null, escrowMarket: market })), "10 Minutes");
 });
 
 test("domain and owner path helpers round-trip", () => {
