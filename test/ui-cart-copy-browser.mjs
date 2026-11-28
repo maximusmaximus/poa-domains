@@ -1017,14 +1017,20 @@ try {
   await expect(pageFooter.locator("#domainsServedCount")).toHaveText("0️⃣0️⃣0️⃣0️⃣0️⃣5️⃣");
   await expect(pageFooter.locator("#domainsServedSr")).toHaveText("5");
   await expect(pageFooter.locator("#waitTimeFooter")).toContainText("Wait Time:");
-  await expect(pageFooter.locator("#waitTimeValue")).toHaveText("20 Minutes");
+  await expect(pageFooter.locator("#waitTimeValue")).toHaveText("2️⃣0️⃣ Minutes");
+  await expect(pageFooter.locator("#waitTimeSr")).toHaveText("20 Minutes");
   await expect(pageFooter.locator("#waitTimeFooter")).toHaveAttribute("title", /Purchases: 5 min \(6\).*Sales: 35 min \(6\)/);
-  await expect(pageFooter.locator("#siteFooter .footer-divider")).toBeVisible();
+  await expect(pageFooter.locator("#siteFooter .footer-divider").first()).toBeVisible();
+  await expect(pageFooter.locator("#footerCreditDivider")).toBeVisible();
   const waitBox = await pageFooter.locator("#waitTimeFooter").boundingBox();
   const servedBox = await pageFooter.locator("#domainsServedFooter").boundingBox();
-  const divBox = await pageFooter.locator("#siteFooter .footer-divider").boundingBox();
+  const divBox = await pageFooter.locator("#siteFooter .footer-divider").first().boundingBox();
+  const linksBox = await pageFooter.locator("#siteFooter .footer-links").boundingBox();
+  const creditDivBox = await pageFooter.locator("#footerCreditDivider").boundingBox();
+  const creditBox = await pageFooter.locator("#siteFooter .footer-credit").boundingBox();
   assert.ok(waitBox && servedBox && divBox && waitBox.y >= servedBox.y + servedBox.height - 1, "Wait Time must sit below Domains Served");
   assert.ok(divBox.y >= waitBox.y + waitBox.height - 1, "Footer divider must sit below Wait Time");
+  assert.ok(linksBox && creditDivBox && creditBox && creditDivBox.y >= linksBox.y + linksBox.height - 1 && creditBox.y >= creditDivBox.y + creditDivBox.height - 1, "Footer credit divider must sit between links and made-with credit");
   await expect(pageFooter.locator("#treasuryTotal")).toHaveText("🪙 201 POA");
   await expect(pageFooter.locator("#poascanHomeLink")).toHaveCount(0);
   await expect(pageFooter.locator('#treasuryFooter a[href="https://poascan.io/"]')).toHaveCount(0);
@@ -3532,9 +3538,11 @@ try {
     assert.equal(tileCheck.primaryBorder, "1px");
     assert.ok(tileCheck.primaryRadius > 2, "primary domain tile must have rounded-square border radius");
 
-    // 3) Wait Time ℹ️ button sits next to Wait Time value and opens calculation popover with live breakdown
-    await expect(pagePol.locator("#waitTimeValue")).toHaveText("20 Minutes");
+    // 3) Wait Time displays emoji numbers with ℹ️ button right next to it opening calculation popover with live breakdown
+    await expect(pagePol.locator("#waitTimeValue")).toHaveText("2️⃣0️⃣ Minutes");
+    await expect(pagePol.locator("#waitTimeSr")).toHaveText("20 Minutes");
     await expect(pagePol.locator("#help-waitTime")).toBeVisible();
+    await expect(pagePol.locator("#footerCreditDivider")).toBeVisible();
     await pagePol.locator("#help-waitTime").click();
     await expect(pagePol.locator("#info-waitTime")).toBeVisible();
     await expect(pagePol.locator("#info-waitTime")).toContainText("50 most recent purchases");

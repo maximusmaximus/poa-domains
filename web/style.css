@@ -752,6 +752,12 @@ footer {
   margin: 0.65rem 0;
 }
 
+.footer-divider {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 0.85rem auto;
+}
+
 .footer-credit {
   text-align: center;
   font-size: 0.9rem;
