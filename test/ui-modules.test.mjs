@@ -764,6 +764,10 @@ test('owner profile, domain page, ownerLink primary rendering, and Manage main-d
   assert.equal(byId.get('ownerProfile').hidden, false);
   assert.ok(collectText(byId.get('ownerNames')).includes('nebula'));
   assert.ok(collectText(byId.get('ownerListings')).includes('comet'));
+  const saleBadges = findAll(byId.get('ownerNames'), (n) => n.tagName === 'A' && n.classList?.contains('owner-sale-badge'));
+  assert.equal(saleBadges.length, 1);
+  assert.equal(saleBadges[0].textContent, '🏷️');
+  assert.ok(saleBadges[0].title.includes('For sale'));
   const ownerPrincipalLink = findAll(byId.get('ownerPrincipal'), (n) => n.tagName === 'A' && n.classList?.contains('poa-addr-text'))[0];
   assert.equal(ownerPrincipalLink.href, poascanAddressUrl(ownerA));
   assert.equal(ownerPrincipalLink.target, '_blank');
