@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PoA domains</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css?v=021c53d0f25e" />
+    <link rel="stylesheet" href="/style.css?v=14ce80246cac" />
   </head>
   <body>
     <a class="skip-link" href="#homeMain">⏭️ Skip to content</a>
@@ -390,18 +390,20 @@
       <p id="waitTimeFooter" class="wait-time-footer">
         <span class="wait-time-label">Wait Time:</span>
         <strong id="waitTimeValue" class="wait-time-value">—</strong>
+        <span id="waitTimeInfoSlot"></span>
       </p>
       <hr class="footer-divider" aria-hidden="true" />
       <nav class="footer-links" aria-label="Project links">
         <a href="https://github.com/maximusmaximus/poa-domains" rel="noreferrer"><svg class="github-mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg> <span>poa-domains on GitHub</span></a>
-        <a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer" title="Mirror Site — static read-only landing page"><svg class="github-mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg> <span>Mirror Site</span></a>
+        <a href="https://maximusmaximus.github.io/poa-domains/" rel="noreferrer" title="FAQ | DOCS — pricing, fees, documentation, and read-only tools"><svg class="github-mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg> <span>FAQ | DOCS</span></a>
         <a href="/terms" target="_blank" rel="noopener noreferrer">📜 Terms</a>
         <a href="/?tab=handoff" id="advancedLink" title="Advanced agent handoff and unsigned action builder">Advanced</a>
         <button type="button" id="openFeedbackBtn" class="footer-action-btn" aria-haspopup="dialog" aria-controls="feedbackModal">💬 Bug / Feature</button>
       </nav>
-      <p class="footer-credit">made with ❤️ in SF by<br /><span id="footerCreditOwner">poa12XVYtPngbDsm1igG9GPeWPXAHDFTZ1bBLuSwhjqBrQ5U</span> | <span id="footerCreditDomain"><a class="domain-link domain-name" href="/d/maxi">maxi</a></span></p>
+      <p class="footer-credit">made with ❤️ in SF by<br /><span id="footerCreditOwner">poa12XVYtPngbDsm1igG9GPeWPXAHDFTZ1bBLuSwhjqBrQ5U</span> | <span id="footerCreditDomain"><a class="domain-link domain-name domain-tile is-registered" href="/d/maxi">maxi</a></span></p>
     </footer>
 
+    <div class="floating-cart-scrim" aria-hidden="true"></div>
     <button
       type="button"
       id="floatingCartBtn"
@@ -542,6 +544,6 @@
       </details>
     </div>
 
-    <script type="module" src="/app.js?v=ca97c173ecc6"></script>
+    <script type="module" src="/app.js?v=355e2a955d0f"></script>
   </body>
 </html>

@@ -1,6 +1,6 @@
-import { createPoaCopyButton, decorateEmojiButton } from "./ui-copy.js?v=ca97c173ecc6";
-import { buildOwnershipIndex, domainPath, hasPoaSiteActions, isPoaAddress, ownershipConflict, poascanAddressUrl, primaryNameForOwner, safeObject, shortenPoaAddress } from "./shared.js?v=ca97c173ecc6";
-import { ui } from "./ui-state.js?v=ca97c173ecc6";
+import { createPoaCopyButton, decorateEmojiButton } from "./ui-copy.js?v=355e2a955d0f";
+import { buildOwnershipIndex, domainPath, hasPoaSiteActions, isPoaAddress, ownershipConflict, poascanAddressUrl, primaryNameForOwner, safeObject, shortenPoaAddress } from "./shared.js?v=355e2a955d0f";
+import { ui } from "./ui-state.js?v=355e2a955d0f";
 let addressNav = null;
 export function registerAddressNav(nav) { addressNav = nav; }
 export const el = (id) => document.getElementById(id);
@@ -44,7 +44,7 @@ function createPrimaryDomainLink(primary) {
  domLink.title = `Open ${primary} domain page`;
  if (addressNav?.createDomainAvatar) domLink.append(addressNav.createDomainAvatar(primary, { size: "xs" }));
  const nameSpan = document.createElement("span");
- nameSpan.className = "domain-name";
+ nameSpan.className = "domain-name domain-tile is-registered";
  nameSpan.textContent = primary;
  domLink.append(nameSpan);
  domLink.addEventListener("click", (event) => {

@@ -17,10 +17,10 @@ Permanent text and Unicode 17 emoji domain names, public profiles, and agent-fir
 
 ## Highlights
 
-- **Permanent ownership:** Standard root domains (`100 POA`) and premium single-emoji domains (`1,000 POA`) are owned permanently with no renewals or expiry.
+- **Permanent ownership & transparent fees:** Standard root domains (`100 POA`) and premium single-emoji domains (`1,000 POA`) are owned permanently with `0 POA` renewal fees. Secondary resales, POA auctions, and subdomain sales carry a `2.5%` (`250 bps`) protocol fee included in the sale price and deducted from seller proceeds (`0%` extra buyer fee; `0 POA` for transfers, profile updates, listings, bids, and refunds).
 - **Zero-key browser safety:** The browser never handles private keys or signs transactions. Users plan in the cart and copy unsigned prompts/JSON for their agent or local CLI to verify and sign.
 - **Agent-native:** Streamable HTTP MCP at `https://poadomains.link/mcp`, discovery at `llms.txt` / `.well-known/agent.json` / `openapi.json`, and quote → preview → submit flows.
-- **Profiles, subdomains & POA markets:** Custom square avatars, receiving addresses, permanent subdomains, fixed-price resales, and first-bid POA auctions (`>10%` increment, instant outbid credit, automatic zero-handover settlement once purchased or closed).
+- **Profiles, subdomains & POA markets:** Custom square avatars, receiving addresses, permanent subdomains, fixed-price resales, and first-bid POA auctions (`3h` standard timer, `>10%` increment, instant outbid credit, automatic zero-handover settlement once purchased or closed).
 - **Fail-closed boundaries:** Escrow credits require PoA finality (`K = 5` / checkpoint), stale network reads automatically hold checkout, and GitHub Pages runs strictly as a read-only mirror.
 
 ---

@@ -691,12 +691,19 @@ button:disabled {
   border-color: var(--accent);
 }
 
-.faq-list details > p {
+.faq-list details > p,
+.faq-list details > ul {
   margin: 0.7rem 0 0.1rem;
   padding-top: 0.65rem;
   border-top: 1px solid #203544;
   color: var(--muted);
   font-size: 0.94rem;
+}
+
+.faq-list details > ul {
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.45rem;
 }
 
 /* Bottom links & footer */

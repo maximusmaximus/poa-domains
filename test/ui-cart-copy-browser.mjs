@@ -3405,6 +3405,167 @@ try {
     await ctxIntro.close();
   }
 
+  // Mobile cart corner gradient scrim, Wait Time ℹ️ calculation popover, FAQ | DOCS link, and consistent .domain-tile box on primary domains next to profile avatars / POA addresses
+  {
+    const prevDeeds = { ...h.payload.state.deeds };
+    const prevNames = { ...h.payload.state.names };
+    const prevPrimary = { ...(h.payload.state.primaryNames || {}) };
+    const prevMarket = h.escrowMarket;
+    const prevEscrowCap = h.escrowCap;
+    const tileOwner = "poa1" + "2".repeat(31) + "7";
+    h.payload.state.deeds["tile-d-ai"] = {
+      id: "tile-d-ai",
+      name: "ai",
+      owner: tileOwner,
+      parentId: null,
+      retired: false,
+      version: 1,
+      ownerVersion: 1,
+      rights: { kind: "permanent" },
+      records: [{ type: "POA", address: tileOwner }],
+      metadata: [],
+    };
+    h.payload.state.names.ai = { name: "ai", key: "ai", activeId: "tile-d-ai", auctionId: null };
+    h.payload.state.primaryNames = { ...prevPrimary, [tileOwner]: "ai" };
+    h.escrowCap = { ...(prevEscrowCap || {}), enabled: true, held: false };
+    h.escrowMarket = {
+      serverTime: Date.now(),
+      items: [],
+      telemetry: {
+        waitTime: {
+          averageMs: 1200000,
+          averageMinutes: 20,
+          totalSamples: 12,
+          purchaseAverageMs: 300000,
+          purchaseAverageMinutes: 5,
+          purchaseSamples: 6,
+          saleAverageMs: 2100000,
+          saleAverageMinutes: 35,
+          saleSamples: 6,
+        },
+      },
+    };
+
+    const ctxPol = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const pagePol = await ctxPol.newPage();
+    const polErrors = [];
+    pagePol.on("pageerror", (e) => polErrors.push(e.message));
+    await pagePol.route("https://**", (r) => r.abort());
+    await pagePol.route("**/v1/escrow/market", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: [],
+          telemetry: {
+            waitTime: {
+              averageMs: 1200000,
+              averageMinutes: 20,
+              totalSamples: 12,
+              purchaseAverageMs: 300000,
+              purchaseAverageMinutes: 5,
+              purchaseSamples: 6,
+              saleAverageMs: 2100000,
+              saleAverageMinutes: 35,
+              saleSamples: 6,
+            },
+          },
+          serverTime: Date.now(),
+        }),
+      });
+    });
+    await pagePol.goto(`${h.url}/d/ai`);
+    await pagePol.waitForFunction(() => document.body.dataset.registryStatus === "ready");
+    if (await pagePol.locator("#termsAgreeBtn").isVisible()) await pagePol.locator("#termsAgreeBtn").click();
+
+    // 1) Mobile black-to-transparent corner gradient scrim behind floating cart button
+    const scrimInfo = await pagePol.evaluate(() => {
+      const scrim = document.querySelector(".floating-cart-scrim");
+      const btn = document.getElementById("floatingCartBtn");
+      const cs = scrim ? getComputedStyle(scrim) : null;
+      const bs = btn ? getComputedStyle(btn) : null;
+      const sr = scrim?.getBoundingClientRect();
+      const br = btn?.getBoundingClientRect();
+      return {
+        display: cs?.display,
+        position: cs?.position,
+        zIndex: Number(cs?.zIndex),
+        btnZIndex: Number(bs?.zIndex),
+        pointerEvents: cs?.pointerEvents,
+        bg: cs?.backgroundImage,
+        scrimW: sr?.width ?? 0,
+        scrimH: sr?.height ?? 0,
+        btnVisible: btn ? !btn.hidden : false,
+        btnRightEdgeFromCorner: br ? window.innerWidth - br.left : 0,
+        overflowX: document.documentElement.scrollWidth - window.innerWidth,
+      };
+    });
+    assert.equal(scrimInfo.btnVisible, true);
+    assert.equal(scrimInfo.display, "block");
+    assert.equal(scrimInfo.position, "fixed");
+    assert.ok(scrimInfo.zIndex < scrimInfo.btnZIndex, "scrim must sit strictly behind floating cart button");
+    assert.equal(scrimInfo.pointerEvents, "none");
+    assert.match(scrimInfo.bg, /radial-gradient\(.*rgb\(0,\s*0,\s*0\)/);
+    assert.ok(scrimInfo.scrimW > scrimInfo.btnRightEdgeFromCorner + 10, `scrim (${scrimInfo.scrimW}px) should extend past circular cart button (${scrimInfo.btnRightEdgeFromCorner}px)`);
+    assert.equal(scrimInfo.overflowX, 0);
+
+    // 2) Consistent .domain-tile treatment on primary domain next to avatar and root POA address
+    const tileCheck = await pagePol.evaluate(() => {
+      const refTile = document.querySelector("#domainTitle a.domain-tile");
+      const primaryTile = document.querySelector("#domainSection a.owner-primary-link .domain-name");
+      const refCs = refTile ? getComputedStyle(refTile) : null;
+      const priCs = primaryTile ? getComputedStyle(primaryTile) : null;
+      return {
+        hasRef: !!refTile,
+        hasPrimary: !!primaryTile,
+        primaryHasTileClass: primaryTile?.classList.contains("domain-tile") ?? false,
+        primaryBg: priCs?.backgroundImage ?? "",
+        refBg: refCs?.backgroundImage ?? "",
+        primaryBorder: priCs?.borderTopWidth ?? "",
+        primaryRadius: parseFloat(priCs?.borderTopLeftRadius ?? "0"),
+      };
+    });
+    assert.equal(tileCheck.hasRef, true);
+    assert.equal(tileCheck.hasPrimary, true);
+    assert.equal(tileCheck.primaryHasTileClass, true);
+    assert.equal(tileCheck.primaryBg, tileCheck.refBg);
+    assert.equal(tileCheck.primaryBorder, "1px");
+    assert.ok(tileCheck.primaryRadius > 2, "primary domain tile must have rounded-square border radius");
+
+    // 3) Wait Time ℹ️ button sits next to Wait Time value and opens calculation popover with live breakdown
+    await expect(pagePol.locator("#waitTimeValue")).toHaveText("20 Minutes");
+    await expect(pagePol.locator("#help-waitTime")).toBeVisible();
+    await pagePol.locator("#help-waitTime").click();
+    await expect(pagePol.locator("#info-waitTime")).toBeVisible();
+    await expect(pagePol.locator("#info-waitTime")).toContainText("50 most recent purchases");
+    await expect(pagePol.locator("#info-waitTime")).toContainText("50 most recent sales");
+    await expect(pagePol.locator("#info-waitTime")).toContainText("Purchases 5 min (6)");
+    await expect(pagePol.locator("#info-waitTime")).toContainText("Sales 35 min (6)");
+    await pagePol.keyboard.press("Escape");
+
+    // 4) Footer button renamed to FAQ | DOCS
+    await expect(pagePol.getByRole("link", { name: "FAQ | DOCS", exact: true })).toHaveAttribute(
+      "href",
+      "https://maximusmaximus.github.io/poa-domains/",
+    );
+
+    // 5) On desktop (1280px), mobile cart scrim is hidden
+    await pagePol.setViewportSize({ width: 1280, height: 800 });
+    assert.equal(
+      await pagePol.evaluate(() => getComputedStyle(document.querySelector(".floating-cart-scrim")).display),
+      "none",
+    );
+
+    assert.deepEqual(polErrors, []);
+    await ctxPol.close();
+
+    h.payload.state.deeds = prevDeeds;
+    h.payload.state.names = prevNames;
+    h.payload.state.primaryNames = prevPrimary;
+    h.escrowMarket = prevMarket;
+    h.escrowCap = prevEscrowCap;
+  }
+
   console.log("PASS Cart copy regression + full-site UI spacing & alignment audit across desktop (1280) and mobile (390)");
 } finally {
   await h.close();
