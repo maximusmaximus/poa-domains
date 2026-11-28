@@ -2311,6 +2311,25 @@ try {
     await expect(pageGeom.locator("#searchResult .inline-controls")).toBeVisible();
     await expect(pageGeom.locator("#cartList")).toContainText("Raise max bid");
     await auditUiGeometry(pageGeom, `${vp.name}:find-auction-and-cart`);
+    const searchGeom = await pageGeom.evaluate(() => {
+      const inp = document.getElementById("searchInput");
+      const btn = document.getElementById("searchBtn");
+      const ir = inp.getBoundingClientRect();
+      const br = btn.getBoundingClientRect();
+      const is = getComputedStyle(inp);
+      const bs = getComputedStyle(btn);
+      return {
+        gapX: Math.abs(br.left - ir.right),
+        diffTop: Math.abs(br.top - ir.top),
+        diffHeight: Math.abs(br.height - ir.height),
+        rTR: is.borderTopRightRadius,
+        rBR: is.borderBottomRightRadius,
+        rTL: bs.borderTopLeftRadius,
+        rBL: bs.borderBottomLeftRadius,
+      };
+    });
+    assert.ok(searchGeom.gapX <= 1 && searchGeom.diffTop <= 1 && searchGeom.diffHeight <= 1, `Main search input & button must connect inline (${vp.name}): ${JSON.stringify(searchGeom)}`);
+    assert.deepEqual([searchGeom.rTR, searchGeom.rBR, searchGeom.rTL, searchGeom.rBL], ["0px", "0px", "0px", "0px"], `Connected seam must have square edges (${vp.name}): ${JSON.stringify(searchGeom)}`);
 
     // 2) Auctions tab (Current live auction + Upcoming queued auction)
     await pageGeom.locator("#tabAuctions").click();
